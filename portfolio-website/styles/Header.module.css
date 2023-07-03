@@ -1,0 +1,26 @@
+.headerContainer {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+  background-color: #f8f9fa;
+}
+
+.logo {
+  font-size: 1.5em;
+  color: #333;
+  text-decoration: none;
+}
+
+.navLinks {
+  display: flex;
+  gap: 20px;
+}
+
+.navLink {
+  color: #333;
+  text-decoration: none;
+}
+
+.navLink:hover {
+  color: #0070f3;
+}
