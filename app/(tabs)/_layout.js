@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
 import { colors } from '../../lib/theme';
+import { MODULES } from '../../lib/modules';
 
 function TabIcon({ emoji, label, focused }) {
   return (
@@ -29,14 +30,10 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen name="vandaag" options={{
-        tabBarIcon: ({ focused }) => <TabIcon emoji="☀️" label="Vandaag" focused={focused} /> }} />
-      <Tabs.Screen name="taken" options={{
-        tabBarIcon: ({ focused }) => <TabIcon emoji="✅" label="Taken" focused={focused} /> }} />
-      <Tabs.Screen name="boodschappen" options={{
-        tabBarIcon: ({ focused }) => <TabIcon emoji="🛒" label="Boodschappen" focused={focused} /> }} />
-      <Tabs.Screen name="huishouden" options={{
-        tabBarIcon: ({ focused }) => <TabIcon emoji="🏡" label="Huishouden" focused={focused} /> }} />
+      {MODULES.map((m) => (
+        <Tabs.Screen key={m.key} name={m.route} options={{
+          tabBarIcon: ({ focused }) => <TabIcon emoji={m.emoji} label={m.label} focused={focused} /> }} />
+      ))}
     </Tabs>
   );
 }

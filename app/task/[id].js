@@ -13,6 +13,8 @@ import { Field, Button, Chip, Avatar } from '../../lib/ui';
 import { colors, radius, type, categoryMeta } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
+import { VisibilityPicker } from '../../lib/VisibilityPicker';
+import { visibilityPayload, validateVisibility } from '../../lib/visibility';
 
 const WEEKDAYS = [
   { d: 1, l: 'Ma' }, { d: 2, l: 'Di' }, { d: 3, l: 'Wo' }, { d: 4, l: 'Do' },
@@ -77,12 +79,8 @@ export default function TaskEditor() {
   const save = async () => {
     if (!title.trim()) { Alert.alert('Geef de taak een titel'); return; }
     if (freq && !dueDate) { Alert.alert('Kies een startdatum', 'Een terugkerende taak heeft een datum nodig.'); return; }
-    if (visibility === VISIBILITY.SUBGROUP && !shareSubgroupId) {
-      Alert.alert('Kies een groep', 'Selecteer met welke groep je dit deelt.'); return;
-    }
-    if (visibility === VISIBILITY.CUSTOM && shareWith.length === 0) {
-      Alert.alert('Kies personen', 'Selecteer met wie je dit deelt, of kies het hele huishouden.'); return;
-    }
+    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
+    if (visError) { Alert.alert('Delen met', visError); return; }
     setBusy(true);
     const payload = {
       title: title.trim(),
@@ -93,9 +91,7 @@ export default function TaskEditor() {
       recur_freq: freq,
       recur_interval: freq ? interval : 1,
       recur_weekdays: freq === RECUR.WEEKLY && weekdays.length ? weekdays : null,
-      visibility,
-      share_subgroup_id: visibility === VISIBILITY.SUBGROUP ? shareSubgroupId : null,
-      share_with: visibility === VISIBILITY.CUSTOM ? shareWith : null,
+      ...visibilityPayload({ visibility, shareSubgroupId, shareWith }),
     };
     try {
       if (isNew) await addTask(payload);
@@ -172,66 +168,12 @@ export default function TaskEditor() {
           </ScrollView>
 
           {/* Delen met */}
-          <Text style={[type.label, { marginBottom: 8 }]}>Delen met</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            <Chip label="🏡 Hele huishouden" active={visibility === VISIBILITY.HOUSEHOLD}
-              onPress={() => setVisibility(VISIBILITY.HOUSEHOLD)} />
-            {subgroups.length > 0 && (
-              <Chip label="👥 Een groep" active={visibility === VISIBILITY.SUBGROUP}
-                onPress={() => setVisibility(VISIBILITY.SUBGROUP)} />
-            )}
-            <Chip label="✓ Kies personen" active={visibility === VISIBILITY.CUSTOM}
-              onPress={() => setVisibility(VISIBILITY.CUSTOM)} />
-          </View>
-
-          {visibility === VISIBILITY.HOUSEHOLD && (
-            <Text style={[type.caption, { marginBottom: 18 }]}>
-              Iedereen in {''}
-              <Text style={{ fontWeight: '700' }}>het huishouden</Text> ziet dit. Dit is de standaard.
-            </Text>
-          )}
-
-          {visibility === VISIBILITY.SUBGROUP && (
-            <View style={{ marginBottom: 18 }}>
-              {subgroups.length === 0 ? (
-                <Text style={[type.caption]}>
-                  Je hebt nog geen groepen. Maak er een aan bij Huishouden → Groepen.
-                </Text>
-              ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {subgroups.map((g) => (
-                    <Chip key={g.id} label={`${g.emoji} ${g.name}`}
-                      active={shareSubgroupId === g.id}
-                      onPress={() => setShareSubgroupId(g.id)} />
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-
-          {visibility === VISIBILITY.CUSTOM && (
-            <View style={{ marginBottom: 18 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {members.map((m) => {
-                  const on = shareWith.includes(m.id);
-                  return (
-                    <TouchableOpacity key={m.id} onPress={() => toggleShareWith(m.id)}
-                      style={{ alignItems: 'center', marginRight: 14, opacity: on ? 1 : 0.45 }}>
-                      <View style={{ borderWidth: 2, borderRadius: 26, borderColor: on ? colors.forest : 'transparent' }}>
-                        <Avatar emoji={m.avatar_emoji} name={m.display_name} size={48} />
-                      </View>
-                      <Text style={[type.caption, { marginTop: 4 }]} numberOfLines={1}>
-                        {m.display_name?.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <Text style={[type.caption, { marginTop: 6 }]}>
-                Jij ziet je eigen taak altijd, ook als je jezelf niet aantikt.
-              </Text>
-            </View>
-          )}
+          <VisibilityPicker
+            visibility={visibility} onChangeVisibility={setVisibility}
+            shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
+            shareWith={shareWith} onToggleMember={toggleShareWith}
+            subgroups={subgroups} members={members}
+          />
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: 8 }]}>Wanneer?</Text>

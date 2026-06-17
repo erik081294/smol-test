@@ -1,62 +1,31 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, RefreshControl, Platform } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, RefreshControl, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-import { useHousehold } from '../../lib/household';
-import { useAuth } from '../../lib/auth';
+import { useGroceries } from '../../lib/useGroceries';
 import { Empty } from '../../lib/ui';
 import { colors, radius, type } from '../../lib/theme';
-import { run } from '../../lib/db';
 
 export default function Boodschappen() {
-  const { activeId } = useHousehold();
-  const { user } = useAuth();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, clearChecked } = useGroceries();
   const [text, setText] = useState('');
-
-  const load = useCallback(async () => {
-    if (!activeId) { setItems([]); setLoading(false); return; }
-    const data = await run(
-      supabase
-        .from('groceries').select('*')
-        .eq('household_id', activeId)
-        .order('checked', { ascending: true })
-        .order('created_at', { ascending: false }),
-      { fallback: [], context: 'boodschappen laden' }
-    );
-    setItems(data ?? []);
-    setLoading(false);
-  }, [activeId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    const ch = supabase.channel(`groceries:${activeId}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'groceries', filter: `household_id=eq.${activeId}` },
-        () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [activeId, load]);
 
   const add = async () => {
     const name = text.trim();
     if (!name) return;
     setText('');
-    await supabase.from('groceries').insert({
-      household_id: activeId, name, added_by: user.id,
-    });
+    try { await addItem(name); } catch (e) { Alert.alert('Kon niet toevoegen', e.message); }
   };
 
-  const toggle = async (item) =>
-    supabase.from('groceries').update({ checked: !item.checked }).eq('id', item.id);
+  const toggle = async (item) => {
+    try { await toggleItem(item); } catch (e) { Alert.alert('Mislukt', e.message); }
+  };
 
-  const remove = async (id) => supabase.from('groceries').delete().eq('id', id);
+  const remove = async (id) => {
+    try { await removeItem(id); } catch (e) { Alert.alert('Kon niet verwijderen', e.message); }
+  };
 
-  const clearChecked = async () => {
-    await supabase.from('groceries').delete().eq('household_id', activeId).eq('checked', true);
+  const onClearChecked = async () => {
+    try { await clearChecked(); } catch (e) { Alert.alert('Mislukt', e.message); }
   };
 
   const checkedCount = useMemo(() => items.filter((i) => i.checked).length, [items]);
