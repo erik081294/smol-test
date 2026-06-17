@@ -9,10 +9,13 @@ import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
-import { Field, Button, Chip, Avatar } from '../../lib/ui';
-import { colors, radius, type, categoryMeta } from '../../lib/theme';
+import { Field, Button, Chip, Avatar, Row, Stepper, ModalHeader } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
+import { colors, radius, type, categoryMeta, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
+import { VisibilityPicker } from '../../lib/VisibilityPicker';
+import { visibilityPayload, validateVisibility } from '../../lib/visibility';
 
 const WEEKDAYS = [
   { d: 1, l: 'Ma' }, { d: 2, l: 'Di' }, { d: 3, l: 'Wo' }, { d: 4, l: 'Do' },
@@ -20,7 +23,7 @@ const WEEKDAYS = [
 ];
 
 export default function TaskEditor() {
-  const { id } = useLocalSearchParams();
+  const { id, date } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
   const { addTask, updateTask, deleteTask } = useTasks();
@@ -31,7 +34,7 @@ export default function TaskEditor() {
   const [notes, setNotes] = useState('');
   const [category, setCategory] = useState('klus');
   const [assignedTo, setAssignedTo] = useState(null);
-  const [dueDate, setDueDate] = useState(null);   // Date | null
+  const [dueDate, setDueDate] = useState(date ? new Date(date + 'T00:00:00') : null);   // Date | null
   const [freq, setFreq] = useState(null);          // null|daily|weekly|monthly
   const [interval, setIntervalN] = useState(1);
   const [weekdays, setWeekdays] = useState([]);
@@ -71,18 +74,25 @@ export default function TaskEditor() {
   const toggleWeekday = (d) =>
     setWeekdays((w) => (w.includes(d) ? w.filter((x) => x !== d) : [...w, d]));
 
+  // Eenheid achter "Elke N …", afhankelijk van de frequentie en het aantal.
+  const unitLabel = (n) => {
+    if (freq === RECUR.DAILY) return n === 1 ? 'dag' : 'dagen';
+    if (freq === RECUR.MONTHLY) return n === 1 ? 'maand' : 'maanden';
+    return n === 1 ? 'week' : 'weken';
+  };
+  // Boven dit aantal heeft een interval weinig zin; houdt de stepper behapbaar.
+  const intervalMax = freq === RECUR.DAILY ? 90 : freq === RECUR.MONTHLY ? 24 : 52;
+  // "Elke N weken" geldt alleen als er géén specifieke weekdagen zijn gekozen.
+  const showInterval = freq && !(freq === RECUR.WEEKLY && weekdays.length > 0);
+
   const toggleShareWith = (pid) =>
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
 
   const save = async () => {
     if (!title.trim()) { Alert.alert('Geef de taak een titel'); return; }
     if (freq && !dueDate) { Alert.alert('Kies een startdatum', 'Een terugkerende taak heeft een datum nodig.'); return; }
-    if (visibility === VISIBILITY.SUBGROUP && !shareSubgroupId) {
-      Alert.alert('Kies een groep', 'Selecteer met welke groep je dit deelt.'); return;
-    }
-    if (visibility === VISIBILITY.CUSTOM && shareWith.length === 0) {
-      Alert.alert('Kies personen', 'Selecteer met wie je dit deelt, of kies het hele huishouden.'); return;
-    }
+    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
+    if (visError) { Alert.alert('Delen met', visError); return; }
     setBusy(true);
     const payload = {
       title: title.trim(),
@@ -91,11 +101,9 @@ export default function TaskEditor() {
       assigned_to: assignedTo,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       recur_freq: freq,
-      recur_interval: freq ? interval : 1,
+      recur_interval: freq && !(freq === RECUR.WEEKLY && weekdays.length) ? interval : 1,
       recur_weekdays: freq === RECUR.WEEKLY && weekdays.length ? weekdays : null,
-      visibility,
-      share_subgroup_id: visibility === VISIBILITY.SUBGROUP ? shareSubgroupId : null,
-      share_with: visibility === VISIBILITY.CUSTOM ? shareWith : null,
+      ...visibilityPayload({ visibility, shareSubgroupId, shareWith }),
     };
     try {
       if (isNew) await addTask(payload);
@@ -119,15 +127,12 @@ export default function TaskEditor() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-            <Text style={{ fontSize: 16, color: colors.inkSoft, fontWeight: '600' }}>Annuleer</Text>
-          </TouchableOpacity>
-          <Text style={[type.title]}>{isNew ? 'Nieuwe taak' : 'Taak bewerken'}</Text>
-          <TouchableOpacity onPress={save} hitSlop={10} disabled={busy}>
-            <Text style={{ fontSize: 16, color: colors.forest, fontWeight: '800' }}>Bewaar</Text>
-          </TouchableOpacity>
-        </View>
+        <ModalHeader
+          title={isNew ? 'Nieuwe taak' : 'Taak bewerken'}
+          onClose={() => router.back()}
+          onConfirm={save}
+          busy={busy}
+        />
 
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           <Field label="Wat moet er gebeuren?" value={title} onChangeText={setTitle}
@@ -137,7 +142,7 @@ export default function TaskEditor() {
           <Text style={[type.label, { marginBottom: 8 }]}>Categorie</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
             {Object.entries(categoryMeta).map(([k, m]) => (
-              <Chip key={k} label={`${m.emoji} ${m.label}`} active={category === k}
+              <Chip key={k} icon={m.icon} label={m.label} active={category === k}
                 color={m.color} onPress={() => setCategory(k)} />
             ))}
           </View>
@@ -154,7 +159,7 @@ export default function TaskEditor() {
                 alignItems: 'center', justifyContent: 'center',
                 borderWidth: 2, borderColor: assignedTo === null ? colors.forest : 'transparent',
               }}>
-                <Text style={{ fontSize: 20 }}>👥</Text>
+                <Icon name="group" size={22} color={colors.forest} />
               </View>
               <Text style={[type.caption, { marginTop: 4 }]}>Iedereen</Text>
             </TouchableOpacity>
@@ -172,66 +177,12 @@ export default function TaskEditor() {
           </ScrollView>
 
           {/* Delen met */}
-          <Text style={[type.label, { marginBottom: 8 }]}>Delen met</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            <Chip label="🏡 Hele huishouden" active={visibility === VISIBILITY.HOUSEHOLD}
-              onPress={() => setVisibility(VISIBILITY.HOUSEHOLD)} />
-            {subgroups.length > 0 && (
-              <Chip label="👥 Een groep" active={visibility === VISIBILITY.SUBGROUP}
-                onPress={() => setVisibility(VISIBILITY.SUBGROUP)} />
-            )}
-            <Chip label="✓ Kies personen" active={visibility === VISIBILITY.CUSTOM}
-              onPress={() => setVisibility(VISIBILITY.CUSTOM)} />
-          </View>
-
-          {visibility === VISIBILITY.HOUSEHOLD && (
-            <Text style={[type.caption, { marginBottom: 18 }]}>
-              Iedereen in {''}
-              <Text style={{ fontWeight: '700' }}>het huishouden</Text> ziet dit. Dit is de standaard.
-            </Text>
-          )}
-
-          {visibility === VISIBILITY.SUBGROUP && (
-            <View style={{ marginBottom: 18 }}>
-              {subgroups.length === 0 ? (
-                <Text style={[type.caption]}>
-                  Je hebt nog geen groepen. Maak er een aan bij Huishouden → Groepen.
-                </Text>
-              ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {subgroups.map((g) => (
-                    <Chip key={g.id} label={`${g.emoji} ${g.name}`}
-                      active={shareSubgroupId === g.id}
-                      onPress={() => setShareSubgroupId(g.id)} />
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-
-          {visibility === VISIBILITY.CUSTOM && (
-            <View style={{ marginBottom: 18 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {members.map((m) => {
-                  const on = shareWith.includes(m.id);
-                  return (
-                    <TouchableOpacity key={m.id} onPress={() => toggleShareWith(m.id)}
-                      style={{ alignItems: 'center', marginRight: 14, opacity: on ? 1 : 0.45 }}>
-                      <View style={{ borderWidth: 2, borderRadius: 26, borderColor: on ? colors.forest : 'transparent' }}>
-                        <Avatar emoji={m.avatar_emoji} name={m.display_name} size={48} />
-                      </View>
-                      <Text style={[type.caption, { marginTop: 4 }]} numberOfLines={1}>
-                        {m.display_name?.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <Text style={[type.caption, { marginTop: 6 }]}>
-                Jij ziet je eigen taak altijd, ook als je jezelf niet aantikt.
-              </Text>
-            </View>
-          )}
+          <VisibilityPicker
+            visibility={visibility} onChangeVisibility={setVisibility}
+            shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
+            shareWith={shareWith} onToggleMember={toggleShareWith}
+            subgroups={subgroups} members={members}
+          />
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: 8 }]}>Wanneer?</Text>
@@ -258,28 +209,51 @@ export default function TaskEditor() {
                 <Chip label="Maandelijks" active={freq === RECUR.MONTHLY} onPress={() => setFreq(RECUR.MONTHLY)} />
               </View>
 
+              {/* Interval: "Elke N dagen/weken/maanden" */}
+              {showInterval && (
+                <Row gap={space.md} style={{ marginTop: 12 }}>
+                  <Text style={type.body}>Elke</Text>
+                  <Stepper
+                    value={interval}
+                    onChange={setIntervalN}
+                    min={1}
+                    max={intervalMax}
+                    accessibilityLabel={`Elke ${interval} ${unitLabel(interval)}`}
+                  />
+                  <Text style={type.body}>{unitLabel(interval)}</Text>
+                </Row>
+              )}
+
               {freq === RECUR.WEEKLY && (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-                  {WEEKDAYS.map((w) => (
-                    <TouchableOpacity key={w.d} onPress={() => toggleWeekday(w.d)}
-                      style={{
-                        width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: weekdays.includes(w.d) ? colors.forest : colors.surface,
-                        borderWidth: 1.5, borderColor: weekdays.includes(w.d) ? colors.forest : colors.line,
-                      }}>
-                      <Text style={{ color: weekdays.includes(w.d) ? '#fff' : colors.inkSoft, fontWeight: '700', fontSize: 13 }}>
-                        {w.l}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <>
+                  <Text style={[type.caption, { marginTop: 12, marginBottom: 6 }]}>
+                    Of kies vaste dagen (dan vervalt het wekeninterval):
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {WEEKDAYS.map((w) => (
+                      <TouchableOpacity key={w.d} onPress={() => toggleWeekday(w.d)}
+                        style={{
+                          width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: weekdays.includes(w.d) ? colors.forest : colors.surface,
+                          borderWidth: 1.5, borderColor: weekdays.includes(w.d) ? colors.forest : colors.line,
+                        }}>
+                        <Text style={{ color: weekdays.includes(w.d) ? '#fff' : colors.inkSoft, fontWeight: '700', fontSize: 13 }}>
+                          {w.l}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
               )}
 
               {freq && (
-                <Text style={[type.caption, { marginTop: 10 }]}>
-                  🔁 {recurrenceLabel({ recur_freq: freq, recur_interval: interval, recur_weekdays: weekdays })}
-                  {'  ·  '}Bij afvinken verschijnt automatisch de volgende keer.
-                </Text>
+                <Row gap={space.xs} align="center" style={{ marginTop: 10 }}>
+                  <Icon name="repeat" size={14} color={colors.inkSoft} />
+                  <Text style={[type.caption, { flex: 1 }]}>
+                    {recurrenceLabel({ recur_freq: freq, recur_interval: interval, recur_weekdays: weekdays })}
+                    {'  ·  '}Bij afvinken verschijnt automatisch de volgende keer.
+                  </Text>
+                </Row>
               )}
             </>
           )}
@@ -313,15 +287,15 @@ function DateStepper({ date, onChange }) {
       borderColor: colors.line, padding: 8, marginTop: 4,
     }}>
       <TouchableOpacity onPress={() => onChange(addDays(date, -1))} hitSlop={10}
-        style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-        <Text style={{ fontSize: 22, color: colors.forest }}>‹</Text>
+        accessibilityLabel="Dag eerder" style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+        <Icon name="back" size={22} color={colors.forest} />
       </TouchableOpacity>
       <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
         {format(date, 'EEEE d MMMM', { locale: nl })}
       </Text>
       <TouchableOpacity onPress={() => onChange(addDays(date, 1))} hitSlop={10}
-        style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-        <Text style={{ fontSize: 22, color: colors.forest }}>›</Text>
+        accessibilityLabel="Dag later" style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+        <Icon name="forward" size={22} color={colors.forest} />
       </TouchableOpacity>
     </View>
   );

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { isConfigured } from '../../lib/supabase';
 import { Button, Field } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
 import { colors, type } from '../../lib/theme';
 
 export default function Welcome() {
@@ -44,7 +45,7 @@ export default function Welcome() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 28, justifyContent: 'center' }}>
           {/* Merk */}
           <View style={{ marginBottom: 36 }}>
-            <Text style={{ fontSize: 52 }}>🏡</Text>
+            <Icon name="home" size={52} color={colors.ocher} weight="fill" />
             <Text style={{ fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: -1, marginTop: 8 }}>
               Huishoek
             </Text>

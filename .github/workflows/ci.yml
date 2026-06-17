@@ -1,0 +1,31 @@
+name: CI
+
+# Draait de unit-tests bij elke push en PR. De RLS-integratietests slaan
+# zichzelf over zolang er geen Supabase-secrets zijn ingesteld (zie hieronder),
+# zodat de build niet faalt op forks of zonder gekoppeld testproject.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tests
+        run: npm test
+        env:
+          # Optioneel: zet deze repo-secrets om óók de RLS-integratietests te
+          # draaien tegen een test-/staging-Supabase-project. Leeg => tests skippen.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

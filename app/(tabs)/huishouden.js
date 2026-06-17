@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Share, Platform, Modal, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Share, Platform, Modal, KeyboardAvoidingView, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { Card, Button, Avatar, Field, Chip } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
 import { colors, radius, type } from '../../lib/theme';
+import { TOGGLEABLE_MODULES } from '../../lib/modules';
 
 export default function HuishoudenTab() {
   const { active, households, members, subgroups, selectHousehold, leaveHousehold,
-          createSubgroup, updateSubgroupMembers, deleteSubgroup } = useHousehold();
+          createSubgroup, updateSubgroupMembers, deleteSubgroup,
+          householdDisabled, userDisabled, setHouseholdModule, setUserModule } = useHousehold();
   const { profile, signOut } = useAuth();
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
+  const isOwner = active?.role === 'owner';
+
+  const toggleHouseholdModule = (key, enabled) =>
+    setHouseholdModule(key, enabled).catch((e) => Alert.alert('Mislukt', e.message));
+  const toggleUserModule = (key, enabled) =>
+    setUserModule(key, enabled).catch((e) => Alert.alert('Mislukt', e.message));
 
   // Subgroep-editor (inline modal)
   const [editorOpen, setEditorOpen] = useState(false);
@@ -94,7 +103,7 @@ export default function HuishoudenTab() {
                 {active?.invite_code}
               </Text>
             </View>
-            <Text style={{ color: '#fff', fontSize: 22 }}>↗</Text>
+            <Icon name="share" size={22} color={colors.onDark} />
           </TouchableOpacity>
           <Text style={[type.caption, { marginTop: 8, textAlign: 'center' }]}>
             Deel deze code zodat anderen kunnen aansluiten.
@@ -147,11 +156,65 @@ export default function HuishoudenTab() {
                     {names || 'Geen leden'}
                   </Text>
                 </View>
-                <Text style={{ color: colors.inkFaint, fontSize: 18 }}>›</Text>
+                <Icon name="forward" size={20} color={colors.inkFaint} />
               </TouchableOpacity>
             );
           })}
         </Card>
+
+        {/* Modules: aan/uit per gebruiker, en (als owner) voor het huishouden */}
+        <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>MIJN MODULES</Text>
+        <Card style={{ marginBottom: 16, padding: 6 }}>
+          {TOGGLEABLE_MODULES.map((m) => {
+            const offForHousehold = householdDisabled.includes(m.key);
+            const onForMe = !offForHousehold && !userDisabled.includes(m.key);
+            return (
+              <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
+                <Text style={{ fontSize: 22, marginRight: 12, opacity: offForHousehold ? 0.4 : 1 }}>{m.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: offForHousehold ? colors.inkFaint : colors.ink }}>
+                    {m.label}
+                  </Text>
+                  {offForHousehold && (
+                    <Text style={[type.caption]}>Uitgezet voor het hele huishouden</Text>
+                  )}
+                </View>
+                <Switch
+                  value={onForMe}
+                  disabled={offForHousehold}
+                  onValueChange={(v) => toggleUserModule(m.key, v)}
+                  trackColor={{ true: colors.forest }}
+                />
+              </View>
+            );
+          })}
+          <Text style={[type.caption, { paddingHorizontal: 12, paddingBottom: 6, paddingTop: 2 }]}>
+            Kies welke modules jij in de tabbalk ziet. Vandaag en Huishouden staan altijd aan.
+          </Text>
+        </Card>
+
+        {isOwner && (
+          <>
+            <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>MODULES VOOR HET HUISHOUDEN</Text>
+            <Card style={{ marginBottom: 16, padding: 6 }}>
+              {TOGGLEABLE_MODULES.map((m) => (
+                <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
+                  <Text style={{ fontSize: 22, marginRight: 12 }}>{m.emoji}</Text>
+                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '600', color: colors.ink }}>{m.label}</Text>
+                  <Switch
+                    value={!householdDisabled.includes(m.key)}
+                    onValueChange={(v) => toggleHouseholdModule(m.key, v)}
+                    trackColor={{ true: colors.forest }}
+                  />
+                </View>
+              ))}
+              <Text style={[type.caption, { paddingHorizontal: 12, paddingBottom: 6, paddingTop: 2 }]}>
+                Als beheerder bepaal je welke modules beschikbaar zijn. Wat je hier uitzet,
+                kan niemand in het huishouden voor zichzelf aanzetten.
+              </Text>
+            </Card>
+          </>
+        )}
 
         {/* Wisselen tussen huishoudens */}
         {households.length > 1 && (
@@ -163,7 +226,7 @@ export default function HuishoudenTab() {
                   style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
                   <Text style={{ fontSize: 24, marginRight: 12 }}>{h.emoji}</Text>
                   <Text style={{ flex: 1, fontSize: 16, fontWeight: '500', color: colors.ink }}>{h.name}</Text>
-                  {h.id === active?.id && <Text style={{ color: colors.done, fontWeight: '800' }}>✓</Text>}
+                  {h.id === active?.id && <Icon name="check" size={20} color={colors.done} weight="bold" />}
                 </TouchableOpacity>
               ))}
             </Card>
@@ -245,7 +308,7 @@ export default function HuishoudenTab() {
                         backgroundColor: on ? colors.forest : 'transparent',
                         alignItems: 'center', justifyContent: 'center',
                       }}>
-                        {on && <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>✓</Text>}
+                        {on && <Icon name="check" size={14} color={colors.onDark} weight="bold" />}
                       </View>
                     </TouchableOpacity>
                   );

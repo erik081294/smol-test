@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { parseISO, isToday } from 'date-fns';
@@ -7,7 +7,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty } from '../../lib/ui';
+import { Empty, FAB, SectionHeader } from '../../lib/ui';
 import { isOverdue } from '../../lib/recurrence';
 import { colors, type } from '../../lib/theme';
 
@@ -55,7 +55,7 @@ export default function Vandaag() {
               {active?.emoji} {active?.name}
             </Text>
             <Text style={[type.h1, { marginTop: 2 }]}>
-              {greeting}, {profile?.display_name?.split(' ')[0] ?? ''} 👋
+              {greeting}, {profile?.display_name?.split(' ')[0] ?? ''}
             </Text>
             <Text style={[type.body, { color: colors.inkSoft, marginTop: 4 }]}>
               {today.length + overdue.length === 0
@@ -66,9 +66,7 @@ export default function Vandaag() {
         }
         renderItem={({ item: section }) => (
           <View style={{ marginBottom: 8 }}>
-            <Text style={{ ...type.label, color: section.tint, marginBottom: 10, marginTop: 6 }}>
-              {section.title} · {section.data.length}
-            </Text>
+            <SectionHeader title={section.title} count={section.data.length} tint={section.tint} />
             {section.data.map((t) => (
               <TaskRow key={t.id} task={t} members={members} onToggle={toggle} />
             ))}
@@ -76,24 +74,14 @@ export default function Vandaag() {
         )}
         ListEmptyComponent={
           !loading && (
-            <Empty emoji="🌤️" title="Een rustige dag"
+            <Empty icon="emptyToday" title="Een rustige dag"
               subtitle="Geen taken voor vandaag. Voeg er een toe via het tabblad Taken." />
           )
         }
       />
 
       {/* Snelle toevoeg-knop */}
-      <TouchableOpacity
-        onPress={() => router.push('/task/new')}
-        style={{
-          position: 'absolute', right: 20, bottom: 24,
-          width: 58, height: 58, borderRadius: 29,
-          backgroundColor: colors.ocher, alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
-          elevation: 5,
-        }}>
-        <Text style={{ fontSize: 30, color: colors.forest, fontWeight: '300', marginTop: -2 }}>+</Text>
-      </TouchableOpacity>
+      <FAB accessibilityLabel="Taak toevoegen" onPress={() => router.push('/task/new')} />
     </SafeAreaView>
   );
 }
