@@ -1,0 +1,13 @@
+-- ============================================================================
+-- HUISHOEK — schema
+-- ============================================================================
+-- De waarheid leeft in supabase/migrations/. Dit bestand is alleen een wegwijzer.
+--
+--   • Verse database opzetten?  Draai de migraties in volgorde:
+--       supabase db push                 (met de Supabase CLI)
+--     of plak supabase/migrations/0001_init.sql in de SQL Editor.
+--
+--   • Schema wijzigen?  Voeg een NIEUWE migratie toe (0002_..., 0003_...),
+--     pas dit bestaande bestand niet aan. Zo blijft elke wijziging traceerbaar
+--     en veilig toe te passen op een bestaande database.
+-- ============================================================================
