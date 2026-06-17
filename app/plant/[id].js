@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { format, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
-import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, usePlantDiary } from '../../lib/usePlants';
+import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, usePlantDiary, deletePlantPhoto, updatePlantPhotoNote } from '../../lib/usePlants';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
@@ -129,6 +129,12 @@ export default function PlantScreen() {
   const detailPhotoUrl = usePlantPhotoUrl(plant?.photo_path, photoNonce);
   const { photos: diary, reload: reloadDiary } = usePlantDiary(plant?.id);
 
+  // Dagboekfoto-detail (modal): grote foto, notitie bewerken, verwijderen.
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const selectedPhotoUrl = usePlantPhotoUrl(selectedPhoto?.photo_path);
+  useEffect(() => { setNoteText(selectedPhoto?.note ?? ''); }, [selectedPhoto?.id]);
+
   // Foto toevoegen aan een bestaande plant: dagboekfoto + meteen de nieuwe omslag.
   const changePhoto = () => offerPicker(async (asset) => {
     setPhotoBusy(true);
@@ -141,6 +147,40 @@ export default function PlantScreen() {
       Alert.alert('Foto', e.message ?? 'Uploaden mislukt.');
     } finally { setPhotoBusy(false); }
   });
+
+  const saveNote = async () => {
+    if (!selectedPhoto) return;
+    await updatePlantPhotoNote(selectedPhoto.id, noteText);
+    setSelectedPhoto(null);
+    reloadDiary();
+  };
+
+  const removeSelectedPhoto = async () => {
+    const ph = selectedPhoto;
+    if (!ph) return;
+    setSelectedPhoto(null);
+    try {
+      const newCover = await deletePlantPhoto({ photo: ph, plant });
+      setPlant((p) => ({ ...p, photo_path: newCover }));
+      setPhotoNonce((n) => n + 1);
+      reloadDiary();
+    } catch (e) {
+      Alert.alert('Foto', e.message ?? 'Verwijderen mislukt.');
+    }
+  };
+
+  // Verwijder-bevestiging: Alert-knoppen vuren niet op web → daar window.confirm.
+  const confirmRemovePhoto = () => {
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (typeof window !== 'undefined' && window.confirm('Deze foto verwijderen?')) removeSelectedPhoto();
+      return;
+    }
+    Alert.alert('Foto verwijderen?', 'Dit kan niet ongedaan worden gemaakt.', [
+      { text: 'Annuleren', style: 'cancel' },
+      { text: 'Verwijder', style: 'destructive', onPress: removeSelectedPhoto },
+    ]);
+  };
 
   if (!isNew) {
     if (!plant) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
@@ -203,12 +243,43 @@ export default function PlantScreen() {
             <Text style={[type.caption]}>Nog geen foto’s — voeg er een toe via de cirkel hierboven.</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-              {diary.map((ph) => <DiaryThumb key={ph.id} photo={ph} />)}
+              {diary.map((ph) => <DiaryThumb key={ph.id} photo={ph} onPress={() => setSelectedPhoto(ph)} />)}
             </ScrollView>
           )}
 
           <Button title="Plant verwijderen" variant="ghost" onPress={confirmRemove} style={{ marginTop: 24 }} />
         </ScrollView>
+
+        {/* Dagboekfoto-detail: groot beeld, notitie bewerken, verwijderen. */}
+        <Modal visible={!!selectedPhoto} animationType="slide" transparent onRequestClose={() => setSelectedPhoto(null)}>
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay ?? '#0008' }}>
+            <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 18, paddingBottom: 28 }}>
+              <ModalHeader title="Dagboekfoto" onClose={() => setSelectedPhoto(null)} />
+              <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
+                backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                {selectedPhotoUrl
+                  ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  : <ActivityIndicator color={colors.forest} />}
+              </View>
+              {selectedPhoto ? (
+                <Text style={[type.caption, { marginTop: 8 }]}>
+                  {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: nl })}
+                </Text>
+              ) : null}
+              <Text style={[type.label, { marginTop: 14, marginBottom: 6 }]}>Notitie</Text>
+              <TextInput
+                value={noteText} onChangeText={setNoteText} multiline
+                placeholder="Bijv. nieuw blad, verpot, gele blaadjes…" placeholderTextColor={colors.inkFaint}
+                style={{ minHeight: 64, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md,
+                  padding: 12, fontSize: 15, color: colors.ink, textAlignVertical: 'top', backgroundColor: colors.surface }}
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <View style={{ flex: 1 }}><Button title="Verwijderen" variant="ghost" onPress={confirmRemovePhoto} /></View>
+                <View style={{ flex: 1 }}><Button title="Notitie bewaren" onPress={saveNote} /></View>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -291,16 +362,24 @@ export default function PlantScreen() {
 }
 
 // Eén dagboekfoto. Eigen component zodat de signed-URL-hook per foto kan draaien.
-function DiaryThumb({ photo }) {
+// Tikken opent het detail (notitie bewerken / verwijderen). Een hoekje toont of
+// er een notitie bij hoort.
+function DiaryThumb({ photo, onPress }) {
   const url = usePlantPhotoUrl(photo.photo_path);
   return (
-    <View style={{ alignItems: 'center' }}>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={{ alignItems: 'center' }}>
       <View style={{ width: 92, height: 92, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
         overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-        {url ? <Image source={{ uri: url }} style={{ width: 92, height: 92 }} /> : <Icon name="plants" size={28} color={colors.inkSoft} />}
+        {url ? <Image source={{ uri: url }} style={{ width: 92, height: 92 }} resizeMode="cover" /> : <Icon name="plants" size={28} color={colors.inkSoft} />}
+        {photo.note ? (
+          <View style={{ position: 'absolute', right: 4, bottom: 4, backgroundColor: colors.forest,
+            borderRadius: radius.pill, paddingHorizontal: 5, paddingVertical: 2 }}>
+            <Icon name="note" size={11} color="#fff" />
+          </View>
+        ) : null}
       </View>
-      <Text style={[type.caption, { marginTop: 4 }]}>{format(parseISO(photo.created_at), 'd MMM', { locale: nl })}</Text>
-    </View>
+      <Text style={[type.caption, { marginTop: 4 }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: nl })}</Text>
+    </TouchableOpacity>
   );
 }
 
