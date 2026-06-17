@@ -36,7 +36,7 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ padding: 24 }}>
-        <Text style={[type.h1, { marginTop: 12 }]}>Welkom! 👋</Text>
+        <Text style={[type.h1, { marginTop: 12 }]}>Welkom!</Text>
         <Text style={[type.body, { color: colors.inkSoft, marginTop: 6, marginBottom: 24 }]}>
           Start een nieuw huishouden, of sluit je aan bij een bestaand met een code.
         </Text>

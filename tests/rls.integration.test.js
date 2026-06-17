@@ -131,3 +131,170 @@ test('RLS: integriteit — delen met subgroep uit ander huishouden wordt geweige
   });
   assert.ok(error, 'cross-huishouden subgroep-deling had geweigerd moeten worden');
 });
+
+// --- Kosten-module: expenses (via de create_expense RPC) + expense_shares ----
+// Verifieert dat (a) de atomaire RPC werkt, (b) de hoofdtabel het contract volgt
+// en (c) de kindtabel expense_shares de zichtbaarheid van zijn parent erft.
+
+async function makeHousehold(owner, name) {
+  const { data: hh } = await owner.client
+    .from('households').insert({ name, created_by: owner.id }).select().single();
+  await owner.client.from('household_members')
+    .insert({ household_id: hh.id, profile_id: owner.id, role: 'owner' });
+  return hh;
+}
+
+test('RLS: household-uitgave + shares zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_exp');
+  const bob = await makeUser('bob_exp');     // huisgenoot
+  const eve = await makeUser('eve_exp');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Kostenhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  // Alice maakt een uitgave van €30, gelijk over Alice + Bob, via de RPC.
+  const { data: expId, error: rpcErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Boodschappen', p_amount_cents: 3000,
+    p_paid_by: alice.id, p_spent_on: null, p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [
+      { profile_id: alice.id, amount_cents: 1500 },
+      { profile_id: bob.id, amount_cents: 1500 },
+    ],
+  });
+  assert.ok(!rpcErr, `create_expense: ${rpcErr?.message}`);
+  assert.ok(expId, 'RPC moet het nieuwe expense-id teruggeven');
+
+  // Bob ziet de uitgave én de shares; Eve niets.
+  const bobExp = await bob.client.from('expenses').select('id').eq('id', expId);
+  assert.equal(bobExp.data?.length, 1, 'huisgenoot moet de household-uitgave zien');
+  const bobShares = await bob.client.from('expense_shares').select('profile_id').eq('expense_id', expId);
+  assert.equal(bobShares.data?.length, 2, 'huisgenoot moet de shares zien (erft parent-zichtbaarheid)');
+
+  const eveExp = await eve.client.from('expenses').select('id').eq('id', expId);
+  assert.equal(eveExp.data?.length ?? 0, 0, 'buitenstaander mag de uitgave NIET zien');
+  const eveShares = await eve.client.from('expense_shares').select('profile_id').eq('expense_id', expId);
+  assert.equal(eveShares.data?.length ?? 0, 0, 'buitenstaander mag de shares NIET zien');
+});
+
+test('RLS: subgroep-uitgave alleen voor subgroepleden (huisgenoot buiten de groep ziet niets)', opts, async () => {
+  const alice = await makeUser('alice_sg_exp');
+  const bob = await makeUser('bob_sg_exp');   // huisgenoot, NIET in de subgroep
+
+  const hh = await makeHousehold(alice, 'Ouderhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  // Subgroep met alleen Alice.
+  const { data: sg } = await alice.client.from('subgroups')
+    .insert({ household_id: hh.id, name: 'Alleen Alice', created_by: alice.id }).select().single();
+  await alice.client.from('subgroup_members').insert({ subgroup_id: sg.id, profile_id: alice.id });
+
+  const { data: expId, error } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Privé', p_amount_cents: 1000,
+    p_paid_by: alice.id, p_spent_on: null, p_split_type: 'equal',
+    p_visibility: 'subgroup', p_share_subgroup_id: sg.id, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 1000 }],
+  });
+  assert.ok(!error, `create_expense (subgroep): ${error?.message}`);
+
+  // Alice (maker + subgroeplid) ziet 'm; Bob (huisgenoot, geen subgroeplid) niet.
+  const aliceSees = await alice.client.from('expenses').select('id').eq('id', expId);
+  assert.equal(aliceSees.data?.length, 1, 'subgroeplid ziet de uitgave');
+  const bobSees = await bob.client.from('expenses').select('id').eq('id', expId);
+  assert.equal(bobSees.data?.length ?? 0, 0, 'huisgenoot buiten de subgroep ziet de uitgave NIET');
+  const bobShares = await bob.client.from('expense_shares').select('profile_id').eq('expense_id', expId);
+  assert.equal(bobShares.data?.length ?? 0, 0, 'huisgenoot buiten de subgroep ziet de shares NIET');
+});
+
+// --- Planten-module: plants volgt het standaard zichtbaarheidscontract --------
+// (Bewijst dat enable_module_rls('plants') hetzelfde gedrag geeft als tasks.)
+
+test('RLS: household-plant zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_plant');
+  const bob = await makeUser('bob_plant');     // huisgenoot
+  const eve = await makeUser('eve_plant');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Plantenhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: plant, error } = await alice.client.from('plants')
+    .insert({ household_id: hh.id, name: 'Monstera', visibility: 'household', created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `plant: ${error?.message}`);
+
+  const bobSees = await bob.client.from('plants').select('id').eq('id', plant.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot moet de household-plant zien');
+  const eveSees = await eve.client.from('plants').select('id').eq('id', plant.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander mag de plant NIET zien');
+});
+
+test('RLS: subgroep-plant alleen voor subgroepleden', opts, async () => {
+  const alice = await makeUser('alice_plant_sg');
+  const bob = await makeUser('bob_plant_sg');   // huisgenoot, niet in subgroep
+
+  const hh = await makeHousehold(alice, 'Privéplant');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: sg } = await alice.client.from('subgroups')
+    .insert({ household_id: hh.id, name: 'Alleen Alice', created_by: alice.id }).select().single();
+  await alice.client.from('subgroup_members').insert({ subgroup_id: sg.id, profile_id: alice.id });
+
+  const { data: plant, error } = await alice.client.from('plants')
+    .insert({ household_id: hh.id, name: 'Geheime orchidee', visibility: 'subgroup', share_subgroup_id: sg.id, created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `subgroep-plant: ${error?.message}`);
+
+  const aliceSees = await alice.client.from('plants').select('id').eq('id', plant.id);
+  assert.equal(aliceSees.data?.length, 1, 'subgroeplid ziet de plant');
+  const bobSees = await bob.client.from('plants').select('id').eq('id', plant.id);
+  assert.equal(bobSees.data?.length ?? 0, 0, 'huisgenoot buiten de subgroep ziet de plant NIET');
+});
+
+// --- Schoonmaak-module: zones zijn household-gescoped (is_member) -------------
+
+test('RLS: zones zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_zone');
+  const bob = await makeUser('bob_zone');     // huisgenoot
+  const eve = await makeUser('eve_zone');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Zonehuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: zone, error } = await alice.client.from('zones')
+    .insert({ household_id: hh.id, name: 'Badkamer', emoji: '🛁' }).select().single();
+  assert.ok(!error, `zone: ${error?.message}`);
+
+  const bobSees = await bob.client.from('zones').select('id').eq('id', zone.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet de zone');
+  const eveSees = await eve.client.from('zones').select('id').eq('id', zone.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de zone NIET');
+});
+
+// --- Plantendagboek: plant_photos erft de zichtbaarheid van de parent-plant ----
+
+test('RLS: dagboekfoto zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_diary');
+  const bob = await makeUser('bob_diary');     // huisgenoot
+  const eve = await makeUser('eve_diary');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Dagboekhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: plant } = await alice.client.from('plants')
+    .insert({ household_id: hh.id, name: 'Ficus', visibility: 'household', created_by: alice.id }).select().single();
+  const { data: photo, error } = await alice.client.from('plant_photos')
+    .insert({ household_id: hh.id, plant_id: plant.id, photo_path: `${hh.id}/${plant.id}/1.jpg`, created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `dagboekfoto: ${error?.message}`);
+
+  const bobSees = await bob.client.from('plant_photos').select('id').eq('id', photo.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet de dagboekfoto (erft plant-zichtbaarheid)');
+  const eveSees = await eve.client.from('plant_photos').select('id').eq('id', photo.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de dagboekfoto NIET');
+});

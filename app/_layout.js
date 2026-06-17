@@ -32,7 +32,10 @@ function Gate() {
     }
   }, [session, authLoading, hhLoading, households.length, segments]);
 
-  if (authLoading) {
+  // Toon de laad-indicator zolang auth nog laadt, óf zolang we ingelogd zijn maar
+  // het huishouden nog laadt. Anders rendert de Stack al terwijl de redirect-
+  // useEffect nog wacht op hhLoading, en flitst de root als "Unmatched Route".
+  if (authLoading || (session && hhLoading)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#fff" size="large" />
@@ -42,10 +45,13 @@ function Gate() {
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="task/[id]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="task" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="plant" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

@@ -3,7 +3,10 @@
 // zichtbaarheidscontract kunnen volgen (een tabel + creator-kolom).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MODULES, DATA_MODULES, getModule } from '../lib/modules.js';
+import {
+  MODULES, DATA_MODULES, TOGGLEABLE_MODULES, getModule,
+  effectiveModules, availableModules,
+} from '../lib/modules.js';
 
 const KINDS = new Set(['overview', 'data', 'admin']);
 
@@ -14,7 +17,17 @@ test('elke module heeft de verplichte velden', () => {
     assert.ok(m.emoji, `emoji ontbreekt voor ${m.key}`);
     assert.ok(m.route, `route ontbreekt voor ${m.key}`);
     assert.ok(KINDS.has(m.kind), `ongeldige kind '${m.kind}' voor ${m.key}`);
+    assert.equal(typeof m.core, 'boolean', `core moet boolean zijn voor ${m.key}`);
+    assert.equal(typeof m.primary, 'boolean', `primary moet boolean zijn voor ${m.key}`);
   }
+});
+
+test('er is minstens één primaire module en de tabbalk blijft behapbaar', () => {
+  const primary = MODULES.filter((m) => m.primary);
+  assert.ok(primary.length >= 1, 'minstens één primaire module nodig');
+  // Primair + de "Meer"-tab samen mogen de balk niet overladen.
+  assert.ok(primary.length <= 5, `te veel primaire tabs (${primary.length}); zet er een onder "Meer"`);
+  assert.ok(MODULES.some((m) => !m.primary), 'er hoort iets onder "Meer" te staan');
 });
 
 test('keys en routes zijn uniek', () => {
@@ -52,4 +65,50 @@ test('creator-kolommen matchen wat de DB/can_view verwacht', () => {
   const byTable = Object.fromEntries(DATA_MODULES.map((m) => [m.table, m.creatorColumn]));
   assert.equal(byTable.tasks, 'created_by');
   assert.equal(byTable.groceries, 'added_by');
+});
+
+test('er is precies één kern-skelet (Vandaag + Huishouden) dat niet uitzetbaar is', () => {
+  const coreKeys = MODULES.filter((m) => m.core).map((m) => m.key).sort();
+  assert.deepEqual(coreKeys, ['huishouden', 'vandaag']);
+  assert.deepEqual(
+    TOGGLEABLE_MODULES.map((m) => m.key).sort(),
+    MODULES.filter((m) => !m.core).map((m) => m.key).sort(),
+  );
+});
+
+test('effectiveModules: zonder overrides staat alles aan', () => {
+  assert.deepEqual(
+    effectiveModules().map((m) => m.key),
+    MODULES.map((m) => m.key),
+  );
+});
+
+test('effectiveModules: een persoonlijke uitzetting verbergt alleen die module', () => {
+  const keys = effectiveModules({ userDisabled: ['boodschappen'] }).map((m) => m.key);
+  assert.ok(!keys.includes('boodschappen'));
+  assert.ok(keys.includes('taken'));
+  assert.ok(keys.includes('vandaag') && keys.includes('huishouden'));
+});
+
+test('effectiveModules: kern is nooit uit te zetten', () => {
+  const keys = effectiveModules({
+    householdDisabled: ['vandaag', 'huishouden'],
+    userDisabled: ['vandaag', 'huishouden'],
+  }).map((m) => m.key);
+  assert.ok(keys.includes('vandaag'));
+  assert.ok(keys.includes('huishouden'));
+});
+
+test('effectiveModules: huishouden-uitzetting wint van de gebruiker', () => {
+  // Huishouden zet boodschappen uit; ook al heeft de gebruiker niets uitgezet,
+  // de module is weg. (En andersom blijft 'ie weg.)
+  const keys = effectiveModules({ householdDisabled: ['boodschappen'], userDisabled: [] }).map((m) => m.key);
+  assert.ok(!keys.includes('boodschappen'));
+});
+
+test('availableModules: toont kern + wat het huishouden niet heeft uitgezet', () => {
+  const keys = availableModules({ householdDisabled: ['boodschappen'] }).map((m) => m.key);
+  assert.ok(!keys.includes('boodschappen'));
+  assert.ok(keys.includes('taken'));
+  assert.ok(keys.includes('vandaag'));
 });
