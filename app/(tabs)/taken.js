@@ -5,15 +5,21 @@ import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty, Chip, FAB, ScreenHeader } from '../../lib/ui';
+import { Empty, Chip, FAB, ScreenHeader, IconButton } from '../../lib/ui';
 import { colors, categoryMeta } from '../../lib/theme';
+import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
+import { choreToTask } from '../../lib/choreLibrary';
 
 export default function Taken() {
-  const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
+  const { tasks, loading, reload, addTask, completeTask, uncompleteTask } = useTasks();
   const { members } = useHousehold();
   const router = useRouter();
   const [cat, setCat] = useState('alle');
   const [showDone, setShowDone] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
+  // Eén tik in de bibliotheek → meteen een taak met passend ritme, vandaag startend.
+  const addFromLibrary = (chore) => addTask(choreToTask(chore, { startDate: new Date() }));
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -28,7 +34,9 @@ export default function Taken() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Taken" subtitle="Alles wat er te doen is in huis." />
+      <ScreenHeader title="Taken" subtitle="Alles wat er te doen is in huis."
+        right={<IconButton icon="library" accessibilityLabel="Klus-bibliotheek"
+          tint={colors.forest} onPress={() => setLibraryOpen(true)} />} />
 
       {/* Filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
@@ -60,6 +68,12 @@ export default function Taken() {
       />
 
       <FAB accessibilityLabel="Taak toevoegen" onPress={() => router.push('/task/new')} />
+
+      <ChoreLibrarySheet
+        visible={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        onAdd={addFromLibrary}
+      />
     </SafeAreaView>
   );
 }

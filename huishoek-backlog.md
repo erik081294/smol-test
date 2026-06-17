@@ -27,6 +27,12 @@ in de canonieke statustabel verderop in dit document (§6).
 >   `lib/icons.js`, `lib/theme.js`, `lib/ui.js`) → item **UX-1**; een **"Meer"-overflow-tab**
 >   in de navigatie → item **UX-2**; en een **CI-pipeline** + testkader
 >   (`.github/workflows/ci.yml`, `tests/*`) → item **INF-2**.
+> - **Fase 2 — eerste no-migratie-stappen (2026-06-17)** — **KLU-2** klus-bibliotheek +
+>   **KLU-3** seizoenssuggesties (`lib/choreLibrary.js`, `lib/ChoreLibrarySheet.js`, één-tik-
+>   toevoegen vanaf het Taken-scherm) en **PLA-7** (plantfoto-cover — bleek al gebouwd).
+>   Alles op de live schema (`0011`), géén nieuwe migratie, met units. **SCH-3**
+>   (eerlijkheidsoverzicht) is bewust uitgesteld: dat vraagt tóch een voltooiings-log
+>   (migratie), zie §6/§7.1.
 >
 > **Enige resterende stap vóór "Fase 1 helemaal af":** de migraties `0005`–`0011` tegen het
 > live Supabase-project pushen en de RLS-integratietests met secrets draaien (zie
@@ -215,7 +221,8 @@ tegen live Supabase (INF-1, zie `VERIFICATIE.md`).
 Boodschappen-bonnetjes (trap 1→2) met productcatalogus + prijstracker (BOO-2/3/5),
 Grote-aankopen-dossiers (AAN-1 t/m AAN-4), beurtrotatie/eerlijkheid (KLU-4, SCH-3),
 kosten-koppeling aan modules (KOS-3) en de autodeel-basis (AUT-1/2). Hier zit het meeste
-bouwwerk; lever in trappen op.
+bouwwerk; lever in trappen op. **Al af (no-migratie-voorlopers):** KLU-2 klus-bibliotheek,
+KLU-3 seizoenssuggesties en PLA-7 plantfoto-cover.
 
 **Fase 3 — Slim & verbonden — ⏳ LATER**
 AI-soortherkenning planten (PLA-6), AI-bonextractie (BOO-7), supermarktvergelijking (BOO-4)
@@ -254,8 +261,8 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | FND-3 | Fundament | Kinderprofielen | 0 | Should | M | ⏳ | FND-1 | Open vraag (§5). Begin evt. met 'profiel zonder account' onder een ouder. |
 | FND-4 | Fundament | Module-toggles (huishouden + gebruiker) | 0 | Should | M | ✅ | FND-2 | Default-on; owner zet uit per huishouden, lid per gebruiker. Migratie 0004, `effectiveModules()`. |
 | KLU-1 | Klussen | Basis taken | 1 | Must | — | ✅ | — | Eenmalige + terugkerende klussen. Gereed in v1.0. |
-| KLU-2 | Klussen | Klus-bibliotheek | 2 | Should | S | ⏳ | FND-2 | Vaste lijst veelvoorkomende klussen + default recur-instellingen. |
-| KLU-3 | Klussen | Seizoenssuggesties | 3 | Could | S | ⏳ | KLU-2 | Regelgebaseerd op maand. |
+| KLU-2 | Klussen | Klus-bibliotheek | 2 | Should | S | ✅ | FND-2 | Vaste lijst veelvoorkomende klussen + default recur-instellingen. `lib/choreLibrary.js` + `ChoreLibrarySheet` (één-tik-toevoegen vanaf het Taken-scherm). Geen migratie. |
+| KLU-3 | Klussen | Seizoenssuggesties | 3 | Could | S | ✅ | KLU-2 | Regelgebaseerd op maand (`months` per klus, `seasonalChores()`); getoond als "Past bij &lt;maand&gt;" in de bibliotheek-sheet. |
 | KLU-4 | Klussen | Beurtrotatie | 2 | Could | M | ⏳ | FND-2 | Rotatie-volgorde opslaan; bij afvinken volgende persoon toewijzen. |
 | BOO-1 | Boodschappen | Gedeelde lijst | 1 | Must | — | ✅ | — | Realtime + afvinken. Gereed in v1.0. |
 | BOO-2 | Boodschappen | Bonnetje scannen — foto + bevestigen | 2 | Should | L | ⏳ | BOO-5 | Trap 1. Levert aankoophistorie + prijsdata; correcties trainen matching. |
@@ -271,9 +278,10 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | PLA-4 | Planten | Verzorgingskaart | 1 | Should | S | ✅ | PLA-2 | `careCard()` in `app/plant/[id].js`. |
 | PLA-5 | Planten | Plantendagboek | 2 | Could | S | ✅ | PLA-1 | Vervroegd gebouwd: foto's over tijd. Migratie 0011 (`plant_photos`). |
 | PLA-6 | Planten | AI-soortherkenning | 3 | Could | L | ⏳ | PLA-1 | Plant-ID API of eigen model; handmatige keuze blijft terugval. |
+| PLA-7 | Planten | Plantfoto-cover automatisch | 2 | Could | S | ✅ | PLA-5 | Nieuwste dagboekfoto is de omslag (`plants.photo_path`) — al geregeld in `addPlantPhoto`/`deletePlantPhoto` en getoond op de plantkaart. Geen extra werk nodig. |
 | SCH-1 | Schoonmaak | Kamer-/zonegerichte taken | 1 | Should | M | ✅ | FND-2 | Zones + `tasks.zone_id`. Migratie 0006, `lib/useZones.js`. |
 | SCH-2 | Schoonmaak | Schoonmaakrooster in één keer | 1 | Should | M | ✅ | SCH-1 | Template → meerdere terugkerende taken. `lib/cleaningTemplates.js`. |
-| SCH-3 | Schoonmaak | Beurtverdeling + eerlijkheidsoverzicht | 2 | Could | M | ⏳ | SCH-1 | Telt voltooide taken per lid; `completed_by` ligt al klaar. |
+| SCH-3 | Schoonmaak | Beurtverdeling + eerlijkheidsoverzicht | 2 | Could | M | ⏳ | SCH-1 | ⚠️ Géén quick win zonder schema: `completeTask` wist `completed_by` bij het doorrollen van terugkerende taken, dus een agg over `tasks` mist juist de (terugkerende) schoonmaak. Vereist een voltooiings-log (nieuwe tabel `task_completions`, migratie). |
 | AAN-1 | Grote aankopen | Aankoop-dossier | 2 | Should | M | ⏳ | FND-1 | Titel, budgetrange, deadline, wie beslist mee. Subgroep-gescoped. |
 | AAN-2 | Grote aankopen | Opties verzamelen | 2 | Should | M | ⏳ | AAN-1 | Kandidaten met prijs/link/foto + voor/tegen per lid. |
 | AAN-3 | Grote aankopen | Vergelijktabel | 2 | Should | M | ⏳ | AAN-2 | Opties naast elkaar op zelfgekozen criteria. |
@@ -300,12 +308,16 @@ Een brede brainstorm voor volgende rondes. Voorgestelde ID's reserveren ruimte i
 neem ze pas op zodra ze "echt" worden. Gegroepeerd naar afstand/aard.
 
 ### 7.1 Bestaande modules verdiepen (laaghangend fruit)
-- **SCH-3 eerlijkheidsoverzicht** — quick win: `completed_by` wordt al vastgelegd, dus "wie
-  deed hoeveel" is een pure agg-query + balkje. Geen schemawerk.
-- **Plantfoto-cover automatisch** (PLA-7) — nieuwste dagboekfoto (PLA-5) automatisch als
-  omslag op `plants.photo_path`. Klein, maakt de plantenlijst meteen levendiger.
-- **KLU-2 klus-bibliotheek** als eerste Fase-2-item — vaste lijst (rookmelder, cv-druk,
-  ontkalken) met één-tik-toevoegen; legt de basis voor KLU-3 seizoenssuggesties.
+- ~~**KLU-2 klus-bibliotheek**~~ — ✅ **gebouwd** (`lib/choreLibrary.js` + `ChoreLibrarySheet`):
+  vaste lijst (rookmelder, cv-druk, ontkalken) met één-tik-toevoegen vanaf het Taken-scherm.
+- ~~**KLU-3 seizoenssuggesties**~~ — ✅ **gebouwd** als deel van dezelfde bibliotheek
+  (`months` per klus → "Past bij &lt;maand&gt;"-sectie). Regelgebaseerd, geen migratie.
+- ~~**Plantfoto-cover automatisch (PLA-7)**~~ — ✅ blijkt al **gebouwd**: de nieuwste
+  dagboekfoto is al de omslag (`plants.photo_path`) en wordt op de plantkaart getoond.
+- **SCH-3 eerlijkheidsoverzicht** — gecorrigeerd: dit is **géén** quick win zonder schema.
+  `completeTask` wist `completed_by` bij het doorrollen van terugkerende taken, dus een agg
+  over `tasks` mist juist de (terugkerende) schoonmaak. Vraagt een voltooiings-log
+  (tabel `task_completions` + migratie) voor een kloppend "wie deed hoeveel".
 - **Agenda: losse afspraken zonder taak-overhead** (AGE-3) — nu is elke afspraak een `tasks`-rij;
   overweeg een lichtere "event"-flow voor puur-agenda-items (begin/eindtijd, geen afvinken).
 - **Kosten: terugkerende uitgaven** (KOS-4) — huur/abonnementen die maandelijks automatisch
