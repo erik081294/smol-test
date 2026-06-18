@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { format, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
+import * as haptics from '../../lib/haptics';
 import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, usePlantDiary, deletePlantPhoto, updatePlantPhotoNote } from '../../lib/usePlants';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
@@ -107,7 +108,7 @@ export default function PlantScreen() {
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (Object.keys(e).length) { haptics.error(); return; }
     setBusy(true);
     try {
       await addPlant({
@@ -115,8 +116,10 @@ export default function PlantScreen() {
         waterDays: speciesId ? null : parseInt(waterDays, 10),
         visibility, shareSubgroupId, shareWith, photoAsset,
       }, chosen);
+      haptics.success();
       router.back();
     } catch (e) {
+      haptics.error();
       Alert.alert('Kon plant niet opslaan', e.message);
     } finally { setBusy(false); }
   };

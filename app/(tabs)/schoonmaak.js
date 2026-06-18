@@ -108,7 +108,7 @@ export default function Schoonmaak() {
       <ScreenHeader title="Schoonmaak" subtitle="Je taken per ruimte — afvinken werkt overal door." />
 
       <FlatList
-        contentContainerStyle={{ padding: 18, paddingTop: 8, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
         data={zones}
         keyExtractor={(z) => z.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
@@ -148,17 +148,17 @@ export default function Schoonmaak() {
             </Card>
           );
         }}
+        ListFooterComponent={zones.length > 0 ? (
+          <Button title="Weekschema opzetten" variant="accent" icon="add"
+            onPress={() => setPicker(CLEANING_TEMPLATES[0])}
+            style={{ marginTop: space.sm }} />
+        ) : null}
         ListEmptyComponent={!loading && (
           <Empty illustration="cleaning" title="Nog geen schoonmaakzones"
-            subtitle="Zet in één keer een weekschema op met de knop hieronder." />
+            subtitle="Zet in één keer een weekschema op — kies een sjabloon en je rooster staat klaar."
+            actionTitle="Weekschema opzetten" onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
         )}
       />
-
-      {/* Actieknop: weekschema opzetten */}
-      <View style={{ position: 'absolute', left: 18, right: 18, bottom: 24 }}>
-        <Button title="Weekschema opzetten" variant="accent"
-          onPress={() => setPicker(CLEANING_TEMPLATES[0])} />
-      </View>
 
       {/* Sjabloon-preview */}
       <Modal visible={!!picker} animationType="slide" transparent onRequestClose={() => setPicker(null)}>

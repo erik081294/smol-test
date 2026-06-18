@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, addDays } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
+import * as haptics from '../../lib/haptics';
 import { useTasks } from '../../lib/useTasks';
 import { useZones } from '../../lib/useZones';
 import { useHousehold } from '../../lib/household';
@@ -108,7 +109,7 @@ export default function TaskEditor() {
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (Object.keys(e).length) { haptics.error(); return; }
     setBusy(true);
     // Rotatie geldt alleen bij een terugkerende taak; de huidige beurt (assigned_to)
     // wordt het eerste lid als de toewijzing nog niet in de rotatie zit.
@@ -130,8 +131,10 @@ export default function TaskEditor() {
     try {
       if (isNew) await addTask(payload);
       else await updateTask(id, payload);
+      haptics.success();
       router.back();
     } catch (e) {
+      haptics.error();
       Alert.alert('Mislukt', e.message);
     } finally { setBusy(false); }
   };

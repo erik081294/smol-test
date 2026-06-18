@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
+import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
@@ -89,7 +90,7 @@ export default function ExpenseEditor() {
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
     setErrors(e);
-    if (Object.keys(e).length) return;
+    if (Object.keys(e).length) { haptics.error(); return; }
 
     setBusy(true);
     try {
@@ -97,8 +98,10 @@ export default function ExpenseEditor() {
         description: description.trim(), amountCents, paidBy, spentOn: null, splitType,
         participants, visibility, shareSubgroupId, shareWith,
       });
+      haptics.success();
       router.back();
     } catch (e) {
+      haptics.error();
       Alert.alert('Kon uitgave niet opslaan', e.message);
     } finally { setBusy(false); }
   };
