@@ -14,13 +14,14 @@
 > 2. **Agenda zonder externe library.** I.p.v. `react-native-calendars` een eigen maandgrid met `date-fns` (`monthMatrix`) — geen nieuwe native dependency en het grid is pure, geteste logica. Het grid is altijd 6 rijen voor een stabiele layout.
 > 3. **Schoonmaak hergebruikt categorie `huishouden`** (+ `zone_id`) i.p.v. een nieuwe categorie `schoonmaak`. Zo blijft `lib/constants.js` in sync met de CHECK in `0001` (de `constants-sync` test leest die als autoriteit) en is het echt DRY.
 > 4. **`expense_shares` slaat alleen de berekende `amount_cents` op** (geen `weight`-kolom). Gewichten bestaan alleen in de UI op het invoermoment; de DB bewaart het resolved bedrag. De atomaire `create_expense` RPC is geïmplementeerd zoals voorgesteld.
-> 5. **Plantfoto's nog niet bekabeld.** Het schema heeft `plants.photo_path`, maar de daadwerkelijke upload (Supabase Storage + `expo-image-picker`) is bewust uitgesteld om geen native dependency te introduceren vóór die installatie. De schermen tonen nu een 🪴-placeholder; dit is de eerstvolgende kleine stap. `plants.water_days` is toegevoegd als handmatige terugval als er geen soort is gekozen.
+> 5. **Plantfoto's zijn nu wél bekabeld.** Inmiddels gebouwd (na deze spec): echte upload via een private Supabase Storage-bucket + `expo-image-picker` (migratie [0010](supabase/migrations/0010_plant_photos.sql), `lib/plantPhoto.js`), plus een **plantendagboek** met meerdere foto's over tijd (migratie [0011](supabase/migrations/0011_plant_diary.sql)). De nieuwste dagboekfoto is automatisch de omslag (`plants.photo_path`). `plants.water_days` blijft de handmatige terugval als er geen soort is gekozen.
 >
 > **Aandachtspunt UX:** de tabbalk heeft nu 8 modules. Ze zijn allemaal toggle-baar
-> (default-on); overweeg of je sommige standaard uit wilt zetten of de navigatie
-> wilt hergroeperen. De `enable_module_rls`-aanroepen voor `expenses` en `plants`
-> en alle RLS staan in de migraties, maar zijn nog **niet tegen een live Supabase
-> gedraaid** — dat is de volgende verificatiestap (migraties pushen + de 3 RLS-tests met secrets draaien).
+> (default-on) en de minder-gebruikte staan onder een **"Meer"-overflowtab** (UX-2).
+> De `enable_module_rls`-aanroepen voor `expenses` en `plants` en alle RLS staan in de
+> migraties en zijn **tegen live Supabase gedraaid**: de DB staat op `0011` en de
+> RLS-integratietests liepen groen (zie PR #3). Resteert alleen de handmatige
+> rooktest met 2 accounts in één huishouden.
 
 ---
 

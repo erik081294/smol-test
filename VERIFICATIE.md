@@ -1,10 +1,26 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-De pure logica is volledig getest met `npm test` (groen). Twee dingen kan ik
-**niet** voor je doen omdat de credentials bewust niet in de repo staan en er
-geen Docker/CLI op deze machine is:
+> **Status (bijgewerkt 2026-06-17).** Het meeste hieronder is **al gedaan**: de
+> migraties `0004`–`0011` zijn naar het hosted project gepusht (DB staat op `0011`)
+> en de RLS-integratietests zijn groen tegen de live database gedraaid — zie PR #3.
+> **Resteert alleen:** de handmatige rooktest met 2 accounts in één huishouden
+> (Stap 3 onderaan). De stappen 1–2 blijven staan als naslag/herhaalrecept (bijv.
+> wanneer er een nieuwe migratie bijkomt).
+>
+> **Draaien vanuit Claude Code on the web?** De secrets zitten niet in de remote
+> container (geen `.env`, env-vars leeg) en de CLI is daar niet ingelogd. Om het tóch
+> remote te draaien: zet `SUPABASE_ACCESS_TOKEN` (vervangt `supabase login`),
+> `SUPABASE_DB_PASSWORD` en `SUPABASE_SERVICE_ROLE_KEY` + de twee `EXPO_PUBLIC_*`
+> als **environment variables** in de environment-config, en zet network access op
+> **Custom** met `api.supabase.com`, `*.supabase.co` en `*.pooler.supabase.com` op de
+> allowlist (Supabase staat niet in de default-allowlist). Anders falen login/push/tests
+> op netwerkniveau. Gebruik een test-/staging-project, geen productie.
 
-1. de nieuwe migraties (`0005`–`0009`) naar het hosted project pushen;
+De pure logica is volledig getest met `npm test` (groen). Twee dingen vereisen
+credentials die bewust niet in de repo staan; doe ze lokaal (VSC, waar je al bent
+ingelogd) of remote zoals hierboven beschreven:
+
+1. nieuwe migraties naar het hosted project pushen (de huidige set `0004`–`0011` staat er al op);
 2. de RLS-integratietests tegen de echte database draaien.
 
 Hieronder de exacte stappen. Je hebt twee dingen nodig die alleen jij hebt:
