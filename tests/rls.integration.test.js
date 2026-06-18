@@ -298,3 +298,54 @@ test('RLS: dagboekfoto zichtbaar voor huisgenoot, niet voor buitenstaander', opt
   const eveSees = await eve.client.from('plant_photos').select('id').eq('id', photo.id);
   assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de dagboekfoto NIET');
 });
+
+// --- Voltooiingen-log: task_completions erft de zichtbaarheid van de parent-taak ---
+// (Bewijst SCH-3's fundament: wie de taak mag zien, mag ook de voltooiingen zien.)
+
+test('RLS: voltooiing van household-taak zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_compl');
+  const bob = await makeUser('bob_compl');     // huisgenoot
+  const eve = await makeUser('eve_compl');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Voltooiinghuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: task } = await alice.client.from('tasks')
+    .insert({ household_id: hh.id, title: 'Stofzuigen', visibility: 'household', created_by: alice.id })
+    .select().single();
+  const { data: compl, error } = await alice.client.from('task_completions')
+    .insert({ household_id: hh.id, task_id: task.id, completed_by: alice.id })
+    .select().single();
+  assert.ok(!error, `voltooiing: ${error?.message}`);
+
+  const bobSees = await bob.client.from('task_completions').select('id').eq('id', compl.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet de voltooiing (erft taak-zichtbaarheid)');
+  const eveSees = await eve.client.from('task_completions').select('id').eq('id', compl.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de voltooiing NIET');
+});
+
+test('RLS: voltooiing van custom-taak alleen zichtbaar voor genoemde personen', opts, async () => {
+  const alice = await makeUser('alice_compl_c');
+  const bob = await makeUser('bob_compl_c');     // huisgenoot, genoemd
+  const carol = await makeUser('carol_compl_c');  // huisgenoot, niet genoemd
+
+  const hh = await makeHousehold(alice, 'Custom-voltooiinghuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+  await carol.client.rpc('join_household', { code: code.invite_code });
+
+  // Custom-taak alleen gedeeld met Bob.
+  const { data: task } = await alice.client.from('tasks')
+    .insert({ household_id: hh.id, title: 'Geheime klus', visibility: 'custom', share_with: [bob.id], created_by: alice.id })
+    .select().single();
+  const { data: compl, error } = await alice.client.from('task_completions')
+    .insert({ household_id: hh.id, task_id: task.id, completed_by: alice.id })
+    .select().single();
+  assert.ok(!error, `custom-voltooiing: ${error?.message}`);
+
+  const bobSees = await bob.client.from('task_completions').select('id').eq('id', compl.id);
+  assert.equal(bobSees.data?.length, 1, 'genoemde persoon ziet de voltooiing');
+  const carolSees = await carol.client.from('task_completions').select('id').eq('id', compl.id);
+  assert.equal(carolSees.data?.length ?? 0, 0, 'niet-genoemde huisgenoot ziet de voltooiing NIET');
+});
