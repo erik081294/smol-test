@@ -10,6 +10,7 @@ import { colors, categoryMeta } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
 import { choreToTask } from '../../lib/choreLibrary';
+import { t } from '../../lib/i18n';
 
 export default function Taken() {
   const { tasks, loading, reload, addTask, completeTask, uncompleteTask } = useTasks();
@@ -38,14 +39,14 @@ export default function Taken() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Taken" subtitle="Alles wat er te doen is in huis."
-        right={<IconButton icon="library" accessibilityLabel="Klus-bibliotheek"
+      <ScreenHeader title={t('tasks.title')} subtitle={t('tasks.subtitle')}
+        right={<IconButton icon="library" accessibilityLabel={t('chores.library')}
           tint={colors.forest} onPress={() => setLibraryOpen(true)} />} />
 
       {/* Filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 10 }}>
-        <Chip label="Alle" active={cat === 'alle'} onPress={() => setCat('alle')} />
+        <Chip label={t('common.all')} active={cat === 'alle'} onPress={() => setCat('alle')} />
         {Object.entries(categoryMeta).map(([k, m]) => (
           <Chip key={k} icon={m.icon} label={m.label} active={cat === k}
             color={m.color} onPress={() => setCat(k)} />
@@ -53,8 +54,8 @@ export default function Taken() {
       </ScrollView>
 
       <View style={{ flexDirection: 'row', paddingHorizontal: 18, marginBottom: 6, gap: 8 }}>
-        <Chip label="Open" active={!showDone} onPress={() => setShowDone(false)} />
-        <Chip label="Afgerond" active={showDone} color={colors.done} onPress={() => setShowDone(true)} />
+        <Chip label={t('tasks.filter.open')} active={!showDone} onPress={() => setShowDone(false)} />
+        <Chip label={t('tasks.filter.done')} active={showDone} color={colors.done} onPress={() => setShowDone(true)} />
       </View>
 
       <FlatList
@@ -67,13 +68,14 @@ export default function Taken() {
           loading && tasks.length === 0 ? (
             <ListSkeleton count={6} />
           ) : !loading ? (
-            <Empty illustration="tasks" title={showDone ? 'Nog niets afgerond' : 'Geen open taken'}
-              subtitle={showDone ? 'Afgevinkte taken verschijnen hier.' : 'Voeg een taak toe met de + knop.'} />
+            <Empty illustration="tasks"
+              title={showDone ? t('tasks.empty.done.title') : t('tasks.empty.open.title')}
+              subtitle={showDone ? t('tasks.empty.done.subtitle') : t('tasks.empty.open.subtitle')} />
           ) : null
         }
       />
 
-      <FAB accessibilityLabel="Taak toevoegen" onPress={() => router.push('/task/new')} />
+      <FAB accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
 
       <ChoreLibrarySheet
         visible={libraryOpen}
