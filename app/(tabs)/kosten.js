@@ -10,6 +10,7 @@ import { useAuth } from '../../lib/auth';
 import { computeBalances, settle, formatCents } from '../../lib/expenses';
 import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
+import { t, plural } from '../../lib/i18n';
 
 export default function Kosten() {
   const { expenses, loading, reload } = useExpenses();
@@ -19,7 +20,7 @@ export default function Kosten() {
   const [subgroupId, setSubgroupId] = useState(null);
   const [showSettle, setShowSettle] = useState(false);
 
-  const nameOf = (id) => members.find((m) => m.id === id)?.display_name ?? 'Iemand';
+  const nameOf = (id) => members.find((m) => m.id === id)?.display_name ?? t('common.someone');
   const emojiOf = (id) => members.find((m) => m.id === id)?.avatar_emoji ?? '🙂';
 
   const filtered = useMemo(
@@ -30,18 +31,18 @@ export default function Kosten() {
   const payments = useMemo(() => settle(balances), [balances]);
 
   const myBalance = balances[user?.id] ?? 0;
-  const balanceText = myBalance > 0 ? `Jij krijgt nog ${formatCents(myBalance)}`
-    : myBalance < 0 ? `Jij bent nog ${formatCents(-myBalance)} schuldig`
-    : 'Je staat gelijk';
+  const balanceText = myBalance > 0 ? t('expenses.balance.positive', { amount: formatCents(myBalance) })
+    : myBalance < 0 ? t('expenses.balance.negative', { amount: formatCents(-myBalance) })
+    : t('expenses.balance.even');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Kosten" subtitle="Wie betaalt wat — eerlijk verdeeld." />
+      <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')} />
 
       {/* Subgroep-scope */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 10 }}>
-        <Chip label="Iedereen" active={!subgroupId} onPress={() => setSubgroupId(null)} />
+        <Chip label={t('common.everyone')} active={!subgroupId} onPress={() => setSubgroupId(null)} />
         {subgroups.map((g) => (
           <Chip key={g.id} label={`${g.emoji} ${g.name}`} active={subgroupId === g.id}
             onPress={() => setSubgroupId(g.id)} />
@@ -56,7 +57,7 @@ export default function Kosten() {
             <Pressable onPress={() => setShowSettle((s) => !s)} style={{ marginTop: space.sm }}
               accessibilityRole="button" hitSlop={8}>
               <Text style={{ color: colors.ocher, fontWeight: '700' }}>
-                {showSettle ? 'Verberg' : 'Bekijk'} vereffening ({payments.length})
+                {showSettle ? t('expenses.settle.hide', { n: payments.length }) : t('expenses.settle.show', { n: payments.length })}
               </Text>
             </Pressable>
           )}
@@ -81,7 +82,7 @@ export default function Kosten() {
               trailing={<Text style={[type.title, { color: colors.forest }]}>{formatCents(item.amount_cents)}</Text>}
               meta={
                 <Text style={type.caption}>
-                  {emojiOf(item.paid_by)} {nameOf(item.paid_by)} betaalde · {n} {n === 1 ? 'deelnemer' : 'deelnemers'}
+                  {emojiOf(item.paid_by)} {t('expenses.row.paid', { name: nameOf(item.paid_by) })} · {plural(n, 'expenses.participants.one', 'expenses.participants.other')}
                   · {format(parseISO(item.spent_on), 'd MMM', { locale: nl })}
                 </Text>
               }
@@ -90,12 +91,12 @@ export default function Kosten() {
           );
         }}
         ListEmptyComponent={!loading && (
-          <Empty illustration="expenses" title="Nog geen uitgaven"
-            subtitle="Voeg een gedeelde uitgave toe met de + knop." />
+          <Empty illustration="expenses" title={t('expenses.empty.title')}
+            subtitle={t('expenses.empty.subtitle')} />
         )}
       />
 
-      <FAB accessibilityLabel="Uitgave toevoegen" onPress={() => router.push('/expense/new')} />
+      <FAB accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
     </SafeAreaView>
   );
 }

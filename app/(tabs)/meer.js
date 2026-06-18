@@ -6,6 +6,7 @@ import { useHousehold } from '../../lib/household';
 import { ScreenHeader, ItemRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, space } from '../../lib/theme';
+import { t } from '../../lib/i18n';
 
 // Overflow-scherm: alle effectieve modules die niet als eigen tab-icoon staan
 // (de niet-primaire). Houdt de tabbalk kort terwijl elke module één tik weg blijft.
@@ -16,7 +17,7 @@ export default function Meer() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Meer" subtitle="De overige modules van je huishouden." />
+      <ScreenHeader title={t('more.title')} subtitle={t('more.subtitle')} />
 
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm }}>
         {items.map((m) => (

@@ -8,6 +8,7 @@ import { Empty, FAB, ScreenHeader } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
+import { t } from '../../lib/i18n';
 
 // Eén plantkaart. Eigen component zodat de foto-URL-hook per plant kan draaien.
 // De bovenhelft is de foto (groot, vol-bleed); de onderhelft de info. Beide
@@ -70,7 +71,7 @@ export default function Planten() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Planten" subtitle="Op tijd water, op maat verzorgd." />
+      <ScreenHeader title={t('plants.title')} subtitle={t('plants.subtitle')} />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}
@@ -92,12 +93,12 @@ export default function Planten() {
           )
         }
         ListEmptyComponent={!loading && (
-          <Empty illustration="plants" title="Nog geen planten"
-            subtitle="Voeg je eerste plant toe met de + knop." />
+          <Empty illustration="plants" title={t('plants.empty.title')}
+            subtitle={t('plants.empty.subtitle')} />
         )}
       />
 
-      <FAB accessibilityLabel="Plant toevoegen" onPress={() => router.push('/plant/new')} />
+      <FAB accessibilityLabel={t('plant.add')} onPress={() => router.push('/plant/new')} />
     </SafeAreaView>
   );
 }

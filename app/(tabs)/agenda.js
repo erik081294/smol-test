@@ -12,6 +12,7 @@ import {
   monthMatrix, groupByDate, filterBySubgroup, dominantCategory,
   sortDayTasks, monthLabel, dateKey, parseKey,
 } from '../../lib/agenda';
+import { t } from '../../lib/i18n';
 
 const WD = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 
@@ -40,12 +41,12 @@ export default function Agenda() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Agenda" subtitle="Je taken op de kalender — per groep te filteren." />
+      <ScreenHeader title={t('agenda.title')} subtitle={t('agenda.subtitle')} />
 
       {/* Subgroep-filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 10 }}>
-        <Chip label="Iedereen" active={!subgroupId} onPress={() => setSubgroupId(null)} />
+        <Chip label={t('common.everyone')} active={!subgroupId} onPress={() => setSubgroupId(null)} />
         {subgroups.map((g) => (
           <Chip key={g.id} label={`${g.emoji} ${g.name}`} active={subgroupId === g.id}
             onPress={() => setSubgroupId(g.id)} />
@@ -55,9 +56,9 @@ export default function Agenda() {
       {/* Maandnavigatie */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: space.lg, marginBottom: space.sm }}>
-        <IconButton icon="back" tint={colors.forest} accessibilityLabel="Vorige maand" onPress={() => stepMonth(-1)} />
+        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('agenda.prevMonth')} onPress={() => stepMonth(-1)} />
         <Text style={[type.title, { textTransform: 'capitalize' }]}>{monthLabel(cursor.y, cursor.m)}</Text>
-        <IconButton icon="forward" tint={colors.forest} accessibilityLabel="Volgende maand" onPress={() => stepMonth(1)} />
+        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('agenda.nextMonth')} onPress={() => stepMonth(1)} />
       </View>
 
       {/* Weekdag-koppen */}
@@ -114,12 +115,12 @@ export default function Agenda() {
         keyExtractor={(t) => t.id}
         renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
         ListEmptyComponent={!loading && (
-          <Empty illustration="agenda" title="Niets op deze dag"
-            subtitle="Tik op + om iets toe te voegen." />
+          <Empty illustration="agenda" title={t('agenda.empty.title')}
+            subtitle={t('agenda.empty.subtitle')} />
         )}
       />
 
-      <FAB accessibilityLabel="Toevoegen op deze dag" onPress={() => router.push(`/task/new?date=${selected}`)} />
+      <FAB accessibilityLabel={t('agenda.addOnDay')} onPress={() => router.push(`/task/new?date=${selected}`)} />
     </SafeAreaView>
   );
 }

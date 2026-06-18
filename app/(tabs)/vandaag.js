@@ -10,6 +10,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { Empty, FAB, SectionHeader } from '../../lib/ui';
 import { isOverdue } from '../../lib/recurrence';
 import { colors, type } from '../../lib/theme';
+import { t, plural } from '../../lib/i18n';
 
 export default function Vandaag() {
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
@@ -30,16 +31,16 @@ export default function Vandaag() {
 
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 6) return 'Goedenacht';
-    if (h < 12) return 'Goedemorgen';
-    if (h < 18) return 'Goedemiddag';
-    return 'Goedenavond';
+    if (h < 6) return t('greeting.night');
+    if (h < 12) return t('greeting.morning');
+    if (h < 18) return t('greeting.afternoon');
+    return t('greeting.evening');
   })();
 
   const sections = [
-    ...(overdue.length ? [{ key: 'over', title: 'Achterstallig', tint: colors.danger, data: overdue }] : []),
-    { key: 'today', title: 'Voor vandaag', tint: colors.forest, data: today },
-    ...(done.length ? [{ key: 'done', title: 'Afgerond vandaag', tint: colors.done, data: done }] : []),
+    ...(overdue.length ? [{ key: 'over', title: t('today.section.overdue'), tint: colors.danger, data: overdue }] : []),
+    { key: 'today', title: t('today.section.today'), tint: colors.forest, data: today },
+    ...(done.length ? [{ key: 'done', title: t('today.section.done'), tint: colors.done, data: done }] : []),
   ];
 
   return (
@@ -59,8 +60,8 @@ export default function Vandaag() {
             </Text>
             <Text style={[type.body, { color: colors.inkSoft, marginTop: 4 }]}>
               {today.length + overdue.length === 0
-                ? 'Niets meer te doen vandaag. Lekker bezig!'
-                : `${today.length + overdue.length} ${today.length + overdue.length === 1 ? 'taak' : 'taken'} te gaan.`}
+                ? t('today.allDone')
+                : plural(today.length + overdue.length, 'today.remaining.one', 'today.remaining.other')}
             </Text>
           </View>
         }
@@ -74,14 +75,14 @@ export default function Vandaag() {
         )}
         ListEmptyComponent={
           !loading && (
-            <Empty illustration="today" title="Een rustige dag"
-              subtitle="Geen taken voor vandaag. Voeg er een toe via het tabblad Taken." />
+            <Empty illustration="today" title={t('today.empty.title')}
+              subtitle={t('today.empty.subtitle')} />
           )
         }
       />
 
       {/* Snelle toevoeg-knop */}
-      <FAB accessibilityLabel="Taak toevoegen" onPress={() => router.push('/task/new')} />
+      <FAB accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
     </SafeAreaView>
   );
 }

@@ -6,6 +6,7 @@ import { useToast } from '../../lib/toast';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton } from '../../lib/ui';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
+import { t } from '../../lib/i18n';
 
 export default function Boodschappen() {
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
@@ -32,12 +33,12 @@ export default function Boodschappen() {
     if (!name) return;
     setText('');
     animateNextLayout();
-    try { await addItem(name); } catch (e) { Alert.alert('Kon niet toevoegen', e.message); }
+    try { await addItem(name); } catch (e) { Alert.alert(t('groceries.error.add'), e.message); }
   };
 
   const toggle = async (item) => {
     animateNextLayout(); // het item glijdt zacht tussen "te halen" en "afgevinkt"
-    try { await toggleItem(item); } catch (e) { Alert.alert('Mislukt', e.message); }
+    try { await toggleItem(item); } catch (e) { Alert.alert(t('common.failed'), e.message); }
   };
 
   // Eén item wissen is óók terug te draaien: verberg het lokaal, verwijder pas
@@ -46,12 +47,12 @@ export default function Boodschappen() {
     animateNextLayout();
     setHiddenIds((h) => [...h, item.id]);
     toast.show({
-      message: `'${item.name}' gewist`,
-      actionLabel: 'Ongedaan maken',
+      message: t('groceries.deleted', { name: item.name }),
+      actionLabel: t('common.undo'),
       onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => x !== item.id)); },
       onExpire: async () => {
         try { await removeItem(item.id); }
-        catch (e) { Alert.alert('Kon niet verwijderen', e.message); }
+        catch (e) { Alert.alert(t('groceries.error.delete'), e.message); }
         finally { setHiddenIds((h) => h.filter((x) => x !== item.id)); }
       },
     });
@@ -63,12 +64,12 @@ export default function Boodschappen() {
     animateNextLayout();
     setHiddenIds((h) => [...h, ...ids]);   // meteen weg uit beeld
     toast.show({
-      message: `${ids.length} afgevinkt gewist`,
-      actionLabel: 'Ongedaan maken',
+      message: t('groceries.clearedChecked', { n: ids.length }),
+      actionLabel: t('common.undo'),
       onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }, // weer tonen
       onExpire: async () => {                // pas nu de echte verwijdering
         try { await removeMany(ids); }
-        catch (e) { Alert.alert('Mislukt', e.message); }
+        catch (e) { Alert.alert(t('common.failed'), e.message); }
         finally { setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }
       },
     });
@@ -83,7 +84,7 @@ export default function Boodschappen() {
           shape="round"
           size={24}
           color={item.checked ? colors.done : colors.inkFaint}
-          accessibilityLabel={`${item.name}, ${item.checked ? 'afgevinkt' : 'niet afgevinkt'}`}
+          accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`}
         />
       }
       title={item.name}
@@ -92,32 +93,32 @@ export default function Boodschappen() {
       dimmed={item.checked}
       meta={item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
       onPress={() => toggle(item)}
-      accessibilityHint="Tik om af te vinken"
+      accessibilityHint={t('a11y.tapToToggle')}
       trailing={
         <IconButton icon="delete" size={20} tint={colors.inkFaint}
-          accessibilityLabel={`'${item.name}' verwijderen`} onPress={() => removeWithUndo(item)} />
+          accessibilityLabel={t('groceries.deleteItem', { name: item.name })} onPress={() => removeWithUndo(item)} />
       }
     />
   );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Boodschappen" subtitle="Gedeelde lijst — iedereen ziet hetzelfde, live." />
+      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')} />
 
       {/* Toevoegbalk */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
         <TextInput
           value={text} onChangeText={setText} onSubmitEditing={add} returnKeyType="done"
-          placeholder="Voeg toe… bijv. melk, brood"
+          placeholder={t('groceries.placeholder')}
           placeholderTextColor={colors.inkFaint}
-          accessibilityLabel="Boodschap toevoegen"
+          accessibilityLabel={t('groceries.addLabel')}
           style={{
             flex: 1, minHeight: touchTarget, backgroundColor: colors.surface, borderRadius: radius.md,
             borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md,
             paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
           }}
         />
-        <IconButton icon="add" accessibilityLabel="Toevoegen" tint={colors.forest}
+        <IconButton icon="add" accessibilityLabel={t('common.add')} tint={colors.forest}
           onPress={add} style={{ backgroundColor: colors.ocher }} />
       </View>
 
@@ -126,22 +127,22 @@ export default function Boodschappen() {
         data={open}
         keyExtractor={(i) => i.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        ListHeaderComponent={open.length > 0 ? <SectionHeader title="Te halen" count={open.length} /> : null}
+        ListHeaderComponent={open.length > 0 ? <SectionHeader title={t('groceries.section.open')} count={open.length} /> : null}
         renderItem={({ item }) => renderRow(item)}
         ListEmptyComponent={
           loading && items.length === 0 ? (
             <ListSkeleton count={5} />
           ) : !loading && items.length === 0 ? (
-            <Empty illustration="groceries" title="Lijst is leeg"
-              subtitle="Typ hierboven om iets toe te voegen." />
+            <Empty illustration="groceries" title={t('groceries.empty.title')}
+              subtitle={t('groceries.empty.subtitle')} />
           ) : null
         }
         ListFooterComponent={
           done.length > 0 ? (
             <View style={{ marginTop: space.lg }}>
-              <SectionHeader title="Afgevinkt" count={done.length}
+              <SectionHeader title={t('groceries.section.done')} count={done.length}
                 action={
-                  <IconButton icon="delete" accessibilityLabel="Afgevinkte wissen"
+                  <IconButton icon="delete" accessibilityLabel={t('groceries.clearChecked')}
                     tint={colors.danger} onPress={onClearChecked} />
                 } />
               {done.map((item) => <View key={item.id}>{renderRow(item)}</View>)}

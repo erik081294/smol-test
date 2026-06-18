@@ -19,11 +19,12 @@ import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
 import { CLEANING_TEMPLATES, planTemplate } from '../../lib/cleaningTemplates';
 import { tally, sinceDate, PERIODS } from '../../lib/fairness';
+import { t, plural } from '../../lib/i18n';
 
 const FAIRNESS_PERIODS = [
-  { key: 'WEEK', label: 'Week', days: PERIODS.WEEK },
-  { key: 'MONTH', label: 'Maand', days: PERIODS.MONTH },
-  { key: 'ALL', label: 'Alles', days: PERIODS.ALL },
+  { key: 'WEEK', labelKey: 'cleaning.period.week', days: PERIODS.WEEK },
+  { key: 'MONTH', labelKey: 'cleaning.period.month', days: PERIODS.MONTH },
+  { key: 'ALL', labelKey: 'cleaning.period.all', days: PERIODS.ALL },
 ];
 
 export default function Schoonmaak() {
@@ -97,7 +98,7 @@ export default function Schoonmaak() {
       reloadZones();
       reload();
     } catch (e) {
-      Alert.alert('Kon schema niet opzetten', e.message);
+      Alert.alert(t('cleaning.error.setup'), e.message);
     } finally {
       setBusy(false);
     }
@@ -105,7 +106,7 @@ export default function Schoonmaak() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Schoonmaak" subtitle="Je taken per ruimte — afvinken werkt overal door." />
+      <ScreenHeader title={t('cleaning.title')} subtitle={t('cleaning.subtitle')} />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
@@ -114,17 +115,17 @@ export default function Schoonmaak() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
         ListHeaderComponent={members.length > 1 ? (
           <Card style={{ marginBottom: 14 }}>
-            <SectionHeader title="Wie deed hoeveel" />
+            <SectionHeader title={t('cleaning.fairness.title')} />
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
               {FAIRNESS_PERIODS.map((p) => (
-                <Chip key={p.key} label={p.label} active={period === p.key} onPress={() => setPeriod(p.key)} />
+                <Chip key={p.key} label={t(p.labelKey)} active={period === p.key} onPress={() => setPeriod(p.key)} />
               ))}
             </View>
             {hasAnyCompletion ? (
               <FairnessBars rows={fairnessRows} />
             ) : (
               <Text style={[type.caption]}>
-                Nog geen afgevinkte schoonmaaktaken in deze periode. Telt vanaf nu.
+                {t('cleaning.fairness.empty')}
               </Text>
             )}
           </Card>
@@ -135,28 +136,28 @@ export default function Schoonmaak() {
             <Card style={{ marginBottom: 14 }}>
               <Text style={[type.title, { marginBottom: 8 }]}>{zone.emoji} {zone.name}</Text>
               {zt.length === 0 ? (
-                <Text style={[type.caption]}>Nog geen taken in deze zone.</Text>
-              ) : zt.map((t) => (
-                <View key={t.id} style={{ marginBottom: 4 }}>
-                  <TaskRow task={t} members={members} onToggle={toggle} />
+                <Text style={[type.caption]}>{t('cleaning.zone.empty')}</Text>
+              ) : zt.map((task) => (
+                <View key={task.id} style={{ marginBottom: 4 }}>
+                  <TaskRow task={task} members={members} onToggle={toggle} />
                 </View>
               ))}
               {/* Zelfde editor als overal — alleen met deze zone voorgevuld. */}
-              <Button title="Taak toevoegen" icon="add" variant="ghost" fullWidth={false}
+              <Button title={t('task.add')} icon="add" variant="ghost" fullWidth={false}
                 onPress={() => router.push(`/task/new?zone=${zone.id}`)}
                 style={{ marginTop: 8 }} />
             </Card>
           );
         }}
         ListFooterComponent={zones.length > 0 ? (
-          <Button title="Weekschema opzetten" variant="accent" icon="add"
+          <Button title={t('cleaning.setup')} variant="accent" icon="add"
             onPress={() => setPicker(CLEANING_TEMPLATES[0])}
             style={{ marginTop: space.sm }} />
         ) : null}
         ListEmptyComponent={!loading && (
-          <Empty illustration="cleaning" title="Nog geen schoonmaakzones"
-            subtitle="Zet in één keer een weekschema op — kies een sjabloon en je rooster staat klaar."
-            actionTitle="Weekschema opzetten" onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
+          <Empty illustration="cleaning" title={t('cleaning.empty.title')}
+            subtitle={t('cleaning.empty.subtitle')}
+            actionTitle={t('cleaning.setup')} onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
         )}
       />
 
@@ -165,12 +166,12 @@ export default function Schoonmaak() {
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
           <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
             padding: space.lg, maxHeight: '85%' }}>
-            <Text style={[type.h2, { marginBottom: space.sm }]}>Weekschema opzetten</Text>
+            <Text style={[type.h2, { marginBottom: space.sm }]}>{t('cleaning.setup')}</Text>
 
             {/* Sjabloonkeuze */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
-              {CLEANING_TEMPLATES.map((t) => (
-                <Chip key={t.key} label={t.label} active={picker?.key === t.key} onPress={() => setPicker(t)} />
+              {CLEANING_TEMPLATES.map((tpl) => (
+                <Chip key={tpl.key} label={tpl.label} active={picker?.key === tpl.key} onPress={() => setPicker(tpl)} />
               ))}
             </ScrollView>
 
@@ -179,25 +180,27 @@ export default function Schoonmaak() {
             )}
 
             <ScrollView style={{ maxHeight: 320 }}>
-              {preview?.tasks.map((t, i) => (
+              {preview?.tasks.map((pt, i) => (
                 <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
                   paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                  <Text style={type.body}>{t.zone_name} · {t.title}</Text>
-                  <Text style={type.caption}>{recurrenceLabel(t)}</Text>
+                  <Text style={type.body}>{pt.zone_name} · {pt.title}</Text>
+                  <Text style={type.caption}>{recurrenceLabel(pt)}</Text>
                 </View>
               ))}
             </ScrollView>
 
             {preview && (
               <Text style={[type.caption, { marginTop: space.sm }]}>
-                {preview.tasks.length} taken
-                {preview.zonesToCreate.length ? ` · ${preview.zonesToCreate.length} nieuwe zones` : ' · gebruikt bestaande zones'}
+                {plural(preview.tasks.length, 'cleaning.preview.tasks.one', 'cleaning.preview.tasks.other')}
+                {preview.zonesToCreate.length
+                  ? t('cleaning.preview.newZones', { n: preview.zonesToCreate.length })
+                  : t('cleaning.preview.existingZones')}
               </Text>
             )}
 
             <Row gap={space.sm} style={{ marginTop: space.md }}>
-              <View style={{ flex: 1 }}><Button title="Annuleren" variant="ghost" onPress={() => setPicker(null)} /></View>
-              <View style={{ flex: 1 }}><Button title="Opzetten" loading={busy} onPress={applyTemplate} /></View>
+              <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setPicker(null)} /></View>
+              <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} onPress={applyTemplate} /></View>
             </Row>
           </View>
         </View>
