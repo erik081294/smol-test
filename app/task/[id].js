@@ -18,6 +18,7 @@ import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityPayload, validateVisibility } from '../../lib/visibility';
+import { t, plural } from '../../lib/i18n';
 
 const WEEKDAYS = [
   { d: 1, l: 'Ma' }, { d: 2, l: 'Di' }, { d: 3, l: 'Wo' }, { d: 4, l: 'Do' },
@@ -75,10 +76,10 @@ export default function TaskEditor() {
   }, [id]);
 
   const quickDates = [
-    { l: 'Vandaag', v: new Date() },
-    { l: 'Morgen', v: addDays(new Date(), 1) },
-    { l: 'Over 3 dagen', v: addDays(new Date(), 3) },
-    { l: 'Volgende week', v: addDays(new Date(), 7) },
+    { l: t('task.quick.today'), v: new Date() },
+    { l: t('task.quick.tomorrow'), v: addDays(new Date(), 1) },
+    { l: t('task.quick.in3'), v: addDays(new Date(), 3) },
+    { l: t('task.quick.nextWeek'), v: addDays(new Date(), 7) },
   ];
 
   const toggleWeekday = (d) =>
@@ -86,9 +87,9 @@ export default function TaskEditor() {
 
   // Eenheid achter "Elke N …", afhankelijk van de frequentie en het aantal.
   const unitLabel = (n) => {
-    if (freq === RECUR.DAILY) return n === 1 ? 'dag' : 'dagen';
-    if (freq === RECUR.MONTHLY) return n === 1 ? 'maand' : 'maanden';
-    return n === 1 ? 'week' : 'weken';
+    if (freq === RECUR.DAILY) return plural(n, 'task.unit.day.one', 'task.unit.day.other');
+    if (freq === RECUR.MONTHLY) return plural(n, 'task.unit.month.one', 'task.unit.month.other');
+    return plural(n, 'task.unit.week.one', 'task.unit.week.other');
   };
   // Boven dit aantal heeft een interval weinig zin; houdt de stepper behapbaar.
   const intervalMax = freq === RECUR.DAILY ? 90 : freq === RECUR.MONTHLY ? 24 : 52;
@@ -104,8 +105,8 @@ export default function TaskEditor() {
 
   const save = async () => {
     const e = {};
-    if (!title.trim()) e.title = 'Geef de taak een titel';
-    if (freq && !dueDate) e.date = 'Een terugkerende taak heeft een startdatum nodig.';
+    if (!title.trim()) e.title = t('task.error.title');
+    if (freq && !dueDate) e.date = t('task.error.recurDate');
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
     setErrors(e);
@@ -135,14 +136,14 @@ export default function TaskEditor() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert('Mislukt', e.message);
+      Alert.alert(t('common.failed'), e.message);
     } finally { setBusy(false); }
   };
 
   const confirmDelete = () => {
-    Alert.alert('Taak verwijderen?', '', [
-      { text: 'Annuleer', style: 'cancel' },
-      { text: 'Verwijder', style: 'destructive', onPress: async () => { await deleteTask(id); router.back(); } },
+    Alert.alert(t('task.delete.title'), '', [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteTask(id); router.back(); } },
     ]);
   };
 
@@ -153,19 +154,19 @@ export default function TaskEditor() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <ModalHeader
-          title={isNew ? 'Nieuwe taak' : 'Taak bewerken'}
+          title={isNew ? t('task.new') : t('task.edit')}
           onClose={() => router.back()}
           onConfirm={save}
           busy={busy}
         />
 
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-          <Field label="Wat moet er gebeuren?" value={title}
+          <Field label={t('task.field.title')} value={title}
             onChangeText={(v) => { setTitle(v); clearErr('title'); }}
-            placeholder="Bijv. Vuilnis buitenzetten" autoFocus={isNew} error={errors.title} />
+            placeholder={t('task.field.title.placeholder')} autoFocus={isNew} error={errors.title} />
 
           {/* Categorie */}
-          <Text style={[type.label, { marginBottom: 8 }]}>Categorie</Text>
+          <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.category')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
             {Object.entries(categoryMeta).map(([k, m]) => (
               <Chip key={k} icon={m.icon} label={m.label} active={category === k}
@@ -177,9 +178,9 @@ export default function TaskEditor() {
               overal zichtbaar; hier ook te wijzigen of los te koppelen. */}
           {zones.length > 0 && (
             <>
-              <Text style={[type.label, { marginBottom: 8 }]}>Zone (optioneel)</Text>
+              <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.zone')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
-                <Chip label="Geen zone" active={!zoneId} onPress={() => setZoneId(null)} />
+                <Chip label={t('task.zone.none')} active={!zoneId} onPress={() => setZoneId(null)} />
                 {zones.map((z) => (
                   <Chip key={z.id} label={`${z.emoji ? `${z.emoji} ` : ''}${z.name}`}
                     active={zoneId === z.id} onPress={() => setZoneId(z.id)} />
@@ -189,7 +190,7 @@ export default function TaskEditor() {
           )}
 
           {/* Toewijzen */}
-          <Text style={[type.label, { marginBottom: 8 }]}>Voor wie?</Text>
+          <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.assignee')}</Text>
           <AvatarSelect members={members} selectedId={assignedTo} onSelect={setAssignedTo}
             includeEveryone style={{ marginBottom: 18 }} />
 
@@ -205,9 +206,9 @@ export default function TaskEditor() {
           ) : null}
 
           {/* Datum */}
-          <Text style={[type.label, { marginBottom: 8 }]}>Wanneer?</Text>
+          <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.when')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-            <Chip label="Geen datum" active={!dueDate} onPress={() => { setDueDate(null); setFreq(null); }} />
+            <Chip label={t('task.date.none')} active={!dueDate} onPress={() => { setDueDate(null); setFreq(null); }} />
             {quickDates.map((q) => (
               <Chip key={q.l} label={q.l}
                 active={dueDate && format(dueDate, 'yyyy-MM-dd') === format(q.v, 'yyyy-MM-dd')}
@@ -224,24 +225,24 @@ export default function TaskEditor() {
           {/* Herhaling */}
           {dueDate && (
             <>
-              <Text style={[type.label, { marginBottom: 8, marginTop: 18 }]}>Herhalen</Text>
+              <Text style={[type.label, { marginBottom: 8, marginTop: 18 }]}>{t('task.field.repeat')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                <Chip label="Eenmalig" active={!freq} onPress={() => setFreq(null)} />
-                <Chip label="Dagelijks" active={freq === RECUR.DAILY} onPress={() => setFreq(RECUR.DAILY)} />
-                <Chip label="Wekelijks" active={freq === RECUR.WEEKLY} onPress={() => setFreq(RECUR.WEEKLY)} />
-                <Chip label="Maandelijks" active={freq === RECUR.MONTHLY} onPress={() => setFreq(RECUR.MONTHLY)} />
+                <Chip label={t('task.recur.once')} active={!freq} onPress={() => setFreq(null)} />
+                <Chip label={t('task.recur.daily')} active={freq === RECUR.DAILY} onPress={() => setFreq(RECUR.DAILY)} />
+                <Chip label={t('task.recur.weekly')} active={freq === RECUR.WEEKLY} onPress={() => setFreq(RECUR.WEEKLY)} />
+                <Chip label={t('task.recur.monthly')} active={freq === RECUR.MONTHLY} onPress={() => setFreq(RECUR.MONTHLY)} />
               </View>
 
               {/* Interval: "Elke N dagen/weken/maanden" */}
               {showInterval && (
                 <Row gap={space.md} style={{ marginTop: 12 }}>
-                  <Text style={type.body}>Elke</Text>
+                  <Text style={type.body}>{t('task.interval.every')}</Text>
                   <Stepper
                     value={interval}
                     onChange={setIntervalN}
                     min={1}
                     max={intervalMax}
-                    accessibilityLabel={`Elke ${interval} ${unitLabel(interval)}`}
+                    accessibilityLabel={`${t('task.interval.every')} ${interval} ${unitLabel(interval)}`}
                   />
                   <Text style={type.body}>{unitLabel(interval)}</Text>
                 </Row>
@@ -250,7 +251,7 @@ export default function TaskEditor() {
               {freq === RECUR.WEEKLY && (
                 <>
                   <Text style={[type.caption, { marginTop: 12, marginBottom: 6 }]}>
-                    Of kies vaste dagen (dan vervalt het wekeninterval):
+                    {t('task.weekly.fixedDays')}
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
                     {WEEKDAYS.map((w) => (
@@ -266,7 +267,7 @@ export default function TaskEditor() {
                   <Icon name="repeat" size={14} color={colors.inkSoft} />
                   <Text style={[type.caption, { flex: 1 }]}>
                     {recurrenceLabel({ recur_freq: freq, recur_interval: interval, recur_weekdays: weekdays })}
-                    {'  ·  '}Bij afvinken verschijnt automatisch de volgende keer.
+                    {'  ·  '}{t('task.recur.autoNext')}
                   </Text>
                 </Row>
               )}
@@ -276,15 +277,14 @@ export default function TaskEditor() {
                 <>
                   <Row gap={space.xs} align="center" style={{ marginTop: 18, marginBottom: 8 }}>
                     <Icon name="rotation" size={16} color={colors.inkSoft} />
-                    <Text style={[type.label, { flex: 1, marginBottom: 0 }]}>Rouleren tussen leden</Text>
-                    <Chip label={rotation.length ? 'Aan' : 'Uit'} active={rotation.length > 0}
+                    <Text style={[type.label, { flex: 1, marginBottom: 0 }]}>{t('task.rotation.label')}</Text>
+                    <Chip label={rotation.length ? t('common.on') : t('common.off')} active={rotation.length > 0}
                       onPress={() => setRotation(rotation.length ? [] : members.map((m) => m.id))} />
                   </Row>
                   {rotation.length > 0 && (
                     <>
                       <Text style={[type.caption, { marginBottom: 8 }]}>
-                        Tik op de leden in de gewenste beurtvolgorde. Bij elke afvink-beurt
-                        gaat de taak naar de volgende.
+                        {t('task.rotation.hint')}
                       </Text>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
                         {members.map((m) => {
@@ -293,7 +293,7 @@ export default function TaskEditor() {
                           return (
                             <Pressable key={m.id} onPress={() => toggleRotationMember(m.id)}
                               accessibilityRole="button" accessibilityState={{ selected: on }}
-                              accessibilityLabel={`${m.display_name}${on ? `, beurt ${pos + 1}` : ''}`}
+                              accessibilityLabel={`${m.display_name}${on ? t('task.rotation.turn', { n: pos + 1 }) : ''}`}
                               style={{ alignItems: 'center', opacity: on ? 1 : 0.45 }}>
                               <View style={{ borderWidth: 2, borderRadius: radius.pill, borderColor: on ? colors.forest : 'transparent' }}>
                                 <Avatar emoji={m.avatar_emoji} name={m.display_name} size={48} />
@@ -314,17 +314,17 @@ export default function TaskEditor() {
 
           {/* Notities */}
           <View style={{ marginTop: 18 }}>
-            <Field label="Notitie (optioneel)" value={notes} onChangeText={setNotes}
-              placeholder="Extra details…" multiline numberOfLines={3}
+            <Field label={t('task.field.notes')} value={notes} onChangeText={setNotes}
+              placeholder={t('task.field.notes.placeholder')} multiline numberOfLines={3}
               style={{ minHeight: 70, textAlignVertical: 'top' }} />
           </View>
 
           {!isNew && (
-            <Button title="Taak verwijderen" variant="ghost" onPress={confirmDelete}
+            <Button title={t('task.deleteButton')} variant="ghost" onPress={confirmDelete}
               style={{ marginTop: 8, borderColor: 'transparent' }} />
           )}
 
-          <Button title={isNew ? 'Taak toevoegen' : 'Wijzigingen bewaren'}
+          <Button title={isNew ? t('task.add') : t('common.saveChanges')}
             onPress={save} loading={busy} style={{ marginTop: 16 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -340,12 +340,12 @@ function DateStepper({ date, onChange }) {
       backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
       borderColor: colors.line, padding: space.xs, marginTop: space.xs,
     }}>
-      <IconButton icon="back" tint={colors.forest} accessibilityLabel="Dag eerder"
+      <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
         onPress={() => onChange(addDays(date, -1))} />
       <Text style={[type.title, { fontWeight: '700' }]}>
         {format(date, 'EEEE d MMMM', { locale: nl })}
       </Text>
-      <IconButton icon="forward" tint={colors.forest} accessibilityLabel="Dag later"
+      <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
         onPress={() => onChange(addDays(date, 1))} />
     </View>
   );

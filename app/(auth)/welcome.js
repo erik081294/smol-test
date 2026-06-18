@@ -6,6 +6,7 @@ import { isConfigured } from '../../lib/supabase';
 import { Button, Field } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type } from '../../lib/theme';
+import { t } from '../../lib/i18n';
 
 export default function Welcome() {
   const { signIn, signUp } = useAuth();
@@ -19,20 +20,20 @@ export default function Welcome() {
 
   const submit = async () => {
     if (!isConfigured) {
-      Alert.alert('Supabase ontbreekt', 'Vul je Supabase-gegevens in .env in. Zie README.');
+      Alert.alert(t('auth.supabaseMissing.title'), t('auth.supabaseMissing.body'));
       return;
     }
     const e = {};
-    if (!email) e.email = 'Vul je e-mail in';
-    if (!password) e.password = 'Vul je wachtwoord in';
+    if (!email) e.email = t('auth.error.email');
+    if (!password) e.password = t('auth.error.password');
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const { error } = await signUp(email.trim(), password, name.trim() || 'Naamloos');
+        const { error } = await signUp(email.trim(), password, name.trim() || t('auth.defaultName'));
         if (error) throw error;
-        Alert.alert('Bijna klaar', 'Check je mail om je account te bevestigen, en log daarna in.');
+        Alert.alert(t('auth.signup.confirm.title'), t('auth.signup.confirm.body'));
         setMode('signin');
       } else {
         const { error } = await signIn(email.trim(), password);
@@ -56,18 +57,18 @@ export default function Welcome() {
               Huishoek
             </Text>
             <Text style={{ fontSize: 17, color: colors.ocherSoft, marginTop: 6, lineHeight: 24 }}>
-              Eén plek voor het hele huishouden.{'\n'}Klusjes, boodschappen en planten — samen geregeld.
+              {t('auth.tagline')}
             </Text>
           </View>
 
           {/* Form */}
           <View style={{ backgroundColor: colors.surface, borderRadius: 22, padding: 20 }}>
             {mode === 'signup' && (
-              <Field label="Je naam" value={name} onChangeText={setName} placeholder="Bijv. Erik" />
+              <Field label={t('auth.field.name')} value={name} onChangeText={setName} placeholder={t('auth.field.name.placeholder')} />
             )}
-            <Field label="E-mail" value={email} onChangeText={(v) => { setEmail(v); clearErr('email'); }}
-              autoCapitalize="none" keyboardType="email-address" placeholder="jij@voorbeeld.nl" error={errors.email} />
-            <Field label="Wachtwoord" value={password} onChangeText={(v) => { setPassword(v); clearErr('password'); }}
+            <Field label={t('auth.field.email')} value={email} onChangeText={(v) => { setEmail(v); clearErr('email'); }}
+              autoCapitalize="none" keyboardType="email-address" placeholder={t('auth.field.email.placeholder')} error={errors.email} />
+            <Field label={t('auth.field.password')} value={password} onChangeText={(v) => { setPassword(v); clearErr('password'); }}
               secureTextEntry placeholder="••••••••" error={errors.password} />
             {errors.form ? (
               <Text style={[type.caption, { color: colors.danger, marginBottom: 8 }]} accessibilityLiveRegion="polite">
@@ -75,20 +76,20 @@ export default function Welcome() {
               </Text>
             ) : null}
             <Button
-              title={mode === 'signup' ? 'Account aanmaken' : 'Inloggen'}
+              title={mode === 'signup' ? t('auth.submit.signup') : t('auth.submit.signin')}
               onPress={submit} loading={busy} style={{ marginTop: 6 }}
             />
           </View>
 
           <Button
             variant="ghost"
-            title={mode === 'signup' ? 'Heb je al een account? Inloggen' : 'Nieuw hier? Maak een account'}
+            title={mode === 'signup' ? t('auth.toggle.toSignin') : t('auth.toggle.toSignup')}
             onPress={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
             style={{ marginTop: 16, borderColor: 'transparent' }}
           />
           {!isConfigured && (
             <Text style={{ color: colors.ocherSoft, textAlign: 'center', marginTop: 12, fontSize: 13 }}>
-              ⚠︎ Supabase nog niet ingesteld — zie README.
+              {t('auth.notConfigured')}
             </Text>
           )}
         </ScrollView>

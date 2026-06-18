@@ -12,6 +12,7 @@ import { Illustration } from '../../lib/illustrations';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, space } from '../../lib/theme';
 import { TOGGLEABLE_MODULES } from '../../lib/modules';
+import { t, plural } from '../../lib/i18n';
 
 export default function HuishoudenTab() {
   const { active, households, members, subgroups, selectHousehold, leaveHousehold,
@@ -22,9 +23,9 @@ export default function HuishoudenTab() {
   const isOwner = active?.role === 'owner';
 
   const toggleHouseholdModule = (key, enabled) =>
-    setHouseholdModule(key, enabled).catch((e) => Alert.alert('Mislukt', e.message));
+    setHouseholdModule(key, enabled).catch((e) => Alert.alert(t('common.failed'), e.message));
   const toggleUserModule = (key, enabled) =>
-    setUserModule(key, enabled).catch((e) => Alert.alert('Mislukt', e.message));
+    setUserModule(key, enabled).catch((e) => Alert.alert(t('common.failed'), e.message));
 
   // Subgroep-editor (inline modal)
   const [editorOpen, setEditorOpen] = useState(false);
@@ -50,8 +51,8 @@ export default function HuishoudenTab() {
 
   const saveSubgroup = async () => {
     const e = {};
-    if (!sgName.trim()) e.name = 'Geef de groep een naam';
-    if (sgMembers.length === 0) e.members = 'Kies minstens één persoon';
+    if (!sgName.trim()) e.name = t('household.subgroup.error.name');
+    if (sgMembers.length === 0) e.members = t('household.subgroup.error.members');
     setSgErrors(e);
     if (Object.keys(e).length) return;
     setSgBusy(true);
@@ -59,14 +60,14 @@ export default function HuishoudenTab() {
       if (editId) await updateSubgroupMembers(editId, sgMembers);
       else await createSubgroup(sgName.trim(), sgEmoji, sgMembers);
       setEditorOpen(false);
-    } catch (e) { Alert.alert('Mislukt', e.message); }
+    } catch (e) { Alert.alert(t('common.failed'), e.message); }
     finally { setSgBusy(false); }
   };
 
   const confirmDeleteSubgroup = (g) => {
-    Alert.alert('Groep verwijderen?', `"${g.name}" wordt verwijderd. Taken die ermee gedeeld waren blijven bestaan, maar verliezen deze groep.`,
-      [{ text: 'Annuleer', style: 'cancel' },
-       { text: 'Verwijder', style: 'destructive', onPress: () => deleteSubgroup(g.id) }]);
+    Alert.alert(t('household.subgroup.delete.title'), t('household.subgroup.delete.body', { name: g.name }),
+      [{ text: t('common.cancel'), style: 'cancel' },
+       { text: t('common.delete'), style: 'destructive', onPress: () => deleteSubgroup(g.id) }]);
   };
 
   const sgEmojis = ['👥', '👩‍❤️‍👨', '⚽', '🎓', '🏠', '🧒', '🎸', '🐾'];
@@ -75,20 +76,20 @@ export default function HuishoudenTab() {
     if (!active) return;
     try {
       await Share.share({
-        message: `Doe mee in "${active.name}" op Huishoek! Gebruik deze code in de app: ${active.invite_code}`,
+        message: t('household.share.message', { name: active.name, code: active.invite_code }),
       });
     } catch {}
   };
 
   const confirmLeave = () => {
-    Alert.alert('Huishouden verlaten?', `Je verlaat "${active.name}". Je kunt later opnieuw toetreden met de code.`,
-      [{ text: 'Annuleer', style: 'cancel' },
-       { text: 'Verlaten', style: 'destructive', onPress: () => leaveHousehold(active.id) }]);
+    Alert.alert(t('household.leave.title'), t('household.leave.body', { name: active.name }),
+      [{ text: t('common.cancel'), style: 'cancel' },
+       { text: t('household.leave.confirm'), style: 'destructive', onPress: () => leaveHousehold(active.id) }]);
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Huishouden" />
+      <ScreenHeader title={t('household.title')} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: space.xxl }}>
 
         {/* Actief huishouden */}
@@ -97,19 +98,19 @@ export default function HuishoudenTab() {
             <Text style={{ fontSize: 40, marginRight: space.md }}>{active?.emoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={type.h2}>{active?.name}</Text>
-              <Text style={type.caption}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
+              <Text style={type.caption}>{plural(members.length, 'household.members.one', 'household.members.other')}</Text>
             </View>
           </View>
 
           {/* Invite code — branded hero, tikbaar om te delen */}
-          <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel="Uitnodigingscode delen"
+          <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel={t('household.shareCode')}
             style={({ pressed }) => ({
               marginTop: space.lg, backgroundColor: pressed ? colors.forestSoft : colors.forest,
               borderRadius: radius.md, padding: space.md,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             })}>
             <View>
-              <Text style={{ color: colors.ocherSoft, fontSize: 12, fontWeight: '600' }}>UITNODIGINGSCODE</Text>
+              <Text style={{ color: colors.ocherSoft, fontSize: 12, fontWeight: '600' }}>{t('household.inviteCode.label')}</Text>
               <Text style={{ color: colors.onDark, fontSize: 26, fontWeight: '800', letterSpacing: 4, marginTop: 2 }}>
                 {active?.invite_code}
               </Text>
@@ -117,30 +118,29 @@ export default function HuishoudenTab() {
             <Icon name="share" size={22} color={colors.onDark} />
           </Pressable>
           <Text style={[type.caption, { marginTop: space.sm, textAlign: 'center' }]}>
-            Deel deze code zodat anderen kunnen aansluiten.
+            {t('household.inviteCode.hint')}
           </Text>
         </Card>
 
         {/* Leden */}
-        <SectionHeader title="Leden" count={members.length} />
+        <SectionHeader title={t('household.section.members')} count={members.length} />
         {members.map((m) => (
           <ItemRow
             key={m.id}
             leading={<Avatar emoji={m.avatar_emoji} name={m.display_name} />}
-            title={`${m.display_name}${m.id === profile?.id ? '  (jij)' : ''}`}
-            trailing={m.role === 'owner' ? <Badge label="Beheerder" tone="brand" /> : null}
+            title={`${m.display_name}${m.id === profile?.id ? `  ${t('household.you')}` : ''}`}
+            trailing={m.role === 'owner' ? <Badge label={t('household.role.owner')} tone="brand" /> : null}
           />
         ))}
 
         {/* Groepen (subgroepen) */}
-        <SectionHeader title="Groepen" count={subgroups.length}
-          action={<IconButton icon="add" accessibilityLabel="Nieuwe groep" tint={colors.forest} onPress={openNewSubgroup} />} />
+        <SectionHeader title={t('household.section.groups')} count={subgroups.length}
+          action={<IconButton icon="add" accessibilityLabel={t('household.subgroup.new')} tint={colors.forest} onPress={openNewSubgroup} />} />
         {subgroups.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: space.md }}>
             <Illustration name="groups" size={96} />
             <Text style={[type.caption, { textAlign: 'center', marginTop: space.sm }]}>
-              Nog geen groepen. Maak er een (bijv. "Ouders" of "Voetbal Tim") om taken
-              met een vast clubje te delen in plaats van het hele huishouden.
+              {t('household.groups.empty')}
             </Text>
           </View>
         ) : subgroups.map((g) => {
@@ -152,16 +152,16 @@ export default function HuishoudenTab() {
               key={g.id}
               leading={<Avatar emoji={g.emoji} />}
               title={g.name}
-              meta={<Text style={type.caption} numberOfLines={1}>{names || 'Geen leden'}</Text>}
+              meta={<Text style={type.caption} numberOfLines={1}>{names || t('household.subgroup.noMembers')}</Text>}
               chevron
               onPress={() => openEditSubgroup(g)}
-              accessibilityHint="Tik om te bewerken"
+              accessibilityHint={t('household.tapToEdit')}
             />
           );
         })}
 
         {/* Modules: aan/uit per gebruiker */}
-        <SectionHeader title="Mijn modules" />
+        <SectionHeader title={t('household.section.myModules')} />
         {TOGGLEABLE_MODULES.map((m) => {
           const offForHousehold = householdDisabled.includes(m.key);
           const onForMe = !offForHousehold && !userDisabled.includes(m.key);
@@ -171,7 +171,7 @@ export default function HuishoudenTab() {
               leading={<Icon name={m.icon} size={24} color={offForHousehold ? colors.inkFaint : colors.forest} />}
               title={m.label}
               titleColor={offForHousehold ? colors.inkFaint : undefined}
-              meta={offForHousehold ? <Text style={type.caption}>Uitgezet voor het hele huishouden</Text> : undefined}
+              meta={offForHousehold ? <Text style={type.caption}>{t('household.module.disabledByHousehold')}</Text> : undefined}
               trailing={
                 <Switch value={onForMe} disabled={offForHousehold}
                   onValueChange={(v) => toggleUserModule(m.key, v)} trackColor={{ true: colors.forest }} />
@@ -180,12 +180,12 @@ export default function HuishoudenTab() {
           );
         })}
         <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
-          Kies welke modules jij in de tabbalk ziet. Vandaag en Huishouden staan altijd aan.
+          {t('household.myModules.hint')}
         </Text>
 
         {isOwner && (
           <>
-            <SectionHeader title="Modules voor het huishouden" />
+            <SectionHeader title={t('household.section.householdModules')} />
             {TOGGLEABLE_MODULES.map((m) => (
               <ItemRow
                 key={m.key}
@@ -198,8 +198,7 @@ export default function HuishoudenTab() {
               />
             ))}
             <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
-              Als beheerder bepaal je welke modules beschikbaar zijn. Wat je hier uitzet,
-              kan niemand in het huishouden voor zichzelf aanzetten.
+              {t('household.householdModules.hint')}
             </Text>
           </>
         )}
@@ -207,7 +206,7 @@ export default function HuishoudenTab() {
         {/* Wisselen tussen huishoudens */}
         {households.length > 1 && (
           <>
-            <SectionHeader title="Wissel van huishouden" />
+            <SectionHeader title={t('household.section.switch')} />
             {households.map((h) => (
               <ItemRow
                 key={h.id}
@@ -220,13 +219,13 @@ export default function HuishoudenTab() {
           </>
         )}
 
-        <Button title="Nieuw of aansluiten bij huishouden" icon="add" variant="soft"
+        <Button title={t('household.newOrJoin')} icon="add" variant="soft"
           onPress={() => router.push('/onboarding')} style={{ marginTop: space.sm, marginBottom: space.sm }} />
-        <Button title="Huishouden verlaten" variant="ghost" onPress={confirmLeave}
+        <Button title={t('household.leave.button')} variant="ghost" onPress={confirmLeave}
           style={{ marginBottom: space.xl, borderColor: 'transparent' }} />
 
         {/* Profiel */}
-        <SectionHeader title="Jij" />
+        <SectionHeader title={t('household.section.you')} />
         <Card style={{ marginBottom: space.lg }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Avatar emoji={profile?.avatar_emoji} name={profile?.display_name} size={44} />
@@ -235,7 +234,7 @@ export default function HuishoudenTab() {
             </View>
           </View>
         </Card>
-        <Button title="Uitloggen" icon="signout" variant="ghost" onPress={signOut} style={{ borderColor: 'transparent' }} />
+        <Button title={t('common.signOut')} icon="signout" variant="ghost" onPress={signOut} style={{ borderColor: 'transparent' }} />
 
         <Text style={[type.caption, { textAlign: 'center', marginTop: space.xl }]}>Huishoek · v1.0</Text>
       </ScrollView>
@@ -246,28 +245,28 @@ export default function HuishoudenTab() {
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
             <ModalHeader
-              title={editId ? 'Groep bewerken' : 'Nieuwe groep'}
+              title={editId ? t('household.subgroup.edit') : t('household.subgroup.new')}
               onClose={() => setEditorOpen(false)}
               onConfirm={saveSubgroup}
               busy={sgBusy}
             />
             <ScrollView contentContainerStyle={{ padding: space.lg }} keyboardShouldPersistTaps="handled">
               {!editId ? (
-                <Field label="Naam van de groep" value={sgName}
+                <Field label={t('household.subgroup.field.name')} value={sgName}
                   onChangeText={(v) => { setSgName(v); clearSgErr('name'); }}
-                  placeholder="Bijv. Ouders, Voetbal Tim" autoFocus error={sgErrors.name} />
+                  placeholder={t('household.subgroup.field.name.placeholder')} autoFocus error={sgErrors.name} />
               ) : (
                 <Text style={[type.h2, { marginBottom: space.md }]}>{sgEmoji} {sgName}</Text>
               )}
 
               {!editId && (
                 <>
-                  <Text style={[type.label, { marginBottom: space.sm }]}>Icoon</Text>
+                  <Text style={[type.label, { marginBottom: space.sm }]}>{t('household.subgroup.icon')}</Text>
                   <EmojiPicker options={sgEmojis} value={sgEmoji} onChange={setSgEmoji} style={{ marginBottom: space.lg }} />
                 </>
               )}
 
-              <Text style={[type.label, { marginBottom: space.sm }]}>Wie zit in deze groep?</Text>
+              <Text style={[type.label, { marginBottom: space.sm }]}>{t('household.subgroup.whoLabel')}</Text>
               {sgErrors.members ? (
                 <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{sgErrors.members}</Text>
               ) : null}
@@ -277,20 +276,20 @@ export default function HuishoudenTab() {
                   <ItemRow
                     key={m.id}
                     leading={<Avatar emoji={m.avatar_emoji} name={m.display_name} />}
-                    title={`${m.display_name}${m.id === profile?.id ? '  (jij)' : ''}`}
+                    title={`${m.display_name}${m.id === profile?.id ? `  ${t('household.you')}` : ''}`}
                     trailing={<Checkbox checked={on} onPress={() => toggleSgMember(m.id)}
-                      accessibilityLabel={`${m.display_name}${on ? ', geselecteerd' : ''}`} />}
+                      accessibilityLabel={`${m.display_name}${on ? `, ${t('a11y.selected')}` : ''}`} />}
                     onPress={() => toggleSgMember(m.id)}
                   />
                 );
               })}
 
               {editId && (
-                <Button title="Groep verwijderen" icon="delete" variant="ghost"
+                <Button title={t('household.subgroup.deleteButton')} icon="delete" variant="ghost"
                   onPress={() => { setEditorOpen(false); confirmDeleteSubgroup({ id: editId, name: sgName }); }}
                   style={{ marginTop: space.lg, borderColor: 'transparent' }} />
               )}
-              <Button title={editId ? 'Wijzigingen bewaren' : 'Groep aanmaken'}
+              <Button title={editId ? t('common.saveChanges') : t('household.subgroup.create')}
                 onPress={saveSubgroup} loading={sgBusy} style={{ marginTop: space.md }} />
             </ScrollView>
           </KeyboardAvoidingView>

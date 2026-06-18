@@ -20,8 +20,13 @@ import { validateVisibility } from '../../lib/visibility';
 import {
   SPLIT, computeShares, exactSharesValid, formatCents, parseAmountToCents,
 } from '../../lib/expenses';
+import { t } from '../../lib/i18n';
 
-const SPLIT_LABELS = { [SPLIT.EQUAL]: 'Gelijk', [SPLIT.SHARES]: 'Op aandeel', [SPLIT.EXACT]: 'Exact bedrag' };
+const SPLIT_LABELS = {
+  [SPLIT.EQUAL]: 'expense.split.equal',
+  [SPLIT.SHARES]: 'expense.split.shares',
+  [SPLIT.EXACT]: 'expense.split.exact',
+};
 
 export default function ExpenseEditor() {
   const { id } = useLocalSearchParams();
@@ -80,12 +85,12 @@ export default function ExpenseEditor() {
 
   const save = async () => {
     const e = {};
-    if (!description.trim()) e.description = 'Geef de uitgave een omschrijving';
-    if (amountCents <= 0) e.amount = 'Vul een geldig bedrag in';
-    if (!paidBy) e.paidBy = 'Kies wie betaald heeft';
-    if (selected.length === 0) e.participants = 'Kies minstens één deelnemer';
+    if (!description.trim()) e.description = t('expense.error.description');
+    if (amountCents <= 0) e.amount = t('expense.error.amount');
+    if (!paidBy) e.paidBy = t('expense.error.paidBy');
+    if (selected.length === 0) e.participants = t('expense.error.participants');
     if (splitType === SPLIT.EXACT && !exactSharesValid(amountCents, participants)) {
-      e.exact = `Er moet nog ${formatCents(exactRemaining)} verdeeld worden.`;
+      e.exact = t('expense.error.exact', { amount: formatCents(exactRemaining) });
     }
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
@@ -102,14 +107,14 @@ export default function ExpenseEditor() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert('Kon uitgave niet opslaan', e.message);
+      Alert.alert(t('expense.error.save'), e.message);
     } finally { setBusy(false); }
   };
 
   const removeExisting = () => {
-    Alert.alert('Uitgave verwijderen?', 'Dit kan niet ongedaan worden gemaakt.', [
-      { text: 'Annuleren', style: 'cancel' },
-      { text: 'Verwijder', style: 'destructive', onPress: async () => {
+    Alert.alert(t('expense.delete.title'), t('expense.delete.body'), [
+      { text: t('common.cancelLong'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
         await mutate(supabase.from('expenses').delete().eq('id', id), { context: 'uitgave verwijderen' });
         router.back();
       } },
@@ -119,23 +124,23 @@ export default function ExpenseEditor() {
   // ---------- Read-only weergave bestaande uitgave ----------
   if (!isNew) {
     if (!existing) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
-    const nameOf = (pid) => members.find((m) => m.id === pid)?.display_name ?? 'Iemand';
+    const nameOf = (pid) => members.find((m) => m.id === pid)?.display_name ?? t('common.someone');
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
           <ModalHeader title={existing.description} onClose={() => router.back()} />
           <Text style={[type.h2, { color: colors.forest }]}>{formatCents(existing.amount_cents)}</Text>
           <Text style={[type.body, { color: colors.inkSoft, marginTop: space.xs }]}>
-            {nameOf(existing.paid_by)} betaalde · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: nl })}
+            {t('expenses.row.paid', { name: nameOf(existing.paid_by) })} · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: nl })}
           </Text>
-          <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>Verdeling</Text>
+          <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>{t('expense.detail.split')}</Text>
           {(existing.expense_shares ?? []).map((s) => (
             <Row key={s.profile_id} justify="space-between" style={{ paddingVertical: space.xs }}>
               <Text style={type.body}>{nameOf(s.profile_id)}</Text>
               <Text style={type.body}>{formatCents(s.amount_cents)}</Text>
             </Row>
           ))}
-          <Button title="Verwijderen" icon="delete" variant="ghost" onPress={removeExisting} style={{ marginTop: space.xl }} />
+          <Button title={t('common.remove')} icon="delete" variant="ghost" onPress={removeExisting} style={{ marginTop: space.xl }} />
         </View>
       </SafeAreaView>
     );
@@ -146,30 +151,30 @@ export default function ExpenseEditor() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title="Nieuwe uitgave" onClose={() => router.back()} />
+          <ModalHeader title={t('expense.new')} onClose={() => router.back()} />
 
-          <Field label="Omschrijving" value={description}
+          <Field label={t('expense.field.description')} value={description}
             onChangeText={(v) => { setDescription(v); clearErr('description'); }}
-            placeholder="Boodschappen, etentje, ..." error={errors.description} />
-          <Field label="Bedrag (€)" value={amountText}
+            placeholder={t('expense.field.description.placeholder')} error={errors.description} />
+          <Field label={t('expense.field.amount')} value={amountText}
             onChangeText={(v) => { setAmountText(v); clearErr('amount'); }}
             placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
 
-          <Text style={[type.label, { marginBottom: space.xs }]}>Betaald door</Text>
+          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
           <AvatarSelect members={members} selectedId={paidBy}
             onSelect={(id) => { setPaidBy(id); clearErr('paidBy'); }} style={{ marginBottom: space.md }} />
           {errors.paidBy ? (
             <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.paidBy}</Text>
           ) : null}
 
-          <Text style={[type.label, { marginBottom: space.xs }]}>Splitsing</Text>
+          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.split')}</Text>
           <View style={{ flexDirection: 'row', marginBottom: space.md }}>
             {Object.values(SPLIT).map((s) => (
-              <Chip key={s} label={SPLIT_LABELS[s]} active={splitType === s} onPress={() => setSplitType(s)} />
+              <Chip key={s} label={t(SPLIT_LABELS[s])} active={splitType === s} onPress={() => setSplitType(s)} />
             ))}
           </View>
 
-          <Text style={[type.label, { marginBottom: space.xs }]}>Deelnemers</Text>
+          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.participants')}</Text>
           {errors.participants ? (
             <Text style={[type.caption, { color: colors.danger, marginBottom: space.xs }]}>{errors.participants}</Text>
           ) : null}
@@ -179,7 +184,7 @@ export default function ExpenseEditor() {
               <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
                 borderBottomWidth: 1, borderBottomColor: colors.line }}>
                 <Checkbox checked={on} onPress={() => { toggleMember(m.id); clearErr('participants'); }}
-                  accessibilityLabel={`${m.display_name}${on ? ', deelnemer' : ''}`} />
+                  accessibilityLabel={`${m.display_name}${on ? t('expense.a11y.participant') : ''}`} />
                 <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
 
                 {on && splitType === SPLIT.EQUAL && (
@@ -188,7 +193,7 @@ export default function ExpenseEditor() {
                 {on && splitType === SPLIT.SHARES && (
                   <Row gap={space.sm}>
                     <Stepper value={weights[m.id] ?? 1} onChange={(v) => setWeights((w) => ({ ...w, [m.id]: v }))}
-                      min={1} accessibilityLabel={`Aandeel ${m.display_name}`} />
+                      min={1} accessibilityLabel={t('expense.a11y.share', { name: m.display_name })} />
                     <Text style={[type.caption, { width: 60, textAlign: 'right' }]}>{formatCents(preview[m.id] ?? 0)}</Text>
                   </Row>
                 )}
@@ -204,7 +209,7 @@ export default function ExpenseEditor() {
 
           {splitType === SPLIT.EXACT && (
             <Text style={[type.caption, { marginTop: space.sm, color: exactRemaining === 0 ? colors.done : colors.danger }]}>
-              {exactRemaining === 0 ? 'Bedragen kloppen' : `Nog te verdelen: ${formatCents(exactRemaining)}`}
+              {exactRemaining === 0 ? t('expense.exact.balanced') : t('expense.exact.remaining', { amount: formatCents(exactRemaining) })}
             </Text>
           )}
 
@@ -219,7 +224,7 @@ export default function ExpenseEditor() {
             ) : null}
           </View>
 
-          <Button title="Uitgave opslaan" onPress={save} loading={busy} style={{ marginTop: 20 }} />
+          <Button title={t('expense.save')} onPress={save} loading={busy} style={{ marginTop: 20 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

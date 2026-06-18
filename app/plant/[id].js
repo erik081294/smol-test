@@ -22,6 +22,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
 import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
+import { t } from '../../lib/i18n';
 
 const LOCATIONS = ['Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Balkon', 'Tuin', 'Kantoor'];
 
@@ -65,7 +66,7 @@ export default function PlantScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
       // Op web is permission soms een no-op; alleen blokkeren als expliciet geweigerd.
       if (perm?.granted === false) {
-        Alert.alert('Geen toegang', 'Geef toegang tot je foto’s om een plantfoto toe te voegen.'); return null;
+        Alert.alert(t('plant.photo.noAccess.title'), t('plant.photo.noAccess.body')); return null;
       }
       const launch = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
       // Geen allowsEditing/aspect: op web niet ondersteund en kan het dialoog blokkeren.
@@ -76,10 +77,10 @@ export default function PlantScreen() {
       const data = parseDataUrl(a.uri);
       const base64 = a.base64 ?? data?.base64 ?? null;
       const ext = data?.ext ?? extFromUri(a.uri);
-      if (!base64) { Alert.alert('Foto', 'Kon de afbeelding niet lezen. Probeer een andere foto.'); return null; }
+      if (!base64) { Alert.alert(t('plant.photo.title'), t('plant.photo.readError')); return null; }
       return { uri: a.uri, base64, ext };
     } catch (e) {
-      Alert.alert('Foto', e.message ?? 'Kon de fotokiezer niet openen.');
+      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.openError'));
       return null;
     }
   };
@@ -88,11 +89,11 @@ export default function PlantScreen() {
   // dus daar openen we direct de bibliotheek. `onPicked` krijgt het gekozen asset.
   const offerPicker = (onPicked, { allowRemove = false, onRemove } = {}) => {
     if (Platform.OS === 'web') { pickAsset(false).then((a) => { if (a) onPicked(a); }); return; }
-    Alert.alert('Plantfoto', 'Waarvandaan?', [
-      { text: 'Camera', onPress: async () => { const a = await pickAsset(true); if (a) onPicked(a); } },
-      { text: 'Bibliotheek', onPress: async () => { const a = await pickAsset(false); if (a) onPicked(a); } },
-      ...(allowRemove ? [{ text: 'Verwijderen', style: 'destructive', onPress: onRemove }] : []),
-      { text: 'Annuleren', style: 'cancel' },
+    Alert.alert(t('plant.photo.source.title'), t('plant.photo.source.body'), [
+      { text: t('plant.photo.camera'), onPress: async () => { const a = await pickAsset(true); if (a) onPicked(a); } },
+      { text: t('plant.photo.library'), onPress: async () => { const a = await pickAsset(false); if (a) onPicked(a); } },
+      ...(allowRemove ? [{ text: t('common.remove'), style: 'destructive', onPress: onRemove }] : []),
+      { text: t('common.cancelLong'), style: 'cancel' },
     ]);
   };
 
@@ -101,9 +102,9 @@ export default function PlantScreen() {
 
   const save = async () => {
     const e = {};
-    if (!name.trim()) e.name = 'Geef je plant een naam';
+    if (!name.trim()) e.name = t('plant.error.name');
     if (!speciesId && !(parseInt(waterDays, 10) > 0)) {
-      e.water = 'Kies een soort, of vul zelf een waterinterval in dagen in.';
+      e.water = t('plant.error.water');
     }
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
@@ -120,7 +121,7 @@ export default function PlantScreen() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert('Kon plant niet opslaan', e.message);
+      Alert.alert(t('plant.error.save'), e.message);
     } finally { setBusy(false); }
   };
 
@@ -152,7 +153,7 @@ export default function PlantScreen() {
       setPhotoNonce((n) => n + 1); // verse signed URL
       reloadDiary();
     } catch (e) {
-      Alert.alert('Foto', e.message ?? 'Uploaden mislukt.');
+      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.uploadError'));
     } finally { setPhotoBusy(false); }
   });
 
@@ -173,7 +174,7 @@ export default function PlantScreen() {
       setPhotoNonce((n) => n + 1);
       reloadDiary();
     } catch (e) {
-      Alert.alert('Foto', e.message ?? 'Verwijderen mislukt.');
+      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.deleteError'));
     }
   };
 
@@ -181,12 +182,12 @@ export default function PlantScreen() {
   const confirmRemovePhoto = () => {
     if (Platform.OS === 'web') {
       // eslint-disable-next-line no-alert
-      if (typeof window !== 'undefined' && window.confirm('Deze foto verwijderen?')) removeSelectedPhoto();
+      if (typeof window !== 'undefined' && window.confirm(t('plant.photo.confirmDelete.web'))) removeSelectedPhoto();
       return;
     }
-    Alert.alert('Foto verwijderen?', 'Dit kan niet ongedaan worden gemaakt.', [
-      { text: 'Annuleren', style: 'cancel' },
-      { text: 'Verwijder', style: 'destructive', onPress: removeSelectedPhoto },
+    Alert.alert(t('plant.photo.delete.title'), t('plant.photo.delete.body'), [
+      { text: t('common.cancelLong'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: removeSelectedPhoto },
     ]);
   };
 
@@ -194,19 +195,19 @@ export default function PlantScreen() {
     if (!plant) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
     const sp = species.find((s) => s.id === plant.species_id) ?? null;
     const card = careCard(sp, plant.location);
-    const plantTasks = tasks.filter((t) => t.plant_id === plant.id);
-    const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
-    const confirmRemove = () => Alert.alert('Plant verwijderen?', 'De verzorgingstaken verdwijnen ook.', [
-      { text: 'Annuleren', style: 'cancel' },
-      { text: 'Verwijder', style: 'destructive', onPress: async () => { await removePlant(plant.id); router.back(); } },
+    const plantTasks = tasks.filter((pt) => pt.plant_id === plant.id);
+    const toggle = (task) => (task.completed_at ? uncompleteTask(task.id) : completeTask(task));
+    const confirmRemove = () => Alert.alert(t('plant.delete.title'), t('plant.delete.body'), [
+      { text: t('common.cancelLong'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => { await removePlant(plant.id); router.back(); } },
     ]);
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <IconButton icon="back" tint={colors.forest} accessibilityLabel="Terug" onPress={() => router.back()} />
+          <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('common.back')} onPress={() => router.back()} />
           <View style={{ alignItems: 'center', marginVertical: space.lg }}>
             <Pressable onPress={changePhoto} disabled={photoBusy} accessibilityRole="button"
-              accessibilityLabel={detailPhotoUrl ? 'Foto wijzigen' : 'Foto toevoegen'}>
+              accessibilityLabel={detailPhotoUrl ? t('plant.photo.change') : t('plant.photo.add')}>
               <View style={{ width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
                 alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {photoBusy
@@ -216,7 +217,7 @@ export default function PlantScreen() {
                     : <Icon name="plants" size={44} color={colors.inkSoft} />}
               </View>
               <Text style={[type.caption, { color: colors.forest, marginTop: space.sm, textAlign: 'center' }]}>
-                {detailPhotoUrl ? 'Foto wijzigen' : 'Foto toevoegen'}
+                {detailPhotoUrl ? t('plant.photo.change') : t('plant.photo.add')}
               </Text>
             </Pressable>
             <Text style={[type.h1, { marginTop: 10 }]}>{plant.name}</Text>
@@ -229,37 +230,37 @@ export default function PlantScreen() {
             ) : null}
           </View>
 
-          <Text style={[type.label, { marginBottom: space.sm }]}>Verzorgingskaart</Text>
+          <Text style={[type.label, { marginBottom: space.sm }]}>{t('plant.careCard')}</Text>
           <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space.lg }}>
-            <CareRow icon="light" label="Licht" value={card.light} />
-            <CareRow icon="water" label="Water" value={card.waterText} />
-            <CareRow icon="feed" label="Voeding" value={card.feedText} />
-            {card.notes ? <CareRow icon="note" label="Tip" value={card.notes} /> : null}
+            <CareRow icon="light" label={t('plant.care.light')} value={card.light} />
+            <CareRow icon="water" label={t('plant.care.water')} value={card.waterText} />
+            <CareRow icon="feed" label={t('plant.care.feed')} value={card.feedText} />
+            {card.notes ? <CareRow icon="note" label={t('plant.care.tip')} value={card.notes} /> : null}
           </View>
 
-          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>Verzorgingstaken</Text>
+          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>{t('plant.careTasks')}</Text>
           {plantTasks.length === 0
-            ? <Text style={[type.caption]}>Geen gekoppelde taken.</Text>
-            : plantTasks.map((t) => <TaskRow key={t.id} task={t} members={members} onToggle={toggle} />)}
+            ? <Text style={[type.caption]}>{t('plant.noTasks')}</Text>
+            : plantTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle} />)}
 
           {/* Plantendagboek: foto's over tijd, nieuwste eerst. */}
-          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>Dagboek</Text>
+          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>{t('plant.diary')}</Text>
           {diary.length === 0 ? (
-            <Text style={[type.caption]}>Nog geen foto’s — voeg er een toe via de cirkel hierboven.</Text>
+            <Text style={[type.caption]}>{t('plant.diary.empty')}</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
               {diary.map((ph) => <DiaryThumb key={ph.id} photo={ph} onPress={() => setSelectedPhoto(ph)} />)}
             </ScrollView>
           )}
 
-          <Button title="Plant verwijderen" variant="ghost" onPress={confirmRemove} style={{ marginTop: 24 }} />
+          <Button title={t('plant.deleteButton')} variant="ghost" onPress={confirmRemove} style={{ marginTop: 24 }} />
         </ScrollView>
 
         {/* Dagboekfoto-detail: groot beeld, notitie bewerken, verwijderen. */}
         <Modal visible={!!selectedPhoto} animationType="slide" transparent onRequestClose={() => setSelectedPhoto(null)}>
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay ?? '#0008' }}>
             <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 18, paddingBottom: 28 }}>
-              <ModalHeader title="Dagboekfoto" onClose={() => setSelectedPhoto(null)} />
+              <ModalHeader title={t('plant.diary.photo')} onClose={() => setSelectedPhoto(null)} />
               <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
                 backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
                 {selectedPhotoUrl
@@ -272,13 +273,13 @@ export default function PlantScreen() {
                 </Text>
               ) : null}
               <View style={{ marginTop: space.md }}>
-                <Field label="Notitie" value={noteText} onChangeText={setNoteText} multiline
-                  placeholder="Bijv. nieuw blad, verpot, gele blaadjes…"
+                <Field label={t('plant.field.note')} value={noteText} onChangeText={setNoteText} multiline
+                  placeholder={t('plant.field.note.placeholder')}
                   style={{ marginBottom: 0 }} />
               </View>
               <Row gap={space.sm} style={{ marginTop: space.md }}>
-                <View style={{ flex: 1 }}><Button title="Verwijderen" icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
-                <View style={{ flex: 1 }}><Button title="Notitie bewaren" onPress={saveNote} /></View>
+                <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
+                <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
               </Row>
             </View>
           </View>
@@ -292,12 +293,12 @@ export default function PlantScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title="Nieuwe plant" onClose={() => router.back()} />
+          <ModalHeader title={t('plant.new')} onClose={() => router.back()} />
 
           {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
           <View style={{ alignItems: 'center', marginBottom: space.lg }}>
             <Pressable onPress={choosePhoto} accessibilityRole="button"
-              accessibilityLabel={photoAsset ? 'Foto wijzigen' : 'Foto toevoegen'}>
+              accessibilityLabel={photoAsset ? t('plant.photo.change') : t('plant.photo.add')}>
               <View style={{ width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
                 alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
                 borderWidth: 2, borderColor: colors.line }}>
@@ -307,15 +308,15 @@ export default function PlantScreen() {
               </View>
             </Pressable>
             <Text style={[type.caption, { color: colors.forest, marginTop: space.sm }]}>
-              {photoAsset ? 'Foto wijzigen' : 'Foto toevoegen'}
+              {photoAsset ? t('plant.photo.change') : t('plant.photo.add')}
             </Text>
           </View>
 
-          <Field label="Naam" value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
-            placeholder="Bijv. Mostafa de Monstera" error={errors.name} />
+          <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+            placeholder={t('plant.field.name.placeholder')} error={errors.name} />
 
-          <Field label="Soort zoeken" value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
-            placeholder="Typ een soort, bijv. monstera" />
+          <Field label={t('plant.field.species')} value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
+            placeholder={t('plant.field.species.placeholder')} />
           {query.length > 0 && !speciesId && (
             <View style={{ marginBottom: space.md }}>
               {matches.map((s) => (
@@ -329,7 +330,7 @@ export default function PlantScreen() {
               ))}
               {matches.length === 0 && (
                 <Text style={[type.caption, { paddingVertical: space.sm }]}>
-                  Geen soort gevonden — vul hieronder zelf een waterinterval in.
+                  {t('plant.species.none')}
                 </Text>
               )}
             </View>
@@ -338,18 +339,18 @@ export default function PlantScreen() {
             <Row gap={4} align="center" style={{ marginBottom: 12 }}>
               <Icon name="check" size={14} color={colors.forest} weight="bold" />
               <Text style={[type.caption, { color: colors.forest, flex: 1 }]}>
-                {chosen.common_name} gekozen — schema wordt automatisch ingesteld.
+                {t('plant.species.chosen', { name: chosen.common_name })}
               </Text>
             </Row>
           )}
 
           {!speciesId && (
-            <Field label="Waterinterval (dagen)" value={waterDays}
+            <Field label={t('plant.field.water')} value={waterDays}
               onChangeText={(v) => { setWaterDays(v); clearErr('water'); }}
               placeholder="7" keyboardType="number-pad" error={errors.water} />
           )}
 
-          <Text style={[type.label, { marginBottom: 6 }]}>Locatie</Text>
+          <Text style={[type.label, { marginBottom: 6 }]}>{t('plant.field.location')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {LOCATIONS.map((loc) => (
               <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(loc)} />
@@ -365,7 +366,7 @@ export default function PlantScreen() {
             <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
           ) : null}
 
-          <Button title="Plant opslaan" onPress={save} loading={busy} style={{ marginTop: space.md }} />
+          <Button title={t('plant.save')} onPress={save} loading={busy} style={{ marginTop: space.md }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -378,7 +379,7 @@ export default function PlantScreen() {
 function DiaryThumb({ photo, onPress }) {
   const url = usePlantPhotoUrl(photo.photo_path);
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Dagboekfoto" style={{ alignItems: 'center' }}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('plant.diary.photo')} style={{ alignItems: 'center' }}>
       <View style={{ width: 92, height: 92, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
         overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
         {url ? <Image source={{ uri: url }} style={{ width: 92, height: 92 }} resizeMode="cover" /> : <Icon name="plants" size={28} color={colors.inkSoft} />}
