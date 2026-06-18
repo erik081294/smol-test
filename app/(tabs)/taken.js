@@ -5,8 +5,9 @@ import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty, Chip, FAB, ScreenHeader, IconButton } from '../../lib/ui';
+import { Empty, Chip, FAB, ScreenHeader, IconButton, ListSkeleton } from '../../lib/ui';
 import { colors, categoryMeta } from '../../lib/theme';
+import { animateNextLayout } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
 import { choreToTask } from '../../lib/choreLibrary';
 
@@ -30,7 +31,10 @@ export default function Taken() {
     });
   }, [tasks, cat, showDone]);
 
-  const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
+  const toggle = (t) => {
+    animateNextLayout(); // de taak glijdt zacht uit de lijst bij afvinken
+    return t.completed_at ? uncompleteTask(t.id) : completeTask(t);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -60,10 +64,12 @@ export default function Taken() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
         renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
         ListEmptyComponent={
-          !loading && (
-            <Empty icon="emptyTasks" title={showDone ? 'Nog niets afgerond' : 'Geen open taken'}
+          loading && tasks.length === 0 ? (
+            <ListSkeleton count={6} />
+          ) : !loading ? (
+            <Empty illustration="tasks" title={showDone ? 'Nog niets afgerond' : 'Geen open taken'}
               subtitle={showDone ? 'Afgevinkte taken verschijnen hier.' : 'Voeg een taak toe met de + knop.'} />
-          )
+          ) : null
         }
       />
 

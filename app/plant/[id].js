@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal, TextInput,
+  View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,10 +12,10 @@ import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPh
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, ModalHeader, Row } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, IconButton, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
-import { colors, radius, type } from '../../lib/theme';
+import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
@@ -45,6 +45,8 @@ export default function PlantScreen() {
   const [shareWith, setShareWith] = useState([]);
   const [photoAsset, setPhotoAsset] = useState(null); // { uri, base64, ext } of null
   const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState({}); // inline validatie i.p.v. Alert
+  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
 
   const matches = useMemo(() => searchSpecies(species, query).slice(0, 8), [species, query]);
   const chosen = species.find((s) => s.id === speciesId) ?? null;
@@ -97,12 +99,15 @@ export default function PlantScreen() {
   const choosePhoto = () => offerPicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
-    if (!name.trim()) { Alert.alert('Geef je plant een naam'); return; }
+    const e = {};
+    if (!name.trim()) e.name = 'Geef je plant een naam';
     if (!speciesId && !(parseInt(waterDays, 10) > 0)) {
-      Alert.alert('Waterinterval', 'Kies een soort, of vul zelf een waterinterval in dagen in.'); return;
+      e.water = 'Kies een soort, of vul zelf een waterinterval in dagen in.';
     }
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) { Alert.alert('Delen met', visError); return; }
+    if (visError) e.visibility = visError;
+    setErrors(e);
+    if (Object.keys(e).length) return;
     setBusy(true);
     try {
       await addPlant({
@@ -194,15 +199,12 @@ export default function PlantScreen() {
     ]);
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={10} accessibilityLabel="Terug"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Icon name="back" size={18} color={colors.forest} />
-            <Text style={{ fontSize: 16, color: colors.forest }}>Terug</Text>
-          </TouchableOpacity>
-          <View style={{ alignItems: 'center', marginVertical: 16 }}>
-            <TouchableOpacity onPress={changePhoto} activeOpacity={0.8} disabled={photoBusy}>
-              <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceAlt,
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
+          <IconButton icon="back" tint={colors.forest} accessibilityLabel="Terug" onPress={() => router.back()} />
+          <View style={{ alignItems: 'center', marginVertical: space.lg }}>
+            <Pressable onPress={changePhoto} disabled={photoBusy} accessibilityRole="button"
+              accessibilityLabel={detailPhotoUrl ? 'Foto wijzigen' : 'Foto toevoegen'}>
+              <View style={{ width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
                 alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {photoBusy
                   ? <ActivityIndicator color={colors.forest} />
@@ -210,10 +212,10 @@ export default function PlantScreen() {
                     ? <Image source={{ uri: detailPhotoUrl }} style={{ width: 88, height: 88 }} />
                     : <Icon name="plants" size={44} color={colors.inkSoft} />}
               </View>
-              <Text style={[type.caption, { color: colors.forest, marginTop: 6, textAlign: 'center' }]}>
+              <Text style={[type.caption, { color: colors.forest, marginTop: space.sm, textAlign: 'center' }]}>
                 {detailPhotoUrl ? 'Foto wijzigen' : 'Foto toevoegen'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
             <Text style={[type.h1, { marginTop: 10 }]}>{plant.name}</Text>
             {sp ? <Text style={[type.body, { color: colors.inkSoft }]}>{sp.common_name} · {sp.latin_name}</Text> : null}
             {plant.location ? (
@@ -224,8 +226,8 @@ export default function PlantScreen() {
             ) : null}
           </View>
 
-          <Text style={[type.label, { marginBottom: 8 }]}>Verzorgingskaart</Text>
-          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: 16 }}>
+          <Text style={[type.label, { marginBottom: space.sm }]}>Verzorgingskaart</Text>
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space.lg }}>
             <CareRow icon="light" label="Licht" value={card.light} />
             <CareRow icon="water" label="Water" value={card.waterText} />
             <CareRow icon="feed" label="Voeding" value={card.feedText} />
@@ -242,7 +244,7 @@ export default function PlantScreen() {
           {diary.length === 0 ? (
             <Text style={[type.caption]}>Nog geen foto’s — voeg er een toe via de cirkel hierboven.</Text>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
               {diary.map((ph) => <DiaryThumb key={ph.id} photo={ph} onPress={() => setSelectedPhoto(ph)} />)}
             </ScrollView>
           )}
@@ -266,17 +268,15 @@ export default function PlantScreen() {
                   {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: nl })}
                 </Text>
               ) : null}
-              <Text style={[type.label, { marginTop: 14, marginBottom: 6 }]}>Notitie</Text>
-              <TextInput
-                value={noteText} onChangeText={setNoteText} multiline
-                placeholder="Bijv. nieuw blad, verpot, gele blaadjes…" placeholderTextColor={colors.inkFaint}
-                style={{ minHeight: 64, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md,
-                  padding: 12, fontSize: 15, color: colors.ink, textAlignVertical: 'top', backgroundColor: colors.surface }}
-              />
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-                <View style={{ flex: 1 }}><Button title="Verwijderen" variant="ghost" onPress={confirmRemovePhoto} /></View>
-                <View style={{ flex: 1 }}><Button title="Notitie bewaren" onPress={saveNote} /></View>
+              <View style={{ marginTop: space.md }}>
+                <Field label="Notitie" value={noteText} onChangeText={setNoteText} multiline
+                  placeholder="Bijv. nieuw blad, verpot, gele blaadjes…"
+                  style={{ marginBottom: 0 }} />
               </View>
+              <Row gap={space.sm} style={{ marginTop: space.md }}>
+                <View style={{ flex: 1 }}><Button title="Verwijderen" icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
+                <View style={{ flex: 1 }}><Button title="Notitie bewaren" onPress={saveNote} /></View>
+              </Row>
             </View>
           </View>
         </Modal>
@@ -288,40 +288,44 @@ export default function PlantScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
           <ModalHeader title="Nieuwe plant" onClose={() => router.back()} />
 
           {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <TouchableOpacity onPress={choosePhoto} activeOpacity={0.8}>
-              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surfaceAlt,
+          <View style={{ alignItems: 'center', marginBottom: space.lg }}>
+            <Pressable onPress={choosePhoto} accessibilityRole="button"
+              accessibilityLabel={photoAsset ? 'Foto wijzigen' : 'Foto toevoegen'}>
+              <View style={{ width: 96, height: 96, borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
                 alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
                 borderWidth: 2, borderColor: colors.line }}>
                 {photoAsset?.uri
                   ? <Image source={{ uri: photoAsset.uri }} style={{ width: 96, height: 96 }} />
                   : <Icon name="plants" size={40} color={colors.inkSoft} />}
               </View>
-            </TouchableOpacity>
-            <Text style={[type.caption, { color: colors.forest, marginTop: 6 }]}>
+            </Pressable>
+            <Text style={[type.caption, { color: colors.forest, marginTop: space.sm }]}>
               {photoAsset ? 'Foto wijzigen' : 'Foto toevoegen'}
             </Text>
           </View>
 
-          <Field label="Naam" value={name} onChangeText={setName} placeholder="Bijv. Mostafa de Monstera" />
+          <Field label="Naam" value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+            placeholder="Bijv. Mostafa de Monstera" error={errors.name} />
 
           <Field label="Soort zoeken" value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
             placeholder="Typ een soort, bijv. monstera" />
           {query.length > 0 && !speciesId && (
-            <View style={{ marginBottom: 12 }}>
+            <View style={{ marginBottom: space.md }}>
               {matches.map((s) => (
-                <TouchableOpacity key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); }}
-                  style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                  <Text style={[type.body]}>{s.common_name}</Text>
-                  <Text style={[type.caption]}>{s.latin_name}</Text>
-                </TouchableOpacity>
+                <Pressable key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); clearErr('water'); }}
+                  accessibilityRole="button" accessibilityLabel={s.common_name}
+                  style={({ pressed }) => ({ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line,
+                    backgroundColor: pressed ? colors.surfaceAlt : 'transparent' })}>
+                  <Text style={type.body}>{s.common_name}</Text>
+                  <Text style={type.caption}>{s.latin_name}</Text>
+                </Pressable>
               ))}
               {matches.length === 0 && (
-                <Text style={[type.caption, { paddingVertical: 8 }]}>
+                <Text style={[type.caption, { paddingVertical: space.sm }]}>
                   Geen soort gevonden — vul hieronder zelf een waterinterval in.
                 </Text>
               )}
@@ -337,8 +341,9 @@ export default function PlantScreen() {
           )}
 
           {!speciesId && (
-            <Field label="Waterinterval (dagen)" value={waterDays} onChangeText={setWaterDays}
-              placeholder="7" keyboardType="number-pad" />
+            <Field label="Waterinterval (dagen)" value={waterDays}
+              onChangeText={(v) => { setWaterDays(v); clearErr('water'); }}
+              placeholder="7" keyboardType="number-pad" error={errors.water} />
           )}
 
           <Text style={[type.label, { marginBottom: 6 }]}>Locatie</Text>
@@ -349,12 +354,15 @@ export default function PlantScreen() {
           </View>
 
           <VisibilityPicker
-            visibility={visibility} onChangeVisibility={setVisibility}
-            shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
-            shareWith={shareWith} onToggleMember={toggleShareWith}
+            visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
+            shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
+            shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
             subgroups={subgroups} members={members} />
+          {errors.visibility ? (
+            <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
+          ) : null}
 
-          <Button title="Plant opslaan" onPress={save} loading={busy} style={{ marginTop: 12 }} />
+          <Button title="Plant opslaan" onPress={save} loading={busy} style={{ marginTop: space.md }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -367,30 +375,30 @@ export default function PlantScreen() {
 function DiaryThumb({ photo, onPress }) {
   const url = usePlantPhotoUrl(photo.photo_path);
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={{ alignItems: 'center' }}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Dagboekfoto" style={{ alignItems: 'center' }}>
       <View style={{ width: 92, height: 92, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
         overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
         {url ? <Image source={{ uri: url }} style={{ width: 92, height: 92 }} resizeMode="cover" /> : <Icon name="plants" size={28} color={colors.inkSoft} />}
         {photo.note ? (
-          <View style={{ position: 'absolute', right: 4, bottom: 4, backgroundColor: colors.forest,
+          <View style={{ position: 'absolute', right: space.xs, bottom: space.xs, backgroundColor: colors.forest,
             borderRadius: radius.pill, paddingHorizontal: 5, paddingVertical: 2 }}>
-            <Icon name="note" size={11} color="#fff" />
+            <Icon name="note" size={11} color={colors.onDark} />
           </View>
         ) : null}
       </View>
-      <Text style={[type.caption, { marginTop: 4 }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: nl })}</Text>
-    </TouchableOpacity>
+      <Text style={[type.caption, { marginTop: space.xs }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: nl })}</Text>
+    </Pressable>
   );
 }
 
 function CareRow({ icon, label, value }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
-      <View style={{ width: 96, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: space.xs }}>
+      <View style={{ width: 96, flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
         <Icon name={icon} size={16} color={colors.inkSoft} />
-        <Text style={{ color: colors.inkSoft, fontWeight: '600', fontSize: 14 }}>{label}</Text>
+        <Text style={type.label}>{label}</Text>
       </View>
-      <Text style={{ flex: 1, color: colors.ink, fontSize: 14 }}>{value}</Text>
+      <Text style={[type.body, { flex: 1 }]}>{value}</Text>
     </View>
   );
 }

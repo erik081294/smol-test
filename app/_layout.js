@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
+import { ToastProvider } from '../lib/toast';
 import { colors } from '../lib/theme';
 
 function Gate() {
@@ -62,7 +63,9 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <AuthProvider>
         <HouseholdProvider>
-          <Gate />
+          <ToastProvider>
+            <Gate />
+          </ToastProvider>
         </HouseholdProvider>
       </AuthProvider>
     </SafeAreaProvider>

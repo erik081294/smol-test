@@ -1,28 +1,49 @@
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, ScrollView, TouchableOpacity, Modal, RefreshControl, Alert,
+  View, Text, FlatList, ScrollView, Modal, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
+import { useTaskCompletions } from '../../lib/useTaskCompletions';
 import { useZones } from '../../lib/useZones';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty, Card, Button, ScreenHeader } from '../../lib/ui';
-import { colors, radius, type } from '../../lib/theme';
+import { FairnessBars } from '../../lib/FairnessBars';
+import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader } from '../../lib/ui';
+import { colors, radius, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
 import { CLEANING_TEMPLATES, planTemplate } from '../../lib/cleaningTemplates';
+import { tally, sinceDate, PERIODS } from '../../lib/fairness';
+
+const FAIRNESS_PERIODS = [
+  { key: 'WEEK', label: 'Week', days: PERIODS.WEEK },
+  { key: 'MONTH', label: 'Maand', days: PERIODS.MONTH },
+  { key: 'ALL', label: 'Alles', days: PERIODS.ALL },
+];
 
 export default function Schoonmaak() {
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
+  const { completions } = useTaskCompletions();
   const { zones, reload: reloadZones } = useZones();
   const { members, activeId } = useHousehold();
   const { user } = useAuth();
+  const router = useRouter();
   const [picker, setPicker] = useState(null); // het gekozen sjabloon in de preview
   const [busy, setBusy] = useState(false);
+  const [period, setPeriod] = useState('WEEK'); // eerlijkheidsoverzicht-periode
+
+  // "Wie deed hoeveel": tel alleen schoonmaakvoltooiingen (taak hangt aan een zone).
+  const fairnessRows = useMemo(() => {
+    const cleaning = completions.filter((c) => c.task?.zone_id != null);
+    const days = FAIRNESS_PERIODS.find((p) => p.key === period)?.days ?? null;
+    return tally(cleaning, members, sinceDate(days));
+  }, [completions, members, period]);
+  const hasAnyCompletion = fairnessRows.some((r) => r.count > 0);
 
   // Schoonmaaktaken = taken die aan een zone hangen.
   const byZone = useMemo(() => {
@@ -84,13 +105,30 @@ export default function Schoonmaak() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Schoonmaak" subtitle="Per ruimte, met een vast ritme." />
+      <ScreenHeader title="Schoonmaak" subtitle="Je taken per ruimte — afvinken werkt overal door." />
 
       <FlatList
         contentContainerStyle={{ padding: 18, paddingTop: 8, paddingBottom: 120 }}
         data={zones}
         keyExtractor={(z) => z.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
+        ListHeaderComponent={members.length > 1 ? (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionHeader title="Wie deed hoeveel" />
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {FAIRNESS_PERIODS.map((p) => (
+                <Chip key={p.key} label={p.label} active={period === p.key} onPress={() => setPeriod(p.key)} />
+              ))}
+            </View>
+            {hasAnyCompletion ? (
+              <FairnessBars rows={fairnessRows} />
+            ) : (
+              <Text style={[type.caption]}>
+                Nog geen afgevinkte schoonmaaktaken in deze periode. Telt vanaf nu.
+              </Text>
+            )}
+          </Card>
+        ) : null}
         renderItem={({ item: zone }) => {
           const zt = byZone[zone.id] ?? [];
           return (
@@ -103,11 +141,15 @@ export default function Schoonmaak() {
                   <TaskRow task={t} members={members} onToggle={toggle} />
                 </View>
               ))}
+              {/* Zelfde editor als overal — alleen met deze zone voorgevuld. */}
+              <Button title="Taak toevoegen" icon="add" variant="ghost" fullWidth={false}
+                onPress={() => router.push(`/task/new?zone=${zone.id}`)}
+                style={{ marginTop: 8 }} />
             </Card>
           );
         }}
         ListEmptyComponent={!loading && (
-          <Empty icon="cleaning" title="Nog geen schoonmaakzones"
+          <Empty illustration="cleaning" title="Nog geen schoonmaakzones"
             subtitle="Zet in één keer een weekschema op met de knop hieronder." />
         )}
       />
@@ -120,50 +162,43 @@ export default function Schoonmaak() {
 
       {/* Sjabloon-preview */}
       <Modal visible={!!picker} animationType="slide" transparent onRequestClose={() => setPicker(null)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0006' }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
           <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
-            padding: 18, maxHeight: '85%' }}>
-            <Text style={[type.h2, { marginBottom: 10 }]}>Weekschema opzetten</Text>
+            padding: space.lg, maxHeight: '85%' }}>
+            <Text style={[type.h2, { marginBottom: space.sm }]}>Weekschema opzetten</Text>
 
             {/* Sjabloonkeuze */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
               {CLEANING_TEMPLATES.map((t) => (
-                <TouchableOpacity key={t.key} onPress={() => setPicker(t)}
-                  style={{
-                    paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.md, marginRight: 8,
-                    backgroundColor: picker?.key === t.key ? colors.forest : colors.surface,
-                    borderWidth: 1.5, borderColor: picker?.key === t.key ? colors.forest : colors.line,
-                  }}>
-                  <Text style={{ color: picker?.key === t.key ? '#fff' : colors.ink, fontWeight: '700' }}>{t.label}</Text>
-                </TouchableOpacity>
+                <Chip key={t.key} label={t.label} active={picker?.key === t.key} onPress={() => setPicker(t)} />
               ))}
             </ScrollView>
 
             {picker && (
-              <Text style={[type.body, { color: colors.inkSoft, marginBottom: 10 }]}>{picker.description}</Text>
+              <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>{picker.description}</Text>
             )}
 
             <ScrollView style={{ maxHeight: 320 }}>
               {preview?.tasks.map((t, i) => (
                 <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
-                  paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                  <Text style={[type.body]}>{t.zone_name} · {t.title}</Text>
-                  <Text style={[type.caption]}>{recurrenceLabel(t)}</Text>
+                  paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                  <Text style={type.body}>{t.zone_name} · {t.title}</Text>
+                  <Text style={type.caption}>{recurrenceLabel(t)}</Text>
                 </View>
               ))}
             </ScrollView>
 
             {preview && (
-              <Text style={[type.caption, { marginTop: 10 }]}>
+              <Text style={[type.caption, { marginTop: space.sm }]}>
                 {preview.tasks.length} taken
                 {preview.zonesToCreate.length ? ` · ${preview.zonesToCreate.length} nieuwe zones` : ' · gebruikt bestaande zones'}
               </Text>
             )}
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+            <Row gap={space.sm} style={{ marginTop: space.md }}>
               <View style={{ flex: 1 }}><Button title="Annuleren" variant="ghost" onPress={() => setPicker(null)} /></View>
               <View style={{ flex: 1 }}><Button title="Opzetten" loading={busy} onPress={applyTemplate} /></View>
-            </View>
+            </Row>
           </View>
         </View>
       </Modal>

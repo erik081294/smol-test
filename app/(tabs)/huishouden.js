@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Share, Platform, Modal, KeyboardAvoidingView, Switch } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, Share, Platform, Modal, KeyboardAvoidingView, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Card, Button, Avatar, Field, Chip } from '../../lib/ui';
+import {
+  Card, Button, Avatar, Field, Checkbox, Badge, EmojiPicker,
+  ScreenHeader, SectionHeader, ItemRow, ModalHeader, IconButton,
+} from '../../lib/ui';
+import { Illustration } from '../../lib/illustrations';
 import { Icon } from '../../lib/icons';
-import { colors, radius, type } from '../../lib/theme';
+import { colors, radius, type, space } from '../../lib/theme';
 import { TOGGLEABLE_MODULES } from '../../lib/modules';
 
 export default function HuishoudenTab() {
@@ -15,7 +19,6 @@ export default function HuishoudenTab() {
           householdDisabled, userDisabled, setHouseholdModule, setUserModule } = useHousehold();
   const { profile, signOut } = useAuth();
   const router = useRouter();
-  const [switching, setSwitching] = useState(false);
   const isOwner = active?.role === 'owner';
 
   const toggleHouseholdModule = (key, enabled) =>
@@ -30,20 +33,27 @@ export default function HuishoudenTab() {
   const [sgEmoji, setSgEmoji] = useState('👥');
   const [sgMembers, setSgMembers] = useState([]);
   const [sgBusy, setSgBusy] = useState(false);
+  const [sgErrors, setSgErrors] = useState({}); // { name, members } — inline i.p.v. Alert
+  const clearSgErr = (key) => setSgErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
 
   const openNewSubgroup = () => {
-    setEditId(null); setSgName(''); setSgEmoji('👥'); setSgMembers([]); setEditorOpen(true);
+    setEditId(null); setSgName(''); setSgEmoji('👥'); setSgMembers([]); setSgErrors({}); setEditorOpen(true);
   };
   const openEditSubgroup = (g) => {
     setEditId(g.id); setSgName(g.name); setSgEmoji(g.emoji);
-    setSgMembers(g.memberIds ?? []); setEditorOpen(true);
+    setSgMembers(g.memberIds ?? []); setSgErrors({}); setEditorOpen(true);
   };
-  const toggleSgMember = (pid) =>
+  const toggleSgMember = (pid) => {
+    clearSgErr('members');
     setSgMembers((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
+  };
 
   const saveSubgroup = async () => {
-    if (!sgName.trim()) { Alert.alert('Geef de groep een naam'); return; }
-    if (sgMembers.length === 0) { Alert.alert('Kies minstens één persoon'); return; }
+    const e = {};
+    if (!sgName.trim()) e.name = 'Geef de groep een naam';
+    if (sgMembers.length === 0) e.members = 'Kies minstens één persoon';
+    setSgErrors(e);
+    if (Object.keys(e).length) return;
     setSgBusy(true);
     try {
       if (editId) await updateSubgroupMembers(editId, sgMembers);
@@ -78,179 +88,156 @@ export default function HuishoudenTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-        <Text style={[type.h1, { marginBottom: 16 }]}>Huishouden</Text>
+      <ScreenHeader title="Huishouden" />
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: space.xxl }}>
 
         {/* Actief huishouden */}
-        <Card style={{ marginBottom: 16 }}>
+        <Card style={{ marginBottom: space.lg }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 40, marginRight: 12 }}>{active?.emoji}</Text>
+            <Text style={{ fontSize: 40, marginRight: space.md }}>{active?.emoji}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[type.h2]}>{active?.name}</Text>
-              <Text style={[type.caption]}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
+              <Text style={type.h2}>{active?.name}</Text>
+              <Text style={type.caption}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
             </View>
           </View>
 
-          {/* Invite code */}
-          <TouchableOpacity onPress={shareCode}
-            style={{
-              marginTop: 16, backgroundColor: colors.forest, borderRadius: radius.md,
-              padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            }}>
+          {/* Invite code — branded hero, tikbaar om te delen */}
+          <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel="Uitnodigingscode delen"
+            style={({ pressed }) => ({
+              marginTop: space.lg, backgroundColor: pressed ? colors.forestSoft : colors.forest,
+              borderRadius: radius.md, padding: space.md,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            })}>
             <View>
               <Text style={{ color: colors.ocherSoft, fontSize: 12, fontWeight: '600' }}>UITNODIGINGSCODE</Text>
-              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', letterSpacing: 4, marginTop: 2 }}>
+              <Text style={{ color: colors.onDark, fontSize: 26, fontWeight: '800', letterSpacing: 4, marginTop: 2 }}>
                 {active?.invite_code}
               </Text>
             </View>
             <Icon name="share" size={22} color={colors.onDark} />
-          </TouchableOpacity>
-          <Text style={[type.caption, { marginTop: 8, textAlign: 'center' }]}>
+          </Pressable>
+          <Text style={[type.caption, { marginTop: space.sm, textAlign: 'center' }]}>
             Deel deze code zodat anderen kunnen aansluiten.
           </Text>
         </Card>
 
         {/* Leden */}
-        <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>LEDEN</Text>
-        <Card style={{ marginBottom: 16, padding: 6 }}>
-          {members.map((m) => (
-            <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-              <Avatar emoji={m.avatar_emoji} name={m.display_name} />
-              <Text style={{ flex: 1, marginLeft: 12, fontSize: 16, fontWeight: '500', color: colors.ink }}>
-                {m.display_name}{m.id === profile?.id ? '  (jij)' : ''}
-              </Text>
-              {m.role === 'owner' && (
-                <View style={{ backgroundColor: colors.ocherSoft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.forest }}>Beheerder</Text>
-                </View>
-              )}
-            </View>
-          ))}
-        </Card>
+        <SectionHeader title="Leden" count={members.length} />
+        {members.map((m) => (
+          <ItemRow
+            key={m.id}
+            leading={<Avatar emoji={m.avatar_emoji} name={m.display_name} />}
+            title={`${m.display_name}${m.id === profile?.id ? '  (jij)' : ''}`}
+            trailing={m.role === 'owner' ? <Badge label="Beheerder" tone="brand" /> : null}
+          />
+        ))}
 
         {/* Groepen (subgroepen) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginLeft: 4, marginRight: 4 }}>
-          <Text style={[type.label]}>GROEPEN</Text>
-          <TouchableOpacity onPress={openNewSubgroup} hitSlop={10}>
-            <Text style={{ color: colors.forest, fontWeight: '700' }}>+ Nieuw</Text>
-          </TouchableOpacity>
-        </View>
-        <Card style={{ marginBottom: 16, padding: 6 }}>
-          {subgroups.length === 0 ? (
-            <Text style={[type.caption, { padding: 12 }]}>
+        <SectionHeader title="Groepen" count={subgroups.length}
+          action={<IconButton icon="add" accessibilityLabel="Nieuwe groep" tint={colors.forest} onPress={openNewSubgroup} />} />
+        {subgroups.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: space.md }}>
+            <Illustration name="groups" size={96} />
+            <Text style={[type.caption, { textAlign: 'center', marginTop: space.sm }]}>
               Nog geen groepen. Maak er een (bijv. "Ouders" of "Voetbal Tim") om taken
               met een vast clubje te delen in plaats van het hele huishouden.
             </Text>
-          ) : subgroups.map((g) => {
-            const names = (g.memberIds ?? [])
-              .map((id) => members.find((m) => m.id === id)?.display_name?.split(' ')[0])
-              .filter(Boolean).join(', ');
-            return (
-              <TouchableOpacity key={g.id} onPress={() => openEditSubgroup(g)}
-                onLongPress={() => confirmDeleteSubgroup(g)}
-                style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-                <Text style={{ fontSize: 22, marginRight: 12 }}>{g.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.ink }}>{g.name}</Text>
-                  <Text style={[type.caption]} numberOfLines={1}>
-                    {names || 'Geen leden'}
-                  </Text>
-                </View>
-                <Icon name="forward" size={20} color={colors.inkFaint} />
-              </TouchableOpacity>
-            );
-          })}
-        </Card>
+          </View>
+        ) : subgroups.map((g) => {
+          const names = (g.memberIds ?? [])
+            .map((id) => members.find((m) => m.id === id)?.display_name?.split(' ')[0])
+            .filter(Boolean).join(', ');
+          return (
+            <ItemRow
+              key={g.id}
+              leading={<Avatar emoji={g.emoji} />}
+              title={g.name}
+              meta={<Text style={type.caption} numberOfLines={1}>{names || 'Geen leden'}</Text>}
+              chevron
+              onPress={() => openEditSubgroup(g)}
+              accessibilityHint="Tik om te bewerken"
+            />
+          );
+        })}
 
-        {/* Modules: aan/uit per gebruiker, en (als owner) voor het huishouden */}
-        <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>MIJN MODULES</Text>
-        <Card style={{ marginBottom: 16, padding: 6 }}>
-          {TOGGLEABLE_MODULES.map((m) => {
-            const offForHousehold = householdDisabled.includes(m.key);
-            const onForMe = !offForHousehold && !userDisabled.includes(m.key);
-            return (
-              <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-                <Text style={{ fontSize: 22, marginRight: 12, opacity: offForHousehold ? 0.4 : 1 }}>{m.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: offForHousehold ? colors.inkFaint : colors.ink }}>
-                    {m.label}
-                  </Text>
-                  {offForHousehold && (
-                    <Text style={[type.caption]}>Uitgezet voor het hele huishouden</Text>
-                  )}
-                </View>
-                <Switch
-                  value={onForMe}
-                  disabled={offForHousehold}
-                  onValueChange={(v) => toggleUserModule(m.key, v)}
-                  trackColor={{ true: colors.forest }}
-                />
-              </View>
-            );
-          })}
-          <Text style={[type.caption, { paddingHorizontal: 12, paddingBottom: 6, paddingTop: 2 }]}>
-            Kies welke modules jij in de tabbalk ziet. Vandaag en Huishouden staan altijd aan.
-          </Text>
-        </Card>
+        {/* Modules: aan/uit per gebruiker */}
+        <SectionHeader title="Mijn modules" />
+        {TOGGLEABLE_MODULES.map((m) => {
+          const offForHousehold = householdDisabled.includes(m.key);
+          const onForMe = !offForHousehold && !userDisabled.includes(m.key);
+          return (
+            <ItemRow
+              key={m.key}
+              leading={<Icon name={m.icon} size={24} color={offForHousehold ? colors.inkFaint : colors.forest} />}
+              title={m.label}
+              titleColor={offForHousehold ? colors.inkFaint : undefined}
+              meta={offForHousehold ? <Text style={type.caption}>Uitgezet voor het hele huishouden</Text> : undefined}
+              trailing={
+                <Switch value={onForMe} disabled={offForHousehold}
+                  onValueChange={(v) => toggleUserModule(m.key, v)} trackColor={{ true: colors.forest }} />
+              }
+            />
+          );
+        })}
+        <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
+          Kies welke modules jij in de tabbalk ziet. Vandaag en Huishouden staan altijd aan.
+        </Text>
 
         {isOwner && (
           <>
-            <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>MODULES VOOR HET HUISHOUDEN</Text>
-            <Card style={{ marginBottom: 16, padding: 6 }}>
-              {TOGGLEABLE_MODULES.map((m) => (
-                <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-                  <Text style={{ fontSize: 22, marginRight: 12 }}>{m.emoji}</Text>
-                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '600', color: colors.ink }}>{m.label}</Text>
-                  <Switch
-                    value={!householdDisabled.includes(m.key)}
-                    onValueChange={(v) => toggleHouseholdModule(m.key, v)}
-                    trackColor={{ true: colors.forest }}
-                  />
-                </View>
-              ))}
-              <Text style={[type.caption, { paddingHorizontal: 12, paddingBottom: 6, paddingTop: 2 }]}>
-                Als beheerder bepaal je welke modules beschikbaar zijn. Wat je hier uitzet,
-                kan niemand in het huishouden voor zichzelf aanzetten.
-              </Text>
-            </Card>
+            <SectionHeader title="Modules voor het huishouden" />
+            {TOGGLEABLE_MODULES.map((m) => (
+              <ItemRow
+                key={m.key}
+                leading={<Icon name={m.icon} size={24} color={colors.forest} />}
+                title={m.label}
+                trailing={
+                  <Switch value={!householdDisabled.includes(m.key)}
+                    onValueChange={(v) => toggleHouseholdModule(m.key, v)} trackColor={{ true: colors.forest }} />
+                }
+              />
+            ))}
+            <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
+              Als beheerder bepaal je welke modules beschikbaar zijn. Wat je hier uitzet,
+              kan niemand in het huishouden voor zichzelf aanzetten.
+            </Text>
           </>
         )}
 
         {/* Wisselen tussen huishoudens */}
         {households.length > 1 && (
           <>
-            <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>WISSEL VAN HUISHOUDEN</Text>
-            <Card style={{ marginBottom: 16, padding: 6 }}>
-              {households.map((h) => (
-                <TouchableOpacity key={h.id} onPress={() => selectHousehold(h.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-                  <Text style={{ fontSize: 24, marginRight: 12 }}>{h.emoji}</Text>
-                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '500', color: colors.ink }}>{h.name}</Text>
-                  {h.id === active?.id && <Icon name="check" size={20} color={colors.done} weight="bold" />}
-                </TouchableOpacity>
-              ))}
-            </Card>
+            <SectionHeader title="Wissel van huishouden" />
+            {households.map((h) => (
+              <ItemRow
+                key={h.id}
+                leading={<Avatar emoji={h.emoji} />}
+                title={h.name}
+                trailing={h.id === active?.id ? <Icon name="check" size={20} color={colors.done} weight="bold" /> : null}
+                onPress={() => selectHousehold(h.id)}
+              />
+            ))}
           </>
         )}
 
-        <Button title="+ Nieuw of aansluiten bij huishouden" variant="soft"
-          onPress={() => router.push('/onboarding')} style={{ marginBottom: 10 }} />
+        <Button title="Nieuw of aansluiten bij huishouden" icon="add" variant="soft"
+          onPress={() => router.push('/onboarding')} style={{ marginTop: space.sm, marginBottom: space.sm }} />
         <Button title="Huishouden verlaten" variant="ghost" onPress={confirmLeave}
-          style={{ marginBottom: 24, borderColor: 'transparent' }} />
+          style={{ marginBottom: space.xl, borderColor: 'transparent' }} />
 
         {/* Profiel */}
-        <Text style={[type.label, { marginBottom: 10, marginLeft: 4 }]}>JIJ</Text>
-        <Card style={{ marginBottom: 16 }}>
+        <SectionHeader title="Jij" />
+        <Card style={{ marginBottom: space.lg }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Avatar emoji={profile?.avatar_emoji} name={profile?.display_name} size={44} />
-            <View style={{ marginLeft: 12, flex: 1 }}>
-              <Text style={[type.title]}>{profile?.display_name}</Text>
+            <View style={{ marginLeft: space.md, flex: 1 }}>
+              <Text style={type.title}>{profile?.display_name}</Text>
             </View>
           </View>
         </Card>
-        <Button title="Uitloggen" variant="ghost" onPress={signOut} style={{ borderColor: 'transparent' }} />
+        <Button title="Uitloggen" icon="signout" variant="ghost" onPress={signOut} style={{ borderColor: 'transparent' }} />
 
-        <Text style={[type.caption, { textAlign: 'center', marginTop: 24 }]}>Huishoek · v1.0</Text>
+        <Text style={[type.caption, { textAlign: 'center', marginTop: space.xl }]}>Huishoek · v1.0</Text>
       </ScrollView>
 
       {/* Subgroep-editor */}
@@ -258,70 +245,53 @@ export default function HuishoudenTab() {
         onRequestClose={() => setEditorOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
-              <TouchableOpacity onPress={() => setEditorOpen(false)} hitSlop={10}>
-                <Text style={{ fontSize: 16, color: colors.inkSoft, fontWeight: '600' }}>Annuleer</Text>
-              </TouchableOpacity>
-              <Text style={[type.title]}>{editId ? 'Groep bewerken' : 'Nieuwe groep'}</Text>
-              <TouchableOpacity onPress={saveSubgroup} hitSlop={10} disabled={sgBusy}>
-                <Text style={{ fontSize: 16, color: colors.forest, fontWeight: '800' }}>Bewaar</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView contentContainerStyle={{ padding: 18 }} keyboardShouldPersistTaps="handled">
-              {!editId && (
-                <Field label="Naam van de groep" value={sgName} onChangeText={setSgName}
-                  placeholder="Bijv. Ouders, Voetbal Tim" autoFocus />
-              )}
-              {editId && (
-                <Text style={[type.h2, { marginBottom: 14 }]}>{sgEmoji} {sgName}</Text>
+            <ModalHeader
+              title={editId ? 'Groep bewerken' : 'Nieuwe groep'}
+              onClose={() => setEditorOpen(false)}
+              onConfirm={saveSubgroup}
+              busy={sgBusy}
+            />
+            <ScrollView contentContainerStyle={{ padding: space.lg }} keyboardShouldPersistTaps="handled">
+              {!editId ? (
+                <Field label="Naam van de groep" value={sgName}
+                  onChangeText={(v) => { setSgName(v); clearSgErr('name'); }}
+                  placeholder="Bijv. Ouders, Voetbal Tim" autoFocus error={sgErrors.name} />
+              ) : (
+                <Text style={[type.h2, { marginBottom: space.md }]}>{sgEmoji} {sgName}</Text>
               )}
 
               {!editId && (
                 <>
-                  <Text style={[type.label, { marginBottom: 8 }]}>Icoon</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
-                    {sgEmojis.map((e) => (
-                      <Text key={e} onPress={() => setSgEmoji(e)}
-                        style={{
-                          fontSize: 26, padding: 8, borderRadius: 12, overflow: 'hidden',
-                          backgroundColor: sgEmoji === e ? colors.ocherSoft : colors.surfaceAlt,
-                        }}>{e}</Text>
-                    ))}
-                  </View>
+                  <Text style={[type.label, { marginBottom: space.sm }]}>Icoon</Text>
+                  <EmojiPicker options={sgEmojis} value={sgEmoji} onChange={setSgEmoji} style={{ marginBottom: space.lg }} />
                 </>
               )}
 
-              <Text style={[type.label, { marginBottom: 8 }]}>Wie zit in deze groep?</Text>
-              <Card style={{ padding: 6 }}>
-                {members.map((m) => {
-                  const on = sgMembers.includes(m.id);
-                  return (
-                    <TouchableOpacity key={m.id} onPress={() => toggleSgMember(m.id)}
-                      style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}>
-                      <Avatar emoji={m.avatar_emoji} name={m.display_name} />
-                      <Text style={{ flex: 1, marginLeft: 12, fontSize: 16, color: colors.ink }}>
-                        {m.display_name}{m.id === profile?.id ? '  (jij)' : ''}
-                      </Text>
-                      <View style={{
-                        width: 24, height: 24, borderRadius: 8, borderWidth: 2,
-                        borderColor: on ? colors.forest : colors.inkFaint,
-                        backgroundColor: on ? colors.forest : 'transparent',
-                        alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {on && <Icon name="check" size={14} color={colors.onDark} weight="bold" />}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </Card>
+              <Text style={[type.label, { marginBottom: space.sm }]}>Wie zit in deze groep?</Text>
+              {sgErrors.members ? (
+                <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{sgErrors.members}</Text>
+              ) : null}
+              {members.map((m) => {
+                const on = sgMembers.includes(m.id);
+                return (
+                  <ItemRow
+                    key={m.id}
+                    leading={<Avatar emoji={m.avatar_emoji} name={m.display_name} />}
+                    title={`${m.display_name}${m.id === profile?.id ? '  (jij)' : ''}`}
+                    trailing={<Checkbox checked={on} onPress={() => toggleSgMember(m.id)}
+                      accessibilityLabel={`${m.display_name}${on ? ', geselecteerd' : ''}`} />}
+                    onPress={() => toggleSgMember(m.id)}
+                  />
+                );
+              })}
 
               {editId && (
-                <Button title="Groep verwijderen" variant="ghost"
+                <Button title="Groep verwijderen" icon="delete" variant="ghost"
                   onPress={() => { setEditorOpen(false); confirmDeleteSubgroup({ id: editId, name: sgName }); }}
-                  style={{ marginTop: 16, borderColor: 'transparent' }} />
+                  style={{ marginTop: space.lg, borderColor: 'transparent' }} />
               )}
               <Button title={editId ? 'Wijzigingen bewaren' : 'Groep aanmaken'}
-                onPress={saveSubgroup} loading={sgBusy} style={{ marginTop: 12 }} />
+                onPress={saveSubgroup} loading={sgBusy} style={{ marginTop: space.md }} />
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>

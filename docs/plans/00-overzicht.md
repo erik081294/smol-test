@@ -18,6 +18,11 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 04 | [Kosten & autodelen uitbreiding](./04-kosten-autodelen.md) | KOS-3, KOS-4, AUT-1, AUT-2 | Module-uitbreiding | Ja |
 | 05 | [Notificaties & herinneringen](./05-notificaties.md) | PLT-1 | Cross-cutting platform | Optioneel |
 | 06 | [Platform-hardening](./06-platform-hardening.md) | INF-6, INF-3, INF-4, INF-5 | Infra/kwaliteit | Nee |
+| 07 | [Strakke app (Fase 1.5)](./07-strakke-app.md) | STR-1 t/m STR-11 | UX-cohesie + interactie-polish + IA | Nee |
+
+> **Volgende ronde = plan 07.** De gebruiker kiest eerst "strak maken" (Fase 1.5)
+> vóór de ambitieuze Fase 2-data-features (plannen 02–04). Plan 07 bouwt nieuwe
+> infrastructuur noch migratie; het past het bestaande design-systeem consequent toe.
 
 ## Aanbevolen volgorde & afhankelijkheden
 
@@ -28,11 +33,14 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 03 (grote aankopen)   ──► onafhankelijk (eigen module)
 05 (notificaties)     ──► onafhankelijk; raakt elke module licht
 06 (platform)         ──► onafhankelijk; INF-6 (i18n) liefst vroeg (raakt alle strings)
+07 (strakke app)      ──► onafhankelijk; geen migratie; doe dit eerst (Fase 1.5)
 ```
 
-Waarde-per-inspanning: begin met **01** (klein, ontsluit twee features en repareert een
-echte datatekortkoming) en **02** (grootste gebruikerswaarde). **06/INF-6 (i18n)** is
-goedkoper naarmate je het eerder doet.
+Waarde-per-inspanning: doe **07 (strakke app)** als eerste — het maakt de bestaande
+app echt af vóór er nieuwe features bijkomen, en is goedkoop (alleen toepassen wat al
+bestaat). Daarna **01** (klein, ontsluit twee features en repareert een echte
+datatekortkoming) en **02** (grootste gebruikerswaarde). **06/INF-6 (i18n)** is
+goedkoper naarmate je het eerder doet — het liefst vóór de grote string-migratie in 07.
 
 ## Hoe te gebruiken in VSC
 

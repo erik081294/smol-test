@@ -14,13 +14,19 @@ export default function Welcome() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState({}); // { email, password, form } — inline i.p.v. Alert
+  const clearErr = (key) => setErrors((e) => (e[key] || e.form ? { ...e, [key]: undefined, form: undefined } : e));
 
   const submit = async () => {
     if (!isConfigured) {
       Alert.alert('Supabase ontbreekt', 'Vul je Supabase-gegevens in .env in. Zie README.');
       return;
     }
-    if (!email || !password) { Alert.alert('Vul e-mail en wachtwoord in'); return; }
+    const e = {};
+    if (!email) e.email = 'Vul je e-mail in';
+    if (!password) e.password = 'Vul je wachtwoord in';
+    setErrors(e);
+    if (Object.keys(e).length) return;
     setBusy(true);
     try {
       if (mode === 'signup') {
@@ -32,8 +38,8 @@ export default function Welcome() {
         const { error } = await signIn(email.trim(), password);
         if (error) throw error;
       }
-    } catch (e) {
-      Alert.alert('Er ging iets mis', e.message);
+    } catch (err) {
+      setErrors({ form: err.message }); // inline foutmelding onder het formulier
     } finally {
       setBusy(false);
     }
@@ -59,10 +65,15 @@ export default function Welcome() {
             {mode === 'signup' && (
               <Field label="Je naam" value={name} onChangeText={setName} placeholder="Bijv. Erik" />
             )}
-            <Field label="E-mail" value={email} onChangeText={setEmail}
-              autoCapitalize="none" keyboardType="email-address" placeholder="jij@voorbeeld.nl" />
-            <Field label="Wachtwoord" value={password} onChangeText={setPassword}
-              secureTextEntry placeholder="••••••••" />
+            <Field label="E-mail" value={email} onChangeText={(v) => { setEmail(v); clearErr('email'); }}
+              autoCapitalize="none" keyboardType="email-address" placeholder="jij@voorbeeld.nl" error={errors.email} />
+            <Field label="Wachtwoord" value={password} onChangeText={(v) => { setPassword(v); clearErr('password'); }}
+              secureTextEntry placeholder="••••••••" error={errors.password} />
+            {errors.form ? (
+              <Text style={[type.caption, { color: colors.danger, marginBottom: 8 }]} accessibilityLiveRegion="polite">
+                {errors.form}
+              </Text>
+            ) : null}
             <Button
               title={mode === 'signup' ? 'Account aanmaken' : 'Inloggen'}
               onPress={submit} loading={busy} style={{ marginTop: 6 }}

@@ -35,13 +35,28 @@ in de canonieke statustabel verderop in dit document (§6).
 > - **Fase 2 — eerste no-migratie-stappen (2026-06-17)** — **KLU-2** klus-bibliotheek +
 >   **KLU-3** seizoenssuggesties (`lib/choreLibrary.js`, `lib/ChoreLibrarySheet.js`, één-tik-
 >   toevoegen vanaf het Taken-scherm) en **PLA-7** (plantfoto-cover — bleek al gebouwd).
->   Alles op de live schema (`0011`), géén nieuwe migratie, met units. **SCH-3**
->   (eerlijkheidsoverzicht) is bewust uitgesteld: dat vraagt tóch een voltooiings-log
->   (migratie), zie §6/§7.1.
+>   Alles op de live schema (`0011`), géén nieuwe migratie, met units.
 >
-> **Enige resterende stap vóór "Fase 1 helemaal af":** de migraties `0005`–`0011` tegen het
-> live Supabase-project pushen en de RLS-integratietests met secrets draaien (zie
-> `VERIFICATIE.md`) → item **INF-1** (status 🔧 te verifiëren).
+> - **Fase 2 — voltooiingen-log (2026-06-18, plan 01)** — **SCH-3** eerlijkheidsoverzicht +
+>   **KLU-4** beurtrotatie, beide op een nieuwe voltooiingen-log `task_completions`
+>   (migratie `0012` + kolom `tasks.rotation`). Pure logica `lib/fairness.js`/`lib/rotation.js`
+>   met units, hook `useTaskCompletions`, component `FairnessBars`, UI op Schoonmaak +
+>   taak-editor. Migratie `0012` is **live gepusht** en de RLS-integratietests zijn
+>   **groen** tegen de live DB (118 tests, 0 skipped) — zie INF-1.
+>
+> **Fase 1 live geverifieerd (2026-06-18):** de migraties `0004`–`0012` staan op het
+> live Supabase-project (DB op `0012`) en de RLS-integratietests draaien groen tegen
+> de live DB (118 tests, 0 skipped) → item **INF-1** ✅. Resteert alleen de handmatige
+> 2-account-rooktest (`VERIFICATIE.md` Stap 3).
+>
+> - **Volgende ronde = Fase 1.5 "Strak & af" (2026-06-18)** — vóór de ambitieuze
+>   Fase 2-data-features eerst de bestaande app echt strak maken. De app heeft een
+>   sterk design-systeem (`lib/theme.js`, `lib/ui.js`, `DESIGN.md`) maar voelt op
+>   mid-tier schermen kaal: zelfgebouwde UI i.p.v. de bibliotheek, geen optimistic
+>   UI/haptics/undo, en taken die op vier schermen (Vandaag/Taken/Agenda/Schoonmaak)
+>   opduiken zonder heldere rolverdeling. Uitgewerkt als items **STR-1 t/m STR-11**
+>   in §6 en build-ready in [`docs/plans/07-strakke-app.md`](docs/plans/07-strakke-app.md).
+>   Geen migratie — dit is "toepassen wat al bestaat".
 >
 > Dit document blijft het waarom/overzicht; de specs zijn het hoe.
 
@@ -222,12 +237,22 @@ Planten-module met handmatige soortkeuze + regelgebaseerd schema (PLA-1 t/m PLA-
 plantendagboek PLA-5). Alles gebouwd met groene units. **Open:** migraties pushen + RLS-tests
 tegen live Supabase (INF-1, zie `VERIFICATIE.md`).
 
-**Fase 2 — De ambitieuze data-features — ⏳ VOLGENDE**
+**Fase 1.5 — Strak & af — ⏳ VOLGENDE**
+Geen nieuwe features, maar de bestaande app van "kaal" naar "strak". Vijf thema's
+(STR-1 t/m STR-11): informatie-architectuur & navigatie (één bron `tasks`, expliciete
+weergaven voor Agenda/Schoonmaak), component-cohesie (mid-tier schermen consequent uit
+`lib/ui.js` + tokens), interactie-feel (optimistic UI, haptics, toast + ongedaan-maken),
+helderheid van bediening (zichtbare item-acties i.p.v. verborgen long-press, inline
+validatie) en empty states + beweging. Geen migratie; leunt volledig op het bestaande
+design-systeem. Build-ready in [`docs/plans/07`](docs/plans/07-strakke-app.md).
+
+**Fase 2 — De ambitieuze data-features — ⏳ DAARNA**
 Boodschappen-bonnetjes (trap 1→2) met productcatalogus + prijstracker (BOO-2/3/5),
-Grote-aankopen-dossiers (AAN-1 t/m AAN-4), beurtrotatie/eerlijkheid (KLU-4, SCH-3),
+Grote-aankopen-dossiers (AAN-1 t/m AAN-4),
 kosten-koppeling aan modules (KOS-3) en de autodeel-basis (AUT-1/2). Hier zit het meeste
-bouwwerk; lever in trappen op. **Al af (no-migratie-voorlopers):** KLU-2 klus-bibliotheek,
-KLU-3 seizoenssuggesties en PLA-7 plantfoto-cover.
+bouwwerk; lever in trappen op. **Al af:** KLU-2 klus-bibliotheek, KLU-3 seizoenssuggesties,
+PLA-7 plantfoto-cover (no-migratie-voorlopers) en — via plan 01 (migratie 0012) —
+beurtrotatie/eerlijkheid (KLU-4, SCH-3) op een nieuwe voltooiingen-log.
 
 **Fase 3 — Slim & verbonden — ⏳ LATER**
 AI-soortherkenning planten (PLA-6), AI-bonextractie (BOO-7), supermarktvergelijking (BOO-4)
@@ -268,7 +293,7 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | KLU-1 | Klussen | Basis taken | 1 | Must | — | ✅ | — | Eenmalige + terugkerende klussen. Gereed in v1.0. |
 | KLU-2 | Klussen | Klus-bibliotheek | 2 | Should | S | ✅ | FND-2 | Vaste lijst veelvoorkomende klussen + default recur-instellingen. `lib/choreLibrary.js` + `ChoreLibrarySheet` (één-tik-toevoegen vanaf het Taken-scherm). Geen migratie. |
 | KLU-3 | Klussen | Seizoenssuggesties | 3 | Could | S | ✅ | KLU-2 | Regelgebaseerd op maand (`months` per klus, `seasonalChores()`); getoond als "Past bij &lt;maand&gt;" in de bibliotheek-sheet. |
-| KLU-4 | Klussen | Beurtrotatie | 2 | Could | M | ⏳ | FND-2 | Rotatie-volgorde opslaan; bij afvinken volgende persoon toewijzen. |
+| KLU-4 | Klussen | Beurtrotatie | 2 | Could | M | ✅ | FND-2 | Rotatie-volgorde (`tasks.rotation uuid[]`, migratie 0012); bij doorrollen springt `assigned_to` naar de volgende (`lib/rotation.js` → `nextAssignee`). UI in de taak-editor; indicator in `TaskRow`. |
 | BOO-1 | Boodschappen | Gedeelde lijst | 1 | Must | — | ✅ | — | Realtime + afvinken. Gereed in v1.0. |
 | BOO-2 | Boodschappen | Bonnetje scannen — foto + bevestigen | 2 | Should | L | ⏳ | BOO-5 | Trap 1. Levert aankoophistorie + prijsdata; correcties trainen matching. |
 | BOO-3 | Boodschappen | Prijstracker | 2 | Should | M | ⏳ | BOO-2 | Prijs per product over tijd en per supermarkt. |
@@ -286,7 +311,7 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | PLA-7 | Planten | Plantfoto-cover automatisch | 2 | Could | S | ✅ | PLA-5 | Nieuwste dagboekfoto is de omslag (`plants.photo_path`) — al geregeld in `addPlantPhoto`/`deletePlantPhoto` en getoond op de plantkaart. Geen extra werk nodig. |
 | SCH-1 | Schoonmaak | Kamer-/zonegerichte taken | 1 | Should | M | ✅ | FND-2 | Zones + `tasks.zone_id`. Migratie 0006, `lib/useZones.js`. |
 | SCH-2 | Schoonmaak | Schoonmaakrooster in één keer | 1 | Should | M | ✅ | SCH-1 | Template → meerdere terugkerende taken. `lib/cleaningTemplates.js`. |
-| SCH-3 | Schoonmaak | Beurtverdeling + eerlijkheidsoverzicht | 2 | Could | M | ⏳ | SCH-1 | ⚠️ Géén quick win zonder schema: `completeTask` wist `completed_by` bij het doorrollen van terugkerende taken, dus een agg over `tasks` mist juist de (terugkerende) schoonmaak. Vereist een voltooiings-log (nieuwe tabel `task_completions`, migratie). |
+| SCH-3 | Schoonmaak | Beurtverdeling + eerlijkheidsoverzicht | 2 | Could | M | ✅ | SCH-1 | Voltooiingen-log `task_completions` (migratie 0012) lost de doorrol-amnesie op; `completeTask` logt nu elke beurt. `lib/fairness.js` → `tally`, hook `useTaskCompletions`, component `FairnessBars`, kaart "Wie deed hoeveel" (Week/Maand/Alles) op het Schoonmaak-scherm. |
 | AAN-1 | Grote aankopen | Aankoop-dossier | 2 | Should | M | ⏳ | FND-1 | Titel, budgetrange, deadline, wie beslist mee. Subgroep-gescoped. |
 | AAN-2 | Grote aankopen | Opties verzamelen | 2 | Should | M | ⏳ | AAN-1 | Kandidaten met prijs/link/foto + voor/tegen per lid. |
 | AAN-3 | Grote aankopen | Vergelijktabel | 2 | Should | M | ⏳ | AAN-2 | Opties naast elkaar op zelfgekozen criteria. |
@@ -302,8 +327,19 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | AUT-3 | Autodelen | Tussen bevriende huishoudens | 3 | Could | L | ⏳ | AUT-2 | Gedeelde subgroep over huishoudens; vertrouwens-/uitnodigingsmodel. |
 | UX-1 | Platform | Design-/icon-systeem (Phosphor) | 1 | — | M | ✅ | — | `DESIGN.md`, `lib/icons.js`, tokens in `lib/theme.js`, componenten in `lib/ui.js`. |
 | UX-2 | Platform | "Meer"-overflow-tab navigatie | 1 | — | S | ✅ | FND-2 | `primary`/`MORE_TAB` in `lib/modules.js`, `app/(tabs)/meer.js`. Houdt tabbalk leesbaar. |
-| INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | 1 | Must | S | 🔧 | — | Migraties 0005–0011 pushen + RLS-integratietests met secrets. Zie `VERIFICATIE.md`. |
+| INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | 1 | Must | S | ✅ | — | Migraties 0004–0012 live gepusht (DB op `0012`); RLS-integratietests groen tegen de live DB (118 tests, 0 skipped, 2026-06-18). Resteert alleen de handmatige 2-account-rooktest (`VERIFICATIE.md` Stap 3). |
 | INF-2 | Platform | CI-pipeline + testkader | 1 | Should | S | ✅ | — | `.github/workflows/ci.yml`, `node:test`-units onder `tests/`. |
+| STR-1 | Platform/UX | IA: één bron `tasks`, expliciete weergaven | 1.5 | Must | M | ✅ | — | **Af:** zone reist mee met de taak (`useTasks` embed `zone:zones`, optie `select` in `useCollection`), zichtbaar in `TaskRow` (Taken/Vandaag/Agenda) en bewerkbaar in de taak-editor (zone-kiezer + `zone_id`); per-zone "Taak toevoegen" op Schoonmaak opent dezelfde editor (`?zone=`). Agenda/Schoonmaak hebben nu "dit is een weergave"-subtitels ("Je taken op de kalender", "Je taken per ruimte — afvinken werkt overal door"). Schoonmaak blijft bewust onder "Meer": het is een gespecialiseerde onderhouds-weergave, geen dagelijkse primaire tab. Plan 07 §A. |
+| STR-2 | Platform/UX | Navigatie-helderheid | 1.5 | Should | S | ✅ | STR-1 | **Af:** `chevron`-prop op `ItemRow` als expliciete "dit is tikbaar"-affordance op navigerende rijen (Meer-modules, huishouden-subgroepen) — niet op afvink-rijen (die hebben al een checkbox). Detailschermen gebruiken consistent `ModalHeader` (terug/sluit). Schoonmaak-plaatsing heroverwogen → bewust onder "Meer" (zie STR-1). |
+| STR-3 | Platform/UX | Schermen naar `lib/ui.js` trekken | 1.5 | Must | M | ✅ | — | **Af — 0 rauwe `TouchableOpacity` in heel `app/`.** Alle editors (taak/plant/uitgave) + alle tab-schermen (boodschappen/huishouden/planten/kosten/agenda/meer/schoonmaak) op `ItemRow`/`IconButton`/`Chip`/`Pressable` + tokens. Bug gefixt: planten-kaart rekte bij oneven aantal de rij vol (ghost-spacer). Pluralisatie "1 deelnemer" gefixt (kosten). |
+| STR-4 | Platform/UX | Ontbrekende gedeelde componenten | 1.5 | Should | S | 🔧 | — | **`AvatarSelect`, `EmojiPicker` en `ListSkeleton` af** (in `lib/ui.js`). `EmojiPicker` vervangt de 2× zelfgebouwde emoji-keuzes (onboarding + huishouden-subgroep); `ListSkeleton` is de zachte laad-placeholder (pulseert, reduce-motion-aware) in Boodschappen/Taken i.p.v. abrupt inpoppen. **Rest:** `PhotoPicker` — bewust uitgesteld: nu maar 1 gebruiker (plant-editor), de inline-implementatie werkt; extractie levert geen dedup-winst op dit moment. |
+| STR-5 | Platform/UX | Zichtbare item-acties + één primaire actie | 1.5 | Should | M | ⏳ | STR-9 | Verborgen long-press-delete → swipe-actie (`Swipeable`); duidelijke primaire actie (Boodschappen-`+`, Schoonmaak-knop). |
+| STR-6 | Platform/UX | Inline formulier-validatie | 1.5 | Should | S | ✅ | — | **Af:** alle veld-validaties tonen nu inline (`Field`-`error` + foutregel onder de control) i.p.v. blokkerende `Alert` — in taak-, uitgave-, plant-editor, auth-welkom, onboarding en huishouden-subgroep. `Alert` resteert alleen voor bevestigingen (verwijderen) en server-/permissie-fouten. Fout wist bij wijzigen van het veld. |
+| STR-7 | Platform/UX | Optimistic UI | 1.5 | Must | M | 🔧 | — | **Gebouwd:** optimistische `update`/`remove` met rollback in `useCollection` (raakt alle modules); `completeTask`/`uncompleteTask` vinken nu direct af (statuswijziging vóór het loggen). Realtime herlaadt de serverwaarheid. Te valideren op web. Vervangt PLT-2. |
+| STR-8 | Platform/UX | Haptics | 1.5 | Could | S | ⏳ | — | `expo-haptics` (al geïnstalleerd) via `lib/haptics.js` op afvinken/opslaan/fout; no-op op web. |
+| STR-9 | Platform/UX | Toast + ongedaan-maken | 1.5 | Should | M | 🔧 | — | **Gebouwd:** `lib/toast.js` (`ToastProvider`/`useToast`) in `app/_layout.js`; uitgesteld-wissen met "Ongedaan maken" voor Boodschappen-`afgevinkt wissen` én nu ook voor **losse item-deletes** (long-press → item lokaal verbergen, echte delete pas bij verlopen toast, terugdraaibaar zonder re-insert). **Rest:** undo uitrollen naar de overige modules (taak/uitgave/plant-delete) — sluit aan op STR-5 (swipe). |
+| STR-10 | Platform/UX | Empty states + illustraties | 1.5 | Should | M | 🔧 | — | **Eigen illustratie-systeem** `lib/illustrations.js` (vaste stage, platte geometrie, palet-tokens, themeable/dark-mode-proof) met 8 scènes (mok/klembord/kar/plant/munten/kalender/bezem/figuurtjes), via een `illustration`-prop op `Empty`. Gewired op Vandaag/Taken/Boodschappen/Planten/Kosten/Agenda/Schoonmaak + groepen-leegstaat. Stijl goedgekeurd (Taken/Today); laatste 6 nog visueel na te lopen. |
+| STR-11 | Platform/UX | Beweging via `motion`-tokens | 1.5 | Could | S | ✅ | — | **Af:** `lib/motion.js` — `animateNextLayout()` (zachte `LayoutAnimation` op de eerstvolgende lijst-mutatie, gevoed door de `motion`-tokens) + `prefersReducedMotion()` (gecachte vlag, luistert naar wijzigingen). Gewired op Boodschappen (toevoegen/afvinken/wissen) en Taken (afvinken). "Vier-de-voortgang": het vinkje popt zacht op bij afvinken (`Checkbox`, spring, overal in de app via `TaskRow`). Alles no-op bij "verminder beweging". |
 
 ---
 
@@ -319,10 +355,11 @@ neem ze pas op zodra ze "echt" worden. Gegroepeerd naar afstand/aard.
   (`months` per klus → "Past bij &lt;maand&gt;"-sectie). Regelgebaseerd, geen migratie.
 - ~~**Plantfoto-cover automatisch (PLA-7)**~~ — ✅ blijkt al **gebouwd**: de nieuwste
   dagboekfoto is al de omslag (`plants.photo_path`) en wordt op de plantkaart getoond.
-- **SCH-3 eerlijkheidsoverzicht** — gecorrigeerd: dit is **géén** quick win zonder schema.
-  `completeTask` wist `completed_by` bij het doorrollen van terugkerende taken, dus een agg
-  over `tasks` mist juist de (terugkerende) schoonmaak. Vraagt een voltooiings-log
-  (tabel `task_completions` + migratie) voor een kloppend "wie deed hoeveel".
+- ~~**SCH-3 eerlijkheidsoverzicht**~~ — ✅ **gebouwd** (plan 01). De voltooiings-log
+  `task_completions` (migratie 0012) lost de doorrol-amnesie op: `completeTask` logt nu
+  elke beurt, óók bij doorrollende terugkerende taken. "Wie deed hoeveel" staat op het
+  Schoonmaak-scherm (`lib/fairness.js`, `useTaskCompletions`, `FairnessBars`). Tegelijk
+  ✅ **KLU-4 beurtrotatie** op dezelfde log/migratie (`lib/rotation.js`).
 - **Agenda: losse afspraken zonder taak-overhead** (AGE-3) — nu is elke afspraak een `tasks`-rij;
   overweeg een lichtere "event"-flow voor puur-agenda-items (begin/eindtijd, geen afvinken).
 - **Kosten: terugkerende uitgaven** (KOS-4) — huur/abonnementen die maandelijks automatisch
@@ -334,11 +371,14 @@ neem ze pas op zodra ze "echt" worden. Gegroepeerd naar afstand/aard.
 - **FND-3 kinderprofielen concreet** — profiel-zonder-account onder een ouder als eerste stap;
   ontgrendelt subgroep-privacy in de praktijk.
 - **Offline-modus / optimistic UI** (PLT-2) — acties direct tonen, sync op de achtergrond;
-  gezinnen gebruiken de app onderweg met wisselend bereik.
+  gezinnen gebruiken de app onderweg met wisselend bereik. *Optimistic UI is opgenomen als
+  **STR-7** (Fase 1.5); de volledige offline-modus blijft hier als latere uitbreiding.*
 - **Globaal zoeken** (PLT-3) — over taken/boodschappen/planten/uitgaven heen.
 - **Data-export & print** (PLT-4) — boodschappenlijst/saldo als CSV of deelbare tekst.
 - **Toegankelijkheids-audit** (PLT-5) — sluit aan op `DESIGN.md` (48dp-targets, contrast AA,
-  font-scaling); systematisch nalopen + smoke-test met VoiceOver/TalkBack.
+  font-scaling); systematisch nalopen + smoke-test met VoiceOver/TalkBack. *Wordt deels
+  geraakt door de cohesie-slag **STR-3/STR-4** (Fase 1.5): schermen die uit `lib/ui.js`
+  zijn opgebouwd erven de toegankelijkheid; de systematische audit blijft hier.*
 - **Activiteiten-/wijzigingenfeed** (PLT-6) — "Tim vinkte 'stofzuigen' af", "Erik voegde melk toe".
 
 ### 7.3 Nieuwe module-ideeën

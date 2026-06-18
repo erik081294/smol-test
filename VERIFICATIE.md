@@ -1,11 +1,17 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-17).** Het meeste hieronder is **al gedaan**: de
-> migraties `0004`–`0011` zijn naar het hosted project gepusht (DB staat op `0011`)
-> en de RLS-integratietests zijn groen tegen de live database gedraaid — zie PR #3.
-> **Resteert alleen:** de handmatige rooktest met 2 accounts in één huishouden
-> (Stap 3 onderaan). De stappen 1–2 blijven staan als naslag/herhaalrecept (bijv.
-> wanneer er een nieuwe migratie bijkomt).
+> **Status (bijgewerkt 2026-06-18).** Het meeste hieronder is **al gedaan**: de
+> migraties `0004`–`0012` zijn naar het hosted project gepusht (DB staat op `0012`)
+> en de RLS-integratietests zijn **groen** tegen de live database gedraaid — alle
+> 118 tests, 0 skipped, inclusief de `task_completions`-cases (plan 01). **Resteert
+> alleen:** de handmatige rooktest met 2 accounts in één huishouden (Stap 3 onderaan).
+> De stappen 1–2 blijven staan als naslag/herhaalrecept (bijv. wanneer er een nieuwe
+> migratie bijkomt).
+>
+> **De secrets staan lokaal in `.env`** (alle drie: `EXPO_PUBLIC_SUPABASE_URL`,
+> `EXPO_PUBLIC_SUPABASE_ANON_KEY` én `SUPABASE_SERVICE_ROLE_KEY`). De CLI is op deze
+> machine ingelogd en gekoppeld. Het hele recept is daarmee één commando per stap —
+> zie de "Snelrecept (deze machine)" hieronder; je hoeft niets te plakken.
 >
 > **Draaien vanuit Claude Code on the web?** De secrets zitten niet in de remote
 > container (geen `.env`, env-vars leeg) en de CLI is daar niet ingelogd. Om het tóch
@@ -15,6 +21,31 @@
 > **Custom** met `api.supabase.com`, `*.supabase.co` en `*.pooler.supabase.com` op de
 > allowlist (Supabase staat niet in de default-allowlist). Anders falen login/push/tests
 > op netwerkniveau. Gebruik een test-/staging-project, geen productie.
+
+## Snelrecept (deze machine — secrets in `.env`, CLI ingelogd)
+
+`node` en `supabase` staan niet op het default-PATH; prefix ze. Vanuit de projectroot:
+
+```bash
+NODE_BIN="$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" | tail -1)/bin"
+
+# 1. Nieuwe migratie(s) live pushen (idempotent; slaat reeds-toegepaste over).
+PATH="/opt/homebrew/bin:$PATH" supabase db push
+
+# 2. Volledige suite incl. RLS-integratietests tegen de live DB. Leest alle drie de
+#    secrets uit .env; mapt de EXPO_PUBLIC_*-namen naar de namen die de test verwacht.
+set -a; . ./.env; set +a
+PATH="$NODE_BIN:$PATH" \
+  SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
+  SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+  npm test
+```
+
+Verwacht: **alle tests groen, 0 skipped** (de RLS-tests draaien i.p.v. skippen).
+De RLS-tests maken tijdelijke `rlstest+<timestamp>@example.com`-gebruikers aan en
+ruimen die na afloop op. De rest van dit document is de uitgebreide naslag.
+
+---
 
 De pure logica is volledig getest met `npm test` (groen). Twee dingen vereisen
 credentials die bewust niet in de repo staan; doe ze lokaal (VSC, waar je al bent
@@ -86,15 +117,18 @@ SUPABASE_SERVICE_ROLE_KEY="PLAK_HIER_DE_SERVICE_ROLE_KEY" \
 npm test
 ```
 
-Zonder de drie variabelen skippen de RLS-tests (zoals nu); mét variabelen draaien
-ze écht. Verwacht: de **5 RLS-tests** lopen door i.p.v. `skipped`, waaronder de
-twee nieuwe voor de Kosten-module:
+Zonder de drie variabelen skippen de RLS-tests; mét variabelen draaien ze écht.
+Verwacht: alle RLS-tests lopen door i.p.v. `skipped`, waaronder de kindtabel-cases
+die het grootste risico afdekken (een kindtabel met eigen policies die de
+zichtbaarheid van zijn parent moet erven):
 - `RLS: household-uitgave + shares zichtbaar voor huisgenoot, niet voor buitenstaander`
-- `RLS: subgroep-uitgave alleen voor subgroepleden (...)`
+- `RLS: subgroep-uitgave alleen voor subgroepleden (...)` (Kosten — `expense_shares`)
+- `RLS: dagboekfoto zichtbaar voor huisgenoot, niet voor buitenstaander` (Planten — `plant_photos`)
+- `RLS: voltooiing van household-taak zichtbaar voor huisgenoot, niet voor buitenstaander`
+- `RLS: voltooiing van custom-taak alleen zichtbaar voor genoemde personen` (`task_completions`, plan 01)
 
-Deze bewijzen dat de `create_expense` RPC werkt én dat `expense_shares` de
-zichtbaarheid van zijn parent-`expense` erft (het grootste risico van de nieuwe
-modules: een kindtabel met eigen policies).
+Deze bewijzen dat de RPC's werken én dat elke kindtabel (`expense_shares`,
+`plant_photos`, `task_completions`) de zichtbaarheid van zijn parent erft.
 
 > De tests maken tijdelijke testgebruikers aan (`rlstest+<timestamp>@example.com`)
 > en ruimen die na afloop op. Gebruik een test-/staging-project, geen productie

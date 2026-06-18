@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, TextInput,
+  View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,9 +11,8 @@ import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { mutate } from '../../lib/db';
-import { Field, Button, Chip, Avatar, ModalHeader } from '../../lib/ui';
-import { Icon } from '../../lib/icons';
-import { colors, radius, type } from '../../lib/theme';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader } from '../../lib/ui';
+import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
@@ -51,6 +50,8 @@ export default function ExpenseEditor() {
   const [shareSubgroupId, setShareSubgroupId] = useState(null);
   const [shareWith, setShareWith] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState({}); // inline validatie i.p.v. Alert
+  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
 
   // Selecteer standaard alle leden zodra ze geladen zijn.
   useEffect(() => {
@@ -75,20 +76,20 @@ export default function ExpenseEditor() {
     setSelected((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
   const toggleShareWith = (pid) =>
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
-  const bumpWeight = (pid, d) =>
-    setWeights((w) => ({ ...w, [pid]: Math.max(1, (w[pid] ?? 1) + d) }));
 
   const save = async () => {
-    if (!description.trim()) { Alert.alert('Geef de uitgave een omschrijving'); return; }
-    if (amountCents <= 0) { Alert.alert('Vul een geldig bedrag in'); return; }
-    if (!paidBy) { Alert.alert('Kies wie betaald heeft'); return; }
-    if (selected.length === 0) { Alert.alert('Kies minstens één deelnemer'); return; }
+    const e = {};
+    if (!description.trim()) e.description = 'Geef de uitgave een omschrijving';
+    if (amountCents <= 0) e.amount = 'Vul een geldig bedrag in';
+    if (!paidBy) e.paidBy = 'Kies wie betaald heeft';
+    if (selected.length === 0) e.participants = 'Kies minstens één deelnemer';
     if (splitType === SPLIT.EXACT && !exactSharesValid(amountCents, participants)) {
-      Alert.alert('Bedragen kloppen niet', `Er moet nog ${formatCents(exactRemaining)} verdeeld worden.`);
-      return;
+      e.exact = `Er moet nog ${formatCents(exactRemaining)} verdeeld worden.`;
     }
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) { Alert.alert('Delen met', visError); return; }
+    if (visError) e.visibility = visError;
+    setErrors(e);
+    if (Object.keys(e).length) return;
 
     setBusy(true);
     try {
@@ -118,25 +119,20 @@ export default function ExpenseEditor() {
     const nameOf = (pid) => members.find((m) => m.id === pid)?.display_name ?? 'Iemand';
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ padding: 18 }}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={10} accessibilityLabel="Terug"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Icon name="back" size={18} color={colors.forest} />
-            <Text style={{ fontSize: 16, color: colors.forest }}>Terug</Text>
-          </TouchableOpacity>
-          <Text style={[type.h1, { marginTop: 12 }]}>{existing.description}</Text>
-          <Text style={[type.h2, { color: colors.forest, marginTop: 4 }]}>{formatCents(existing.amount_cents)}</Text>
-          <Text style={[type.body, { color: colors.inkSoft, marginTop: 6 }]}>
+        <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
+          <ModalHeader title={existing.description} onClose={() => router.back()} />
+          <Text style={[type.h2, { color: colors.forest }]}>{formatCents(existing.amount_cents)}</Text>
+          <Text style={[type.body, { color: colors.inkSoft, marginTop: space.xs }]}>
             {nameOf(existing.paid_by)} betaalde · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: nl })}
           </Text>
-          <Text style={[type.label, { marginTop: 18, marginBottom: 8 }]}>Verdeling</Text>
+          <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>Verdeling</Text>
           {(existing.expense_shares ?? []).map((s) => (
-            <View key={s.profile_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-              <Text style={[type.body]}>{nameOf(s.profile_id)}</Text>
-              <Text style={[type.body]}>{formatCents(s.amount_cents)}</Text>
-            </View>
+            <Row key={s.profile_id} justify="space-between" style={{ paddingVertical: space.xs }}>
+              <Text style={type.body}>{nameOf(s.profile_id)}</Text>
+              <Text style={type.body}>{formatCents(s.amount_cents)}</Text>
+            </Row>
           ))}
-          <Button title="Verwijderen" variant="ghost" onPress={removeExisting} style={{ marginTop: 24 }} />
+          <Button title="Verwijderen" icon="delete" variant="ghost" onPress={removeExisting} style={{ marginTop: space.xl }} />
         </View>
       </SafeAreaView>
     );
@@ -146,77 +142,78 @@ export default function ExpenseEditor() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
           <ModalHeader title="Nieuwe uitgave" onClose={() => router.back()} />
 
-          <Field label="Omschrijving" value={description} onChangeText={setDescription} placeholder="Boodschappen, etentje, ..." />
-          <Field label="Bedrag (€)" value={amountText} onChangeText={setAmountText} placeholder="0,00" keyboardType="decimal-pad" />
+          <Field label="Omschrijving" value={description}
+            onChangeText={(v) => { setDescription(v); clearErr('description'); }}
+            placeholder="Boodschappen, etentje, ..." error={errors.description} />
+          <Field label="Bedrag (€)" value={amountText}
+            onChangeText={(v) => { setAmountText(v); clearErr('amount'); }}
+            placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
 
-          <Text style={[type.label, { marginBottom: 6 }]}>Betaald door</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-            {members.map((m) => (
-              <TouchableOpacity key={m.id} onPress={() => setPaidBy(m.id)} style={{ alignItems: 'center', marginRight: 12, opacity: paidBy === m.id ? 1 : 0.45 }}>
-                <Avatar emoji={m.avatar_emoji} name={m.display_name} />
-                <Text style={[type.caption, { marginTop: 2 }]}>{m.display_name?.split(' ')[0]}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <Text style={[type.label, { marginBottom: space.xs }]}>Betaald door</Text>
+          <AvatarSelect members={members} selectedId={paidBy}
+            onSelect={(id) => { setPaidBy(id); clearErr('paidBy'); }} style={{ marginBottom: space.md }} />
+          {errors.paidBy ? (
+            <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.paidBy}</Text>
+          ) : null}
 
-          <Text style={[type.label, { marginBottom: 6 }]}>Splitsing</Text>
-          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+          <Text style={[type.label, { marginBottom: space.xs }]}>Splitsing</Text>
+          <View style={{ flexDirection: 'row', marginBottom: space.md }}>
             {Object.values(SPLIT).map((s) => (
               <Chip key={s} label={SPLIT_LABELS[s]} active={splitType === s} onPress={() => setSplitType(s)} />
             ))}
           </View>
 
-          <Text style={[type.label, { marginBottom: 6 }]}>Deelnemers</Text>
+          <Text style={[type.label, { marginBottom: space.xs }]}>Deelnemers</Text>
+          {errors.participants ? (
+            <Text style={[type.caption, { color: colors.danger, marginBottom: space.xs }]}>{errors.participants}</Text>
+          ) : null}
           {members.map((m) => {
             const on = selected.includes(m.id);
             return (
-              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8,
+              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
                 borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                <TouchableOpacity onPress={() => toggleMember(m.id)} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <View style={{ width: 22, height: 22, borderRadius: 6, marginRight: 10, borderWidth: 2,
-                    borderColor: on ? colors.forest : colors.line, backgroundColor: on ? colors.forest : 'transparent',
-                    alignItems: 'center', justifyContent: 'center' }}>
-                    {on && <Icon name="check" size={14} color={colors.onDark} weight="bold" />}
-                  </View>
-                  <Text style={[type.body]}>{m.avatar_emoji} {m.display_name}</Text>
-                </TouchableOpacity>
+                <Checkbox checked={on} onPress={() => { toggleMember(m.id); clearErr('participants'); }}
+                  accessibilityLabel={`${m.display_name}${on ? ', deelnemer' : ''}`} />
+                <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
 
                 {on && splitType === SPLIT.EQUAL && (
                   <Text style={[type.body, { color: colors.inkSoft }]}>{formatCents(preview[m.id] ?? 0)}</Text>
                 )}
                 {on && splitType === SPLIT.SHARES && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => bumpWeight(m.id, -1)} hitSlop={8}><Text style={{ fontSize: 20, color: colors.forest, width: 24, textAlign: 'center' }}>−</Text></TouchableOpacity>
-                    <Text style={{ width: 22, textAlign: 'center' }}>{weights[m.id] ?? 1}</Text>
-                    <TouchableOpacity onPress={() => bumpWeight(m.id, 1)} hitSlop={8}><Text style={{ fontSize: 20, color: colors.forest, width: 24, textAlign: 'center' }}>+</Text></TouchableOpacity>
-                    <Text style={[type.caption, { width: 64, textAlign: 'right' }]}>{formatCents(preview[m.id] ?? 0)}</Text>
-                  </View>
+                  <Row gap={space.sm}>
+                    <Stepper value={weights[m.id] ?? 1} onChange={(v) => setWeights((w) => ({ ...w, [m.id]: v }))}
+                      min={1} accessibilityLabel={`Aandeel ${m.display_name}`} />
+                    <Text style={[type.caption, { width: 60, textAlign: 'right' }]}>{formatCents(preview[m.id] ?? 0)}</Text>
+                  </Row>
                 )}
                 {on && splitType === SPLIT.EXACT && (
                   <TextInput value={exactText[m.id] ?? ''} onChangeText={(v) => setExactText((e) => ({ ...e, [m.id]: v }))}
                     placeholder="0,00" keyboardType="decimal-pad" placeholderTextColor={colors.inkFaint}
                     style={{ width: 80, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.sm,
-                      paddingHorizontal: 8, paddingVertical: 6, textAlign: 'right', color: colors.ink }} />
+                      paddingHorizontal: space.sm, paddingVertical: space.xs, textAlign: 'right', color: colors.ink }} />
                 )}
               </View>
             );
           })}
 
           {splitType === SPLIT.EXACT && (
-            <Text style={[type.caption, { marginTop: 8, color: exactRemaining === 0 ? colors.done : colors.danger }]}>
+            <Text style={[type.caption, { marginTop: space.sm, color: exactRemaining === 0 ? colors.done : colors.danger }]}>
               {exactRemaining === 0 ? 'Bedragen kloppen' : `Nog te verdelen: ${formatCents(exactRemaining)}`}
             </Text>
           )}
 
-          <View style={{ marginTop: 18 }}>
+          <View style={{ marginTop: space.lg }}>
             <VisibilityPicker
-              visibility={visibility} onChangeVisibility={setVisibility}
-              shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
-              shareWith={shareWith} onToggleMember={toggleShareWith}
+              visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
+              shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
+              shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
               subgroups={subgroups} members={members} />
+            {errors.visibility ? (
+              <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
+            ) : null}
           </View>
 
           <Button title="Uitgave opslaan" onPress={save} loading={busy} style={{ marginTop: 20 }} />

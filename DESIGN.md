@@ -11,6 +11,11 @@ nergens anders:
 
 - **`lib/theme.js`** — alle tokens (kleur, ruimte, vorm, type, schaduw, beweging).
 - **`lib/ui.js`** — alle componenten.
+- **`lib/illustrations.js`** — de beeldtaal voor lege staten (één vaste stage,
+  platte geometrie, palet-tokens). Eén `<Illustration name="…">`, net als `Icon`.
+- **`lib/motion.js`** — beweging op één plek: `animateNextLayout()` (zachte
+  `LayoutAnimation` bij lijst-mutaties) en `prefersReducedMotion()`. Altijd
+  no-op bij "verminder beweging".
 
 Een scherm verzint geen eigen knop, kleur of marge. Het stelt samen uit
 bestaande bouwstenen. Heb je iets nodig dat er niet is? Voeg het tóe aan de
@@ -88,11 +93,13 @@ gewone taal. Vernietigende acties (`danger`) vragen om bevestiging.
 **Lay-out** — `Stack`, `Row`, `Divider`
 **Tekst** — `T` (past een type-token toe)
 **Acties** — `Button` (primary/accent/ghost/danger · md/lg), `IconButton`, `FAB`
-**Invoer** — `Field` (label + helper/fout), `Checkbox`, `Chip`
+**Invoer** — `Field` (label + helper/fout), `Checkbox` (popt zacht op bij
+afvinken), `Chip`, `EmojiPicker` (icoon-keuze)
 **Oppervlak** — `Card` (optioneel aantikbaar)
-**Status & info** — `Badge`, `Banner`, `Empty` (met optionele actie)
-**Mensen** — `Avatar`
-**Structuur** — `SectionHeader`
+**Status & info** — `Badge`, `Banner`, `Empty` (met optionele actie/illustratie),
+`ListSkeleton` (zachte laad-placeholder)
+**Mensen** — `Avatar`, `AvatarSelect` (lid-keuze, één selectie, optioneel "Iedereen")
+**Structuur** — `SectionHeader`, `ItemRow` (`chevron` voor navigerende rijen)
 
 Alle interactieve componenten dragen een `accessibilityRole`, weerspiegelen hun
 toestand via `accessibilityState` (disabled/selected/checked/busy) en hebben een

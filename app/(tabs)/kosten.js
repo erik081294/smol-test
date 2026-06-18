@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -8,8 +8,8 @@ import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader } from '../../lib/ui';
-import { colors, type } from '../../lib/theme';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow } from '../../lib/ui';
+import { colors, type, space } from '../../lib/theme';
 
 export default function Kosten() {
   const { expenses, loading, reload } = useExpenses();
@@ -49,18 +49,19 @@ export default function Kosten() {
       </ScrollView>
 
       {/* Saldo-balk */}
-      <View style={{ paddingHorizontal: 18 }}>
+      <View style={{ paddingHorizontal: space.lg }}>
         <Card style={{ backgroundColor: colors.forest }}>
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>{balanceText}</Text>
+          <Text style={{ color: colors.onDark, fontSize: 18, fontWeight: '700' }}>{balanceText}</Text>
           {payments.length > 0 && (
-            <TouchableOpacity onPress={() => setShowSettle((s) => !s)} style={{ marginTop: 8 }}>
+            <Pressable onPress={() => setShowSettle((s) => !s)} style={{ marginTop: space.sm }}
+              accessibilityRole="button" hitSlop={8}>
               <Text style={{ color: colors.ocher, fontWeight: '700' }}>
                 {showSettle ? 'Verberg' : 'Bekijk'} vereffening ({payments.length})
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
           {showSettle && payments.map((p, i) => (
-            <Text key={i} style={{ color: '#fff', marginTop: 6 }}>
+            <Text key={i} style={{ color: colors.onDark, marginTop: space.xs }}>
               {emojiOf(p.from)} {nameOf(p.from)} → {nameOf(p.to)} {emojiOf(p.to)}: {formatCents(p.amountCents)}
             </Text>
           ))}
@@ -68,26 +69,28 @@ export default function Kosten() {
       </View>
 
       <FlatList
-        contentContainerStyle={{ padding: 18, paddingTop: 12, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.md, paddingBottom: 120 }}
         data={filtered}
         keyExtractor={(e) => e.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity activeOpacity={0.7} onPress={() => router.push(`/expense/${item.id}`)}>
-            <Card style={{ marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[type.title]} numberOfLines={1}>{item.description}</Text>
-                <Text style={[type.title, { color: colors.forest }]}>{formatCents(item.amount_cents)}</Text>
-              </View>
-              <Text style={[type.caption, { marginTop: 4 }]}>
-                {emojiOf(item.paid_by)} {nameOf(item.paid_by)} betaalde · {item.participantIds.length} deelnemers
-                · {format(parseISO(item.spent_on), 'd MMM', { locale: nl })}
-              </Text>
-            </Card>
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          const n = item.participantIds.length;
+          return (
+            <ItemRow
+              title={item.description}
+              trailing={<Text style={[type.title, { color: colors.forest }]}>{formatCents(item.amount_cents)}</Text>}
+              meta={
+                <Text style={type.caption}>
+                  {emojiOf(item.paid_by)} {nameOf(item.paid_by)} betaalde · {n} {n === 1 ? 'deelnemer' : 'deelnemers'}
+                  · {format(parseISO(item.spent_on), 'd MMM', { locale: nl })}
+                </Text>
+              }
+              onPress={() => router.push(`/expense/${item.id}`)}
+            />
+          );
+        }}
         ListEmptyComponent={!loading && (
-          <Empty icon="expenses" title="Nog geen uitgaven"
+          <Empty illustration="expenses" title="Nog geen uitgaven"
             subtitle="Voeg een gedeelde uitgave toe met de + knop." />
         )}
       />

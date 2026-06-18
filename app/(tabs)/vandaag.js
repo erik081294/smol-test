@@ -74,7 +74,7 @@ export default function Vandaag() {
         )}
         ListEmptyComponent={
           !loading && (
-            <Empty icon="emptyToday" title="Een rustige dag"
+            <Empty illustration="today" title="Een rustige dag"
               subtitle="Geen taken voor vandaag. Voeg er een toe via het tabblad Taken." />
           )
         }

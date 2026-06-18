@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, FlatList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { isToday } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty, Chip, FAB, ScreenHeader } from '../../lib/ui';
-import { Icon } from '../../lib/icons';
-import { colors, type, categoryMeta } from '../../lib/theme';
+import { Empty, Chip, FAB, ScreenHeader, IconButton } from '../../lib/ui';
+import { colors, type, space, categoryMeta } from '../../lib/theme';
 import {
   monthMatrix, groupByDate, filterBySubgroup, dominantCategory,
   sortDayTasks, monthLabel, dateKey, parseKey,
@@ -41,7 +40,7 @@ export default function Agenda() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title="Agenda" subtitle="Alles met een datum, per groep te filteren." />
+      <ScreenHeader title="Agenda" subtitle="Je taken op de kalender — per groep te filteren." />
 
       {/* Subgroep-filter */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
@@ -55,14 +54,10 @@ export default function Agenda() {
 
       {/* Maandnavigatie */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 18, marginBottom: 8 }}>
-        <TouchableOpacity onPress={() => stepMonth(-1)} hitSlop={12} accessibilityLabel="Vorige maand">
-          <Icon name="back" size={24} color={colors.forest} />
-        </TouchableOpacity>
+        paddingHorizontal: space.lg, marginBottom: space.sm }}>
+        <IconButton icon="back" tint={colors.forest} accessibilityLabel="Vorige maand" onPress={() => stepMonth(-1)} />
         <Text style={[type.title, { textTransform: 'capitalize' }]}>{monthLabel(cursor.y, cursor.m)}</Text>
-        <TouchableOpacity onPress={() => stepMonth(1)} hitSlop={12} accessibilityLabel="Volgende maand">
-          <Icon name="forward" size={24} color={colors.forest} />
-        </TouchableOpacity>
+        <IconButton icon="forward" tint={colors.forest} accessibilityLabel="Volgende maand" onPress={() => stepMonth(1)} />
       </View>
 
       {/* Weekdag-koppen */}
@@ -85,7 +80,8 @@ export default function Agenda() {
               const isSel = cell.key === selected;
               const isTod = isToday(cell.date);
               return (
-                <TouchableOpacity key={cell.key} onPress={() => setSelected(cell.key)}
+                <Pressable key={cell.key} onPress={() => setSelected(cell.key)}
+                  accessibilityRole="button" accessibilityState={{ selected: isSel }}
                   style={{ flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <View style={{
                     width: 34, height: 34, borderRadius: 17,
@@ -94,7 +90,7 @@ export default function Agenda() {
                   }}>
                     <Text style={{
                       fontSize: 14,
-                      color: isSel ? '#fff' : cell.inMonth ? colors.ink : colors.inkFaint,
+                      color: isSel ? colors.onDark : cell.inMonth ? colors.ink : colors.inkFaint,
                       fontWeight: isTod || isSel ? '700' : '500',
                     }}>{cell.date.getDate()}</Text>
                   </View>
@@ -103,7 +99,7 @@ export default function Agenda() {
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dotColor }} />
                     ) : null}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </View>
@@ -118,7 +114,7 @@ export default function Agenda() {
         keyExtractor={(t) => t.id}
         renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
         ListEmptyComponent={!loading && (
-          <Empty icon="agenda" title="Niets op deze dag"
+          <Empty illustration="agenda" title="Niets op deze dag"
             subtitle="Tik op + om iets toe te voegen." />
         )}
       />
