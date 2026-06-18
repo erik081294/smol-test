@@ -10,6 +10,11 @@ in de canonieke statustabel verderop in dit document (§6).
 > bijgehouden (§6 — "Backlog-status"). Het oude `huishoek-backlog.xlsx` is **verouderd**
 > en wordt niet meer onderhouden (binair, geen statuskolom, slecht te diffen in git).
 
+> **Build-ready plannen.** Uitgewerkte, direct-implementeerbare plannen voor de volgende
+> ronde (Fase 2/3 + platform/infra) staan in [`docs/plans/`](docs/plans/00-overzicht.md):
+> voltooiingen-log + eerlijkheid/rotatie (01), boodschappen-intelligentie (02), grote
+> aankopen (03), kosten & autodelen (04), notificaties (05) en platform-hardening (06).
+
 > **Status-update (laatst herzien: 2026-06-17).** Fase 0 **én** Fase 1 zijn **af in de
 > code** (werkboom). Gebouwd en aanwezig:
 > - **Fase 0** — **FND-1** (subgroepen + zichtbaarheid: `subgroups`/`subgroup_members`,

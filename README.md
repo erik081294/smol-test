@@ -235,6 +235,10 @@ geplande uitbreidingen — boodschappen-bonnetjes & prijstracker, grote-aankopen
 beurtrotatie/eerlijkheid, kosten-koppeling, autodelen, en de slimme AI-features — staan
 met status, prioriteit en aanpak in [`huishoek-backlog.md`](./huishoek-backlog.md).
 
+**Build-ready implementatieplannen** voor de volgende ronde (met migratie-SQL, pure logica
++ tests, hooks, schermen, RLS en file-checklists) staan in
+[`docs/plans/`](./docs/plans/00-overzicht.md) — direct oppakbaar in VSC.
+
 ---
 
 Gemaakt als compleet startpunt — kloon, vul je Supabase in, en bouw verder. 🛠️
