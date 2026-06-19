@@ -11,7 +11,7 @@
 // De service-role-key staat BEWUST niet in de repo. Hij is alleen nodig om
 // testgebruikers aan te maken/op te ruimen; de feitelijke RLS-checks draaien via
 // de anon-client als die gebruikers. Gebruik een test-/staging-project.
-import { test, before, after } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 

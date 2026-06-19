@@ -10,7 +10,7 @@ import { Empty, Chip, FAB, ScreenHeader, IconButton } from '../../lib/ui';
 import { colors, type, space, categoryMeta } from '../../lib/theme';
 import {
   monthMatrix, groupByDate, filterBySubgroup, dominantCategory,
-  sortDayTasks, monthLabel, dateKey, parseKey,
+  sortDayTasks, monthLabel, dateKey,
 } from '../../lib/agenda';
 import { t } from '../../lib/i18n';
 
@@ -39,7 +39,6 @@ export default function Agenda() {
   };
 
   const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
-  const selectedDate = parseKey(selected);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>

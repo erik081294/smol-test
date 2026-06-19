@@ -5,7 +5,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
-import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
@@ -21,7 +20,7 @@ import {
 } from '../../lib/expenses';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
-import { t } from '../../lib/i18n';
+import { t, dateLocale } from '../../lib/i18n';
 
 const SPLIT_LABELS = {
   [SPLIT.EQUAL]: 'expense.split.equal',
@@ -141,7 +140,7 @@ export default function ExpenseEditor() {
           <ModalHeader title={existing.description} onClose={() => router.back()} />
           <Text style={[type.h2, { color: colors.forest }]}>{formatCents(existing.amount_cents)}</Text>
           <Text style={[type.body, { color: colors.inkSoft, marginTop: space.xs }]}>
-            {t('expenses.row.paid', { name: nameOf(existing.paid_by) })} · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: nl })}
+            {t('expenses.row.paid', { name: nameOf(existing.paid_by) })} · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: dateLocale() })}
           </Text>
           <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>{t('expense.detail.split')}</Text>
           {(existing.expense_shares ?? []).map((s) => (

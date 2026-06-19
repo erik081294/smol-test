@@ -5,7 +5,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, addDays } from 'date-fns';
-import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { useTasks } from '../../lib/useTasks';
@@ -20,7 +19,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityPayload, validateVisibility } from '../../lib/visibility';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
-import { t, plural } from '../../lib/i18n';
+import { t, plural, dateLocale } from '../../lib/i18n';
 
 const WEEKDAYS = [
   { d: 1, l: 'Ma' }, { d: 2, l: 'Di' }, { d: 3, l: 'Wo' }, { d: 4, l: 'Do' },
@@ -34,7 +33,7 @@ export default function TaskEditor() {
   const toast = useToast();
   const { addTask, updateTask, deleteTask } = useTasks();
   const { zones } = useZones();
-  const { members, subgroups, activeId } = useHousehold();
+  const { members, subgroups } = useHousehold();
 
   const [loaded, setLoaded] = useState(isNew);
   const [title, setTitle] = useState('');
@@ -358,7 +357,7 @@ function DateStepper({ date, onChange }) {
       <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
         onPress={() => onChange(addDays(date, -1))} />
       <Text style={[type.title, { fontWeight: '700' }]}>
-        {format(date, 'EEEE d MMMM', { locale: nl })}
+        {format(date, 'EEEE d MMMM', { locale: dateLocale() })}
       </Text>
       <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
         onPress={() => onChange(addDays(date, 1))} />

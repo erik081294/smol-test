@@ -21,6 +21,12 @@ jobs:
 
       - run: npm ci
 
+      - name: Lint
+        # Faalt alleen op errors (o.a. no-undef / react/jsx-no-undef) — het vangnet
+        # dat een bug als "nl is not defined" vóór runtime tegenhoudt. De nieuwe
+        # React-compiler-regels staan bewust op "warn" (zie eslint.config.js).
+        run: npx eslint .
+
       - name: Tests
         run: npm test
         env:

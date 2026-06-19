@@ -3,14 +3,13 @@ import { View, Text, FlatList, ScrollView, Pressable, RefreshControl } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
-import { nl } from 'date-fns/locale';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, settle, formatCents } from '../../lib/expenses';
 import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
-import { t, plural } from '../../lib/i18n';
+import { t, plural, dateLocale } from '../../lib/i18n';
 
 export default function Kosten() {
   const { expenses, loading, reload } = useExpenses();
@@ -83,7 +82,7 @@ export default function Kosten() {
               meta={
                 <Text style={type.caption}>
                   {emojiOf(item.paid_by)} {t('expenses.row.paid', { name: nameOf(item.paid_by) })} · {plural(n, 'expenses.participants.one', 'expenses.participants.other')}
-                  · {format(parseISO(item.spent_on), 'd MMM', { locale: nl })}
+                  · {format(parseISO(item.spent_on), 'd MMM', { locale: dateLocale() })}
                 </Text>
               }
               onPress={() => router.push(`/expense/${item.id}`)}
