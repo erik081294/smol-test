@@ -15,7 +15,7 @@ in de canonieke statustabel verderop in dit document (§6).
 > voltooiingen-log + eerlijkheid/rotatie (01), boodschappen-intelligentie (02), grote
 > aankopen (03), kosten & autodelen (04), notificaties (05) en platform-hardening (06).
 
-> **Status-update (laatst herzien: 2026-06-17).** Fase 0 **én** Fase 1 zijn **af in de
+> **Status-update (laatst herzien: 2026-06-19).** Fase 0 **én** Fase 1 zijn **af in de
 > code** (werkboom). Gebouwd en aanwezig:
 > - **Fase 0** — **FND-1** (subgroepen + zichtbaarheid: `subgroups`/`subgroup_members`,
 >   RLS-helpers `can_view`/`in_subgroup`, `lib/visibility.js`, `VisibilityPicker`,
@@ -76,13 +76,20 @@ in de canonieke statustabel verderop in dit document (§6).
 >   apparaat-taaldetectie (`expo-localization`) + taalwissel + persistentie, gewired in
 >   `app/_layout.js`. Het laatste open stuk van **INF-6** is daarmee dicht.
 >
-> - **Fase B — eerste Android dev-build via EAS (2026-06-19)** — project gekoppeld aan
->   `@evdns-team/huishoek` (`app.config.js`: `owner` + `projectId`), EAS-env-vars gezet
->   (alleen de twee `EXPO_PUBLIC_`-waarden), keystore in de cloud gegenereerd, build
->   gequeued (`development`-profiel). **Status:** build draait (in queue → bouwen); zodra de
->   APK klaar is volgt: installeren op toestel + `expo start --dev-client --lan` → de
->   **rooktests** die de 🔧-items (BOO-2/3/5, INF-3/4/7) naar ✅ tillen. Dit is de
->   **vervolgstap**.
+> - **Fase B — dev-build klaar + toestel-rooktest gedaan (2026-06-19)** — de EAS Android
+>   `development`-build is **finished** (APK, build `76fd754c…`) en geïnstalleerd op een
+>   **moto g72 (Android 13)**. Gestart via **USB + `adb reverse`** met een dev-client-deeplink
+>   naar `localhost:8081` (omzeilt de firewall-LAN-val — `--localhost` niet eens nodig).
+>   **Rooktest groen op toestel** (screenshots + UI-dumps): login, navigatie + álle tabs
+>   renderen; taken afvinken (doorrol bevestigd: 25 jul→1 aug→8 aug); boodschap
+>   toevoegen/verwijderen + **undo-toast** (`'Melk' gewist` + Ongedaan maken); productcatalogus
+>   (BOO-5), prijstracker-detail + empty state (BOO-3), bon-editor (BOO-2, incl. "Scan bon"-knop
+>   + lopende totaalcontrole) en kosten/saldo ("Je staat gelijk") — **geen redbox/JS-fouten**,
+>   sterke a11y-labels. Daarmee **INF-7 ✅** en de boodschappen-🔧 **BOO-2/3/5 op toestel
+>   bevestigd**. **Rest:** bon écht end-to-end opslaan (`create_purchase`), BOO-7-scan
+>   (Orq-secrets), INF-3 Maestro-kalibratie + INF-4 Sentry-DSN, en de 2-account-rooktest
+>   (`VERIFICATIE.md` Stap 3). Mini-bug gezien: spatie mist in kosten-metaregel
+>   ("1 deelnemer· 18 jun.").
 >
 > Dit document blijft het waarom/overzicht; de specs zijn het hoe.
 
@@ -321,10 +328,10 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | KLU-3 | Klussen | Seizoenssuggesties | 3 | Could | S | ✅ | KLU-2 | Regelgebaseerd op maand (`months` per klus, `seasonalChores()`); getoond als "Past bij &lt;maand&gt;" in de bibliotheek-sheet. |
 | KLU-4 | Klussen | Beurtrotatie | 2 | Could | M | ✅ | FND-2 | Rotatie-volgorde (`tasks.rotation uuid[]`, migratie 0012); bij doorrollen springt `assigned_to` naar de volgende (`lib/rotation.js` → `nextAssignee`). UI in de taak-editor; indicator in `TaskRow`. |
 | BOO-1 | Boodschappen | Gedeelde lijst | 1 | Must | — | ✅ | — | Realtime + afvinken. Gereed in v1.0. |
-| BOO-2 | Boodschappen | Bonnetje — handmatig invoeren (trap 1) | 2 | Should | L | 🔧 | BOO-5 | **Datalaag + UI af (plan 02, 2026-06-19).** Bon invoeren met regels (winkel/datum/aantal/eenheid/prijs), live matching-suggestie per regel + lopend-totaal-controle: `app/purchase/[id].js`, hook `lib/usePurchases.js`, RPC `create_purchase` (migratie 0013, **live**). Foto optioneel/later (bucket `receipts`, 0014). **Rest:** web-rooktest. |
-| BOO-3 | Boodschappen | Prijstracker | 2 | Should | M | 🔧 | BOO-2 | **Datalaag + UI af (plan 02).** Productdetail `app/product/[id].js`: laatste prijs per winkel, min/max/trend, sparkline (`react-native-svg`) over de bonregels. Pure kern `lib/priceTrack.js` + units groen; data via `useProductPrices`. **Rest:** web-rooktest. |
+| BOO-2 | Boodschappen | Bonnetje — handmatig invoeren (trap 1) | 2 | Should | L | ✅ | BOO-5 | **Datalaag + UI af (plan 02, 2026-06-19); editor op toestel bevestigd (2026-06-19).** Bon invoeren met regels (winkel/datum/aantal/eenheid/prijs), live matching-suggestie per regel + lopend-totaal-controle: `app/purchase/[id].js`, hook `lib/usePurchases.js`, RPC `create_purchase` (migratie 0013, **live**). Foto optioneel/later (bucket `receipts`, 0014). Toestel-rooktest: editor + alle velden + "Scan bon"-knop + totaalcontrole renderen, geen JS-fouten. **Rest:** één bon écht end-to-end opslaan (matching → `create_purchase`). |
+| BOO-3 | Boodschappen | Prijstracker | 2 | Should | M | ✅ | BOO-2 | **Datalaag + UI af (plan 02); op toestel bevestigd (2026-06-19).** Productdetail `app/product/[id].js`: laatste prijs per winkel, min/max/trend, sparkline (`react-native-svg`) over de bonregels. Pure kern `lib/priceTrack.js` + units groen; data via `useProductPrices`. Toestel: detail rendert + nette empty state "Nog geen prijsdata" (geen svg-crash). |
 | BOO-4 | Boodschappen | Supermarktvergelijking | 3 | Could | L | ⏳ | BOO-3 | Totaalprijs standaardmandje per winkel. Vereist betrouwbare matching. |
-| BOO-5 | Boodschappen | Productcatalogus & matching | 2 | Must | M | 🔧 | FND-2 | **Datalaag + UI af (plan 02).** Tabel `products` (household-breed, is_member-RLS, migratie 0013 **live**, RLS-integratietest groen), hook `lib/useProducts.js`, pure matching `lib/productMatch.js` + units. Catalogus-sheet + product-autocomplete + inline "nieuw product" in `app/(tabs)/boodschappen.js`; `groceries.product_id`-koppeling. **Rest:** web-rooktest. |
+| BOO-5 | Boodschappen | Productcatalogus & matching | 2 | Must | M | ✅ | FND-2 | **Datalaag + UI af (plan 02); op toestel bevestigd (2026-06-19).** Tabel `products` (household-breed, is_member-RLS, migratie 0013 **live**, RLS-integratietest groen), hook `lib/useProducts.js`, pure matching `lib/productMatch.js` + units. Catalogus-sheet + product-autocomplete + inline "nieuw product" in `app/(tabs)/boodschappen.js`; `groceries.product_id`-koppeling. Toestel: catalogus-sheet laadt producten + opent productdetail. |
 | BOO-6 | Boodschappen | Per-keten bon-parsers | 3 | Could | M | ⏳ | BOO-2 | Trap 2. AH/Jumbo/Lidl/Plus. |
 | BOO-7 | Boodschappen | AI-bonextractie (foto → regels) | 3 | Could | L | 🔧 | BOO-2 | **Gebouwd (2026-06-19).** "Scan bon"-knop in de bon-editor → foto → Supabase Edge Function `scan-receipt` (Deno) proxiet naar de **Orq.ai AI Gateway** (model-router, vision) → gestructureerde JSON (winkel/datum/regels in centen) → vult de bewerkbare editor; gebruiker controleert (totaal-check + per-regel matching) vóór opslaan = vangnet. `ORQ_API_KEY` server-side (secret), functie achter `verify_jwt`. **Rest (jouw account):** Orq-deployment `receipt-extractor` aanmaken + secrets zetten + `supabase functions deploy scan-receipt` — zie [`docs/orq-receipt-scan.md`](docs/orq-receipt-scan.md). Kosten per scan via Orq meewegen. |
 | BOO-8 | Boodschappen | Aankoopfrequentie leren | 3 | Could | M | ⏳ | BOO-3 | Begin als simpele 'je koopt dit meestal rond nu'-suggestie. |
@@ -445,7 +452,8 @@ neem ze pas op zodra ze "echt" worden. Gegroepeerd naar afstand/aard.
   gemigreerd naar `t(...)`). Alleen `expo-localization` voor locale-detectie rest, apart. Zie §6.
 - **Meertaligheid (i18n-fundament)** (INF-6) — strings nu nog NL-hardcoded; een i18n-laag
   voorbereiden maakt latere talen goedkoop.
-- **Expo-Go-toestel-deblokkade** (INF-7) — 🔧 **aanpak gestaged (plan 08 fase B):** dev build
-  i.p.v. Expo Go (`expo-dev-client` + `eas.json` development-profiel) + `expo start --dev-client
-  --lan` omzeilt de ngrok-/firewall-blokkade. **Rest:** eerste APK bouwen (wacht op Expo-login)
-  en op een echt Android-toestel installeren.
+- **Expo-Go-toestel-deblokkade** (INF-7) — ✅ **opgelost & bewezen (2026-06-19).** Dev build
+  i.p.v. Expo Go (`expo-dev-client` + `eas.json` development-profiel). De EAS `development`-APK
+  is gebouwd, geïnstalleerd op een moto g72 (Android 13) en draait via **USB + `adb reverse`**
+  met een dev-client-deeplink naar `localhost:8081` (omzeilt de firewall-/ngrok-blokkade;
+  `--localhost` niet nodig). Volledige rooktest groen, geen JS-fouten. Web blijft fallback.
