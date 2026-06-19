@@ -64,6 +64,26 @@ in de canonieke statustabel verderop in dit document (§6).
 >   afvinken/opslaan/fout) en **STR-5 zichtbare acties** (geen verborgen long-press meer;
 >   Schoonmaak-actieknop in-flow i.p.v. zwevend). Resteert: de 🔧-items op web narlopen.
 >
+> - **Fase 2 — Boodschappen-intelligentie + AI-scan (2026-06-19, plan 02)** — **BOO-5**
+>   productcatalogus/matching, **BOO-2** handmatige bon (trap 1) en **BOO-3** prijstracker
+>   gebouwd (datalaag + hooks + schermen); migratie `0013` **live** (DB op `0013`), RLS-tests
+>   groen (**155 tests**). Daarbovenop **BOO-7** AI-bonscan via een `scan-receipt` Edge Function
+>   naar de **Orq.ai**-gateway (foto → JSON → bewerkbare editor als vangnet). Alle code
+>   **gecommit + gepusht**; resteert de **web-rooktest** (→ 🔧) en, account-afhankelijk, het
+>   activeren van de Orq-deployment + secrets voor de scan.
+>
+> - **i18n-locale-detectie af (2026-06-19)** — `lib/i18nRuntime.js` (commit c68592a):
+>   apparaat-taaldetectie (`expo-localization`) + taalwissel + persistentie, gewired in
+>   `app/_layout.js`. Het laatste open stuk van **INF-6** is daarmee dicht.
+>
+> - **Fase B — eerste Android dev-build via EAS (2026-06-19)** — project gekoppeld aan
+>   `@evdns-team/huishoek` (`app.config.js`: `owner` + `projectId`), EAS-env-vars gezet
+>   (alleen de twee `EXPO_PUBLIC_`-waarden), keystore in de cloud gegenereerd, build
+>   gequeued (`development`-profiel). **Status:** build draait (in queue → bouwen); zodra de
+>   APK klaar is volgt: installeren op toestel + `expo start --dev-client --lan` → de
+>   **rooktests** die de 🔧-items (BOO-2/3/5, INF-3/4/7) naar ✅ tillen. Dit is de
+>   **vervolgstap**.
+>
 > Dit document blijft het waarom/overzicht; de specs zijn het hoe.
 
 ---
@@ -335,7 +355,7 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | UX-2 | Platform | "Meer"-overflow-tab navigatie | 1 | — | S | ✅ | FND-2 | `primary`/`MORE_TAB` in `lib/modules.js`, `app/(tabs)/meer.js`. Houdt tabbalk leesbaar. |
 | INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | 1 | Must | S | ✅ | — | Migraties 0004–**0013** live gepusht (DB op `0013`, boodschappen-catalogus 2026-06-19); RLS-integratietests groen tegen de live DB (**155 tests, 0 skipped**), incl. de nieuwe bon/purchase_items-case. Resteert alleen de handmatige 2-account-rooktest (`VERIFICATIE.md` Stap 3). |
 | INF-2 | Platform | CI-pipeline + testkader | 1 | Should | S | ✅ | — | `.github/workflows/ci.yml`: **lint + units**. `node:test`-units onder `tests/`; ESLint via `eslint-config-expo` (flat config, `eslint.config.js`) als CI-stap die op errors faalt (`no-undef`/`react/jsx-no-undef` = vangnet tegen runtime-`ReferenceError`s zoals "nl is not defined"). De nieuwe React-compiler-regels (`react-hooks/refs|static-components|set-state-in-effect`) staan bewust op "warn". |
-| INF-6 | Platform | i18n-fundament | 2 | Should | S | ✅ | — | **Af — hele app gemigreerd.** `lib/i18n.js` (`t(key, vars)` met `{var}`-interpolatie, zichtbare key-fallback, `setLang`/`getLang`/`registerDict`, simpele `plural`), units `tests/i18n.test.js` (6, groen). Alle zichtbare copy (headers, filters, empty states, sectie-titels, toasts, Alerts, validatie-/foutmeldingen, a11y-labels, pluralisatie) op álle schermen via `t(...)`: 8 tab-schermen + `TaskRow` én de editors (taak/uitgave/plant), auth-welkom, onboarding en huishouden. Bewust níét vertaald (data, geen UI-copy): `LOCATIONS` (opgeslagen waarde van `plant.location`), weekdag-afkortingen (locale-tokens, later via date-fns) en `categoryMeta`/module-labels. **Regel:** nieuwe code gebruikt `t(...)`. **Later (apart):** `expo-localization` voor automatische locale-detectie. Plan 06. |
+| INF-6 | Platform | i18n-fundament | 2 | Should | S | ✅ | — | **Af — hele app gemigreerd + locale-detectie.** `lib/i18n.js` (`t(key, vars)` met `{var}`-interpolatie, zichtbare key-fallback, `setLang`/`getLang`/`registerDict`, simpele `plural`), units `tests/i18n.test.js` (6, groen). Alle zichtbare copy (headers, filters, empty states, sectie-titels, toasts, Alerts, validatie-/foutmeldingen, a11y-labels, pluralisatie) op álle schermen via `t(...)`: 8 tab-schermen + `TaskRow` én de editors (taak/uitgave/plant), auth-welkom, onboarding en huishouden. Bewust níét vertaald (data, geen UI-copy): `LOCATIONS` (opgeslagen waarde van `plant.location`), weekdag-afkortingen (locale-tokens, later via date-fns) en `categoryMeta`/module-labels. **Regel:** nieuwe code gebruikt `t(...)`. **Automatische locale-detectie nu óók af** (commit c68592a): `lib/i18nRuntime.js` — `useLang`-hook (taalwissel herrendert via `useSyncExternalStore`), `initLocale()` leest `expo-localization` apparaat-taal bij eerste start (opgeslagen keuze wint, anders device, anders `nl`-default) + persistentie via AsyncStorage; gewired in `app/_layout.js`. Plan 06. |
 | STR-1 | Platform/UX | IA: één bron `tasks`, expliciete weergaven | 1.5 | Must | M | ✅ | — | **Af:** zone reist mee met de taak (`useTasks` embed `zone:zones`, optie `select` in `useCollection`), zichtbaar in `TaskRow` (Taken/Vandaag/Agenda) en bewerkbaar in de taak-editor (zone-kiezer + `zone_id`); per-zone "Taak toevoegen" op Schoonmaak opent dezelfde editor (`?zone=`). Agenda/Schoonmaak hebben nu "dit is een weergave"-subtitels ("Je taken op de kalender", "Je taken per ruimte — afvinken werkt overal door"). Schoonmaak blijft bewust onder "Meer": het is een gespecialiseerde onderhouds-weergave, geen dagelijkse primaire tab. Plan 07 §A. |
 | STR-2 | Platform/UX | Navigatie-helderheid | 1.5 | Should | S | ✅ | STR-1 | **Af:** `chevron`-prop op `ItemRow` als expliciete "dit is tikbaar"-affordance op navigerende rijen (Meer-modules, huishouden-subgroepen) — niet op afvink-rijen (die hebben al een checkbox). Detailschermen gebruiken consistent `ModalHeader` (terug/sluit). Schoonmaak-plaatsing heroverwogen → bewust onder "Meer" (zie STR-1). |
 | STR-3 | Platform/UX | Schermen naar `lib/ui.js` trekken | 1.5 | Must | M | ✅ | — | **Af — 0 rauwe `TouchableOpacity` in heel `app/`.** Alle editors (taak/plant/uitgave) + alle tab-schermen (boodschappen/huishouden/planten/kosten/agenda/meer/schoonmaak) op `ItemRow`/`IconButton`/`Chip`/`Pressable` + tokens. Bug gefixt: planten-kaart rekte bij oneven aantal de rij vol (ghost-spacer). Pluralisatie "1 deelnemer" gefixt (kosten). |
