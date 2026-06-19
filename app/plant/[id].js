@@ -405,7 +405,7 @@ function DiaryThumb({ photo, onPress }) {
           </View>
         ) : null}
       </View>
-      <Text style={[type.caption, { marginTop: space.xs }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: nl })}</Text>
+      <Text style={[type.caption, { marginTop: space.xs }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: dateLocale() })}</Text>
     </Pressable>
   );
 }
