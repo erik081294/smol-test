@@ -3,6 +3,7 @@ export default ({ config }) => ({
   ...config,
   name: 'Huishoek',
   slug: 'huishoek',
+  owner: 'evdns-team',
   scheme: 'huishoek',
   version: '1.0.0',
   orientation: 'portrait',
@@ -16,5 +17,6 @@ export default ({ config }) => ({
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    eas: { projectId: '21c400af-8a3c-4b50-ba7c-fc600638cc41' },
   },
 });
