@@ -19,10 +19,14 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 05 | [Notificaties & herinneringen](./05-notificaties.md) | PLT-1 | Cross-cutting platform | Optioneel |
 | 06 | [Platform-hardening](./06-platform-hardening.md) | INF-6, INF-3, INF-4, INF-5 | Infra/kwaliteit | Nee |
 | 07 | [Strakke app (Fase 1.5)](./07-strakke-app.md) | STR-1 t/m STR-11 | UX-cohesie + interactie-polish + IA | Nee |
+| 08 | [Professionele app: hardening & afmaken](./08-professioneel-hardening.md) | INF-3/4/5/7, STR-7/9/10, INF-1-rest | Productie-readiness | Nee |
 
-> **Volgende ronde = plan 07.** De gebruiker kiest eerst "strak maken" (Fase 1.5)
-> vóór de ambitieuze Fase 2-data-features (plannen 02–04). Plan 07 bouwt nieuwe
-> infrastructuur noch migratie; het past het bestaande design-systeem consequent toe.
+> **Volgende ronde = plan 08** (gekozen 2026-06-19): eerst de bestaande app
+> *professioneel* maken — 🔧-eindjes dicht, op een echt **Android**-toestel (dev build),
+> crash-monitoring, E2E en een release-pijplijn naar Play Internal — vóór de Fase 2-
+> features (plannen 02–05, kernen al gemerged). Geen migratie.
+>
+> *(Plannen 01, 06/INF-6 en 07 zijn grotendeels gereed; zie backlog §6.)*
 
 ## Aanbevolen volgorde & afhankelijkheden
 
