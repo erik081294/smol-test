@@ -11,7 +11,6 @@ import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { mutate } from '../../lib/db';
 import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
@@ -20,6 +19,8 @@ import { validateVisibility } from '../../lib/visibility';
 import {
   SPLIT, computeShares, exactSharesValid, formatCents, parseAmountToCents,
 } from '../../lib/expenses';
+import { useToast } from '../../lib/toast';
+import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t } from '../../lib/i18n';
 
 const SPLIT_LABELS = {
@@ -32,7 +33,8 @@ export default function ExpenseEditor() {
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
-  const { addExpense } = useExpenses();
+  const toast = useToast();
+  const { addExpense, deleteExpense } = useExpenses();
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
 
@@ -111,14 +113,22 @@ export default function ExpenseEditor() {
     } finally { setBusy(false); }
   };
 
+  // Verwijderen met ongedaan-maken (zelfde patroon als de taak-editor): de uitgave
+  // verdwijnt meteen uit het overzicht, de echte delete volgt pas bij het verlopen
+  // van de toast. Geen blokkerende Alert — undo is het vangnet en werkt óók op web.
   const removeExisting = () => {
-    Alert.alert(t('expense.delete.title'), t('expense.delete.body'), [
-      { text: t('common.cancelLong'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: async () => {
-        await mutate(supabase.from('expenses').delete().eq('id', id), { context: 'uitgave verwijderen' });
-        router.back();
-      } },
-    ]);
+    markPending(id);
+    router.back();
+    toast.show({
+      message: t('expense.deleted', { name: existing?.description ?? t('common.remove') }),
+      actionLabel: t('common.undo'),
+      onAction: () => unmarkPending(id),
+      onExpire: async () => {
+        try { await deleteExpense(id); }
+        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        finally { unmarkPending(id); }
+      },
+    });
   };
 
   // ---------- Read-only weergave bestaande uitgave ----------

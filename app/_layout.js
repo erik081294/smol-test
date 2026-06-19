@@ -6,8 +6,13 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
 import { ToastProvider } from '../lib/toast';
+import { ErrorBoundary } from '../lib/ErrorBoundary';
+import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
 import { colors } from '../lib/theme';
+
+// Crash-/foutmonitoring zo vroeg mogelijk starten (no-op zonder DSN).
+initMonitoring();
 
 function Gate() {
   const { session, loading: authLoading } = useAuth();
@@ -64,15 +69,17 @@ function Gate() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      <AuthProvider>
-        <HouseholdProvider>
-          <ToastProvider>
-            <Gate />
-          </ToastProvider>
-        </HouseholdProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <AuthProvider>
+          <HouseholdProvider>
+            <ToastProvider>
+              <Gate />
+            </ToastProvider>
+          </HouseholdProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

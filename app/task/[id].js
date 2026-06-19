@@ -18,6 +18,8 @@ import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityPayload, validateVisibility } from '../../lib/visibility';
+import { useToast } from '../../lib/toast';
+import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t, plural } from '../../lib/i18n';
 
 const WEEKDAYS = [
@@ -29,6 +31,7 @@ export default function TaskEditor() {
   const { id, date, zone } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
+  const toast = useToast();
   const { addTask, updateTask, deleteTask } = useTasks();
   const { zones } = useZones();
   const { members, subgroups, activeId } = useHousehold();
@@ -140,11 +143,23 @@ export default function TaskEditor() {
     } finally { setBusy(false); }
   };
 
+  // Verwijderen met ongedaan-maken (geen blokkerende confirm — de undo-toast ís het
+  // vangnet, en Alert-knoppen vuren bovendien niet op web). De taak verdwijnt meteen
+  // uit de lijst (markPending), we navigeren terug, en de echte delete volgt pas als
+  // de toast verloopt; "Ongedaan maken" haalt de markering weg en er is niets gebeurd.
   const confirmDelete = () => {
-    Alert.alert(t('task.delete.title'), '', [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteTask(id); router.back(); } },
-    ]);
+    markPending(id);
+    router.back();
+    toast.show({
+      message: t('task.deleted', { name: title.trim() || t('task.deleteButton') }),
+      actionLabel: t('common.undo'),
+      onAction: () => unmarkPending(id),
+      onExpire: async () => {
+        try { await deleteTask(id); }
+        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        finally { unmarkPending(id); }
+      },
+    });
   };
 
   if (!loaded) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;

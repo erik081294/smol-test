@@ -1,0 +1,19 @@
+# Kritieke flow 1: taak toevoegen → terug in de lijst → afvinken.
+# Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+appId: app.huishoek
+---
+- launchApp
+- tapOn: "Taken"                 # tab
+- assertVisible: "Taken"         # scherm-titel
+- tapOn:
+    accessibilityText: "Taak toevoegen"   # FAB (task.add)
+- assertVisible: "Nieuwe taak"
+- tapOn: "Wat moet er gebeuren?" # titel-veld (task.field.title)
+- inputText: "E2E rooktest taak"
+- tapOn: "Opslaan"               # ModalHeader bevestigen (common.save)
+- assertVisible: "E2E rooktest taak"
+# Afvinken: tik de rij-checkbox (accessibilityLabel bevat de taaknaam).
+- tapOn:
+    text: "E2E rooktest taak"
+- tapOn: "Afgerond"              # filter naar afgeronde taken (tasks.filter.done)
+- assertVisible: "E2E rooktest taak"

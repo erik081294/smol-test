@@ -1,0 +1,17 @@
+# Kritieke flow 3: boodschap toevoegen → verwijderen → ongedaan maken (STR-9 undo).
+# Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+appId: app.huishoek
+---
+- launchApp
+- tapOn: "Boodschappen"          # tab (groceries.title)
+- tapOn:
+    accessibilityText: "Boodschap toevoegen"   # invoerveld (groceries.addLabel)
+- inputText: "E2E rooktest melk"
+- pressKey: Enter
+- assertVisible: "E2E rooktest melk"
+# Verwijderen via de trailing delete-knop op de rij (accessibilityLabel bevat de naam).
+- tapOn:
+    accessibilityText: "'E2E rooktest melk' verwijderen"
+# Undo-toast verschijnt: tik "Ongedaan maken" → item komt terug (common.undo).
+- tapOn: "Ongedaan maken"
+- assertVisible: "E2E rooktest melk"

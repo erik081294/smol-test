@@ -21,6 +21,8 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
 import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
+import { useToast } from '../../lib/toast';
+import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t, dateLocale } from '../../lib/i18n';
 
 const LOCATIONS = ['Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Balkon', 'Tuin', 'Kantoor'];
@@ -29,6 +31,7 @@ export default function PlantScreen() {
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
+  const toast = useToast();
   const { addPlant, removePlant } = usePlants();
   const { species } = usePlantSpecies();
   const { tasks, completeTask, uncompleteTask } = useTasks();
@@ -196,10 +199,23 @@ export default function PlantScreen() {
     const card = careCard(sp, plant.location);
     const plantTasks = tasks.filter((pt) => pt.plant_id === plant.id);
     const toggle = (task) => (task.completed_at ? uncompleteTask(task.id) : completeTask(task));
-    const confirmRemove = () => Alert.alert(t('plant.delete.title'), t('plant.delete.body'), [
-      { text: t('common.cancelLong'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: async () => { await removePlant(plant.id); router.back(); } },
-    ]);
+    // Verwijderen met ongedaan-maken (zelfde patroon als de taak-/uitgave-editor):
+    // de plant verdwijnt meteen uit de lijst, de echte delete volgt pas als de toast
+    // verloopt. Geen blokkerende Alert — undo is het vangnet en werkt óók op web.
+    const confirmRemove = () => {
+      markPending(plant.id);
+      router.back();
+      toast.show({
+        message: t('plant.deleted', { name: plant.name }),
+        actionLabel: t('common.undo'),
+        onAction: () => unmarkPending(plant.id),
+        onExpire: async () => {
+          try { await removePlant(plant.id); }
+          catch (e) { Alert.alert(t('common.failed'), e.message); }
+          finally { unmarkPending(plant.id); }
+        },
+      });
+    };
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>

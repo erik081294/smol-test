@@ -1,0 +1,16 @@
+# Kritieke flow 2: uitgave toevoegen, gelijk gesplitst → terug in het overzicht.
+# Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+appId: app.huishoek
+---
+- launchApp
+- tapOn: "Kosten"                # tab (expenses.title)
+- tapOn:
+    accessibilityText: "Uitgave toevoegen"   # FAB (expense.add)
+- assertVisible: "Nieuwe uitgave"
+- tapOn: "Omschrijving"          # expense.field.description
+- inputText: "E2E rooktest etentje"
+- tapOn: "Bedrag (€)"            # expense.field.amount
+- inputText: "2400"             # 24,00 in centen-parser; pas aan op het echte invoerformaat
+- tapOn: "Gelijk"                # splitsing gelijk (expense.split.equal)
+- tapOn: "Uitgave opslaan"       # expense.save
+- assertVisible: "E2E rooktest etentje"

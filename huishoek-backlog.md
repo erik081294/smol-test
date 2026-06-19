@@ -344,7 +344,7 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | STR-6 | Platform/UX | Inline formulier-validatie | 1.5 | Should | S | ✅ | — | **Af:** alle veld-validaties tonen nu inline (`Field`-`error` + foutregel onder de control) i.p.v. blokkerende `Alert` — in taak-, uitgave-, plant-editor, auth-welkom, onboarding en huishouden-subgroep. `Alert` resteert alleen voor bevestigingen (verwijderen) en server-/permissie-fouten. Fout wist bij wijzigen van het veld. |
 | STR-7 | Platform/UX | Optimistic UI | 1.5 | Must | M | 🔧 | — | **Gebouwd:** optimistische `update`/`remove` met rollback in `useCollection` (raakt alle modules); `completeTask`/`uncompleteTask` vinken nu direct af (statuswijziging vóór het loggen). Realtime herlaadt de serverwaarheid. Te valideren op web. Vervangt PLT-2. |
 | STR-8 | Platform/UX | Haptics | 1.5 | Could | S | ✅ | — | **Af:** `expo-haptics` toegevoegd (bleek nog niet geïnstalleerd) + `lib/haptics.js` (`tapLight`/`success`/`error`, no-op op web/zonder hardware, fire-and-forget). `tapLight` zit in `Checkbox` (afvinken + elke keuze, overal via `TaskRow`); `success`/`error` op opslaan resp. validatie-/serverfout in de taak-, uitgave- en plant-editor. |
-| STR-9 | Platform/UX | Toast + ongedaan-maken | 1.5 | Should | M | 🔧 | — | **Gebouwd:** `lib/toast.js` (`ToastProvider`/`useToast`) in `app/_layout.js`; uitgesteld-wissen met "Ongedaan maken" voor Boodschappen-`afgevinkt wissen` én nu ook voor **losse item-deletes** (long-press → item lokaal verbergen, echte delete pas bij verlopen toast, terugdraaibaar zonder re-insert). **Rest:** undo uitrollen naar de overige modules (taak/uitgave/plant-delete) — sluit aan op STR-5 (swipe). |
+| STR-9 | Platform/UX | Toast + ongedaan-maken | 1.5 | Should | M | 🔧 | — | **Uitgerold naar alle modules (plan 08 fase A1).** `lib/toast.js` (`ToastProvider`/`useToast`) + uitgesteld-wissen voor Boodschappen én nu **taak/uitgave/plant-delete**: de editor markeert het item via de nieuwe module-globale `lib/pendingDeletes.js`-store (units in `tests/pendingDeletes.test.js`), navigeert terug, en de echte delete volgt pas bij het verlopen van de toast — "Ongedaan maken" haalt de markering weg, zónder re-insert (geen id-/historie-churn). `useCollection`/`useExpenses` filteren pending-ids via `useSyncExternalStore`. De blokkerende confirm-`Alert` verdween daarmee (die vuurde bovendien niet op web). **Rest:** runtime-rooktest op web/toestel om → ✅ te zetten. |
 | STR-10 | Platform/UX | Empty states + illustraties | 1.5 | Should | M | 🔧 | — | **Eigen illustratie-systeem** `lib/illustrations.js` (vaste stage, platte geometrie, palet-tokens, themeable/dark-mode-proof) met 8 scènes (mok/klembord/kar/plant/munten/kalender/bezem/figuurtjes), via een `illustration`-prop op `Empty`. Gewired op Vandaag/Taken/Boodschappen/Planten/Kosten/Agenda/Schoonmaak + groepen-leegstaat. Stijl goedgekeurd (Taken/Today); laatste 6 nog visueel na te lopen. |
 | STR-11 | Platform/UX | Beweging via `motion`-tokens | 1.5 | Could | S | ✅ | — | **Af:** `lib/motion.js` — `animateNextLayout()` (zachte `LayoutAnimation` op de eerstvolgende lijst-mutatie, gevoed door de `motion`-tokens) + `prefersReducedMotion()` (gecachte vlag, luistert naar wijzigingen). Gewired op Boodschappen (toevoegen/afvinken/wissen) en Taken (afvinken). "Vier-de-voortgang": het vinkje popt zacht op bij afvinken (`Checkbox`, spring, overal in de app via `TaskRow`). Alles no-op bij "verminder beweging". |
 
@@ -408,14 +408,24 @@ neem ze pas op zodra ze "echt" worden. Gegroepeerd naar afstand/aard.
   aan boodschappen uit?", "welke plant heeft water nodig?") bovenop de bestaande tabellen.
 
 ### 7.5 Kwaliteit & infra
-- **E2E-tests** (INF-3) — Maestro of Detox voor de kritieke flows (onboarding, taak afvinken,
-  uitgave splitsen) bovenop de bestaande units.
-- **Foutrapportage/monitoring** (INF-4) — Sentry of vergelijkbaar voor crashes in productie.
-- **Release-pijplijn** (INF-5) — EAS Build/Submit naar TestFlight/Play Internal.
+- **E2E-tests** (INF-3) — 🔧 **scaffolds gebouwd (plan 08 fase D):** Maestro gekozen (lichte
+  YAML); 3 kritieke flows in `.maestro/` (taak toevoegen+afvinken, uitgave splitsen,
+  boodschap toevoegen+undo) + `.maestro/README.md`. Geschreven tegen de echte NL-teksten,
+  **nog te kalibreren tegen een draaiende build** (geen toestel beschikbaar bij het schrijven).
+- **Foutrapportage/monitoring** (INF-4) — 🔧 **gewired (plan 08 fase C):** `@sentry/react-native`
+  geïnstalleerd + config-plugin in `app.config.js`; `lib/monitoring.js` (env-gated op
+  `EXPO_PUBLIC_SENTRY_DSN`, no-op zonder DSN, `sendDefaultPii:false`) en een app-brede
+  `lib/ErrorBoundary.js` (nette NL-fallback) in `app/_layout.js`. **Rest:** DSN + een build
+  om echte rapportage te verifiëren.
+- **Release-pijplijn** (INF-5) — 🔧 **config gestaged (plan 08 fase B/E):** `eas.json`
+  (development/preview/production-profielen, Android APK→AAB, autoIncrement, submit naar
+  `internal`-track) + `expo-dev-client` + `docs/eas-setup.md`. **Rest:** `eas login`/`init`,
+  secrets, eerste build + Play-submit (wacht op Play-account in goedkeuring).
 - ~~**Meertaligheid (i18n-fundament)** (INF-6)~~ — ✅ **af** (`lib/i18n.js` + units; héle app
   gemigreerd naar `t(...)`). Alleen `expo-localization` voor locale-detectie rest, apart. Zie §6.
 - **Meertaligheid (i18n-fundament)** (INF-6) — strings nu nog NL-hardcoded; een i18n-laag
   voorbereiden maakt latere talen goedkoop.
-- **Expo-Go-toestel-deblokkade** (INF-7) — firewall block-all + Defender-quarantaine van ngrok
-  blokkeert nu toestel-testen (zie projectgeheugen); een werkende dev-flow op een echt toestel
-  opzetten (dev build i.p.v. Expo Go, of tunnel-uitzondering).
+- **Expo-Go-toestel-deblokkade** (INF-7) — 🔧 **aanpak gestaged (plan 08 fase B):** dev build
+  i.p.v. Expo Go (`expo-dev-client` + `eas.json` development-profiel) + `expo start --dev-client
+  --lan` omzeilt de ngrok-/firewall-blokkade. **Rest:** eerste APK bouwen (wacht op Expo-login)
+  en op een echt Android-toestel installeren.
