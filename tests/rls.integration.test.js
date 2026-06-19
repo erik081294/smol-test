@@ -349,3 +349,50 @@ test('RLS: voltooiing van custom-taak alleen zichtbaar voor genoemde personen', 
   const carolSees = await carol.client.from('task_completions').select('id').eq('id', compl.id);
   assert.equal(carolSees.data?.length ?? 0, 0, 'niet-genoemde huisgenoot ziet de voltooiing NIET');
 });
+
+// --- Boodschappen-catalogus: purchases (via create_purchase RPC) + purchase_items
+// Catalogus/bonnen zijn household-breed (is_member, géén visibility-contract).
+// Verifieert dat (a) de atomaire RPC werkt, (b) een huisgenoot de bon + regels ziet
+// en (c) een buitenstaander niets ziet — de regels erven de toegang van hun parent.
+
+test('RLS: bon + bonregels zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_boo');
+  const bob = await makeUser('bob_boo');       // huisgenoot
+  const eve = await makeUser('eve_boo');        // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Boodschappenhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  // Alice maakt een product in de catalogus en voert een bon met twee regels in via de RPC.
+  const { data: product, error: pErr } = await alice.client.from('products')
+    .insert({ household_id: hh.id, name: 'Halfvolle melk', search: 'halfvolle melk', created_by: alice.id })
+    .select().single();
+  assert.ok(!pErr, `product: ${pErr?.message}`);
+
+  const { data: purchaseId, error: rpcErr } = await alice.client.rpc('create_purchase', {
+    p_household_id: hh.id, p_store: 'AH', p_purchased_on: null, p_total_cents: 250,
+    p_photo_path: null,
+    p_items: [
+      { product_id: product.id, name: 'Halfvolle melk 1L', quantity: 1, unit: 'l', unit_price_cents: 119, line_total_cents: 119 },
+      { product_id: null, name: 'Brood', quantity: 1, unit: 'stuk', unit_price_cents: 131, line_total_cents: 131 },
+    ],
+  });
+  assert.ok(!rpcErr, `create_purchase: ${rpcErr?.message}`);
+  assert.ok(purchaseId, 'RPC moet het nieuwe purchase-id teruggeven');
+
+  // Bob ziet de bon, de regels én het product; Eve niets.
+  const bobBon = await bob.client.from('purchases').select('id').eq('id', purchaseId);
+  assert.equal(bobBon.data?.length, 1, 'huisgenoot moet de bon zien');
+  const bobItems = await bob.client.from('purchase_items').select('id').eq('purchase_id', purchaseId);
+  assert.equal(bobItems.data?.length, 2, 'huisgenoot moet de bonregels zien (erven parent-toegang)');
+  const bobProd = await bob.client.from('products').select('id').eq('id', product.id);
+  assert.equal(bobProd.data?.length, 1, 'huisgenoot moet het catalogusproduct zien');
+
+  const eveBon = await eve.client.from('purchases').select('id').eq('id', purchaseId);
+  assert.equal(eveBon.data?.length ?? 0, 0, 'buitenstaander mag de bon NIET zien');
+  const eveItems = await eve.client.from('purchase_items').select('id').eq('purchase_id', purchaseId);
+  assert.equal(eveItems.data?.length ?? 0, 0, 'buitenstaander mag de bonregels NIET zien');
+  const eveProd = await eve.client.from('products').select('id').eq('id', product.id);
+  assert.equal(eveProd.data?.length ?? 0, 0, 'buitenstaander mag het catalogusproduct NIET zien');
+});

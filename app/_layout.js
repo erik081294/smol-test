@@ -63,6 +63,8 @@ function Gate() {
       <Stack.Screen name="task" options={{ presentation: 'modal' }} />
       <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
       <Stack.Screen name="plant" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="purchase" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="product" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

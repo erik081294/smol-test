@@ -1,17 +1,35 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, RefreshControl, Platform, Alert } from 'react-native';
+import { View, Text, FlatList, TextInput, RefreshControl, Platform, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
+import { useProducts } from '../../lib/useProducts';
 import { useToast } from '../../lib/toast';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader } from '../../lib/ui';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { t } from '../../lib/i18n';
 
 export default function Boodschappen() {
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
+  const { products, suggestFor } = useProducts();
   const toast = useToast();
+  const router = useRouter();
   const [text, setText] = useState('');
+  const [catalogOpen, setCatalogOpen] = useState(false);
+
+  // Catalogus-suggesties terwijl je typt (BOO-5): koppel een boodschap aan een
+  // bestaand product zodat de prijsdata uit normaal gebruik groeit.
+  const productHints = useMemo(() => {
+    if (text.trim().length < 2) return [];
+    return suggestFor(text, 3).filter((s) => s.score >= 0.4).map((s) => s.product);
+  }, [text, products]);
+
+  const addLinked = (product) => {
+    setText('');
+    animateNextLayout();
+    addItem(product.name, product.id).catch((e) => Alert.alert(t('groceries.error.add'), e.message));
+  };
   // Ids die we lokaal verbergen zolang de "ongedaan maken"-toast loopt; de echte
   // verwijdering gebeurt pas als die toast verloopt.
   const [hiddenIds, setHiddenIds] = useState([]);
@@ -103,7 +121,15 @@ export default function Boodschappen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')} />
+      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
+        right={
+          <Row gap={space.xs}>
+            <IconButton icon="catalog" accessibilityLabel={t('groceries.catalog')} tint={colors.forest}
+              onPress={() => setCatalogOpen(true)} />
+            <IconButton icon="receipt" accessibilityLabel={t('groceries.receipt')} tint={colors.forest}
+              onPress={() => router.push('/purchase/new')} />
+          </Row>
+        } />
 
       {/* Toevoegbalk */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
@@ -121,6 +147,14 @@ export default function Boodschappen() {
         <IconButton icon="add" accessibilityLabel={t('common.add')} tint={colors.forest}
           onPress={add} style={{ backgroundColor: colors.ocher }} />
       </View>
+
+      {productHints.length > 0 ? (
+        <Row gap={space.xs} wrap style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+          {productHints.map((p) => (
+            <Chip key={p.id} label={p.name} icon="catalog" onPress={() => addLinked(p)} />
+          ))}
+        </Row>
+      ) : null}
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
@@ -150,6 +184,30 @@ export default function Boodschappen() {
           ) : null
         }
       />
+
+      {/* Catalogus-sheet (BOO-5): blader door producten → open de prijstracker. */}
+      <Modal visible={catalogOpen} animationType="slide" onRequestClose={() => setCatalogOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+          <ModalHeader title={t('groceries.catalog.title')} onClose={() => setCatalogOpen(false)} />
+          <FlatList
+            data={products}
+            keyExtractor={(p) => p.id}
+            contentContainerStyle={{ padding: space.lg }}
+            renderItem={({ item }) => (
+              <ItemRow
+                title={item.name}
+                meta={<Text style={type.caption}>{item.category}</Text>}
+                chevron
+                onPress={() => { setCatalogOpen(false); router.push(`/product/${item.id}`); }}
+              />
+            )}
+            ListEmptyComponent={
+              <Empty illustration="groceries" title={t('groceries.catalog.title')}
+                subtitle={t('groceries.catalog.empty')} />
+            }
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
