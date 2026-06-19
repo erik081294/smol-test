@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
 import { ToastProvider } from '../lib/toast';
+import { useLang, initLocale } from '../lib/i18nRuntime';
 import { colors } from '../lib/theme';
 
 function Gate() {
@@ -13,6 +14,10 @@ function Gate() {
   const { households, loading: hhLoading } = useHousehold();
   const segments = useSegments();
   const router = useRouter();
+  const lang = useLang();
+
+  // Eénmalig de taal bepalen (opgeslagen keuze → apparaat-taal → default).
+  useEffect(() => { initLocale(); }, []);
 
   useEffect(() => {
     if (authLoading || (session && hhLoading)) return;
@@ -45,7 +50,7 @@ function Gate() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+    <Stack key={lang} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="onboarding" />

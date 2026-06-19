@@ -14,12 +14,14 @@ import {
 } from '../../lib/agenda';
 import { t } from '../../lib/i18n';
 
-const WD = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
-
 export default function Agenda() {
   const { tasks, loading, completeTask, uncompleteTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
+
+  // Weekdag-koppen (ma-eerst), opgebouwd uit de gedeelde weekdag-sleutels zodat
+  // ze meebewegen met de taal. Binnen de component, niet op module-niveau.
+  const WD = [1, 2, 3, 4, 5, 6, 0].map((d) => t(`weekday.min.${d}`));
 
   const today = new Date();
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });

@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { format, parseISO } from 'date-fns';
-import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, usePlantDiary, deletePlantPhoto, updatePlantPhotoNote } from '../../lib/usePlants';
@@ -22,7 +21,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
 import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
-import { t } from '../../lib/i18n';
+import { t, dateLocale } from '../../lib/i18n';
 
 const LOCATIONS = ['Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Balkon', 'Tuin', 'Kantoor'];
 
@@ -269,7 +268,7 @@ export default function PlantScreen() {
               </View>
               {selectedPhoto ? (
                 <Text style={[type.caption, { marginTop: 8 }]}>
-                  {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: nl })}
+                  {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
                 </Text>
               ) : null}
               <View style={{ marginTop: space.md }}>

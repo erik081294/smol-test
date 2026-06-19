@@ -12,7 +12,7 @@ export default ({ config }) => ({
   ios: { supportsTablet: true, bundleIdentifier: 'app.huishoek' },
   android: { package: 'app.huishoek', adaptiveIcon: { backgroundColor: '#0E3A2F' } },
   web: { bundler: 'metro', output: 'single' },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-font'],
+  plugins: ['expo-router', 'expo-secure-store', 'expo-font', 'expo-localization'],
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
