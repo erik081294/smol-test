@@ -5,7 +5,9 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // supabase/functions/* draait op Deno (eigen globals/runtime), niet op de
+    // Expo/React-Native-omgeving — lint die niet mee met de app-config.
+    ignores: ["dist/*", "supabase/functions/**"],
     rules: {
       // De nieuwe React-19/compiler-regels uit eslint-config-expo 56 markeren
       // idiomatische, wérkende RN-patronen in de kern-UI: `useRef(...).current`

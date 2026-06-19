@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { format, addDays, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
+import { parseDataUrl } from '../../lib/plantPhoto';
 import * as haptics from '../../lib/haptics';
 import { usePurchases } from '../../lib/usePurchases';
 import { useProducts } from '../../lib/useProducts';
@@ -37,6 +39,7 @@ export default function PurchaseEditor() {
   const [totalText, setTotalText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [scanning, setScanning] = useState(false);
 
   const updateLine = (i, patch) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, emptyLine()]);
@@ -62,6 +65,68 @@ export default function PurchaseEditor() {
     } catch (e) {
       Alert.alert(t('common.failed'), e.message);
     }
+  };
+
+  // --- Bonscan (BOO-7): foto -> Orq.ai-gateway via de edge function -> prefill ---
+  // Het resultaat vult de bewerkbare editor; de gebruiker controleert/corrigeert
+  // (totaal-controle + per-regel matching) vóór opslaan. Geen waarheid, een vliegende start.
+  const applyScan = (data) => {
+    if (data.store) setStore(data.store);
+    if (data.purchased_on) {
+      const d = parseISO(data.purchased_on);
+      if (!Number.isNaN(d.getTime())) setDate(d);
+    }
+    const scanned = (data.items ?? []).map((i) => ({
+      name: i.name,
+      quantity: i.quantity || 1,
+      unit: UNITS.includes(i.unit) ? i.unit : 'stuk',
+      priceText: i.unit_price_cents != null ? (i.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
+      productId: null,
+    }));
+    setLines(scanned.length ? scanned : [emptyLine()]);
+  };
+
+  const runScan = async (asset) => {
+    const base64 = asset.base64 ?? parseDataUrl(asset.uri)?.base64;
+    if (!base64) { Alert.alert(t('purchase.scan.error'), t('purchase.scan.readError')); return; }
+    setScanning(true);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('scan-receipt', {
+        body: { imageBase64: base64, mimeType: 'image/jpeg' },
+      });
+      if (fnErr) throw new Error(fnErr.message);
+      if (data?.error) throw new Error(data.error);
+      applyScan(data);
+      haptics.success();
+    } catch (e) {
+      haptics.error();
+      Alert.alert(t('purchase.scan.error'), e.message);
+    } finally { setScanning(false); }
+  };
+
+  const launchScan = async (camera) => {
+    try {
+      const perm = camera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm?.granted === false) { Alert.alert(t('purchase.scan.noAccess')); return; }
+      const fn = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+      const res = await fn({ mediaTypes: ['images'], quality: 0.5, base64: true });
+      if (res.canceled) return;
+      await runScan(res.assets[0]);
+    } catch (e) {
+      Alert.alert(t('purchase.scan.error'), e.message);
+    }
+  };
+
+  // Web: Alert-actiesheets vuren niet, dus direct de bibliotheek. Native: keuze camera/bibliotheek.
+  const onScanPress = () => {
+    if (Platform.OS === 'web') { launchScan(false); return; }
+    Alert.alert(t('purchase.scan.title'), undefined, [
+      { text: t('purchase.scan.camera'), onPress: () => launchScan(true) },
+      { text: t('purchase.scan.library'), onPress: () => launchScan(false) },
+      { text: t('common.cancelLong'), style: 'cancel' },
+    ]);
   };
 
   const save = async () => {
@@ -127,8 +192,13 @@ export default function PurchaseEditor() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ModalHeader title={t('purchase.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+          {/* Bonscan: vult winkel/datum/regels in één keer; daarna controleren. */}
+          <Button title={t('purchase.scan')} icon="receipt" variant="soft" onPress={onScanPress}
+            loading={scanning} style={{ marginBottom: space.md }} />
+          <Text style={[type.caption, { marginBottom: space.lg, textAlign: 'center' }]}>{t('purchase.scan.hint')}</Text>
+
           <Field label={t('purchase.field.store')} value={store} onChangeText={setStore}
-            placeholder={t('purchase.field.store.placeholder')} autoFocus />
+            placeholder={t('purchase.field.store.placeholder')} />
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('purchase.field.date')}</Text>

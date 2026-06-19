@@ -337,6 +337,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Bonscan (BOO-7): proxiet de bon-foto naar de Orq.ai-gateway. verify_jwt houdt de
+# functie achter een ingelogde sessie (geen open proxy). Secrets via `supabase
+# secrets set ORQ_API_KEY=... ORQ_DEPLOYMENT_KEY=...` — zie docs/orq-receipt-scan.md.
+[functions.scan-receipt]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
