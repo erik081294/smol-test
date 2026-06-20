@@ -6,20 +6,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE } from '../lib/constants.js';
+import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS } from '../lib/constants.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(resolve(here, '../supabase/migrations/0001_init.sql'), 'utf8');
+const sql0016 = readFileSync(resolve(here, '../supabase/migrations/0016_maaltijden_voorraad.sql'), 'utf8');
 
 // Haalt de in-lijst uit een  ... in ('a','b',...)  CHECK op. Pakt het eerste
 // voorkomen ná het gegeven kolom-anker, zodat we de juiste CHECK te pakken hebben.
-function checkValues(anchor) {
-  const idx = sql.indexOf(anchor);
+function checkValuesIn(source, anchor) {
+  const idx = source.indexOf(anchor);
   assert.ok(idx !== -1, `anker niet gevonden in SQL: ${anchor}`);
-  const m = sql.slice(idx).match(/in\s*\(([^)]*)\)/i);
+  const m = source.slice(idx).match(/in\s*\(([^)]*)\)/i);
   assert.ok(m, `geen in (...) gevonden na ${anchor}`);
   return m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean).sort();
 }
+const checkValues = (anchor) => checkValuesIn(sql, anchor);
 
 test('CATEGORIES matcht tasks.category CHECK', () => {
   assert.deepEqual([...CATEGORIES].sort(), checkValues('category      text not null'));
@@ -35,4 +37,12 @@ test('RECUR_VALUES matcht tasks.recur_freq CHECK', () => {
 
 test('ROLE matcht household_members.role CHECK', () => {
   assert.deepEqual(Object.values(ROLE).sort(), checkValues('role         text not null default'));
+});
+
+test('MEAL_TYPES matcht meal_plan_entries.meal_type CHECK (0016)', () => {
+  assert.deepEqual([...MEAL_TYPES].sort(), checkValuesIn(sql0016, 'meal_type    text not null'));
+});
+
+test('PANTRY_LOCATIONS matcht pantry_items.location CHECK (0016)', () => {
+  assert.deepEqual([...PANTRY_LOCATIONS].sort(), checkValuesIn(sql0016, "location           text not null default 'kast'"));
 });
