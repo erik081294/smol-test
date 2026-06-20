@@ -1,123 +1,73 @@
-# Plan 05 — Notificaties & herinneringen
+# Plan 05 — Notificaties & herinneringen (PLT-1)
 
-**Backlog:** PLT-1. **Soort:** cross-cutting platform (raakt elke module licht).
-**Migratie:** optioneel (alleen voor remote push / prefs in de cloud).
-**Afhankelijkheden:** geen. Nieuwe dependency: `expo-notifications` (+ `expo-device`).
+**Backlog:** PLT-1. **Soort:** cross-cutting platform (raakt elke module licht). **Migratie:**
+alleen voor trap 2 (remote push). **Afhankelijkheden:** geen; sluit aan op de keuken-loop
+(plan 09) voor maaltijd-/voorraad-herinneringen. Nieuwe deps: `expo-notifications`, `expo-device`.
 
-## Waarom & aanpak
+> Bouwt op de bestaande pure kern `lib/notifications.js` (al aanwezig: `plannedReminders`,
+> `dailySummary`, `reminderId`). Twee trappen, **beide volledig uitgewerkt** (geen afslag):
+> trap 1 lokaal (MVP), trap 2 remote push. Web = stil no-op (zoals `lib/haptics.js`).
 
-Herinneringen zijn hoge-waarde, lage-frictie: "3 taken vandaag", "Monstera water geven".
-**Aanpak in twee trappen**, begin bij trap 1:
+## B1. Dependencies & config
+- `npx expo install expo-notifications expo-device`. Plugin-blok in `app.config.js`
+  (notificatie-icoon/kleur). Mount `useNotifications()` in `app/_layout.js` ná de Auth/
+  Household/Toast-providers. Alles guarden met `Platform.OS !== 'web'`.
 
-1. **Lokale, geplande notificaties** — geen server nodig. De app plant op het toestel
-   notificaties voor taken met een datum/tijd en een dagelijkse samenvatting. Werkt offline,
-   privacyvriendelijk, en dekt 90% van de waarde.
-2. **Remote push** (optioneel, later) — Expo push tokens + een Supabase Edge/cron-functie
-   die pushes stuurt (bijv. wanneer iemand jóu een taak toewijst). Vereist de migratie
-   hieronder. Noteer als upgrade-pad.
-
-Belangrijk: houd de **beslislogica puur en testbaar**; alleen het plannen/cancelen en de
-permissie-aanvraag zijn impure (platform-API).
-
-## Trap 1 — Lokale notificaties
-
-### Dependency & config
-- `npx expo install expo-notifications expo-device`.
-- In `app.config.js`/`app.json`: het `expo-notifications`-plugin-blok (icoon/kleur).
-- iOS/Android vragen runtime-permissie; **web** ondersteunt dit anders → guard met
-  `Platform.OS !== 'web'` (of de Web Notifications-API als je het later wilt).
-
-### Pure logica — `lib/notifications.js` (de testbare kern)
+## B2. Pure kern uitbreiden — `lib/notifications.js`
+Toevoegen in dezelfde stijl (puur, stabiele ids, getest):
 ```js
-import { parseISO } from 'date-fns';
-// Welke taken verdienen een herinnering, en wanneer/waarmee?
-//   tasks: open taken met due_date (+ optioneel due_time)
-//   opts:  { now, leadMinutes } (bijv. 0 = op tijd, of X min ervoor)
-// -> [{ taskId, fireAt: Date, title, body }]  (alleen toekomstige fireAt)
-export function plannedReminders(tasks, { now = new Date(), leadMinutes = 0 } = {}) { /* … */ }
-
-// Tekst van de dagelijkse samenvatting voor een dag.
-export function dailySummary(tasks, day = new Date()) { /* -> { title, body } | null (null = niets te melden) */ }
-
-// Stabiele notificatie-id per taak(occurrence), zodat herplannen oude vervangt.
-export function reminderId(task) { /* -> `task:${task.id}:${task.due_date}` */ }
+export function mealReminders(entries, { now, time = '16:30' }) { /* per geplande maaltijd -> [{id,fireAt,title,body}] */ }
+export function pantryAlerts(pantryItems, { now, soonDays = 2 }) { /* verlopen/binnenkort/bijna-op, gebucket */ }
+export function allReminders({ tasks, meals, pantry }, prefs, now) { /* combineert + filtert per-domein */ }
 ```
+Units (`tests/notifications.test.js` uitbreiden): `mealReminders` alleen toekomstige dagen +
+stabiele id per (datum,recept); `pantryAlerts` bucketgrenzen + geen alert zonder houdbaarheid/
+drempel; `allReminders` respecteert per-domein prefs.
 
-### Impure laag — `lib/useNotifications.js` (hook)
-- Vraagt eenmalig permissie (`Notifications.requestPermissionsAsync`) en zet een
-  Android-kanaal.
-- **Sync-strategie**: bij wijziging van `tasks` (uit `useTasks`) en bij app-start: cancel
-  alle eerder geplande huishoek-notificaties en herplan op basis van `plannedReminders`
-  (idempotent dankzij stabiele `reminderId`). Plan ook de `dailySummary` (dagelijkse trigger
-  op een vast tijdstip uit de prefs).
-- Respecteer de prefs (zie onder). Cap het aantal geplande notificaties (OS-limieten).
+## B3. Impure hook — `lib/useNotifications.js`
+- Eenmalig permissie (`Notifications.requestPermissionsAsync`) + Android-kanaal.
+- **Sync** bij wijziging van `tasks`/`meal_plan_entries`/`pantry_items` (en app-start): cancel
+  eerder geplande huishoek-notificaties en herplan op `allReminders` (idempotent via stabiele
+  ids). Plan ook de `dailySummary` op het ingestelde tijdstip. Cap op OS-limieten.
+- Leest prefs (B4); doet niets als globaal uit.
 
-### Voorkeuren (prefs)
-- **Eenvoud eerst (geen migratie):** bewaar prefs lokaal met het bestaande opslagpatroon
-  (`@react-native-async-storage/async-storage`, al in deps; zie `lib/supabase.js` voor de
-  platform-aware opslag). Velden: `enabled`, `dailySummaryTime` (bijv. "08:00"),
-  `leadMinutes`, per-module aan/uit.
-- **Scherm**: een sectie op `app/(tabs)/huishouden.js` of een nieuw `app/instellingen.js`
-  met toggles (`Chip`/switch) + een tijdkiezer (hergebruik de `Stepper`/quick-times).
+## B4. Voorkeuren + scherm
+- **Opslag** lokaal via `@react-native-async-storage/async-storage` (zie `lib/supabase.js`-
+  patroon). `lib/notificationPrefs.js` (get/set + defaults): `enabled`, `dailySummaryTime`,
+  `leadMinutes`, `mealReminderTime`, per-domein toggles (`taken`, `plantzorg`, `maaltijden`, `voorraad`).
+- **Scherm** `app/instellingen.js` (via een rij op `huishouden.js`): toggles (`Chip`/switch),
+  tijdkiezers (quick-times + `Stepper`), uitleg-`Banner`. Permissie geweigerd → `Banner` met
+  knop naar systeeminstellingen (`Linking`).
 
-### Units — `tests/notifications.test.js`
-- `plannedReminders` neemt alleen toekomstige, open, gedateerde taken; `leadMinutes`
-  verschuift `fireAt`; afgevinkte/datumloze taken vallen weg; `reminderId` stabiel per
-  occurrence (verandert mee met `due_date` bij doorrollen → oude wordt vervangen).
-- `dailySummary` geeft null bij 0 taken, anders een telling-tekst; respecteert "vandaag".
+## B5. Trap 2 — Remote push (volledig)
+- **Migratie** `NNNN_push_tokens.sql`:
+  ```sql
+  create table if not exists public.push_tokens (
+    profile_id uuid not null references public.profiles(id) on delete cascade,
+    token text not null, platform text, updated_at timestamptz not null default now(),
+    primary key (profile_id, token));
+  alter table public.push_tokens enable row level security;
+  create policy push_tokens_self on public.push_tokens for all
+    using (profile_id = auth.uid()) with check (profile_id = auth.uid());
+  ```
+- **Tokenregistratie**: in `useNotifications` bij login `getExpoPushTokenAsync()` → upsert.
+- **Edge Function** `supabase/functions/notify/index.ts` (patroon van de bestaande
+  `scan-receipt`-functie): getriggerd door een Database Webhook op `tasks` (assigned_to
+  wijzigt en ≠ created_by); zoekt met de service-role de tokens van de toegewezene en POST
+  naar de Expo Push API (`https://exp.host/--/api/v2/push/send`). Idempotent op (task_id,
+  assigned_to). Deploy + webhook documenteren in `docs/notify-setup.md`.
+- Later uitbreidbaar naar uitgave-toewijzing en reservering-botsingen.
 
-### Integratie
-- Mount `useNotifications()` in `app/_layout.js` (na auth/household, zodat er taken zijn).
-- Plantenverzorging valt hier automatisch onder: verzorgingstaken zijn gewone `tasks` met
-  `plant_id`, dus ze krijgen dezelfde herinneringen. Optioneel een mooiere body via de
-  plantnaam.
+## B6. Edge cases, tests, acceptatie
+- Web/geen hardware: no-op; prefs "alleen op mobiel". Doorrollende taken: stabiele
+  `reminderId` (incl. `due_date`) vervangt de oude occurrence. Tijdzone: lokale toesteltijd.
+- **Acceptatie**: taak/maaltijd met tijd → lokale notificatie op tijd; dagsamenvatting klopt;
+  voorraad-alert bij naderende houdbaarheid; prefs uit/aan werkt; remote push komt aan bij
+  toewijzing. `npm test` groen incl. uitgebreide `notifications`-units.
 
-## Trap 2 — Remote push (optioneel, upgrade-pad)
-
-### Migratie `NNNN_push_tokens.sql`
-```sql
-create table if not exists public.push_tokens (
-  profile_id  uuid not null references public.profiles(id) on delete cascade,
-  token       text not null,
-  platform    text,
-  updated_at  timestamptz not null default now(),
-  primary key (profile_id, token)
-);
-alter table public.push_tokens enable row level security;
-drop policy if exists push_tokens_self on public.push_tokens;
-create policy push_tokens_self on public.push_tokens for all
-  using (profile_id = auth.uid()) with check (profile_id = auth.uid());
-```
-> Mede-leden moeten elkaars token kunnen lezen om een push te triggeren — doe dat **niet**
-> via RLS-verbreding maar via een `security definer` functie / Edge Function die met de
-> service-role de tokens van de betrokkenen opzoekt en de Expo Push API aanroept.
-
-### Verzendkant
-- Een Supabase **Edge Function** (of externe worker) die op events reageert (bijv. een
-  `tasks`-insert met `assigned_to <> created_by`) en via de **Expo Push API** een bericht
-  stuurt naar de tokens van de toegewezene. Trigger via Database Webhooks of `pg_cron`.
-- Client registreert het token (`Notifications.getExpoPushTokenAsync`) bij login en schrijft
-  het naar `push_tokens` (upsert).
-
-## Edge cases & beslissingen
-- **Web**: geen `expo-notifications`; toon de prefs als "alleen op mobiel" of gebruik de
-  Web Notifications-API in een aparte tak. Niet blokkerend voor trap 1 op mobiel.
-- **Permissie geweigerd**: faal stil, toon een nette banner met uitleg + knop naar de
-  systeeminstellingen.
-- **Doorrollende taken**: dankzij `reminderId` (incl. `due_date`) wordt bij elk doorrollen
-  netjes de oude notificatie vervangen door de nieuwe occurrence.
-- **Tijdzone**: plan op lokale tijd van het toestel; `due_time` is een wandkloktijd.
-
-## Acceptatiecriteria
-- Een taak met datum/tijd voor straks → er valt op tijd een lokale notificatie (mobiel).
-- De dagelijkse samenvatting verschijnt op het ingestelde tijdstip en klopt qua telling.
-- Prefs uit/aan werkt; permissie-weigering crasht niets.
-- `npm test` groen incl. `notifications`.
-
-## File-checklist
-**Nieuw:** `lib/notifications.js` · `lib/useNotifications.js` · `tests/notifications.test.js`
-· (optioneel) `app/instellingen.js` · (trap 2) `supabase/migrations/NNNN_push_tokens.sql`
-+ een Edge Function.
-**Gewijzigd:** `app/_layout.js` (hook mounten) · `app.config.js` (plugin) · `package.json`
-(deps) · `app/(tabs)/huishouden.js` (prefs-sectie, of het nieuwe instellingen-scherm) ·
-`lib/icons.js` (`bell` bestaat al) · `huishoek-backlog.md` (PLT-1 status).
+## B7. File-checklist
+**Nieuw:** `lib/useNotifications.js` · `lib/notificationPrefs.js` · `app/instellingen.js` ·
+`supabase/migrations/NNNN_push_tokens.sql` · `supabase/functions/notify/index.ts` ·
+`docs/notify-setup.md`. **Gewijzigd:** `lib/notifications.js` · `tests/notifications.test.js`
+· `app/_layout.js` · `app.config.js` · `package.json` · `app/(tabs)/huishouden.js` ·
+`lib/i18n.js` (`notif.*`) · `huishoek-backlog.md` (PLT-1) · `docs/plans/00-overzicht.md`.

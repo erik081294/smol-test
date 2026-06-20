@@ -20,13 +20,15 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 06 | [Platform-hardening](./06-platform-hardening.md) | INF-6, INF-3, INF-4, INF-5 | Infra/kwaliteit | Nee |
 | 07 | [Strakke app (Fase 1.5)](./07-strakke-app.md) | STR-1 t/m STR-11 | UX-cohesie + interactie-polish + IA | Nee |
 | 08 | [Professionele app: hardening & afmaken](./08-professioneel-hardening.md) | INF-3/4/5/7, STR-7/9/10, INF-1-rest | Productie-readiness | Nee |
+| 09 | [Slimme keuken-loop](./09-slimme-keuken.md) | MLT-1, MLT-2, VOO-1 | Twee nieuwe modules (op de catalogus) | Ja |
 
-> **Volgende ronde = plan 08** (gekozen 2026-06-19): eerst de bestaande app
-> *professioneel* maken — 🔧-eindjes dicht, op een echt **Android**-toestel (dev build),
-> crash-monitoring, E2E en een release-pijplijn naar Play Internal — vóór de Fase 2-
-> features (plannen 02–05, kernen al gemerged). Geen migratie.
+> **Volgende ronde (gekozen 2026-06-20): drie elkaar versterkende features** met maximale
+> gebruikerswaarde — **09 Slimme keuken-loop** (Maaltijden + Voorraad, bovenop de catalogus),
+> **05 Notificaties** (geactualiseerd: lokaal + remote, incl. maaltijd-/voorraad-herinneringen)
+> en **04 Kosten & autodelen** (geactualiseerd: bon→uitgave nu echt mogelijk via `purchases`).
+> Samenhang: menu → lijst → voorraad → herinneringen → kosten. Aanbevolen volgorde **09 → 05 → 04**.
 >
-> *(Plannen 01, 06/INF-6 en 07 zijn grotendeels gereed; zie backlog §6.)*
+> *(Plannen 01, 02, 06/INF-6, 07 en 08 zijn (groten)deels gereed; zie backlog §6.)*
 
 ## Aanbevolen volgorde & afhankelijkheden
 
@@ -38,6 +40,9 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 05 (notificaties)     ──► onafhankelijk; raakt elke module licht
 06 (platform)         ──► onafhankelijk; INF-6 (i18n) liefst vroeg (raakt alle strings)
 07 (strakke app)      ──► onafhankelijk; geen migratie; doe dit eerst (Fase 1.5)
+09 (keuken-loop)      ──► leunt op de catalogus (0013/0014); menu→lijst (−voorraad)→voorraad
+05 (notificaties)     ──► maakt 09 + bestaande modules proactief (diner/voorraad/taken)
+04 (kosten/autodelen) ──► KOS-3 bon→uitgave leunt nu op de gebouwde purchases (0013)
 ```
 
 Waarde-per-inspanning: doe **07 (strakke app)** als eerste — het maakt de bestaande
