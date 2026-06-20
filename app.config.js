@@ -13,6 +13,10 @@ export default ({ config }) => ({
   ios: { supportsTablet: true, bundleIdentifier: 'app.huishoek' },
   android: { package: 'app.huishoek', adaptiveIcon: { backgroundColor: '#0E3A2F' } },
   web: { bundler: 'metro', output: 'single' },
+  // Lazy routes in dev: alleen het startscherm zit in de eerste bundle, de rest
+  // streamt binnen bij navigatie. Korter "grijs scherm" bij opstarten. Op
+  // 'development' gescoped → productie-builds bundelen gewoon eager (geen impact).
+  experiments: { asyncRoutes: 'development' },
   plugins: ['expo-router', 'expo-secure-store', 'expo-font', 'expo-localization', '@sentry/react-native'],
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,

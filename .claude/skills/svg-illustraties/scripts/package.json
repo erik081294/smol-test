@@ -1,0 +1,9 @@
+{
+  "name": "svg-illustraties-skill",
+  "private": true,
+  "type": "module",
+  "description": "Render-pipeline voor de svg-illustraties skill. react/react-dom/@babel worden geleend uit de project-node_modules; alleen de rasterizer is een eigen dep.",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

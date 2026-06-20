@@ -124,6 +124,8 @@ export default function Boodschappen() {
       <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
         right={
           <Row gap={space.xs}>
+            <IconButton icon="search" accessibilityLabel={t('catalog.open')} tint={colors.forest}
+              onPress={() => router.push('/catalog')} />
             <IconButton icon="catalog" accessibilityLabel={t('groceries.catalog')} tint={colors.forest}
               onPress={() => setCatalogOpen(true)} />
             <IconButton icon="receipt" accessibilityLabel={t('groceries.receipt')} tint={colors.forest}
@@ -168,7 +170,8 @@ export default function Boodschappen() {
             <ListSkeleton count={5} />
           ) : !loading && items.length === 0 ? (
             <Empty illustration="groceries" title={t('groceries.empty.title')}
-              subtitle={t('groceries.empty.subtitle')} />
+              subtitle={t('groceries.empty.subtitle')}
+              actionTitle={t('catalog.open')} onAction={() => router.push('/catalog')} />
           ) : null
         }
         ListFooterComponent={

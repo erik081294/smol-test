@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { parseISO, isToday } from 'date-fns';
@@ -7,27 +7,40 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { TaskRow } from '../../lib/TaskRow';
-import { Empty, FAB, SectionHeader } from '../../lib/ui';
+import { FAB, SectionHeader } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
+import { HOME_CARDS } from '../../lib/home/cards';
 import { isOverdue } from '../../lib/recurrence';
-import { colors, type } from '../../lib/theme';
+import { colors, type, space } from '../../lib/theme';
 import { t, plural } from '../../lib/i18n';
 
-export default function Vandaag() {
+// Hoeveel focus-taken we bovenaan tonen voordat we doorverwijzen naar Taken.
+// Houdt het startscherm rustig: de focus is een overzicht, niet de volledige lijst.
+const FOCUS_CAP = 6;
+
+// Home-dashboard ("Thuis"). Twee taken: (1) focus — de achterstallige en
+// vandaag-taken bovenaan, afvinkbaar; (2) launchpad — per ingeschakelde module
+// een samenvattingskaart die naar die module-omgeving navigeert. Zo is alles wat
+// telt direct zichtbaar en elke module één tik weg.
+export default function Home() {
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
-  const { active, members } = useHousehold();
+  const { active, members, modules } = useHousehold();
   const { profile } = useAuth();
   const router = useRouter();
 
-  const { overdue, today, done } = useMemo(() => {
-    const open = tasks.filter((t) => !t.completed_at);
+  const { overdue, today } = useMemo(() => {
+    const open = tasks.filter((tk) => !tk.completed_at);
     return {
       overdue: open.filter(isOverdue),
-      today: open.filter((t) => t.due_date && isToday(parseISO(t.due_date)) && !isOverdue(t)),
-      done: tasks.filter((t) => t.completed_at && t.due_date && isToday(parseISO(t.completed_at))),
+      today: open.filter((tk) => tk.due_date && isToday(parseISO(tk.due_date)) && !isOverdue(tk)),
     };
   }, [tasks]);
 
-  const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
+  const focus = useMemo(() => [...overdue, ...today], [overdue, today]);
+  const visibleFocus = focus.slice(0, FOCUS_CAP);
+  const extraFocus = focus.length - visibleFocus.length;
+
+  const toggle = (tk) => (tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk));
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -37,51 +50,70 @@ export default function Vandaag() {
     return t('greeting.evening');
   })();
 
-  const sections = [
-    ...(overdue.length ? [{ key: 'over', title: t('today.section.overdue'), tint: colors.danger, data: overdue }] : []),
-    { key: 'today', title: t('today.section.today'), tint: colors.forest, data: today },
-    ...(done.length ? [{ key: 'done', title: t('today.section.done'), tint: colors.done, data: done }] : []),
-  ];
+  // De ingeschakelde modules die een Home-kaart hebben (Vandaag = dit scherm,
+  // Taken zit al in de focus, dus die staan niet in HOME_CARDS).
+  const cards = modules.filter((m) => HOME_CARDS[m.key]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <FlatList
-        contentContainerStyle={{ padding: 18, paddingBottom: 40 }}
-        data={sections}
-        keyExtractor={(s) => s.key}
+      <ScrollView
+        contentContainerStyle={{ padding: 18, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        ListHeaderComponent={
-          <View style={{ marginBottom: 18 }}>
-            <Text style={[type.caption, { textTransform: 'uppercase', letterSpacing: 1 }]}>
-              {active?.emoji} {active?.name}
-            </Text>
-            <Text style={[type.h1, { marginTop: 2 }]}>
-              {greeting}, {profile?.display_name?.split(' ')[0] ?? ''}
-            </Text>
-            <Text style={[type.body, { color: colors.inkSoft, marginTop: 4 }]}>
-              {today.length + overdue.length === 0
-                ? t('today.allDone')
-                : plural(today.length + overdue.length, 'today.remaining.one', 'today.remaining.other')}
-            </Text>
-          </View>
-        }
-        renderItem={({ item: section }) => (
-          <View style={{ marginBottom: 8 }}>
-            <SectionHeader title={section.title} count={section.data.length} tint={section.tint} />
-            {section.data.map((t) => (
-              <TaskRow key={t.id} task={t} members={members} onToggle={toggle} />
+      >
+        {/* Kop: huishouden + persoonlijke groet + stand van zaken vandaag */}
+        <View style={{ marginBottom: space.lg }}>
+          <Text style={[type.caption, { textTransform: 'uppercase', letterSpacing: 1 }]}>
+            {active?.emoji} {active?.name}
+          </Text>
+          <Text style={[type.h1, { marginTop: 2 }]}>
+            {greeting}, {profile?.display_name?.split(' ')[0] ?? ''}
+          </Text>
+          <Text style={[type.body, { color: colors.inkSoft, marginTop: 4 }]}>
+            {focus.length === 0
+              ? t('today.allDone')
+              : plural(focus.length, 'today.remaining.one', 'today.remaining.other')}
+          </Text>
+        </View>
+
+        {/* Focus: achterstallig + vandaag, afvinkbaar. Leeg → overslaan (de kop
+            zegt al dat er niets te doen is), zodat het dashboard rustig blijft. */}
+        {focus.length > 0 && (
+          <View style={{ marginBottom: space.lg }}>
+            <SectionHeader
+              title={t('home.focus.title')}
+              count={focus.length}
+              tint={overdue.length ? colors.danger : colors.forest}
+            />
+            {visibleFocus.map((tk) => (
+              <TaskRow key={tk.id} task={tk} members={members} onToggle={toggle} />
             ))}
+            {extraFocus > 0 && (
+              <Pressable
+                onPress={() => router.push('/(tabs)/taken')}
+                accessibilityRole="button"
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: space.xs, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text style={[type.label, { color: colors.forest }]}>
+                  {t('home.focus.more', { n: extraFocus })}
+                </Text>
+                <Icon name="chevron" size={16} color={colors.forest} />
+              </Pressable>
+            )}
           </View>
         )}
-        ListEmptyComponent={
-          !loading && (
-            <Empty illustration="today" title={t('today.empty.title')}
-              subtitle={t('today.empty.subtitle')} />
-          )
-        }
-      />
 
-      {/* Snelle toevoeg-knop */}
+        {/* Launchpad: één kaart per ingeschakelde module. */}
+        <SectionHeader title={t('home.modules.title')} />
+        {cards.map((m) => {
+          const Card = HOME_CARDS[m.key];
+          return <Card key={m.key} tasks={tasks} members={members} />;
+        })}
+      </ScrollView>
+
+      {/* Snel een taak toevoegen — de kernactie van het huishouden. */}
       <FAB accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
     </SafeAreaView>
   );
