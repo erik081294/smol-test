@@ -27,9 +27,11 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 > **05 Notificaties** (geactualiseerd: lokaal + remote, incl. maaltijd-/voorraad-herinneringen)
 > en **04 Kosten & autodelen** (geactualiseerd: bon→uitgave nu echt mogelijk via `purchases`).
 > Samenhang: menu → lijst → voorraad → herinneringen → kosten. Aanbevolen volgorde **09 → 05 → 04**.
-> **→ GEBOUWD (2026-06-20)** op branch `claude/keuken-notif-kosten` (migraties `0016`–`0018`),
-> getest (units groen, lint 0 errors, RLS-cases erbij). Status 🔧 tot de migraties live staan
-> en de rooktest is gedaan — zie backlog §6 en `VERIFICATIE.md`.
+> **→ GEBOUWD (2026-06-20)** (migraties `0016`–`0018`), plus een vervolgronde met
+> **kosten-inzichten & budget** (`0019`), **reserveringen-kalender** + **server-side recurring**
+> (`0020`, `pg_cron`) en **FK-indexen** (`0021`). Getest (units groen, lint 0 errors, RLS-cases
+> erbij). **Alle migraties `0016`–`0021` staan live (2026-06-20)**; resteert nog de toestel-rooktest
+> — zie backlog §6 en `VERIFICATIE.md`. ✅
 >
 > *(Plannen 01, 02, 06/INF-6, 07 en 08 zijn (groten)deels gereed; zie backlog §6.)*
 
@@ -69,7 +71,7 @@ Alle plannen gaan hiervan uit; ze herhalen het niet. Dit is de bestaande archite
 ### Migraties (`supabase/migrations/NNNN_naam.sql`)
 - **Idempotent**: `create table if not exists`, `drop policy if exists` vóór `create policy`,
   realtime via een `do $$ … pg_publication_tables …` block.
-- **Nummering**: gebruik het eerstvolgende vrije nummer (nu is `0011` de laatste). De
+- **Nummering**: gebruik het eerstvolgende vrije nummer (nu is `0021` de laatste). De
   plannen noemen relatieve namen; ken een nummer toe op het moment van bouwen.
 - **Module-tabel met zichtbaarheidscontract** (een "item" dat gedeeld kan worden):
   kolommen `household_id`, een creator-kolom, `visibility` / `share_subgroup_id` /
