@@ -27,6 +27,22 @@ eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "<anon-key>"        
 > `SUPABASE_SERVICE_ROLE_KEY` hoort **niet** in een client-build — die is alleen voor de
 > RLS-integratietests (lokaal/CI).
 
+## Preview build — snelste test op je telefoon (geen dev-server)
+
+Het `preview`-profiel bouwt een **zelfstandige APK met de JS al ingebundeld**. Je hoeft
+dus géén Metro/dev-server te draaien en niets bereikbaar te houden — handig wanneer je
+toestel niet op hetzelfde netwerk zit als de dev-machine (bv. cloud-/remote-omgevingen,
+waar de LAN- en tunnel-route geblokkeerd zijn).
+
+```sh
+eas build -p android --profile preview         # bouwt een APK in de cloud
+# → open de build-link op je Android-telefoon en installeer de APK (sideload)
+```
+
+Vereist alleen dat de Supabase-env als EAS-env staat (zie *Secrets* hierboven). De app
+draait dan tegen je live Supabase; nieuwe code vereist een nieuwe build (geen OTA, want
+`expo-updates` is niet geïnstalleerd).
+
 ## Development build op een echt toestel (fase B)
 
 ```sh
