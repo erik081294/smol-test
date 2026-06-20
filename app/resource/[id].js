@@ -204,6 +204,10 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
               <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')} onPress={() => setDay((d) => addDays(d, 1))} />
             </View>
 
+            <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
+              <Chip label={t('share.reservation.allDay')} active={fromH === 0 && toH === 23}
+                onPress={() => { setFromH(0); setToH(23); }} />
+            </Row>
             <Row gap={space.xl} style={{ marginBottom: space.md }}>
               <View>
                 <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.from')}</Text>

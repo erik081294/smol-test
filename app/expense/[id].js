@@ -4,13 +4,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader, Editor } from '../../lib/ui';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader, IconButton, Editor } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
@@ -54,6 +54,7 @@ export default function ExpenseEditor() {
     sourceType === 'purchase' ? 'boodschappen' : sourceType === 'reservation' ? 'vervoer' : 'overig'
   );
   const [paidBy, setPaidBy] = useState(user?.id ?? null);
+  const [spentOn, setSpentOn] = useState(new Date());
   const [selected, setSelected] = useState(members.map((m) => m.id));
   const [splitType, setSplitType] = useState(SPLIT.EQUAL);
   const [weights, setWeights] = useState({}); // { id: number } voor 'shares'
@@ -106,7 +107,7 @@ export default function ExpenseEditor() {
     setBusy(true);
     try {
       await addExpense({
-        description: description.trim(), amountCents, paidBy, spentOn: null, splitType,
+        description: description.trim(), amountCents, paidBy, spentOn: format(spentOn, 'yyyy-MM-dd'), splitType,
         participants, visibility, shareSubgroupId, shareWith,
         sourceType: sourceType ?? null, sourceId: sourceId ?? null, category,
       });
@@ -231,6 +232,9 @@ export default function ExpenseEditor() {
             </Text>
           )}
 
+          <Text style={[type.label, { marginBottom: space.xs, marginTop: space.md }]}>{t('expense.field.date')}</Text>
+          <DateStepper date={spentOn} onChange={setSpentOn} />
+
           <View style={{ marginTop: space.lg }}>
             <VisibilityPicker
               collapsible
@@ -243,5 +247,24 @@ export default function ExpenseEditor() {
             ) : null}
           </View>
     </Editor>
+  );
+}
+
+// Eenvoudige datum-stepper (geen native picker; werkt overal gelijk).
+function DateStepper({ date, onChange }) {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
+      borderColor: colors.line, padding: space.xs,
+    }}>
+      <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
+        onPress={() => onChange(addDays(date, -1))} />
+      <Text style={[type.title, { fontWeight: '700' }]}>
+        {format(date, 'EEEE d MMMM', { locale: dateLocale() })}
+      </Text>
+      <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
+        onPress={() => onChange(addDays(date, 1))} />
+    </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,7 +11,7 @@ import { usePurchases } from '../../lib/usePurchases';
 import { useProducts } from '../../lib/useProducts';
 import { usePantry } from '../../lib/usePantry';
 import { useToast } from '../../lib/toast';
-import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, T } from '../../lib/ui';
+import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, Editor, T } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { t, dateLocale } from '../../lib/i18n';
@@ -217,10 +217,8 @@ export default function PurchaseEditor() {
 
   // ---------- Nieuwe bon ----------
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ModalHeader title={t('purchase.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
-        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+    <Editor title={t('purchase.new')} onClose={() => router.back()} onConfirm={save} busy={busy}
+      contentContainerStyle={{ paddingBottom: 60 }}>
           {/* Bonscan: vult winkel/datum/regels in één keer; daarna controleren. */}
           <Button title={t('purchase.scan')} icon="receipt" variant="soft" onPress={onScanPress}
             loading={scanning} style={{ marginBottom: space.md }} />
@@ -288,7 +286,7 @@ export default function PurchaseEditor() {
                     ))}
                   </Row>
                 </Row>
-                <Field value={line.priceText} onChangeText={(v) => updateLine(i, { priceText: v })}
+                <Field label={t('purchase.line.price')} value={line.priceText} onChangeText={(v) => updateLine(i, { priceText: v })}
                   placeholder={t('purchase.line.price.placeholder')} keyboardType="decimal-pad"
                   style={{ marginBottom: 0 }} />
               </View>
@@ -309,8 +307,6 @@ export default function PurchaseEditor() {
 
           {error ? <T variant="caption" color={colors.danger}>{error}</T> : null}
           <View style={{ height: space.lg }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
