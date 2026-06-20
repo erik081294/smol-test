@@ -12,7 +12,7 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
-import { VISIBILITY } from '../../lib/constants';
+import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import {
@@ -49,6 +49,10 @@ export default function ExpenseEditor() {
   // Voorvullen vanuit een bron (KOS-3): bv. "Splitsen met huishouden" vanaf een bon.
   const [description, setDescription] = useState(prefillDescription ?? '');
   const [amountText, setAmountText] = useState(prefillAmount ?? '');
+  // Zinnige default-categorie op basis van de bron (bon → boodschappen, reservering → vervoer).
+  const [category, setCategory] = useState(
+    sourceType === 'purchase' ? 'boodschappen' : sourceType === 'reservation' ? 'vervoer' : 'overig'
+  );
   const [paidBy, setPaidBy] = useState(user?.id ?? null);
   const [selected, setSelected] = useState(members.map((m) => m.id));
   const [splitType, setSplitType] = useState(SPLIT.EQUAL);
@@ -104,7 +108,7 @@ export default function ExpenseEditor() {
       await addExpense({
         description: description.trim(), amountCents, paidBy, spentOn: null, splitType,
         participants, visibility, shareSubgroupId, shareWith,
-        sourceType: sourceType ?? null, sourceId: sourceId ?? null,
+        sourceType: sourceType ?? null, sourceId: sourceId ?? null, category,
       });
       haptics.success();
       router.back();
@@ -170,6 +174,13 @@ export default function ExpenseEditor() {
           <Field label={t('expense.field.amount')} value={amountText}
             onChangeText={(v) => { setAmountText(v); clearErr('amount'); }}
             placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
+
+          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.category')}</Text>
+          <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
+            {EXPENSE_CATEGORIES.map((c) => (
+              <Chip key={c} label={t('category.' + c)} active={category === c} onPress={() => setCategory(c)} />
+            ))}
+          </Row>
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
           <AvatarSelect members={members} selectedId={paidBy}
