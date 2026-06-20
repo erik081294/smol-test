@@ -9,6 +9,8 @@ import { parseDataUrl } from '../../lib/plantPhoto';
 import * as haptics from '../../lib/haptics';
 import { usePurchases } from '../../lib/usePurchases';
 import { useProducts } from '../../lib/useProducts';
+import { usePantry } from '../../lib/usePantry';
+import { useToast } from '../../lib/toast';
 import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, T } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
@@ -23,6 +25,8 @@ export default function PurchaseEditor() {
   const router = useRouter();
   const { addPurchase } = usePurchases();
   const { products, addProduct, matchFor } = useProducts();
+  const { restockFromPurchase } = usePantry();
+  const toast = useToast();
 
   // ----- Bestaande bon: read-only weergave -----
   const [existing, setExisting] = useState(null);
@@ -181,6 +185,16 @@ export default function PurchaseEditor() {
               {it.unit_price_cents != null ? <Text style={type.body}>{formatCents(it.unit_price_cents)}</Text> : null}
             </Row>
           ))}
+          {(existing.purchase_items ?? []).length > 0 ? (
+            <Button title={t('pantry.fromPurchase')} icon="pantry" variant="soft" style={{ marginTop: space.xl }}
+              onPress={async () => {
+                try {
+                  await restockFromPurchase(existing.purchase_items ?? []);
+                  haptics.success();
+                  toast.show({ message: t('pantry.fromPurchase.done', { n: (existing.purchase_items ?? []).length }) });
+                } catch (e) { Alert.alert(t('common.failed'), e.message); }
+              }} />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     );
