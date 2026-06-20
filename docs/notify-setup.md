@@ -21,3 +21,9 @@
 Effect: krijgt iemand een taak toegewezen (`assigned_to` ≠ maker), dan stuurt de
 functie die persoon een push via de Expo Push API. Uit te breiden naar uitgave-
 toewijzing en reservering-botsingen.
+
+**Dedup & robuustheid:** de functie stuurt alléén bij een echte toewijzing
+(`assigned_to` gezet én bij UPDATE gewijzigd t.o.v. `old_record`), dus geen dubbele
+push bij ongerelateerde taak-edits. Tokens staan uniek op `(profile_id, token)`
+(`push_tokens` PK), dus per apparaat hooguit één rij. Token-registratie is automatisch
+(`lib/useNotifications.js`, best-effort upsert na permissie) — geen aparte API nodig.
