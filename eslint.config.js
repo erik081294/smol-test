@@ -3,11 +3,14 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require("eslint-config-expo/flat");
 
 module.exports = defineConfig([
+  {
+    // Globale ignores (los object zónder andere keys, anders geldt het niet globaal):
+    // build-output, Deno-edge-functions (eigen runtime/URL-imports) en de Claude-
+    // skill-scripts (los tooling met eigen deps) horen niet bij de app-lint.
+    ignores: ["dist/*", "supabase/functions/**", ".claude/**"],
+  },
   expoConfig,
   {
-    // supabase/functions/* draait op Deno (eigen globals/runtime), niet op de
-    // Expo/React-Native-omgeving — lint die niet mee met de app-config.
-    ignores: ["dist/*", "supabase/functions/**"],
     rules: {
       // De nieuwe React-19/compiler-regels uit eslint-config-expo 56 markeren
       // idiomatische, wérkende RN-patronen in de kern-UI: `useRef(...).current`

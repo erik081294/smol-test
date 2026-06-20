@@ -1,23 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { useExpenses } from '../../lib/useExpenses';
+import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
 export default function Kosten() {
   const { expenses, loading, reload } = useExpenses();
+  const { templates } = useRecurringExpenses(); // laadt + materialiseert verschuldigde occurrences
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
   const router = useRouter();
   const [subgroupId, setSubgroupId] = useState(null);
   const [showSettle, setShowSettle] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
 
   const nameOf = (id) => members.find((m) => m.id === id)?.display_name ?? t('common.someone');
   const emojiOf = (id) => members.find((m) => m.id === id)?.avatar_emoji ?? '🙂';
@@ -36,7 +39,9 @@ export default function Kosten() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')} />
+      <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')}
+        right={<IconButton icon="repeat" accessibilityLabel={t('recurring.title')} tint={colors.forest}
+          onPress={() => setRecurringOpen(true)} />} />
 
       {/* Subgroep-scope */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
@@ -96,6 +101,39 @@ export default function Kosten() {
       />
 
       <FAB accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
+
+      {/* Terugkerende uitgaven beheren */}
+      <Modal visible={recurringOpen} animationType="slide" onRequestClose={() => setRecurringOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+          <ModalHeader title={t('recurring.title')} onClose={() => setRecurringOpen(false)} />
+          <FlatList
+            data={templates}
+            keyExtractor={(tpl) => tpl.id}
+            contentContainerStyle={{ padding: space.lg }}
+            renderItem={({ item }) => (
+              <ItemRow
+                title={item.description}
+                titleColor={item.active ? undefined : colors.inkFaint}
+                meta={
+                  <Text style={type.caption}>
+                    {formatCents(item.amount_cents)} · {t('recur.' + item.recur_freq + '.one')}
+                    {' · '}{t('recurring.next', { date: format(parseISO(item.next_date), 'd MMM', { locale: dateLocale() }) })}
+                  </Text>
+                }
+                chevron
+                onPress={() => { setRecurringOpen(false); router.push(`/recurring-expense/${item.id}`); }}
+              />
+            )}
+            ListEmptyComponent={
+              <Empty icon="repeat" title={t('recurring.empty.title')} subtitle={t('recurring.empty.subtitle')} />
+            }
+            ListFooterComponent={
+              <Button title={t('recurring.new')} icon="add" variant="soft" style={{ marginTop: space.md }}
+                onPress={() => { setRecurringOpen(false); router.push('/recurring-expense/new'); }} />
+            }
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }

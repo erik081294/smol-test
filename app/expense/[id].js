@@ -29,7 +29,7 @@ const SPLIT_LABELS = {
 };
 
 export default function ExpenseEditor() {
-  const { id } = useLocalSearchParams();
+  const { id, prefillDescription, prefillAmount, sourceType, sourceId } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
   const toast = useToast();
@@ -46,8 +46,9 @@ export default function ExpenseEditor() {
   }, [id]);
 
   // ----- Nieuwe uitgave: formulier -----
-  const [description, setDescription] = useState('');
-  const [amountText, setAmountText] = useState('');
+  // Voorvullen vanuit een bron (KOS-3): bv. "Splitsen met huishouden" vanaf een bon.
+  const [description, setDescription] = useState(prefillDescription ?? '');
+  const [amountText, setAmountText] = useState(prefillAmount ?? '');
   const [paidBy, setPaidBy] = useState(user?.id ?? null);
   const [selected, setSelected] = useState(members.map((m) => m.id));
   const [splitType, setSplitType] = useState(SPLIT.EQUAL);
@@ -103,6 +104,7 @@ export default function ExpenseEditor() {
       await addExpense({
         description: description.trim(), amountCents, paidBy, spentOn: null, splitType,
         participants, visibility, shareSubgroupId, shareWith,
+        sourceType: sourceType ?? null, sourceId: sourceId ?? null,
       });
       haptics.success();
       router.back();

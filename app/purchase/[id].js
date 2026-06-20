@@ -186,14 +186,29 @@ export default function PurchaseEditor() {
             </Row>
           ))}
           {(existing.purchase_items ?? []).length > 0 ? (
-            <Button title={t('pantry.fromPurchase')} icon="pantry" variant="soft" style={{ marginTop: space.xl }}
-              onPress={async () => {
-                try {
-                  await restockFromPurchase(existing.purchase_items ?? []);
-                  haptics.success();
-                  toast.show({ message: t('pantry.fromPurchase.done', { n: (existing.purchase_items ?? []).length }) });
-                } catch (e) { Alert.alert(t('common.failed'), e.message); }
-              }} />
+            <View style={{ marginTop: space.xl, gap: space.sm }}>
+              <Button title={t('purchase.split')} icon="expenses" variant="accent"
+                onPress={() => {
+                  const cents = existing.total_cents
+                    ?? (existing.purchase_items ?? []).reduce((s, it) => s + (it.line_total_cents ?? 0), 0);
+                  router.push({
+                    pathname: '/expense/new',
+                    params: {
+                      prefillDescription: `${existing.store || t('purchase.untitled')} · ${format(parseISO(existing.purchased_on), 'd MMM', { locale: dateLocale() })}`,
+                      prefillAmount: cents ? (cents / 100).toFixed(2).replace('.', ',') : '',
+                      sourceType: 'purchase', sourceId: existing.id,
+                    },
+                  });
+                }} />
+              <Button title={t('pantry.fromPurchase')} icon="pantry" variant="soft"
+                onPress={async () => {
+                  try {
+                    await restockFromPurchase(existing.purchase_items ?? []);
+                    haptics.success();
+                    toast.show({ message: t('pantry.fromPurchase.done', { n: (existing.purchase_items ?? []).length }) });
+                  } catch (e) { Alert.alert(t('common.failed'), e.message); }
+                }} />
+            </View>
           ) : null}
         </ScrollView>
       </SafeAreaView>
