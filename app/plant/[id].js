@@ -12,7 +12,7 @@ import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPh
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, ModalHeader, IconButton, Row } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -218,8 +218,8 @@ export default function PlantScreen() {
     };
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <ModalHeader title={plant.name} onClose={() => router.back()} />
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('common.back')} onPress={() => router.back()} />
           <View style={{ alignItems: 'center', marginVertical: space.lg }}>
             <Pressable onPress={changePhoto} disabled={photoBusy} accessibilityRole="button"
               accessibilityLabel={detailPhotoUrl ? t('plant.photo.change') : t('plant.photo.add')}>
@@ -308,7 +308,7 @@ export default function PlantScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title={t('plant.new')} onClose={() => router.back()} />
+          <ModalHeader title={t('plant.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
 
           {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
           <View style={{ alignItems: 'center', marginBottom: space.lg }}>
@@ -381,7 +381,7 @@ export default function PlantScreen() {
             <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
           ) : null}
 
-          <Button title={t('plant.save')} onPress={save} loading={busy} style={{ marginTop: space.md }} />
+          <View style={{ height: space.md }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -6,6 +6,7 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useProducts } from '../../lib/useProducts';
 import { useToast } from '../../lib/toast';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader } from '../../lib/ui';
+import { EtenNav } from '../../lib/EtenNav';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { t } from '../../lib/i18n';
@@ -132,6 +133,8 @@ export default function Boodschappen() {
               onPress={() => router.push('/purchase/new')} />
           </Row>
         } />
+
+      <EtenNav active="boodschappen" />
 
       {/* Toevoegbalk */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>

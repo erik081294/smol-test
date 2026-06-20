@@ -234,8 +234,6 @@ export default function HuishoudenTab() {
             </View>
           </View>
         </Card>
-        <Button title={t('notif.settings')} icon="bell" variant="soft"
-          onPress={() => router.push('/instellingen')} style={{ marginBottom: space.sm }} />
         <Button title={t('common.signOut')} icon="signout" variant="ghost" onPress={signOut} style={{ borderColor: 'transparent' }} />
 
         <Text style={[type.caption, { textAlign: 'center', marginTop: space.xl }]}>Huishoek · v1.0</Text>

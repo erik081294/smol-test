@@ -337,9 +337,6 @@ export default function TaskEditor() {
             <Button title={t('task.deleteButton')} variant="ghost" onPress={confirmDelete}
               style={{ marginTop: 8, borderColor: 'transparent' }} />
           )}
-
-          <Button title={isNew ? t('task.add') : t('common.saveChanges')}
-            onPress={save} loading={busy} style={{ marginTop: 16 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

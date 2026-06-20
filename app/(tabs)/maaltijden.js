@@ -18,6 +18,7 @@ import { animateNextLayout } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
 import { normalize } from '../../lib/productMatch';
+import { EtenNav } from '../../lib/EtenNav';
 import { t } from '../../lib/i18n';
 
 export default function Maaltijden() {
@@ -87,6 +88,8 @@ export default function Maaltijden() {
       <ScreenHeader title={t('meals.title')} subtitle={t('meals.subtitle')}
         right={<IconButton icon="library" accessibilityLabel={t('meals.recipes')} tint={colors.forest}
           onPress={() => router.push('/recipe/new')} />} />
+
+      <EtenNav active="maaltijden" />
 
       {/* Weeknavigatie */}
       <Row justify="space-between" style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>

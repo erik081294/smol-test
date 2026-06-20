@@ -162,7 +162,7 @@ export default function ExpenseEditor() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title={t('expense.new')} onClose={() => router.back()} />
+          <ModalHeader title={t('expense.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
 
           <Field label={t('expense.field.description')} value={description}
             onChangeText={(v) => { setDescription(v); clearErr('description'); }}
@@ -235,7 +235,7 @@ export default function ExpenseEditor() {
             ) : null}
           </View>
 
-          <Button title={t('expense.save')} onPress={save} loading={busy} style={{ marginTop: 20 }} />
+          <View style={{ height: space.xl }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

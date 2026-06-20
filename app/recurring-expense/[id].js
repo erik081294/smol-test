@@ -170,7 +170,6 @@ export default function RecurringExpenseEditor() {
             <Button title={t('recurring.delete')} variant="ghost" onPress={confirmDelete}
               style={{ borderColor: 'transparent' }} />
           ) : null}
-          <Button title={t('common.save')} onPress={save} loading={busy} style={{ marginTop: space.sm }} />
           <View style={{ height: space.xxl }} />
         </ScrollView>
       </KeyboardAvoidingView>

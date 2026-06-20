@@ -7,7 +7,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { TaskRow } from '../../lib/TaskRow';
-import { FAB, SectionHeader } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { HOME_CARDS } from '../../lib/home/cards';
 import { isOverdue } from '../../lib/recurrence';
@@ -105,12 +105,20 @@ export default function Home() {
           </View>
         )}
 
-        {/* Launchpad: één kaart per ingeschakelde module. */}
-        <SectionHeader title={t('home.modules.title')} />
+        {/* Wat speelt er: alleen modules mét nieuws renderen een kaart (de overige
+            geven null terug). De volledige, gegroepeerde directory leeft in "Meer". */}
         {cards.map((m) => {
           const Card = HOME_CARDS[m.key];
           return <Card key={m.key} tasks={tasks} members={members} />;
         })}
+
+        {/* Eén rustige ingang naar alle onderdelen i.p.v. een tweede launchpad. */}
+        <ItemRow
+          leading={<Icon name="more" size={24} color={colors.forest} />}
+          title={t('home.allModules')}
+          chevron
+          onPress={() => router.push('/(tabs)/meer')}
+        />
       </ScrollView>
 
       {/* Snel een taak toevoegen — de kernactie van het huishouden. */}

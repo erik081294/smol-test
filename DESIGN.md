@@ -118,3 +118,23 @@ zichtbare ingedrukte staat. Iconen-zonder-tekst (`IconButton`) eisen een
 - **Betekenis nooit via kleur alleen** — voeg label, emoji of tekst toe.
 - **Schrijf microcopy zoals je tegen je huisgenoot praat**: kort, warm, in het
   Nederlands.
+
+---
+
+## Acties & knoppen — één plek, één betekenis
+
+Zodat elke actie op een voorspelbare plek staat:
+
+- **Aanmaken op een lijst → `FAB`** (rechtsonder). De dagelijkse "voeg toe"-actie.
+  *Uitzondering:* Boodschappen gebruikt een inline invoerbalk voor razendsnel
+  achter-elkaar toevoegen — dat is bewust.
+- **Bevestigen in een editor/sheet → `ModalHeader` met `onConfirm`** (Annuleer ·
+  titel · Bewaar, altijd in de kop en dus bereikbaar zonder te scrollen).
+  **Nooit óók een Bewaar-knop onderaan** — één bevestigplek per scherm.
+- **Verwijderen → onderaan**, als `Button variant="ghost"`/`danger`, los van de
+  bevestiging. Destructief hoort niet naast Bewaar.
+- **Secundair/navigatie → header-rechts `IconButton`(s)** (zoeken, bibliotheek,
+  terugkerend). Houd het bij maximaal een handvol.
+- **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →
+  volle-breedte `Button` aan het eind van de inhoud.
+- **Detailschermen krijgen een `ModalHeader`** (titel + sluiten), geen losse back-knop.

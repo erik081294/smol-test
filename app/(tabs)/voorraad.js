@@ -13,6 +13,7 @@ import {
   Badge, Banner, FAB, Field, Stepper, Button, ModalHeader,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
+import { EtenNav } from '../../lib/EtenNav';
 import { animateNextLayout } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { PANTRY_LOCATIONS, UNITS } from '../../lib/constants';
@@ -125,6 +126,8 @@ export default function Voorraad() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('pantry.title')} subtitle={t('pantry.subtitle')} />
+
+      <EtenNav active="voorraad" />
 
       <Row gap={space.sm} style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
         <Chip label={t('pantry.view.urgency')} active={view === 'urgentie'} onPress={() => setView('urgentie')} />

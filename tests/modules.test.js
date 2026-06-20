@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MODULES, DATA_MODULES, TOGGLEABLE_MODULES, getModule,
-  effectiveModules, availableModules,
+  effectiveModules, availableModules, MODULE_GROUPS,
 } from '../lib/modules.js';
 
 const KINDS = new Set(['overview', 'data', 'admin']);
@@ -67,9 +67,21 @@ test('creator-kolommen matchen wat de DB/can_view verwacht', () => {
   assert.equal(byTable.groceries, 'added_by');
 });
 
-test('er is precies één kern-skelet (Vandaag + Huishouden) dat niet uitzetbaar is', () => {
+test('elke module heeft een geldige group (null of bekend) en niet-primaire data/overview-modules zitten in een groep', () => {
+  const known = new Set(MODULE_GROUPS);
+  for (const m of MODULES) {
+    assert.ok(m.group === null || known.has(m.group), `onbekende group '${m.group}' voor ${m.key}`);
+    // Wat via "Meer" bereikbaar is (niet-primair) en geen hub-kind is, hoort in een groep
+    // te vallen zodat het gegroepeerd getoond kan worden — behalve bewust verborgen (group:null).
+    if (!m.primary && m.group === null) {
+      assert.ok(['huishouden'].includes(m.key), `${m.key} is niet-primair maar heeft geen groep`);
+    }
+  }
+});
+
+test('er is precies één kern-skelet (Vandaag + Huishouden + Instellingen) dat niet uitzetbaar is', () => {
   const coreKeys = MODULES.filter((m) => m.core).map((m) => m.key).sort();
-  assert.deepEqual(coreKeys, ['huishouden', 'vandaag']);
+  assert.deepEqual(coreKeys, ['huishouden', 'instellingen', 'vandaag']);
   assert.deepEqual(
     TOGGLEABLE_MODULES.map((m) => m.key).sort(),
     MODULES.filter((m) => !m.core).map((m) => m.key).sort(),

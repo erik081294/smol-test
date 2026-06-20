@@ -7,7 +7,7 @@ import { mutate } from '../../lib/db';
 import { useRecipes, useRecipe } from '../../lib/useRecipes';
 import { useProducts } from '../../lib/useProducts';
 import {
-  ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Chip, SectionHeader,
+  ModalHeader, Field, Stepper, ItemRow, IconButton, Row, Chip, SectionHeader,
 } from '../../lib/ui';
 import { colors, space, type } from '../../lib/theme';
 import { success, error as hapticError } from '../../lib/haptics';
@@ -159,7 +159,6 @@ export default function RecipeEditor() {
           <Field label={t('recipe.field.source')} value={sourceUrl} onChangeText={setSourceUrl}
             placeholder="https://…" autoCapitalize="none" keyboardType="url" />
 
-          <Button title={t('recipe.save')} onPress={save} loading={busy} style={{ marginTop: space.sm }} />
           <View style={{ height: space.xxl }} />
         </ScrollView>
       </KeyboardAvoidingView>

@@ -308,8 +308,7 @@ export default function PurchaseEditor() {
           </View>
 
           {error ? <T variant="caption" color={colors.danger}>{error}</T> : null}
-
-          <Button title={t('purchase.save')} onPress={save} loading={busy} style={{ marginTop: space.lg }} />
+          <View style={{ height: space.lg }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
