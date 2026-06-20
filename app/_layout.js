@@ -9,10 +9,19 @@ import { ToastProvider } from '../lib/toast';
 import { ErrorBoundary } from '../lib/ErrorBoundary';
 import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
+import { useNotifications } from '../lib/useNotifications';
 import { colors } from '../lib/theme';
 
 // Crash-/foutmonitoring zo vroeg mogelijk starten (no-op zonder DSN).
 initMonitoring();
+
+// Plant lokale herinneringen zodra er een actief huishouden is. Aparte component
+// zodat de notificatie-hooks (useTasks/useMealPlan/usePantry) binnen de providers
+// draaien en alleen mounten als de gebruiker is ingelogd met een huishouden.
+function NotificationsMount() {
+  useNotifications();
+  return null;
+}
 
 function Gate() {
   const { session, loading: authLoading } = useAuth();
@@ -55,18 +64,23 @@ function Gate() {
   }
 
   return (
-    <Stack key={lang} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="task" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="plant" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="purchase" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="product" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="catalog" options={{ presentation: 'modal' }} />
-    </Stack>
+    <>
+      {session && households.length > 0 ? <NotificationsMount /> : null}
+      <Stack key={lang} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="task" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="plant" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="purchase" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="product" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="catalog" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="recipe" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="instellingen" options={{ presentation: 'modal' }} />
+      </Stack>
+    </>
   );
 }
 
