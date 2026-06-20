@@ -138,3 +138,27 @@ Zodat elke actie op een voorspelbare plek staat:
 - **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →
   volle-breedte `Button` aan het eind van de inhoud.
 - **Detailschermen krijgen een `ModalHeader`** (titel + sluiten), geen losse back-knop.
+
+### Editor-flow — één skelet, één volgorde
+
+Elke aanmaak-/bewerk-editor gebruikt het `Editor`-omhulsel uit `lib/ui.js`
+(veilige rand + toetsenbord-ontwijking + **vaste** `ModalHeader` + scrollend
+inhoudsvlak). Daarmee blijft de Bewaar-knop altijd in beeld en is "één
+bevestigplek" structureel geborgd — bouw geen eigen `SafeAreaView`/`ScrollView`/
+`ModalHeader`-combinatie meer per scherm.
+
+Velden staan in een vaste, voorspelbare volgorde — de denkstap van de gebruiker:
+
+1. **Wat** — titel/omschrijving (+ categorie, bedrag).
+2. **Wie** — toewijzen / betaald door / deelnemers.
+3. **Wanneer** — datum (+ herhaling).
+4. **Details** — notities e.d.
+5. **Delen met** — geavanceerd; via `VisibilityPicker collapsible` ingeklapt
+   onderaan (opent vanzelf als de keuze afwijkt van "Hele huishouden"), zodat het
+   de hoofd-flow niet onderbreekt.
+6. **Verwijderen** — helemaal onderaan, alleen in bewerk-modus (undo-toast, geen
+   blokkerende `Alert`).
+
+Eén scherm doet zowel aanmaken als bewerken: prefill de formulier-state uit het
+bestaande record en laat Bewaar vertakken (`isNew ? add… : update…`). Geavanceerde,
+zelden-gewijzigde blokken horen in een `Collapsible`.
