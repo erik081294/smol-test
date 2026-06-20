@@ -8,7 +8,7 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button, Row } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
@@ -40,8 +40,14 @@ export default function Kosten() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')}
-        right={<IconButton icon="repeat" accessibilityLabel={t('recurring.title')} tint={colors.forest}
-          onPress={() => setRecurringOpen(true)} />} />
+        right={
+          <Row gap={space.xs}>
+            <IconButton icon="price" accessibilityLabel={t('insights.title')} tint={colors.forest}
+              onPress={() => router.push('/kosten-inzichten')} />
+            <IconButton icon="repeat" accessibilityLabel={t('recurring.title')} tint={colors.forest}
+              onPress={() => setRecurringOpen(true)} />
+          </Row>
+        } />
 
       {/* Subgroep-scope */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}

@@ -473,3 +473,41 @@ test('RLS: reservering van een custom-resource alleen voor genoemde personen', o
   const bobSees = await bob.client.from('reservations').select('id').eq('id', rsv.id);
   assert.equal(bobSees.data?.length ?? 0, 0, 'huisgenoot buiten de custom-share ziet de reservering NIET');
 });
+
+// --- Kosten-inzichten: recurring_expenses (contract) + expenses.category (0019) ----
+
+test('RLS: terugkerende uitgave zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_recur');
+  const bob = await makeUser('bob_recur');     // huisgenoot
+  const eve = await makeUser('eve_recur');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Recurhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: tpl, error } = await alice.client.from('recurring_expenses')
+    .insert({ household_id: hh.id, description: 'Huur', amount_cents: 120000, paid_by: alice.id,
+      next_date: '2026-07-01', visibility: 'household', created_by: alice.id }).select().single();
+  assert.ok(!error, `recurring: ${error?.message}`);
+
+  const bobSees = await bob.client.from('recurring_expenses').select('id').eq('id', tpl.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet het sjabloon');
+  const eveSees = await eve.client.from('recurring_expenses').select('id').eq('id', tpl.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet het sjabloon NIET');
+});
+
+test('RLS: create_expense schrijft de categorie (0019)', opts, async () => {
+  const alice = await makeUser('alice_cat');
+  const hh = await makeHousehold(alice, 'Categoriehuis');
+
+  const { data: expId, error } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'AH', p_amount_cents: 2000, p_paid_by: alice.id,
+    p_spent_on: '2026-06-20', p_split_type: 'equal', p_visibility: 'household',
+    p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 2000 }],
+    p_source_type: null, p_source_id: null, p_category: 'boodschappen',
+  });
+  assert.ok(!error, `create_expense: ${error?.message}`);
+  const { data: row } = await alice.client.from('expenses').select('category').eq('id', expId).single();
+  assert.equal(row.category, 'boodschappen', 'de categorie is opgeslagen');
+});

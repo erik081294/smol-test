@@ -81,6 +81,7 @@ function Gate() {
         <Stack.Screen name="herinneringen" options={{ presentation: 'modal' }} />
         <Stack.Screen name="beeldstijl" options={{ presentation: 'modal' }} />
         <Stack.Screen name="recurring-expense" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="kosten-inzichten" options={{ presentation: 'modal' }} />
         <Stack.Screen name="resource" options={{ presentation: 'modal' }} />
       </Stack>
     </>

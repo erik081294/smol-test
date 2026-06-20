@@ -6,11 +6,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS } from '../lib/constants.js';
+import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS, EXPENSE_CATEGORIES } from '../lib/constants.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(resolve(here, '../supabase/migrations/0001_init.sql'), 'utf8');
 const sql0016 = readFileSync(resolve(here, '../supabase/migrations/0016_maaltijden_voorraad.sql'), 'utf8');
+const sql0019 = readFileSync(resolve(here, '../supabase/migrations/0019_kosten_inzichten.sql'), 'utf8');
 
 // Haalt de in-lijst uit een  ... in ('a','b',...)  CHECK op. Pakt het eerste
 // voorkomen ná het gegeven kolom-anker, zodat we de juiste CHECK te pakken hebben.
@@ -45,4 +46,8 @@ test('MEAL_TYPES matcht meal_plan_entries.meal_type CHECK (0016)', () => {
 
 test('PANTRY_LOCATIONS matcht pantry_items.location CHECK (0016)', () => {
   assert.deepEqual([...PANTRY_LOCATIONS].sort(), checkValuesIn(sql0016, "location           text not null default 'kast'"));
+});
+
+test('EXPENSE_CATEGORIES matcht expenses.category CHECK (0019)', () => {
+  assert.deepEqual([...EXPENSE_CATEGORIES].sort(), checkValuesIn(sql0019, 'category text not null default'));
 });

@@ -3,34 +3,13 @@ import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import Svg, { Polyline } from 'react-native-svg';
 import { useProducts } from '../../lib/useProducts';
 import { useProductPrices } from '../../lib/usePurchases';
-import { ModalHeader, Row, SectionHeader, Empty } from '../../lib/ui';
+import { ModalHeader, Row, SectionHeader, Empty, Sparkline } from '../../lib/ui';
 import { colors, type, space, radius } from '../../lib/theme';
 import { formatCents } from '../../lib/expenses';
 import { series, latestPerStore, stats, trendPct } from '../../lib/priceTrack';
 import { t, dateLocale } from '../../lib/i18n';
-
-// Kleine sparkline (geen chart-library): een Polyline over de prijsreeks. Schaalt
-// op min/max van de reeks; toont niets bij < 2 punten.
-function Sparkline({ data, width = 300, height = 56 }) {
-  if (data.length < 2) return null;
-  const cents = data.map((p) => p.cents);
-  const min = Math.min(...cents), max = Math.max(...cents);
-  const range = max - min || 1;
-  const pad = 4;
-  const pts = data.map((p, i) => {
-    const x = (i / (data.length - 1)) * (width - pad * 2) + pad;
-    const y = height - pad - ((p.cents - min) / range) * (height - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return (
-    <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      <Polyline points={pts} fill="none" stroke={colors.forest} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-    </Svg>
-  );
-}
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();
