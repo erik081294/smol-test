@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator, Modal,
+  View, Text, ScrollView, Pressable, Platform, Alert, Image, ActivityIndicator, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,7 +12,7 @@ import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPh
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, ModalHeader, Row } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, Row, Editor } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -305,11 +305,7 @@ export default function PlantScreen() {
 
   // ----- Nieuwe plant -----
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title={t('plant.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
-
+    <Editor title={t('plant.new')} onClose={() => router.back()} onConfirm={save} busy={busy}>
           {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
           <View style={{ alignItems: 'center', marginBottom: space.lg }}>
             <Pressable onPress={choosePhoto} accessibilityRole="button"
@@ -325,6 +321,7 @@ export default function PlantScreen() {
             <Text style={[type.caption, { color: colors.forest, marginTop: space.sm }]}>
               {photoAsset ? t('plant.photo.change') : t('plant.photo.add')}
             </Text>
+            <Text style={type.caption}>{t('plant.photo.optional')}</Text>
           </View>
 
           <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
@@ -373,6 +370,7 @@ export default function PlantScreen() {
           </View>
 
           <VisibilityPicker
+            collapsible
             visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
             shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
             shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
@@ -380,11 +378,7 @@ export default function PlantScreen() {
           {errors.visibility ? (
             <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
           ) : null}
-
-          <View style={{ height: space.md }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
 

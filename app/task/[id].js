@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert,
+  View, Text, ScrollView, Pressable, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import * as haptics from '../../lib/haptics';
 import { useTasks } from '../../lib/useTasks';
 import { useZones } from '../../lib/useZones';
 import { useHousehold } from '../../lib/household';
-import { Field, Button, Chip, Avatar, Row, Stepper, AvatarSelect, IconButton, ModalHeader } from '../../lib/ui';
+import { Field, Button, Chip, Avatar, Row, Stepper, AvatarSelect, IconButton, Editor } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, categoryMeta, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
@@ -164,17 +164,12 @@ export default function TaskEditor() {
   if (!loaded) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        {/* Header */}
-        <ModalHeader
-          title={isNew ? t('task.new') : t('task.edit')}
-          onClose={() => router.back()}
-          onConfirm={save}
-          busy={busy}
-        />
-
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+    <Editor
+      title={isNew ? t('task.new') : t('task.edit')}
+      onClose={() => router.back()}
+      onConfirm={save}
+      busy={busy}
+    >
           <Field label={t('task.field.title')} value={title}
             onChangeText={(v) => { setTitle(v); clearErr('title'); }}
             placeholder={t('task.field.title.placeholder')} autoFocus={isNew} error={errors.title} />
@@ -207,17 +202,6 @@ export default function TaskEditor() {
           <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.assignee')}</Text>
           <AvatarSelect members={members} selectedId={assignedTo} onSelect={setAssignedTo}
             includeEveryone style={{ marginBottom: 18 }} />
-
-          {/* Delen met */}
-          <VisibilityPicker
-            visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
-            shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
-            shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
-            subgroups={subgroups} members={members}
-          />
-          {errors.visibility ? (
-            <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.visibility}</Text>
-          ) : null}
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.when')}</Text>
@@ -333,13 +317,24 @@ export default function TaskEditor() {
               style={{ minHeight: 70, textAlignVertical: 'top' }} />
           </View>
 
+          {/* Delen met — geavanceerd, ingeklapt onderaan zodat het de hoofd-flow
+              (wat → wie → wanneer) niet onderbreekt. */}
+          <VisibilityPicker
+            collapsible
+            visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
+            shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
+            shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
+            subgroups={subgroups} members={members}
+          />
+          {errors.visibility ? (
+            <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.visibility}</Text>
+          ) : null}
+
           {!isNew && (
             <Button title={t('task.deleteButton')} variant="ghost" onPress={confirmDelete}
               style={{ marginTop: 8, borderColor: 'transparent' }} />
           )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, TextInput,
+  View, Text, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,7 +10,7 @@ import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader } from '../../lib/ui';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader, Editor } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
@@ -163,11 +163,7 @@ export default function ExpenseEditor() {
 
   // ---------- Nieuwe uitgave ----------
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
-          <ModalHeader title={t('expense.new')} onClose={() => router.back()} onConfirm={save} busy={busy} />
-
+    <Editor title={t('expense.new')} onClose={() => router.back()} onConfirm={save} busy={busy}>
           <Field label={t('expense.field.description')} value={description}
             onChangeText={(v) => { setDescription(v); clearErr('description'); }}
             placeholder={t('expense.field.description.placeholder')} error={errors.description} />
@@ -237,6 +233,7 @@ export default function ExpenseEditor() {
 
           <View style={{ marginTop: space.lg }}>
             <VisibilityPicker
+              collapsible
               visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
               shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
               shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
@@ -245,10 +242,6 @@ export default function ExpenseEditor() {
               <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
             ) : null}
           </View>
-
-          <View style={{ height: space.xl }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
