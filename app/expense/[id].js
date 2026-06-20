@@ -10,7 +10,7 @@ import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, ModalHeader, IconButton, Editor } from '../../lib/ui';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, IconButton, Editor } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
@@ -33,19 +33,14 @@ export default function ExpenseEditor() {
   const isNew = id === 'new';
   const router = useRouter();
   const toast = useToast();
-  const { addExpense, deleteExpense } = useExpenses();
+  const { addExpense, updateExpense, deleteExpense } = useExpenses();
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
 
-  // ----- Bestaande uitgave: laden en read-only tonen -----
   const [existing, setExisting] = useState(null);
-  useEffect(() => {
-    if (isNew) return;
-    supabase.from('expenses').select('*, expense_shares(profile_id, amount_cents)').eq('id', id).single()
-      .then(({ data }) => { if (!data) router.back(); else setExisting(data); });
-  }, [id]);
+  const [loaded, setLoaded] = useState(isNew);
 
-  // ----- Nieuwe uitgave: formulier -----
+  // ----- Formulier-state -----
   // Voorvullen vanuit een bron (KOS-3): bv. "Splitsen met huishouden" vanaf een bon.
   const [description, setDescription] = useState(prefillDescription ?? '');
   const [amountText, setAmountText] = useState(prefillAmount ?? '');
@@ -70,6 +65,37 @@ export default function ExpenseEditor() {
   useEffect(() => {
     if (isNew && members.length && selected.length === 0) setSelected(members.map((m) => m.id));
   }, [members.length]);
+
+  // ----- Bestaande uitgave: laden en het formulier voorvullen (bewerkbaar) -----
+  useEffect(() => {
+    if (isNew) return;
+    supabase.from('expenses').select('*, expense_shares(profile_id, amount_cents)').eq('id', id).single()
+      .then(({ data }) => {
+        if (!data) { router.back(); return; }
+        setExisting(data);
+        setDescription(data.description ?? '');
+        setAmountText(data.amount_cents != null ? (data.amount_cents / 100).toFixed(2).replace('.', ',') : '');
+        setCategory(data.category ?? 'overig');
+        setPaidBy(data.paid_by);
+        setSpentOn(data.spent_on ? parseISO(data.spent_on) : new Date());
+        setVisibility(data.visibility ?? VISIBILITY.HOUSEHOLD);
+        setShareSubgroupId(data.share_subgroup_id ?? null);
+        setShareWith(data.share_with ?? []);
+        const sh = data.expense_shares ?? [];
+        setSelected(sh.map((s) => s.profile_id));
+        setSplitType(data.split_type ?? SPLIT.EQUAL);
+        // Bedragen herstellen: bij 'exact' rechtstreeks, bij 'aandeel' de bedragen
+        // als gewichten (zelfde verhouding) — gewichten zelf worden niet bewaard.
+        if (data.split_type === SPLIT.EXACT) {
+          const ex = {}; sh.forEach((s) => { ex[s.profile_id] = (s.amount_cents / 100).toFixed(2).replace('.', ','); });
+          setExactText(ex);
+        } else if (data.split_type === SPLIT.SHARES) {
+          const w = {}; sh.forEach((s) => { w[s.profile_id] = s.amount_cents; });
+          setWeights(w);
+        }
+        setLoaded(true);
+      });
+  }, [id]);
 
   const amountCents = parseAmountToCents(amountText) ?? 0;
 
@@ -106,11 +132,18 @@ export default function ExpenseEditor() {
 
     setBusy(true);
     try {
-      await addExpense({
-        description: description.trim(), amountCents, paidBy, spentOn: format(spentOn, 'yyyy-MM-dd'), splitType,
-        participants, visibility, shareSubgroupId, shareWith,
-        sourceType: sourceType ?? null, sourceId: sourceId ?? null, category,
-      });
+      if (isNew) {
+        await addExpense({
+          description: description.trim(), amountCents, paidBy, spentOn: format(spentOn, 'yyyy-MM-dd'), splitType,
+          participants, visibility, shareSubgroupId, shareWith,
+          sourceType: sourceType ?? null, sourceId: sourceId ?? null, category,
+        });
+      } else {
+        await updateExpense(id, {
+          description: description.trim(), amountCents, paidBy, spentOn: format(spentOn, 'yyyy-MM-dd'), splitType,
+          participants, visibility, shareSubgroupId, shareWith, category,
+        });
+      }
       haptics.success();
       router.back();
     } catch (e) {
@@ -137,34 +170,12 @@ export default function ExpenseEditor() {
     });
   };
 
-  // ---------- Read-only weergave bestaande uitgave ----------
-  if (!isNew) {
-    if (!existing) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
-    const nameOf = (pid) => members.find((m) => m.id === pid)?.display_name ?? t('common.someone');
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
-          <ModalHeader title={existing.description} onClose={() => router.back()} />
-          <Text style={[type.h2, { color: colors.forest }]}>{formatCents(existing.amount_cents)}</Text>
-          <Text style={[type.body, { color: colors.inkSoft, marginTop: space.xs }]}>
-            {t('expenses.row.paid', { name: nameOf(existing.paid_by) })} · {format(parseISO(existing.spent_on), 'd MMMM yyyy', { locale: dateLocale() })}
-          </Text>
-          <Text style={[type.label, { marginTop: space.lg, marginBottom: space.sm }]}>{t('expense.detail.split')}</Text>
-          {(existing.expense_shares ?? []).map((s) => (
-            <Row key={s.profile_id} justify="space-between" style={{ paddingVertical: space.xs }}>
-              <Text style={type.body}>{nameOf(s.profile_id)}</Text>
-              <Text style={type.body}>{formatCents(s.amount_cents)}</Text>
-            </Row>
-          ))}
-          <Button title={t('common.remove')} icon="delete" variant="ghost" onPress={removeExisting} style={{ marginTop: space.xl }} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Wacht tot een bestaande uitgave geladen is (geen lege-formulier-flits).
+  if (!isNew && !loaded) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  // ---------- Nieuwe uitgave ----------
+  // ---------- Uitgave aanmaken / bewerken (zelfde formulier) ----------
   return (
-    <Editor title={t('expense.new')} onClose={() => router.back()} onConfirm={save} busy={busy}>
+    <Editor title={isNew ? t('expense.new') : t('expense.edit')} onClose={() => router.back()} onConfirm={save} busy={busy}>
           <Field label={t('expense.field.description')} value={description}
             onChangeText={(v) => { setDescription(v); clearErr('description'); }}
             placeholder={t('expense.field.description.placeholder')} error={errors.description} />
@@ -246,6 +257,11 @@ export default function ExpenseEditor() {
               <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
             ) : null}
           </View>
+
+          {!isNew ? (
+            <Button title={t('common.remove')} icon="delete" variant="ghost" onPress={removeExisting}
+              style={{ marginTop: space.lg, borderColor: 'transparent' }} />
+          ) : null}
     </Editor>
   );
 }

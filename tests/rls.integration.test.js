@@ -178,6 +178,56 @@ test('RLS: household-uitgave + shares zichtbaar voor huisgenoot, niet voor buite
   assert.equal(eveShares.data?.length ?? 0, 0, 'buitenstaander mag de shares NIET zien');
 });
 
+test('RLS: uitgave bijwerken (update_expense) vervangt bedrag + shares; buitenstaander kan niet', opts, async () => {
+  const alice = await makeUser('alice_updexp');
+  const bob = await makeUser('bob_updexp');     // huisgenoot
+  const eve = await makeUser('eve_updexp');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Bijwerkhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: expId } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Etentje', p_amount_cents: 2000,
+    p_paid_by: alice.id, p_spent_on: null, p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [
+      { profile_id: alice.id, amount_cents: 1000 },
+      { profile_id: bob.id, amount_cents: 1000 },
+    ],
+  });
+
+  // Alice corrigeert het bedrag naar €40 en herverdeelt.
+  const { error: updErr } = await alice.client.rpc('update_expense', {
+    p_id: expId, p_household_id: hh.id, p_description: 'Etentje (gecorrigeerd)', p_amount_cents: 4000,
+    p_paid_by: alice.id, p_spent_on: null, p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [
+      { profile_id: alice.id, amount_cents: 2000 },
+      { profile_id: bob.id, amount_cents: 2000 },
+    ],
+  });
+  assert.ok(!updErr, `update_expense: ${updErr?.message}`);
+
+  const updated = await bob.client.from('expenses').select('description, amount_cents').eq('id', expId).single();
+  assert.equal(updated.data?.amount_cents, 4000, 'bedrag moet bijgewerkt zijn');
+  assert.equal(updated.data?.description, 'Etentje (gecorrigeerd)', 'omschrijving moet bijgewerkt zijn');
+  const shares = await bob.client.from('expense_shares').select('amount_cents').eq('expense_id', expId);
+  assert.equal(shares.data?.length, 2, 'shares blijven 2 (volledig vervangen)');
+  assert.ok((shares.data ?? []).every((s) => s.amount_cents === 2000), 'shares moeten de nieuwe bedragen zijn');
+
+  // Een buitenstaander mag de uitgave niet bijwerken (is_member-guard).
+  const { error: eveErr } = await eve.client.rpc('update_expense', {
+    p_id: expId, p_household_id: hh.id, p_description: 'gehackt', p_amount_cents: 1,
+    p_paid_by: eve.id, p_spent_on: null, p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: eve.id, amount_cents: 1 }],
+  });
+  assert.ok(eveErr, 'buitenstaander mag update_expense NIET kunnen aanroepen');
+  const stillThere = await alice.client.from('expenses').select('amount_cents').eq('id', expId).single();
+  assert.equal(stillThere.data?.amount_cents, 4000, 'uitgave moet onveranderd blijven na geweigerde poging');
+});
+
 test('RLS: subgroep-uitgave alleen voor subgroepleden (huisgenoot buiten de groep ziet niets)', opts, async () => {
   const alice = await makeUser('alice_sg_exp');
   const bob = await makeUser('bob_sg_exp');   // huisgenoot, NIET in de subgroep

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -7,7 +7,7 @@ import { mutate } from '../../lib/db';
 import { useRecipes, useRecipe } from '../../lib/useRecipes';
 import { useProducts } from '../../lib/useProducts';
 import {
-  ModalHeader, Field, Stepper, ItemRow, IconButton, Row, Chip, SectionHeader,
+  ModalHeader, Field, Stepper, ItemRow, IconButton, Row, Chip, SectionHeader, Editor,
 } from '../../lib/ui';
 import { colors, space, type } from '../../lib/theme';
 import { success, error as hapticError } from '../../lib/haptics';
@@ -19,7 +19,7 @@ export default function RecipeEditor() {
   const isNew = id === 'new';
   const router = useRouter();
   const { addRecipe, updateRecipe, activeId } = useRecipes();
-  const { recipe, ingredients, loading, addIngredient, removeIngredient } = useRecipe(isNew ? null : id);
+  const { recipe, ingredients, loading, addIngredient, updateIngredient, removeIngredient } = useRecipe(isNew ? null : id);
   const { suggestFor } = useProducts();
 
   const [title, setTitle] = useState('');
@@ -37,6 +37,9 @@ export default function RecipeEditor() {
   const [ingQty, setIngQty] = useState(1);
   const [ingUnit, setIngUnit] = useState('stuk');
   const [ingProductId, setIngProductId] = useState(null);
+  // Sleutel van het ingrediënt dat nu in de invoerrij bewerkt wordt (id of _key);
+  // null = een nieuw ingrediënt toevoegen.
+  const [editingKey, setEditingKey] = useState(null);
 
   React.useEffect(() => {
     if (isNew || !recipe) return;
@@ -54,11 +57,31 @@ export default function RecipeEditor() {
     return suggestFor(ingName, 3).filter((s) => s.score >= 0.4).map((s) => s.product);
   }, [ingName, suggestFor]);
 
-  const resetIngInput = () => { setIngName(''); setIngQty(1); setIngUnit('stuk'); setIngProductId(null); };
+  const resetIngInput = () => { setIngName(''); setIngQty(1); setIngUnit('stuk'); setIngProductId(null); setEditingKey(null); };
+
+  // Tik een ingrediënt aan om het in de invoerrij te bewerken (i.p.v. verwijderen
+  // + opnieuw toevoegen). De rij wordt dan de editor; "+" wordt "✓".
+  const startEdit = (item) => {
+    setEditingKey(item.id ?? item._key);
+    setIngName(item.name);
+    setIngQty(Math.max(1, Math.round(+item.quantity) || 1));
+    setIngUnit(item.unit ?? 'stuk');
+    setIngProductId(item.product_id ?? item.productId ?? null);
+  };
 
   const addIng = async () => {
     if (!ingName.trim()) return;
     const ing = { name: ingName.trim(), quantity: ingQty, unit: ingUnit, productId: ingProductId };
+    if (editingKey) {
+      if (isNew) {
+        setDraft((d) => d.map((x) => (x._key === editingKey ? { ...x, ...ing } : x)));
+        resetIngInput();
+      } else {
+        try { await updateIngredient(editingKey, { name: ing.name, quantity: ing.quantity, unit: ing.unit, product_id: ing.productId }); resetIngInput(); }
+        catch (e) { Alert.alert(t('common.failed'), e.message); }
+      }
+      return;
+    }
     if (isNew) {
       setDraft((d) => [...d, { ...ing, _key: `${Date.now()}-${d.length}` }]);
       resetIngInput();
@@ -69,6 +92,7 @@ export default function RecipeEditor() {
   };
 
   const removeIng = (item) => {
+    if (editingKey && editingKey === (item.id ?? item._key)) resetIngInput();
     if (isNew) setDraft((d) => d.filter((x) => x._key !== item._key));
     else removeIngredient(item.id).catch((e) => Alert.alert(t('common.failed'), e.message));
   };
@@ -107,11 +131,11 @@ export default function RecipeEditor() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ModalHeader title={isNew ? t('recipe.new') : t('recipe.edit')} onClose={() => router.back()}
-          onConfirm={save} busy={busy} confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
-        <ScrollView contentContainerStyle={{ padding: space.lg }} keyboardShouldPersistTaps="handled">
+    <Editor
+      title={isNew ? t('recipe.new') : t('recipe.edit')}
+      onClose={() => router.back()} onConfirm={save} busy={busy}
+      confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
+    >
           <Field label={t('recipe.field.title')} value={title}
             onChangeText={(x) => { setTitle(x); if (titleError) setTitleError(null); }}
             placeholder={t('recipe.field.title.placeholder')} autoFocus={isNew} error={titleError} />
@@ -123,18 +147,25 @@ export default function RecipeEditor() {
           <SectionHeader title={t('recipe.ingredients')} count={shownIngredients.length} />
           {shownIngredients.length === 0 ? (
             <Text style={[type.caption, { marginBottom: space.md }]}>{t('recipe.empty.ingredients')}</Text>
-          ) : shownIngredients.map((ing) => (
-            <ItemRow
-              key={ing.id ?? ing._key}
-              title={ing.name}
-              meta={<Text style={type.caption}>{(+ing.quantity).toLocaleString('nl-NL')} {ing.unit}</Text>}
-              trailing={<IconButton icon="delete" size={18} tint={colors.inkFaint}
-                accessibilityLabel={t('common.delete')} onPress={() => removeIng(ing)} />}
-            />
-          ))}
+          ) : shownIngredients.map((ing) => {
+            const key = ing.id ?? ing._key;
+            return (
+              <ItemRow
+                key={key}
+                title={ing.name}
+                borderColor={editingKey === key ? colors.forest : undefined}
+                onPress={() => startEdit(ing)}
+                accessibilityHint={t('recipe.ingredient.editHint')}
+                meta={<Text style={type.caption}>{(+ing.quantity).toLocaleString('nl-NL')} {ing.unit}</Text>}
+                trailing={<IconButton icon="delete" size={18} tint={colors.inkFaint}
+                  accessibilityLabel={t('common.delete')} onPress={() => removeIng(ing)} />}
+              />
+            );
+          })}
 
-          {/* Nieuw ingrediënt */}
-          <Field label={t('recipe.ingredient.add')} value={ingName} onChangeText={(x) => { setIngName(x); setIngProductId(null); }}
+          {/* Ingrediënt toevoegen of (na aantikken) bewerken */}
+          <Field label={editingKey ? t('recipe.ingredient.edit') : t('recipe.ingredient.add')}
+            value={ingName} onChangeText={(x) => { setIngName(x); setIngProductId(null); }}
             placeholder={t('recipe.ingredient.placeholder')} onSubmitEditing={addIng} style={{ marginBottom: space.sm }} />
           {hints.length > 0 ? (
             <Row gap={space.xs} wrap style={{ marginBottom: space.sm }}>
@@ -149,7 +180,8 @@ export default function RecipeEditor() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {UNITS.map((u) => <Chip key={u} label={u} active={ingUnit === u} onPress={() => setIngUnit(u)} />)}
             </ScrollView>
-            <IconButton icon="add" tint={colors.forest} accessibilityLabel={t('recipe.ingredient.add')}
+            <IconButton icon={editingKey ? 'check' : 'add'} tint={colors.forest}
+              accessibilityLabel={editingKey ? t('recipe.ingredient.edit') : t('recipe.ingredient.add')}
               onPress={addIng} style={{ backgroundColor: colors.ocherSoft }} />
           </Row>
 
@@ -160,8 +192,6 @@ export default function RecipeEditor() {
             placeholder="https://…" autoCapitalize="none" keyboardType="url" />
 
           <View style={{ height: space.xxl }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
