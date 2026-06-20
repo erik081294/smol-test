@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Switch, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, addDays, parseISO } from 'date-fns';
@@ -8,11 +8,13 @@ import { supabase } from '../../lib/supabase';
 import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { ModalHeader, Field, Stepper, Button, Chip, Row, AvatarSelect, IconButton } from '../../lib/ui';
+import { ModalHeader, Field, Stepper, Button, Chip, Checkbox, Row, AvatarSelect, IconButton, Editor } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { success, error as hapticError } from '../../lib/haptics';
 import { RECUR } from '../../lib/constants';
+import { useToast } from '../../lib/toast';
+import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t } from '../../lib/i18n';
 
 const FREQS = [RECUR.DAILY, RECUR.WEEKLY, RECUR.MONTHLY];
@@ -24,6 +26,7 @@ export default function RecurringExpenseEditor() {
   const { addTemplate, updateTemplate, removeTemplate } = useRecurringExpenses();
   const { members } = useHousehold();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [description, setDescription] = useState('');
   const [amountText, setAmountText] = useState('');
@@ -92,23 +95,34 @@ export default function RecurringExpenseEditor() {
     finally { setBusy(false); }
   };
 
+  // Verwijderen met ongedaan-maken — zelfde patroon als de taak-/uitgave-editor
+  // (geen blokkerende Alert; undo is het vangnet en werkt óók op web).
   const confirmDelete = () => {
-    Alert.alert(t('recurring.delete.confirm'), '', [
-      { text: t('common.cancelLong'), style: 'cancel' },
-      { text: t('common.remove'), style: 'destructive', onPress: async () => { await removeTemplate(id); router.back(); } },
-    ]);
+    markPending(id);
+    router.back();
+    toast.show({
+      message: t('recurring.deleted', { name: description.trim() || t('recurring.delete') }),
+      actionLabel: t('common.undo'),
+      onAction: () => unmarkPending(id),
+      onExpire: async () => {
+        try { await removeTemplate(id); }
+        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        finally { unmarkPending(id); }
+      },
+    });
   };
 
   if (!loaded) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}><ModalHeader title="" onClose={() => router.back()} /></SafeAreaView>;
 
   const amountCents = parseAmountToCents(amountText);
+  const perPerson = amountCents && participants.length ? Math.round(amountCents / participants.length) : 0;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ModalHeader title={isNew ? t('recurring.new') : t('recurring.edit')} onClose={() => router.back()}
-          onConfirm={save} busy={busy} confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
-        <ScrollView contentContainerStyle={{ padding: space.lg }} keyboardShouldPersistTaps="handled">
+    <Editor
+      title={isNew ? t('recurring.new') : t('recurring.edit')}
+      onClose={() => router.back()} onConfirm={save} busy={busy}
+      confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
+    >
           <Field label={t('recurring.field.description')} value={description}
             onChangeText={(x) => { setDescription(x); setErrors((e) => ({ ...e, description: null })); }}
             placeholder={t('recurring.field.description.placeholder')} autoFocus={isNew} error={errors.description} />
@@ -120,19 +134,23 @@ export default function RecurringExpenseEditor() {
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
           <AvatarSelect members={members} selectedId={paidBy} onSelect={setPaidBy} style={{ marginBottom: space.lg }} />
 
+          {/* Deelnemers — checkbox-rijen met het gelijke aandeel per persoon,
+              gelijkgetrokken met de uitgave-editor. */}
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recurring.field.participants')}</Text>
-          <Row gap={space.xs} wrap style={{ marginBottom: space.xs }}>
-            {members.map((m) => (
-              <Chip key={m.id} label={m.display_name?.split(' ')[0]} active={participants.includes(m.id)}
-                onPress={() => toggleParticipant(m.id)} />
-            ))}
-          </Row>
-          {errors.participants ? <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{errors.participants}</Text> : null}
-          {amountCents && participants.length ? (
-            <Text style={[type.caption, { marginBottom: space.lg }]}>
-              {t('recurring.perPerson', { amount: formatCents(Math.round(amountCents / participants.length)) })}
-            </Text>
-          ) : <View style={{ marginBottom: space.lg }} />}
+          {errors.participants ? <Text style={[type.caption, { color: colors.danger, marginBottom: space.xs }]}>{errors.participants}</Text> : null}
+          {members.map((m) => {
+            const on = participants.includes(m.id);
+            return (
+              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
+                borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                <Checkbox checked={on} onPress={() => { toggleParticipant(m.id); setErrors((e) => ({ ...e, participants: null })); }}
+                  accessibilityLabel={m.display_name} />
+                <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
+                {on && perPerson ? <Text style={[type.body, { color: colors.inkSoft }]}>{formatCents(perPerson)}</Text> : null}
+              </View>
+            );
+          })}
+          <View style={{ marginBottom: space.lg }} />
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recurring.field.freq')}</Text>
           <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
@@ -170,9 +188,6 @@ export default function RecurringExpenseEditor() {
             <Button title={t('recurring.delete')} variant="ghost" onPress={confirmDelete}
               style={{ borderColor: 'transparent' }} />
           ) : null}
-          <View style={{ height: space.xxl }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Editor>
   );
 }
