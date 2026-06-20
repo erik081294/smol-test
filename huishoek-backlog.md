@@ -98,6 +98,14 @@ in de canonieke statustabel verderop in dit document (§6).
 >   (KOS-3/4, AUT-1/2, geactualiseerd: bon→uitgave nu echt via `purchases`). Samenhang:
 >   menu → lijst → voorraad → herinneringen → kosten. Nieuwe migraties (vanaf `0016`); nog te bouwen.
 >
+> - **Volgende ronde GEBOUWD (2026-06-20, branch `claude/keuken-notif-kosten`)** — alle drie
+>   de features staan in code, getest (units groen, lint 0 errors) met RLS-integratietests
+>   erbij: **MLT-1/MLT-2/VOO-1** (keuken-loop, migratie `0016`), **PLT-1** (notificaties
+>   lokaal+remote, `0018`), **KOS-3/4 + AUT-1/2** (kosten & autodelen, `0017`). Status 🔧:
+>   migraties `0016`–`0018` nog **live pushen** + RLS-tests met secrets + web-/toestel-rooktest
+>   (zie `VERIFICATIE.md`), dan → ✅. Pure logica: `lib/mealPlan.js`, `lib/pantry.js`,
+>   `lib/notifications.js` (uitgebreid), `lib/reservations.js`, `lib/recurringExpense.js`.
+>
 > Dit document blijft het waarom/overzicht; de specs zijn het hoe.
 
 ---
@@ -361,15 +369,15 @@ te valideren tegen live Supabase) · **⏳ Open** (nog te bouwen). Inspanning is
 | AGE-2 | Agenda | Sync met telefoon-agenda | 3 | Could | L | ⏳ | AGE-1 | `expo-calendar`; rechten per platform. |
 | KOS-1 | Kosten | WieBetaaltWat — uitgaven & splitsen | 1 | Should | L | ✅ | FND-1 | Splitsing gelijk/aandeel/exact; `create_expense` RPC. Migratie 0007. |
 | KOS-2 | Kosten | Saldo-overzicht & vereffenen | 1 | Should | M | ✅ | KOS-1 | Greedy schuldminimalisatie in `lib/expenses.js`. |
-| KOS-3 | Kosten | Kosten koppelen aan modules | 2 | Could | M | ⏳ | KOS-1 | **Plan 04.** Bon (`purchases`, nu gebouwd) → gesplitste uitgave via `expenses.source_type/source_id`. |
-| KOS-4 | Kosten | Terugkerende uitgaven | 2 | Could | M | ⏳ | KOS-1 | **Plan 04.** `recurring_expenses` + `lib/recurringExpense.js` (aanwezig); materialiseren via `create_expense`. |
-| AUT-1 | Autodelen | Gedeeld item + reserveringskalender | 2 | Could | M | ⏳ | KOS-1 | **Plan 04.** `shared_resources` + `reservations`; kalender via `lib/agenda.js`. `lib/reservations.js` aanwezig. |
-| AUT-2 | Autodelen | Gebruik → kosten | 2 | Could | M | ⏳ | AUT-1 | **Plan 04.** Kilometers/tankbeurten → uitgaven, gesplitst naar gebruik (`computeShares`). |
+| KOS-3 | Kosten | Kosten koppelen aan modules | 2 | Could | M | 🔧 | KOS-1 | **Plan 04 — gebouwd** (migratie `0017` nog live te pushen). Bon → "Splitsen met huishouden" via `expenses.source_type/source_id`; `create_expense` uitgebreid. |
+| KOS-4 | Kosten | Terugkerende uitgaven | 2 | Could | M | 🔧 | KOS-1 | **Plan 04 — gebouwd** (`0017`). `recurring_expenses` + `useRecurringExpenses` (idempotent materialiseren via partiële unieke index) + `app/recurring-expense`. |
+| AUT-1 | Autodelen | Gedeeld item + reserveringskalender | 2 | Could | M | 🔧 | KOS-1 | **Plan 04 — gebouwd** (`0017`). Module `delen`, `shared_resources` + `reservations` (kind-RLS), reserveren met dubbelboek-waarschuwing (`lib/reservations.js`). |
+| AUT-2 | Autodelen | Gebruik → kosten | 2 | Could | M | 🔧 | AUT-1 | **Plan 04 — gebouwd** (`0017`). "Kosten verdelen" naar gebruik (km → `computeShares` shares) of gelijk, via `create_expense`. |
 | AUT-3 | Autodelen | Tussen bevriende huishoudens | 3 | Could | L | ⏳ | AUT-2 | Gedeelde subgroep over huishoudens; vertrouwens-/uitnodigingsmodel. |
-| MLT-1 | Maaltijden | Weekmenu → boodschappenlijst | 2 | Should | M | ⏳ | BOO-5 | **Plan 09.** `meal_plan_entries`; "Boodschappen aanvullen" via `add_groceries` (behoefte − voorraad). |
-| MLT-2 | Maaltijden | Recepten + ingrediënten | 2 | Should | M | ⏳ | BOO-5 | **Plan 09.** `recipes`/`recipe_ingredients`, gekoppeld aan producten/catalogus; `lib/mealPlan.js`. |
-| VOO-1 | Voorraad | Voorraad + houdbaarheid | 2 | Should | M | ⏳ | BOO-5 | **Plan 09.** `pantry_items`; status bijna-op/verlopen → suggestie naar lijst; bij te vullen uit een bon. `lib/pantry.js`. |
-| PLT-1 | Platform | Notificaties & herinneringen | 2 | Should | M | ⏳ | — | **Plan 05.** Lokaal (`expo-notifications`) + remote push; taken/plantzorg/maaltijd/voorraad. Pure kern `lib/notifications.js` aanwezig. |
+| MLT-1 | Maaltijden | Weekmenu → boodschappenlijst | 2 | Should | M | 🔧 | BOO-5 | **Plan 09 — gebouwd** (migratie `0016` nog live te pushen). `app/(tabs)/maaltijden.js` (week-overzicht), "Boodschappen aanvullen" via `add_groceries` (behoefte − voorraad), units `lib/mealPlan.js`. |
+| MLT-2 | Maaltijden | Recepten + ingrediënten | 2 | Should | M | 🔧 | BOO-5 | **Plan 09 — gebouwd** (`0016`). `recipes`/`recipe_ingredients`, `app/recipe/[id].js`, gekoppeld aan producten/catalogus (`useProducts.suggestFor`). |
+| VOO-1 | Voorraad | Voorraad + houdbaarheid | 2 | Should | M | 🔧 | BOO-5 | **Plan 09 — gebouwd** (`0016`). `app/(tabs)/voorraad.js` (urgentie/plaats, status-badges, "op de lijst"), bij te vullen uit een bon. Units `lib/pantry.js`. |
+| PLT-1 | Platform | Notificaties & herinneringen | 2 | Should | M | 🔧 | — | **Plan 05 — gebouwd.** Trap 1 lokaal (`expo-notifications`, `useNotifications`, prefs-scherm) + trap 2 remote (migratie `0018` + Edge Function `notify`). Units `lib/notifications.js` uitgebreid. |
 | UX-1 | Platform | Design-/icon-systeem (Phosphor) | 1 | — | M | ✅ | — | `DESIGN.md`, `lib/icons.js`, tokens in `lib/theme.js`, componenten in `lib/ui.js`. |
 | UX-2 | Platform | "Meer"-overflow-tab navigatie | 1 | — | S | ✅ | FND-2 | `primary`/`MORE_TAB` in `lib/modules.js`, `app/(tabs)/meer.js`. Houdt tabbalk leesbaar. |
 | INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | 1 | Must | S | ✅ | — | Migraties 0004–**0013** live gepusht (DB op `0013`, boodschappen-catalogus 2026-06-19); RLS-integratietests groen tegen de live DB (**155 tests, 0 skipped**), incl. de nieuwe bon/purchase_items-case. Resteert alleen de handmatige 2-account-rooktest (`VERIFICATIE.md` Stap 3). |

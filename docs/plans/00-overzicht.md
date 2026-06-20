@@ -27,6 +27,9 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 > **05 Notificaties** (geactualiseerd: lokaal + remote, incl. maaltijd-/voorraad-herinneringen)
 > en **04 Kosten & autodelen** (geactualiseerd: bon→uitgave nu echt mogelijk via `purchases`).
 > Samenhang: menu → lijst → voorraad → herinneringen → kosten. Aanbevolen volgorde **09 → 05 → 04**.
+> **→ GEBOUWD (2026-06-20)** op branch `claude/keuken-notif-kosten` (migraties `0016`–`0018`),
+> getest (units groen, lint 0 errors, RLS-cases erbij). Status 🔧 tot de migraties live staan
+> en de rooktest is gedaan — zie backlog §6 en `VERIFICATIE.md`.
 >
 > *(Plannen 01, 02, 06/INF-6, 07 en 08 zijn (groten)deels gereed; zie backlog §6.)*
 

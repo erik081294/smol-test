@@ -396,3 +396,80 @@ test('RLS: bon + bonregels zichtbaar voor huisgenoot, niet voor buitenstaander',
   const eveProd = await eve.client.from('products').select('id').eq('id', product.id);
   assert.equal(eveProd.data?.length ?? 0, 0, 'buitenstaander mag het catalogusproduct NIET zien');
 });
+
+// --- Keuken-loop: recipes/recipe_ingredients/meal_plan_entries/pantry_items -----
+// Household-brede data (is_member); recipe_ingredients erft via de parent-recipe.
+
+test('RLS: recept + ingrediënt + weekmenu + voorraad household-gescoped', opts, async () => {
+  const alice = await makeUser('alice_keuken');
+  const bob = await makeUser('bob_keuken');     // huisgenoot
+  const eve = await makeUser('eve_keuken');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Keukenhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: recipe, error: rErr } = await alice.client.from('recipes')
+    .insert({ household_id: hh.id, title: 'Pasta pesto', servings: 2, created_by: alice.id }).select().single();
+  assert.ok(!rErr, `recept: ${rErr?.message}`);
+  const { data: ing, error: iErr } = await alice.client.from('recipe_ingredients')
+    .insert({ household_id: hh.id, recipe_id: recipe.id, name: 'Pasta', quantity: 500, unit: 'g' }).select().single();
+  assert.ok(!iErr, `ingrediënt: ${iErr?.message}`);
+  const { data: meal } = await alice.client.from('meal_plan_entries')
+    .insert({ household_id: hh.id, plan_date: '2026-06-20', meal_type: 'diner', recipe_id: recipe.id, servings: 2, created_by: alice.id }).select().single();
+  const { data: pantry } = await alice.client.from('pantry_items')
+    .insert({ household_id: hh.id, name: 'Olijfolie', quantity: 1, unit: 'l', updated_by: alice.id }).select().single();
+
+  for (const [tbl, row] of [['recipes', recipe], ['recipe_ingredients', ing], ['meal_plan_entries', meal], ['pantry_items', pantry]]) {
+    const bobSees = await bob.client.from(tbl).select('id').eq('id', row.id);
+    assert.equal(bobSees.data?.length, 1, `huisgenoot ziet ${tbl}`);
+    const eveSees = await eve.client.from(tbl).select('id').eq('id', row.id);
+    assert.equal(eveSees.data?.length ?? 0, 0, `buitenstaander ziet ${tbl} NIET`);
+  }
+});
+
+// --- Autodelen: shared_resources (contract) + reservations (erft via parent) ----
+
+test('RLS: gedeeld item + reservering zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_delen');
+  const bob = await makeUser('bob_delen');     // huisgenoot
+  const eve = await makeUser('eve_delen');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Deelhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  const { data: res, error: resErr } = await alice.client.from('shared_resources')
+    .insert({ household_id: hh.id, name: 'De auto', kind: 'auto', visibility: 'household', created_by: alice.id }).select().single();
+  assert.ok(!resErr, `resource: ${resErr?.message}`);
+  const { data: rsv, error: rsvErr } = await alice.client.from('reservations')
+    .insert({ household_id: hh.id, resource_id: res.id, profile_id: alice.id,
+      starts_at: '2026-06-20T09:00:00Z', ends_at: '2026-06-20T17:00:00Z' }).select().single();
+  assert.ok(!rsvErr, `reservering: ${rsvErr?.message}`);
+
+  const bobSees = await bob.client.from('reservations').select('id').eq('id', rsv.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet de reservering (erft resource-toegang)');
+  const eveSees = await eve.client.from('reservations').select('id').eq('id', rsv.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de reservering NIET');
+});
+
+test('RLS: reservering van een custom-resource alleen voor genoemde personen', opts, async () => {
+  const alice = await makeUser('alice_delen2');
+  const bob = await makeUser('bob_delen2');     // huisgenoot, NIET in de custom-share
+  const hh = await makeHousehold(alice, 'Deelhuis2');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  // Resource alleen gedeeld met Alice (de maker). Bob is huisgenoot maar niet genoemd.
+  const { data: res } = await alice.client.from('shared_resources')
+    .insert({ household_id: hh.id, name: 'Privé boormachine', kind: 'gereedschap',
+      visibility: 'custom', share_with: [alice.id], created_by: alice.id }).select().single();
+  const { data: rsv } = await alice.client.from('reservations')
+    .insert({ household_id: hh.id, resource_id: res.id, profile_id: alice.id,
+      starts_at: '2026-06-21T09:00:00Z', ends_at: '2026-06-21T12:00:00Z' }).select().single();
+
+  const aliceSees = await alice.client.from('reservations').select('id').eq('id', rsv.id);
+  assert.equal(aliceSees.data?.length, 1, 'maker ziet zijn eigen reservering');
+  const bobSees = await bob.client.from('reservations').select('id').eq('id', rsv.id);
+  assert.equal(bobSees.data?.length ?? 0, 0, 'huisgenoot buiten de custom-share ziet de reservering NIET');
+});
