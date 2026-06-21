@@ -1,12 +1,11 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-18).** Het meeste hieronder is **al gedaan**: de
-> migraties `0004`–`0012` zijn naar het hosted project gepusht (DB staat op `0012`)
-> en de RLS-integratietests zijn **groen** tegen de live database gedraaid — alle
-> 118 tests, 0 skipped, inclusief de `task_completions`-cases (plan 01). **Resteert
-> alleen:** de handmatige rooktest met 2 accounts in één huishouden (Stap 3 onderaan).
-> De stappen 1–2 blijven staan als naslag/herhaalrecept (bijv. wanneer er een nieuwe
-> migratie bijkomt).
+> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0022` zijn live (DB op `0022`).
+> **Nieuw deze ronde:** `0023_push_deliveries` staat in de repo en moet nog gepusht
+> (`supabase db push`, idempotent). Zie **`docs/HANDOVER.md`** voor de volledige lijst
+> openstaande Supabase-acties (migratie pushen, RLS-tests met secrets, PLT-1 trap 2 flip-on
+> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan). De stappen 1–2
+> hieronder blijven het herhaalrecept telkens als er een migratie bijkomt.
 >
 > **De secrets staan lokaal in `.env`** (alle drie: `EXPO_PUBLIC_SUPABASE_URL`,
 > `EXPO_PUBLIC_SUPABASE_ANON_KEY` én `SUPABASE_SERVICE_ROLE_KEY`). De CLI is op deze
