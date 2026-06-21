@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert, Image, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
-import { useRecipes, useRecipe } from '../../lib/useRecipes';
+import { useRecipes, useRecipe, addRecipePhoto, useRecipePhotoUrl } from '../../lib/useRecipes';
 import { useProducts } from '../../lib/useProducts';
+import { offerImagePicker } from '../../lib/photoPicker';
 import {
   ModalHeader, Field, Stepper, ItemRow, IconButton, Row, Chip, SectionHeader, Editor,
 } from '../../lib/ui';
-import { colors, space, type } from '../../lib/theme';
+import { Icon } from '../../lib/icons';
+import { colors, space, type, radius } from '../../lib/theme';
 import { success, error as hapticError } from '../../lib/haptics';
 import { UNITS } from '../../lib/constants';
 import { t } from '../../lib/i18n';
@@ -19,7 +21,7 @@ export default function RecipeEditor() {
   const isNew = id === 'new';
   const router = useRouter();
   const { addRecipe, updateRecipe, activeId } = useRecipes();
-  const { recipe, ingredients, loading, addIngredient, updateIngredient, removeIngredient } = useRecipe(isNew ? null : id);
+  const { recipe, ingredients, loading, reload, addIngredient, updateIngredient, removeIngredient } = useRecipe(isNew ? null : id);
   const { suggestFor } = useProducts();
 
   const [title, setTitle] = useState('');
@@ -29,6 +31,25 @@ export default function RecipeEditor() {
   const [titleError, setTitleError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
+  // Omslagfoto (MLT-3): nieuw recept bewaart het asset tot opslaan; bestaand recept
+  // uploadt meteen. `photoNonce` forceert een verse signed URL na vervangen.
+  const [photoAsset, setPhotoAsset] = useState(null);
+  const [photoNonce, setPhotoNonce] = useState(0);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const coverUrl = useRecipePhotoUrl(recipe?.photo_path, photoNonce);
+
+  const choosePhoto = () => {
+    if (isNew) {
+      offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
+      return;
+    }
+    offerImagePicker(async (asset) => {
+      setPhotoBusy(true);
+      try { await addRecipePhoto({ householdId: activeId, recipeId: id, asset }); await reload(); setPhotoNonce((n) => n + 1); }
+      catch (e) { Alert.alert(t('common.failed'), e.message); }
+      finally { setPhotoBusy(false); }
+    });
+  };
 
   // Lokale ingrediënten voor een NIEUW recept (live voor een bestaand recept).
   const [draft, setDraft] = useState([]);
@@ -103,6 +124,10 @@ export default function RecipeEditor() {
     try {
       if (isNew) {
         const row = await addRecipe({ title, servings, instructions: instructions.trim() || null, sourceUrl: sourceUrl.trim() || null });
+        if (row?.id && photoAsset) {
+          try { await addRecipePhoto({ householdId: activeId, recipeId: row.id, asset: photoAsset }); }
+          catch { /* een mislukte foto mag het opslaan niet blokkeren */ }
+        }
         if (row?.id && draft.length) {
           await mutate(
             supabase.from('recipe_ingredients').insert(
@@ -136,6 +161,24 @@ export default function RecipeEditor() {
       onClose={() => router.back()} onConfirm={save} busy={busy}
       confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
     >
+          {/* Omslagfoto (MLT-3) */}
+          <Pressable onPress={choosePhoto} disabled={photoBusy} accessibilityRole="button"
+            accessibilityLabel={t('photo.source.title')}
+            style={{
+              height: 160, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
+              alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: space.lg,
+            }}>
+            {(isNew ? photoAsset?.uri : coverUrl) ? (
+              <Image source={{ uri: isNew ? photoAsset.uri : coverUrl }}
+                style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
+            ) : (
+              <View style={{ alignItems: 'center', gap: space.xs }}>
+                <Icon name="meals" size={28} color={colors.inkFaint} />
+                <Text style={type.caption}>{t('photo.source.title')}</Text>
+              </View>
+            )}
+          </Pressable>
+
           <Field label={t('recipe.field.title')} value={title}
             onChangeText={(x) => { setTitle(x); if (titleError) setTitleError(null); }}
             placeholder={t('recipe.field.title.placeholder')} autoFocus={isNew} error={titleError} />
