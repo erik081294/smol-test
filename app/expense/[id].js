@@ -4,13 +4,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { format, parseISO, addDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, IconButton, Editor } from '../../lib/ui';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, Editor, DateStepper } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
@@ -20,7 +20,7 @@ import {
 } from '../../lib/expenses';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
-import { t, dateLocale } from '../../lib/i18n';
+import { t } from '../../lib/i18n';
 
 const SPLIT_LABELS = {
   [SPLIT.EQUAL]: 'expense.split.equal',
@@ -83,15 +83,16 @@ export default function ExpenseEditor() {
         setShareWith(data.share_with ?? []);
         const sh = data.expense_shares ?? [];
         setSelected(sh.map((s) => s.profile_id));
-        setSplitType(data.split_type ?? SPLIT.EQUAL);
-        // Bedragen herstellen: bij 'exact' rechtstreeks, bij 'aandeel' de bedragen
-        // als gewichten (zelfde verhouding) — gewichten zelf worden niet bewaard.
-        if (data.split_type === SPLIT.EXACT) {
+        // Gewichten van een 'aandeel'-split worden niet bewaard en zijn na afronding
+        // niet te reconstrueren uit de bedragen. Een opgeslagen aandeel- of exact-split
+        // bewerken we daarom als exacte bedragen: de verdeling blijft exact behouden en
+        // is volledig aanpasbaar. 'Gelijk' blijft gelijk (zelfde uitkomst).
+        if (data.split_type === SPLIT.EQUAL) {
+          setSplitType(SPLIT.EQUAL);
+        } else {
+          setSplitType(SPLIT.EXACT);
           const ex = {}; sh.forEach((s) => { ex[s.profile_id] = (s.amount_cents / 100).toFixed(2).replace('.', ','); });
           setExactText(ex);
-        } else if (data.split_type === SPLIT.SHARES) {
-          const w = {}; sh.forEach((s) => { w[s.profile_id] = s.amount_cents; });
-          setWeights(w);
         }
         setLoaded(true);
       });
@@ -263,24 +264,5 @@ export default function ExpenseEditor() {
               style={{ marginTop: space.lg, borderColor: 'transparent' }} />
           ) : null}
     </Editor>
-  );
-}
-
-// Eenvoudige datum-stepper (geen native picker; werkt overal gelijk).
-function DateStepper({ date, onChange }) {
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
-      borderColor: colors.line, padding: space.xs,
-    }}>
-      <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
-        onPress={() => onChange(addDays(date, -1))} />
-      <Text style={[type.title, { fontWeight: '700' }]}>
-        {format(date, 'EEEE d MMMM', { locale: dateLocale() })}
-      </Text>
-      <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
-        onPress={() => onChange(addDays(date, 1))} />
-    </View>
   );
 }

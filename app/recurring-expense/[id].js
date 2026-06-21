@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { format, addDays, parseISO } from 'date-fns';
-import { nl } from 'date-fns/locale';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { ModalHeader, Field, Stepper, Button, Chip, Checkbox, Row, AvatarSelect, IconButton, Editor } from '../../lib/ui';
-import { colors, space, type, radius } from '../../lib/theme';
+import { ModalHeader, Field, Stepper, Button, Chip, Checkbox, Row, AvatarSelect, Editor, DateStepper } from '../../lib/ui';
+import { colors, space, type } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { success, error as hapticError } from '../../lib/haptics';
 import { RECUR } from '../../lib/constants';
@@ -165,17 +164,7 @@ export default function RecurringExpenseEditor() {
           </Row>
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recurring.field.start')}</Text>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
-            borderColor: colors.line, padding: space.xs, marginBottom: space.lg,
-          }}>
-            <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
-              onPress={() => setStartDate((d) => addDays(d, -1))} />
-            <Text style={[type.title, { fontWeight: '700' }]}>{format(startDate, 'EEEE d MMMM', { locale: nl })}</Text>
-            <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
-              onPress={() => setStartDate((d) => addDays(d, 1))} />
-          </View>
+          <DateStepper date={startDate} onChange={setStartDate} style={{ marginBottom: space.lg }} />
 
           <Row justify="space-between" style={{ marginBottom: space.lg }}>
             <Text style={type.body}>{t('recurring.field.active')}</Text>

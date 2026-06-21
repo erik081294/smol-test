@@ -10,7 +10,7 @@ import * as haptics from '../../lib/haptics';
 import { useTasks } from '../../lib/useTasks';
 import { useZones } from '../../lib/useZones';
 import { useHousehold } from '../../lib/household';
-import { Field, Button, Chip, Avatar, Row, Stepper, AvatarSelect, IconButton, Editor } from '../../lib/ui';
+import { Field, Button, Chip, Avatar, Row, Stepper, AvatarSelect, Editor, DateStepper } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, categoryMeta, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
@@ -19,7 +19,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityPayload, validateVisibility } from '../../lib/visibility';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
-import { t, plural, dateLocale } from '../../lib/i18n';
+import { t, plural } from '../../lib/i18n';
 
 const WEEKDAYS = [
   { d: 1, l: 'Ma' }, { d: 2, l: 'Di' }, { d: 3, l: 'Wo' }, { d: 4, l: 'Do' },
@@ -214,7 +214,7 @@ export default function TaskEditor() {
             ))}
           </ScrollView>
           {dueDate && (
-            <DateStepper date={dueDate} onChange={setDueDate} />
+            <DateStepper date={dueDate} onChange={setDueDate} style={{ marginTop: space.xs }} />
           )}
           {errors.date ? (
             <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.date}</Text>
@@ -335,24 +335,5 @@ export default function TaskEditor() {
               style={{ marginTop: 8, borderColor: 'transparent' }} />
           )}
     </Editor>
-  );
-}
-
-// Eenvoudige datum-stepper (geen native picker nodig, werkt overal gelijk)
-function DateStepper({ date, onChange }) {
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
-      borderColor: colors.line, padding: space.xs, marginTop: space.xs,
-    }}>
-      <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
-        onPress={() => onChange(addDays(date, -1))} />
-      <Text style={[type.title, { fontWeight: '700' }]}>
-        {format(date, 'EEEE d MMMM', { locale: dateLocale() })}
-      </Text>
-      <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
-        onPress={() => onChange(addDays(date, 1))} />
-    </View>
   );
 }

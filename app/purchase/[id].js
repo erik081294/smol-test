@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { parseDataUrl } from '../../lib/plantPhoto';
 import * as haptics from '../../lib/haptics';
@@ -11,7 +11,7 @@ import { usePurchases } from '../../lib/usePurchases';
 import { useProducts } from '../../lib/useProducts';
 import { usePantry } from '../../lib/usePantry';
 import { useToast } from '../../lib/toast';
-import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, Editor, T } from '../../lib/ui';
+import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, Editor, DateStepper, T } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { t, dateLocale } from '../../lib/i18n';
@@ -229,17 +229,7 @@ export default function PurchaseEditor() {
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('purchase.field.date')}</Text>
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5,
-            borderColor: colors.line, padding: space.xs, marginBottom: space.lg,
-          }}>
-            <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')}
-              onPress={() => setDate((d) => addDays(d, -1))} />
-            <Text style={[type.title, { fontWeight: '700' }]}>{format(date, 'EEEE d MMMM', { locale: dateLocale() })}</Text>
-            <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')}
-              onPress={() => setDate((d) => addDays(d, 1))} />
-          </View>
+          <DateStepper date={date} onChange={setDate} style={{ marginBottom: space.lg }} />
 
           {/* Regels */}
           <Text style={[type.label, { marginBottom: space.sm }]}>{t('purchase.field.lines')}</Text>

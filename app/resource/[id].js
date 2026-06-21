@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, ScrollView, Modal, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import { useReservations } from '../../lib/useResources';
@@ -13,7 +13,7 @@ import { useToast } from '../../lib/toast';
 import { hasConflict, usageParticipants, reservationsByDay } from '../../lib/reservations';
 import { monthMatrix, monthLabel, dateKey, parseKey } from '../../lib/agenda';
 import {
-  ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Banner, Empty, SectionHeader, Chip, AvatarSelect,
+  ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Banner, Empty, SectionHeader, Chip, AvatarSelect, DateStepper,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
 import { parseAmountToCents } from '../../lib/expenses';
@@ -194,15 +194,7 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
             confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
           <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
             <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.day')}</Text>
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-              backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line,
-              padding: space.xs, marginBottom: space.lg,
-            }}>
-              <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('task.date.prev')} onPress={() => setDay((d) => addDays(d, -1))} />
-              <Text style={[type.title, { fontWeight: '700' }]}>{format(day, 'EEEE d MMMM', { locale: nl })}</Text>
-              <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('task.date.next')} onPress={() => setDay((d) => addDays(d, 1))} />
-            </View>
+            <DateStepper date={day} onChange={setDay} style={{ marginBottom: space.lg }} />
 
             <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
               <Chip label={t('share.reservation.allDay')} active={fromH === 0 && toH === 23}
