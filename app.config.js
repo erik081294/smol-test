@@ -7,7 +7,7 @@ export default ({ config }) => ({
   scheme: 'huishoek',
   version: '1.0.0',
   orientation: 'portrait',
-  userInterfaceStyle: 'light',
+  userInterfaceStyle: 'automatic',  // app respecteert het apparaat-schema; 'Systeem'-thema werkt zo
   newArchEnabled: true,
   splash: { backgroundColor: '#0E3A2F' },
   ios: { supportsTablet: true, bundleIdentifier: 'app.huishoek' },

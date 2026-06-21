@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ModalHeader, Card, Row, Chip, Banner } from '../lib/ui';
+import { ModalHeader, Card, Row, Chip } from '../lib/ui';
 import { colors, space, type } from '../lib/theme';
 import { getThemePrefs, setThemePrefs, THEME_MODES, THEME_DEFAULTS } from '../lib/themePrefs';
 import { t } from '../lib/i18n';
@@ -21,8 +21,6 @@ export default function Beeldstijl() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ModalHeader title={t('appearance.title')} onClose={() => router.back()} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
-        <Banner tone="info" style={{ marginBottom: space.lg }}>{t('appearance.soon')}</Banner>
-
         <Text style={[type.label, { marginBottom: space.xs }]}>{t('appearance.theme')}</Text>
         <Card>
           <Row gap={space.xs} wrap>
@@ -31,6 +29,7 @@ export default function Beeldstijl() {
             ))}
           </Row>
         </Card>
+        <Text style={[type.caption, { marginTop: space.sm }]}>{t('appearance.hint')}</Text>
       </ScrollView>
     </SafeAreaView>
   );

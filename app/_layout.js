@@ -10,6 +10,7 @@ import { ErrorBoundary } from '../lib/ErrorBoundary';
 import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
 import { useNotifications } from '../lib/useNotifications';
+import { useTheme } from '../lib/useTheme';
 import { colors } from '../lib/theme';
 
 // Crash-/foutmonitoring zo vroeg mogelijk starten (no-op zonder DSN).
@@ -23,7 +24,7 @@ function NotificationsMount() {
   return null;
 }
 
-function Gate() {
+function Gate({ themeMode }) {
   const { session, loading: authLoading } = useAuth();
   const { households, loading: hhLoading } = useHousehold();
   const segments = useSegments();
@@ -66,7 +67,7 @@ function Gate() {
   return (
     <>
       {session && households.length > 0 ? <NotificationsMount /> : null}
-      <Stack key={lang} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack key={`${lang}-${themeMode}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" />
@@ -89,14 +90,17 @@ function Gate() {
 }
 
 export default function RootLayout() {
+  // Past het licht/donker-palet toe en geeft de effectieve modus terug; die voedt de
+  // root-remount-key (in Gate) en de statusbalk-stijl.
+  const themeMode = useTheme();
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={themeMode === 'donker' ? 'light' : 'dark'} />
         <AuthProvider>
           <HouseholdProvider>
             <ToastProvider>
-              <Gate />
+              <Gate themeMode={themeMode} />
             </ToastProvider>
           </HouseholdProvider>
         </AuthProvider>
