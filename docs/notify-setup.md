@@ -26,7 +26,9 @@
    ```
    supabase db push
    ```
-2. **Webhook-secret zetten** (gedeeld geheim tussen de webhook en de functie):
+2. **Webhook-secret zetten** (gedeeld geheim tussen de webhook en de functie —
+   **verplicht**: de functie weigert te draaien (`500`) zonder dit secret, want met
+   `verify_jwt=false` is dit de enige authenticatie):
    ```
    supabase secrets set NOTIFY_WEBHOOK_SECRET=<lang-willekeurig-geheim>
    ```
@@ -57,9 +59,11 @@ gewijzigd), dan stuurt de functie die persoon een push via de Expo Push API. Tok
 uniek op `(profile_id, token)` (`push_tokens` PK); dode tokens worden automatisch opgeruimd.
 
 ### Troubleshooting
+- **Functie geeft 500 "NOTIFY_WEBHOOK_SECRET ontbreekt"** → het secret is niet gezet
+  (stap 2). De functie is bewust fail-closed: zonder secret draait hij niet.
 - **Webhook krijgt 401** → header `x-notify-secret` ontbreekt of komt niet overeen met
-  `NOTIFY_WEBHOOK_SECRET`. (Een 401 zónder secret-mismatch betekent dat `verify_jwt` nog op
-  `true` staat — controleer `supabase/config.toml` en herdeploy.)
+  `NOTIFY_WEBHOOK_SECRET`. (Krijg je in plaats daarvan een JWT-fout, dan staat `verify_jwt`
+  nog op `true` — controleer `supabase/config.toml` en herdeploy.)
 - **`skipped: "geen tokens"`** → de ontvanger heeft geen rij in `push_tokens`: permissie niet
   verleend, geen dev build, of geen EAS `projectId`.
 - **Niets gebeurt** → check de functie-logs (`supabase functions logs notify`) en of de webhook

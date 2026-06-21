@@ -18,12 +18,33 @@ import { buildIntents, expoMessages, chunk, EXPO_PUSH_URL, EXPO_MAX_BATCH } from
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
+// Constant-time vergelijking: hash beide kanten en vergelijk de (vaste-lengte)
+// digests bit voor bit. De vergelijking lekt geen informatie over het geheim via
+// timing, en werkt ook als de lengtes verschillen.
+async function safeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ]);
+  const va = new Uint8Array(ha);
+  const vb = new Uint8Array(hb);
+  let diff = 0;
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i];
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   try {
-    // 1) Beveiliging: gedeeld geheim. Alleen afdwingen als het secret gezet is,
-    //    zodat een lokale dev-omgeving zonder secret blijft werken.
+    // 1) Beveiliging: gedeeld geheim, FAIL-CLOSED. Met verify_jwt=false is dit de
+    //    enige auth; ontbreekt het secret in de omgeving, dan weigeren we i.p.v. de
+    //    functie open te zetten (een service-role-endpoint mag nooit open staan).
     const secret = Deno.env.get('NOTIFY_WEBHOOK_SECRET');
-    if (secret && req.headers.get('x-notify-secret') !== secret) {
+    if (!secret) {
+      return json({ error: 'server misconfigured: NOTIFY_WEBHOOK_SECRET ontbreekt' }, 500);
+    }
+    const provided = req.headers.get('x-notify-secret') ?? '';
+    if (!(await safeEqual(provided, secret))) {
       return json({ error: 'unauthorized' }, 401);
     }
 
