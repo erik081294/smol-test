@@ -1,40 +1,35 @@
 // Importeer een opgeschoonde NL-subset van de Open Food Facts DUMP in
-// public.catalog_products. Vervangt de oude API-bulk-import: OFF raadt voor meer dan
-// een paar honderd producten EXPLICIET de dump aan i.p.v. de API (die is rate-limited
-// en bedoeld voor losse lookups). Zie het onderzoek + huishoek-backlog.md (BOO-5/INF).
+// public.catalog_products. OFF raadt voor meer dan een paar honderd producten EXPLICIET
+// de dump aan i.p.v. de API (rate-limited; voor losse lookups). Zie docs/off-catalog.md.
 //
 // Bron: de OFF JSONL-dump (één JSON-record per regel), gegzipt of plat:
 //   https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz   (~7 GB)
-// We STREAMEN regel-voor-regel (nooit ~43 GB in geheugen), filteren naar de NL-subset
-// + kwaliteit via lib/offCatalog.transformOffProduct (puur + unit-getest), en upserten
-// per `code` (idempotent → herdraaien verfrist de catalogus). Foto's worden gehotlinkt
-// naar de OFF-CDN (niets in Storage). De ~27k NL-rijen kosten ~23 MB (past in free tier).
+// We STREAMEN regel-voor-regel (nooit ~43 GB in geheugen) via scripts/off-ingest, filteren
+// naar de NL-subset + kwaliteit (lib/offCatalog, puur + unit-getest), en upserten per `code`
+// (idempotent → herdraaien verfrist). Foto's gehotlinkt naar de OFF-CDN (niets in Storage).
 //
-// Draaien (node staat off-PATH; zie memory node-on-path):
+// Na afloop zetten we het delta-watermerk (catalog_sync_state) op "nu", zodat de
+// scheduled delta-refresh (scripts/refresh-off-delta.mjs) naadloos verder kan zonder de
+// laatste 14 dagen opnieuw te draaien. Dit is de periodieke "volle reconciliatie" die ook
+// verwijderingen opschoont (delta's kunnen dat niet).
+//
+// Draaien (node off-PATH; zie memory):
 //   export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:$PATH"
 //   curl -L -o /tmp/off.jsonl.gz https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz
 //   OFF_DUMP=/tmp/off.jsonl.gz node scripts/import-off-dump.mjs
 //
-// Verplichte env (uit .env of shell): SUPABASE_SERVICE_ROLE_KEY + EXPO_PUBLIC_SUPABASE_URL.
-// Optioneel: OFF_DUMP (pad; anders argv[2]), DRY_RUN=1 (alleen filteren, geen DB-schrijf),
-//   LIMIT (max te bewaren rijen, voor een testrun), BATCH (upsert-batch, default 1000),
-//   MIN_COMPLETENESS (OFF completeness-drempel 0..1.1, default 0 = uit).
-//
-// Licentie: OFF-data is ODbL, foto's CC-BY-SA. De UI toont de verplichte attributie
-// (lib/i18n 'catalog.attribution'); zie het licentie-onderzoek voor de share-alike-nuance.
+// Env: SUPABASE_SERVICE_ROLE_KEY + EXPO_PUBLIC_SUPABASE_URL (uit .env of shell).
+// Optioneel: OFF_DUMP (pad; anders argv[2]), DRY_RUN=1, LIMIT, BATCH, MIN_COMPLETENESS.
 
 import { readFileSync, createReadStream } from 'node:fs';
-import { createGunzip } from 'node:zlib';
-import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
-import { transformOffProduct } from '../lib/offCatalog.js';
+import { ingestJsonl } from './off-ingest.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 
-// .env parsen (klein en zonder dep): KEY=VALUE per regel, # = comment.
 function loadEnv() {
   const out = {};
   try {
@@ -42,7 +37,7 @@ function loadEnv() {
       const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
       if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '');
     }
-  } catch { /* .env optioneel — env-vars uit de shell mogen 't ook leveren */ }
+  } catch { /* .env optioneel */ }
   return { ...out, ...process.env };
 }
 
@@ -73,52 +68,32 @@ async function upsertBatch(rows) {
   if (error) throw new Error(error.message);
 }
 
-// Dedup binnen een batch op code (zou bij een dump niet voorkomen — één rij per code —
-// maar veilig) en upsert.
-async function flush(rows, stats) {
-  const byCode = new Map(rows.map((r) => [r.code, r]));
-  await upsertBatch([...byCode.values()]);
-  stats.upserted += byCode.size;
-}
-
 async function main() {
   const isGz = /\.gz$/i.test(DUMP);
-  const stream = isGz ? createReadStream(DUMP).pipe(createGunzip()) : createReadStream(DUMP);
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
-
-  const stats = { seen: 0, kept: 0, upserted: 0, skip: {} };
-  const bump = (r) => { stats.skip[r] = (stats.skip[r] || 0) + 1; };
-  let batch = [];
   const t0 = Date.now();
   console.log(`Importeren uit ${DUMP}${DRY_RUN ? '  (DRY RUN)' : ''}…`);
 
-  for await (const line of rl) {
-    if (!line) continue;
-    stats.seen++;
-    // Goedkope voorfilter: alleen regels die 'netherlands' bevatten parsen we. Scheelt
-    // ~99% JSON.parse op de globale dump; transformOffProduct verifieert daarna de tag.
-    if (!line.toLowerCase().includes('netherlands')) continue;
+  const stats = await ingestJsonl(createReadStream(DUMP), {
+    gunzip: isGz,
+    onBatch: upsertBatch,
+    transformOpts: { minCompleteness: MIN_COMPLETENESS },
+    batchSize: BATCH,
+    limit: LIMIT,
+    onProgress: (s) => process.stdout.write(`\r  gezien ${s.seen} · bewaard ${s.kept} · upserted ${s.written}…`),
+  });
 
-    let p;
-    try { p = JSON.parse(line); } catch { bump('json-fout'); continue; }
-
-    const out = transformOffProduct(p, { minCompleteness: MIN_COMPLETENESS });
-    if (out.skip) { bump(out.skip); continue; }
-
-    batch.push(out.row);
-    stats.kept++;
-    if (batch.length >= BATCH) {
-      await flush(batch, stats);
-      batch = [];
-      process.stdout.write(`\r  gezien ${stats.seen} · bewaard ${stats.kept} · upserted ${stats.upserted}…`);
-    }
-    if (stats.kept >= LIMIT) break;
+  // Zet het delta-watermerk op "nu": de volle import dekt alles t/m dit moment, dus de
+  // delta-refresh hoeft de laatste 14 dagen niet over te doen.
+  if (!DRY_RUN) {
+    const now = Math.floor(Date.now() / 1000);
+    const { error } = await supabase.from('catalog_sync_state')
+      .upsert({ id: 'off-delta', last_delta_ts: now, last_run_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) console.warn(`  (watermerk niet bijgewerkt: ${error.message})`);
   }
-  if (batch.length) await flush(batch, stats);
 
   const secs = Math.round((Date.now() - t0) / 1000);
   console.log(`\n\nKlaar in ${secs}s. Regels gezien: ${stats.seen}, bewaard: ${stats.kept}, `
-    + `${DRY_RUN ? '(dry-run — niets weggeschreven)' : `ge-upsert: ${stats.upserted}`}.`);
+    + `${DRY_RUN ? '(dry-run — niets weggeschreven)' : `ge-upsert: ${stats.written}`}.`);
   console.log('Overgeslagen (per reden):', stats.skip);
 }
 

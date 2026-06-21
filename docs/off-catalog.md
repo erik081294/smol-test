@@ -40,12 +40,32 @@ categorie via `lib/offCategoryMap` (dezelfde mapping als de live scan), naam
 genormaliseerd voor zoeken (`lib/productMatch.normalize`), `popularity` uit `unique_scans_n`.
 Foto's worden **gehotlinkt** naar de OFF-CDN (`image_small_url`) — niets in Storage.
 
-## Vers houden
-- **Dagelijkse delta's:** `static.openfoodfacts.org/data/delta/index.txt` (14 dagen bewaard,
-  JSONL-gz). Toe te passen met dezelfde transform.
-- **Belangrijk:** delta's bevatten **geen verwijderingen** → herimporteer periodiek (≤14
-  dagen) de volle dump om verwijderde producten op te schonen.
-- De volle dump wordt nachtelijk geregenereerd.
+## Vers houden — incrementele delta-refresh (geautomatiseerd)
+De catalogus blijft vers via OFF's **dagelijkse delta's** (incrementeel), zonder telkens de
+volle ~7 GB dump te halen. Dit is een echte stateful sync:
+- **Watermerk in de DB** (`catalog_sync_state`, migr. 0028): de grootste verwerkte
+  OFF-wijzigingstimestamp. Stateful + herhaalbaar over runs/CI; `scripts/import-off-dump.mjs`
+  zet 'm op "nu" na een volle import zodat de delta's naadloos verderlopen.
+- **`scripts/refresh-off-delta.mjs`**: leest het watermerk, haalt `…/data/delta/index.txt`,
+  past alleen nóg niet-verwerkte delta's toe (zelfde filter/transform als de volle import,
+  idempotente upsert per `code`), en schuift het watermerk na elk bestand op (resumable).
+- **Gat-detectie (self-heal):** valt het watermerk vóór de oudste beschikbare delta (>14 dagen
+  niet gedraaid), dan waarschuwt het script en moet je een **volle her-import** draaien.
+- **Verwijderingen:** delta's bevatten die niet → draai periodiek (≤14 dagen, of na grote
+  schoonmaak) `scripts/import-off-dump.mjs` als volle reconciliatie.
+
+Handmatig draaien / testen:
+```bash
+# echte run (vereist de service-role + URL in .env):
+node scripts/refresh-off-delta.mjs
+# proefdraai zonder DB, met een lokale fixture-map (index.txt + delta .gz-bestanden):
+DRY_RUN=1 WATERMARK=0 LOCAL_DELTA_DIR=/pad/naar/fixtures node scripts/refresh-off-delta.mjs
+```
+
+**Geautomatiseerd:** `.github/workflows/off-catalog-refresh.yml` draait de delta-refresh
+**dagelijks** (04:17 UTC) en op handmatige trigger. Het is een **no-op tot je de secrets zet**
+(`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` als repo-secrets). Zo werkt het zoals bij
+professionele apps: één keer instellen, daarna blijft de catalogus vanzelf vers.
 
 ## Past in het free tier
 ~27k NL-rijen ≈ **~23 MB** (886 byte/rij × indexen) op een DB die nu 17 MB is → ~7% van de
