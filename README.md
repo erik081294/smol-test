@@ -49,7 +49,8 @@ storage).
 - **Realtime** — wijzigingen van een gezinslid verschijnen meteen bij de rest.
 - **Design-/icon-systeem** — één set tokens (`lib/theme.js`) en componenten (`lib/ui.js`)
   met Phosphor-iconen (`lib/icons.js`); toegankelijk by default (48dp-targets, contrast,
-  font-scaling). Zie [DESIGN.md](./DESIGN.md).
+  font-scaling) en met een **licht/donker-thema** (systeem/licht/donker, instelbaar in
+  Beeldstijl). Zie [DESIGN.md](./DESIGN.md).
 - Volledige **Row Level Security**: leden zien alléén hun eigen huishouden(s), en binnen
   een huishouden alléén de items die met hen gedeeld zijn.
 

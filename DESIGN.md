@@ -86,6 +86,15 @@ gewone taal. Vernietigende acties (`danger`) vragen om bevestiging.
 | Tik | `touchTarget` (48), `hitSlopFor(size)` | minimale tikmaat |
 | Beweging | `motion.fast/base/slow` | kort en zacht |
 
+**Thema (licht/donker).** `colors` is één **live palet** dat bij een thema-wissel
+in plaats wordt gemuteerd (`applyTheme` in `lib/theme.js`); alle `colors.*`-inline-
+styles lezen daardoor automatisch het actieve palet. `type`/`categoryMeta` lezen hun
+kleur via een **getter** (niet vooraf-berekend), zodat een wissel doorwerkt zónder de
+in dev bevroren style-objecten te muteren. `lib/useTheme.js` kiest de modus (systeem/
+licht/donker, voorkeur in `lib/themePrefs.js`) en de **root-remount via `key`** in
+`app/_layout.js` past 'm toe. **Gevolg voor wie bouwt:** blijf `colors.*`/`type.*`
+gebruiken (nooit een rauwe hex) — dan erft je scherm de donkere modus gratis.
+
 ---
 
 ## Componenten (`lib/ui.js`)
@@ -138,6 +147,9 @@ Zodat elke actie op een voorspelbare plek staat:
 - **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →
   volle-breedte `Button` aan het eind van de inhoud.
 - **Detailschermen krijgen een `ModalHeader`** (titel + sluiten), geen losse back-knop.
+  De `ModalHeader` **padt zichzelf** (`paddingHorizontal: space.lg`): plaats 'm direct
+  onder de `SafeAreaView`/sheet en wrap 'm níét nog eens in een padded `View` — anders
+  springt de titel dubbel in of plakt 'ie tegen de hoek.
 
 ### Editor-flow — één skelet, één volgorde
 
@@ -162,3 +174,9 @@ Velden staan in een vaste, voorspelbare volgorde — de denkstap van de gebruike
 Eén scherm doet zowel aanmaken als bewerken: prefill de formulier-state uit het
 bestaande record en laat Bewaar vertakken (`isNew ? add… : update…`). Geavanceerde,
 zelden-gewijzigde blokken horen in een `Collapsible`.
+
+**Niet-bewaarde wijzigingen.** Geef de `Editor` een `dirty`-prop mee wanneer het
+formulier gewijzigd is; bij sluiten/terug-drukken vraagt 'ie dan eerst om bevestiging
+(`confirmDiscard`, cross-platform: `Alert` native / `window.confirm` web, Android-back
+onderschept) i.p.v. een ingevuld formulier stil weg te gooien. Een schoon formulier
+sluit direct — geen frictie. (De native `Alert` wordt later het eigen dialoog-systeem.)
