@@ -9,9 +9,16 @@ import { useHousehold } from '../../lib/household';
 function TabIcon({ icon, label, focused }) {
   const tint = focused ? colors.forest : colors.inkFaint;
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', width: 72, gap: 3 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', width: 86, gap: 3 }}>
       <Icon name={icon} size={24} weight={focused ? 'fill' : 'regular'} color={tint} />
-      <Text style={{ fontSize: 11, fontWeight: focused ? '700' : '500', color: tint }}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
+        style={{ fontSize: 11, fontWeight: focused ? '700' : '500', color: tint }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }

@@ -53,6 +53,7 @@ export default function TaskEditor() {
   const [shareWith, setShareWith] = useState([]); // profiel-ids bij 'custom'
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({}); // { title, date, visibility } — inline i.p.v. Alert
+  const [initialSnap, setInitialSnap] = useState(null); // momentopname bij openen (dirty-detectie)
   const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
 
   // Bestaande taak inladen
@@ -76,6 +77,20 @@ export default function TaskEditor() {
       setLoaded(true);
     });
   }, [id]);
+
+  // Niet-bewaarde-wijzigingen-detectie. Serialiseer de inhoudelijke velden en vergelijk
+  // met de toestand bij openen (leeg formulier bij nieuw, geladen taak bij bewerken).
+  // Voedt de Editor-guard die per ongeluk sluiten/terug-drukken opvangt.
+  const buildSnapshot = () => JSON.stringify({
+    title: title.trim(), notes: notes.trim(), category, zoneId, assignedTo,
+    dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
+    freq, interval, weekdays, rotation, visibility, shareSubgroupId, shareWith,
+  });
+  useEffect(() => {
+    if (loaded && initialSnap === null) setInitialSnap(buildSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+  const dirty = initialSnap !== null && buildSnapshot() !== initialSnap;
 
   const quickDates = [
     { l: t('task.quick.today'), v: new Date() },
@@ -169,6 +184,7 @@ export default function TaskEditor() {
       onClose={() => router.back()}
       onConfirm={save}
       busy={busy}
+      dirty={dirty}
     >
           <Field label={t('task.field.title')} value={title}
             onChangeText={(v) => { setTitle(v); clearErr('title'); }}

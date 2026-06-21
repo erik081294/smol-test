@@ -47,3 +47,33 @@ test('buildFeed: filtert ongeldige events en sorteert nieuwste eerst', () => {
   assert.deepEqual(feed.map((f) => f.id), ['b', 'a']);
   assert.equal(feed.length, 2);
 });
+
+test('buildFeed: vouwt opeenvolgende identieke acties samen met teller', () => {
+  const feed = buildFeed([
+    { id: 'b1', type: 'task_completed', at: ago(1 * MIN), actorName: 'Tim', taskTitle: 'Badkamer' },
+    { id: 'b2', type: 'task_completed', at: ago(2 * MIN), actorName: 'Tim', taskTitle: 'Badkamer' },
+    { id: 'b3', type: 'task_completed', at: ago(3 * MIN), actorName: 'Tim', taskTitle: 'Badkamer' },
+  ], NOW);
+  assert.equal(feed.length, 1);
+  assert.equal(feed[0].count, 3);
+  assert.equal(feed[0].text, "Tim vinkte 'Badkamer' 3× af");
+  // tijd/id van het nieuwste event in de groep
+  assert.equal(feed[0].id, 'b1');
+  assert.equal(feed[0].when, '1 min geleden');
+});
+
+test('buildFeed: ander event ertussen breekt de groep (chronologie blijft)', () => {
+  const feed = buildFeed([
+    { id: 'x1', type: 'task_completed', at: ago(1 * MIN), actorName: 'Tim', taskTitle: 'Badkamer' },
+    { id: 'y',  type: 'task_completed', at: ago(2 * MIN), actorName: 'Ann', taskTitle: 'Afwas' },
+    { id: 'x2', type: 'task_completed', at: ago(3 * MIN), actorName: 'Tim', taskTitle: 'Badkamer' },
+  ], NOW);
+  assert.deepEqual(feed.map((f) => f.id), ['x1', 'y', 'x2']);
+  assert.equal(feed.every((f) => !f.count), true); // geen enkele groep > 1
+});
+
+test('formatActivity: count 1 levert geen teller en geen count-veld', () => {
+  const item = formatActivity({ id: 'c1', type: 'task_completed', at: ago(MIN), actorName: 'Tim', taskTitle: 'Stofzuigen' }, NOW, 1);
+  assert.equal(item.text, "Tim vinkte 'Stofzuigen' af");
+  assert.equal('count' in item, false);
+});

@@ -116,6 +116,7 @@ export default function Schoonmaak() {
         ListHeaderComponent={members.length > 1 ? (
           <Card style={{ marginBottom: 14 }}>
             <SectionHeader title={t('cleaning.fairness.title')} />
+            <Text style={[type.caption, { marginTop: -6, marginBottom: 12 }]}>{t('cleaning.fairness.subtitle')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
               {FAIRNESS_PERIODS.map((p) => (
                 <Chip key={p.key} label={t(p.labelKey)} active={period === p.key} onPress={() => setPeriod(p.key)} />
