@@ -20,9 +20,12 @@
   `request.jwt.claims.sub`, en rolt alles terug. Resultaat: **7/7 PASS, 0 residu** — lid ziet
   household-taak, niet-gedeelde `custom`-taak blijft verborgen (ook voor leden), buitenstaander
   ziet niets, en de insert-policy blokkeert niet-leden.
+- ✅ **C1 — `useRealtimeReload`-primitief**: de gedupliceerde realtime-/channel-boilerplate uit
+  **7** hooks geëxtraheerd naar `lib/useRealtimeReload.js`. Gedrag-behoudend; −69 regels,
+  lint 68 → 61 warnings (0 errors), units 196/0. Eén seam voor de volgende scale-stappen.
 - ⏳ **Open (mens/secret/toestel nodig):** A2-live-RLS, A3 flip-on, A4 rooktest, B1/B2/B3 (RPC-/
   edge-wijzigingen — vereisen live-RLS-verificatie), B5 (pg_trgm verplaatsen — niet-triviaal,
-  afhankelijke index), B6 (Auth-toggle leaked-password-protection).
+  afhankelijke index), B6 (Auth-toggle leaked-password-protection), C2/C3 (scale-vervolg).
 
 ## 0. Geverifieerde startstand (deze sessie gemeten, niet aangenomen)
 - **DB-migraties** waren bij aanvang live t/m `0022_update_expense`; `0023`/`0024` zijn deze
@@ -95,15 +98,30 @@ Bundel deze in één migratie + één `scan-receipt`-revisie. Bronnen: audit `do
 
 ---
 
-## Spoor C — Structurele hefboom: `useRealtimeQuery` (eigen ronde)
-Grootste architectuur-/performance-winst uit de audit (lost A-H1/H2 + P-H1/H3 op). Eén primitief
-`useRealtimeQuery(queryFn, { table, filter })` dat:
-1. de gewijzigde rij **incrementeel** uit `payload.new/.old` patcht i.p.v. volledig herlaadt;
-2. channel-uniciteit + optimistische rollback + pending-delete-filtering centraliseert;
-3. een **verplicht `household_id`-filter** op de subscriptie afdwingt (lost de ongefilterde
-   `expense_shares`-subscriptie in `useExpenses.js:53` op).
-- `useCollection`/`useExpenses`/`useMealPlan`/`useReservations` bouwen erbovenop i.p.v. ~80 regels
-  te dupliceren. Inspanning **L**; plan dit als losse ronde met eigen testdekking.
+## Spoor C — Structurele hefboom: realtime-primitief (eigen ronde)
+Grootste architectuur-/performance-winst uit de audit (lost A-H1/H2 + P-H1/H3 op). Gefaseerd:
+
+### C1 — `useRealtimeReload`-primitief + dedup — ✅ gedaan (deze sessie)
+De identieke loadRef + channel-boilerplate stond in **7** hooks (`useCollection`, `useExpenses`,
+`useTaskCompletions`, `useMealPlan`, `useReservations`, `usePurchases`, `useRecipe`). Geëxtraheerd
+naar **`lib/useRealtimeReload.js`** (één plek voor channel-uniciteit + opruimen + reload-on-change).
+Gedrag-behoudend; −69 regels in de hooks, lint-warnings 68 → 61 (0 errors), units 196/0. Dit is nu
+de **enige seam** waar C2/C3 landen i.p.v. 7 plekken.
+
+### C2 — Filter de brede subscripties (scale + security) — ⏳ volgende
+De `expense_shares`- en `purchase_items`-subscripties luisteren **ongefilterd** op de hele tabel:
+een wijziging in een wíllekeurig ander huishouden triggert hier een refetch (RLS blokkeert de
+payload, maar het event + de refetch gebeuren wél). Fix: denormaliseer `household_id` op die
+kindtabellen (migratie + vullen in `create_expense`/`update_expense`/`create_purchase` + backfill +
+index), en geef de bron in `useRealtimeReload` een `household_id=eq.…`-filter. Via de connector te
+verifiëren (RPC-rollbacktest + backfill-check), maar raakt productie-RPC's → eigen commit met zorg.
+
+### C3 — Incrementeel patchen + gedeelde kanalen — ⏳ later (vereist device-verificatie)
+Voor de platte collecties (`useCollection` met `select '*'`) kan het primitief de gewijzigde rij uit
+`payload.new/.old` patchen i.p.v. volledig herladen. Geldt **niet** voor de embedded-select-hooks
+(`expenses`+shares, `purchases`+items, mealplan+recipe): die hebben de join nodig en blijven
+reload-on-event. Plus: kanalen bundelen om het aantal WebSocket-subscripties op het Thuis-scherm te
+drukken. Beide raken runtime-realtime-gedrag → op een dev build verifiëren.
 
 ---
 
