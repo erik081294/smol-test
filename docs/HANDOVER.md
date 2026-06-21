@@ -15,22 +15,21 @@
 - Verificatie in de bouwsessie: **`npm test` → 196 tests, 0 fail** (18 RLS-tests geskipt zonder
   secrets), **`eslint` 0 errors**.
 
-## 2. Openstaande Supabase-acties (DIT vereist de volgende sessie)
-Volg het **Snelrecept** in `VERIFICATIE.md` (secrets uit `.env`, CLI ingelogd). Concreet:
+## 2. Openstaande Supabase-acties
+> **Let op:** veel hiervan is op 2026-06-21 via de Supabase-connector gedaan. De **live
+> status + uitvoeringslog** staat in **`docs/vervolgplan-2026-06-21.md`** (dat is nu de
+> canonieke voortgangstracker). Hieronder per actie de actuele stand.
 
 ### 2a. Migraties pushen — ✅ GEDAAN (2026-06-21, via connector)
-`0023_push_deliveries` (idempotentie-/audittabel voor remote push, RLS aan zonder policies →
-alleen service-role) **én** `0024_function_search_path` (security-hardening B4: vaste
-`search_path` op `enable_module_rls`/`search_catalog`) zijn live toegepast. **DB staat nu op
-`0024`.** Geverifieerd via `list_migrations` + advisors. Zie `docs/vervolgplan-2026-06-21.md`
-(uitvoeringslog). Niets meer te pushen tot er een nieuwe migratie bijkomt.
+`0023_push_deliveries` (push-idempotentie/audit), `0024_function_search_path` (B4) **én**
+`0025_expense_shares_hardening` (B1/B2 + C2) zijn live toegepast. **DB staat nu op `0025`.**
+Geverifieerd via `list_migrations` + advisors. Niets meer te pushen tot er een nieuwe migratie bijkomt.
 
-### 2b. RLS-integratietests tegen de live DB
-```bash
-set -a; . ./.env; set +a
-SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" npm test
-```
-Verwacht: **alle tests groen, 0 skipped** (incl. de nieuwe `update_expense`-RLS-case).
+### 2b. RLS-integratietests tegen de live DB — ◐ kern bewezen via connector
+De volledige **JS-suite** (`npm test` met secrets) vereist de service-role-key + egress naar
+`*.supabase.co` en kon niet vanuit de web-container draaien. De **kern-RLS + RPC's** zijn wél
+bewezen via **`docs/rls-connector-check.sql`** (13/13, rol/JWT-impersonatie + rollback). Voor de
+volledige JS-run met 0 skipped: secrets + allowlist (kop van `VERIFICATIE.md`) of lokaal draaien.
 
 ### 2c. PLT-1 trap 2 live zetten (flip-on)
 Exact stap-voor-stap in **`docs/notify-setup.md`**. Kort:
@@ -46,13 +45,14 @@ Exact stap-voor-stap in **`docs/notify-setup.md`**. Kort:
 `VERIFICATIE.md` Stap 3 (Agenda/Schoonmaak/Kosten/Planten/Navigatie).
 
 ## 3. Aanbevolen follow-ups uit de audit (niet-blokkerend)
-Volledig met `pad:regel` in **`docs/audit-2026-06-21.md`**. Prioriteit:
-1. **Security-mediums** (kleine migratie + RPC): `expense_shares`-write-policy aanscherpen (S-M2)
-   en `create_expense` membership-validatie van `paid_by`/shares (S-M1); `scan-receipt`
-   rate-limit + MIME-whitelist (S-M4).
-2. **Grootste structurele hefboom:** `useRealtimeQuery`-primitief — incrementele realtime-patches
-   + gedeelde channels + verplicht `household_id`-filter (lost A-H1/H2 + P-H1/H3 op). Eigen ronde.
-3. **Schaalbaarheid:** limit/venster op `task_completions`/`expenses`/`tasks` (P-H2); bulk-RPC
+Volledig met `pad:regel` in **`docs/audit-2026-06-21.md`**. Stand:
+1. **Security-mediums:** ✅ S-M1 (`create_expense`/`update_expense` membership-validatie) en
+   ✅ S-M2 (`expense_shares`-write-policy) gedaan via migratie `0025`. ⏳ Resteert S-M4
+   (`scan-receipt` rate-limit + MIME-whitelist).
+2. **Grootste structurele hefboom:** ◐ realtime-primitief — ✅ `useRealtimeReload` extractie (C1)
+   + ✅ brede subscripties gefilterd op `household_id` (C2, migr. `0025`). ⏳ Resteert C3
+   (incrementeel patchen + gedeelde channels, vereist device-verificatie).
+3. **Schaalbaarheid:** ⏳ limit/venster op `task_completions`/`expenses`/`tasks` (P-H2); bulk-RPC
    voor bon→voorraad (P-H4).
 
 ## 4. Waar staat wat

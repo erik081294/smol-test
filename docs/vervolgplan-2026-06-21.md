@@ -15,21 +15,28 @@
 - ◐ **A2 — units groen** (`npm test` → **196 / 0 fail / 18 skipped**). De 18 skipped zijn de
   live-RLS-tests; die vereisen secrets + Supabase-netwerk (niet in deze container) → de JS-suite
   kan hier niet draaien (egress-allowlist blokkeert `*.supabase.co`: `host_not_allowed`).
-- ✅ **A2′ — RLS live geverifieerd via de connector** (alternatief voor de geblokkeerde JS-suite).
-  `docs/rls-connector-check.sql` bouwt fixtures, dwingt RLS af als `authenticated` met wisselende
-  `request.jwt.claims.sub`, en rolt alles terug. Resultaat: **7/7 PASS, 0 residu** — lid ziet
-  household-taak, niet-gedeelde `custom`-taak blijft verborgen (ook voor leden), buitenstaander
-  ziet niets, en de insert-policy blokkeert niet-leden.
+- ✅ **A2′ — RLS + RPC live geverifieerd via de connector** (alternatief voor de geblokkeerde
+  JS-suite). `docs/rls-connector-check.sql` bouwt fixtures, dwingt RLS af als `authenticated` met
+  wisselende `request.jwt.claims.sub`, en rolt alles terug. Uitgebreid naar **13/13 PASS, 0 residu**:
+  tasks-zichtbaarheid + insert-policy, `expense_shares`-kind-RLS, én de nieuwe B1/B2/C2-cases.
 - ✅ **C1 — `useRealtimeReload`-primitief**: de gedupliceerde realtime-/channel-boilerplate uit
   **7** hooks geëxtraheerd naar `lib/useRealtimeReload.js`. Gedrag-behoudend; −69 regels,
   lint 68 → 61 warnings (0 errors), units 196/0. Eén seam voor de volgende scale-stappen.
-- ⏳ **Open (mens/secret/toestel nodig):** A2-live-RLS, A3 flip-on, A4 rooktest, B1/B2/B3 (RPC-/
-  edge-wijzigingen — vereisen live-RLS-verificatie), B5 (pg_trgm verplaatsen — niet-triviaal,
-  afhankelijke index), B6 (Auth-toggle leaked-password-protection), C2/C3 (scale-vervolg).
+- ✅ **B1 + B2 — kosten-hardening** (migratie **`0025_expense_shares_hardening`**, live):
+  `create_expense`/`update_expense` valideren nu dat `paid_by` + elke deelnemer lid is; de
+  `expense_shares`-schrijfpolicy is aangescherpt tot de maker van de parent-uitgave. Bewezen via
+  de connector-check (B1 weigert niet-leden, B2 blokkeert niet-maker). Advisors: geen nieuwe gaten.
+- ✅ **C2 — brede subscripties gefilterd** (scale + security): `expense_shares` kreeg een
+  gedenormaliseerde `household_id` (migr. `0025`, backfill `shares_null_hh=0`); `purchase_items`
+  had die al (0013). `useExpenses`/`usePurchases` filteren nu beide kindtabel-subscripties op
+  `household_id` → geen cross-household refetch-storms meer. Units 196/0, lint 0 errors.
+- ⏳ **Open (mens/secret/toestel nodig):** A2-volledige-JS-suite, A3 flip-on, A4 rooktest,
+  B3 (`scan-receipt` rate-limit/MIME), B5 (pg_trgm verplaatsen — afhankelijke index), B6
+  (Auth-toggle leaked-password-protection), C3 (incrementeel patchen + gedeelde kanalen).
 
 ## 0. Geverifieerde startstand (deze sessie gemeten, niet aangenomen)
-- **DB-migraties** waren bij aanvang live t/m `0022_update_expense`; `0023`/`0024` zijn deze
-  sessie toegepast (zie uitvoeringslog). DB staat nu op **`0024`**.
+- **DB-migraties** waren bij aanvang live t/m `0022_update_expense`; `0023`–`0025` zijn deze
+  sessie toegepast (zie uitvoeringslog). DB staat nu op **`0025`**.
 - **Edge Functions:** alleen **`scan-receipt`** is gedeployed (`verify_jwt: true`). De
   **`notify`-functie is nog niet gedeployed** — PLT-1 trap 2 is dus écht nog "flip-off".
 - **Security-advisors (allen WARN, geen ERROR):** mutable `search_path` op `enable_module_rls`
@@ -58,9 +65,9 @@ Doel: repo en live-DB weer gelijk, en de notificatie-pijplijn aantoonbaar werken
   key is niet via de connector beschikbaar → de suite skipt (18). Voor de volle run: zie de kop van
   `VERIFICATIE.md` (env-vars + allowlist), of lokaal draaien.
 - **Alternatief dat hier wél kan, en is gedraaid:** `docs/rls-connector-check.sql` verifieert de
-  kern-RLS rechtstreeks via de connector (rol/JWT-impersonatie + rollback). **7/7 PASS** op
-  2026-06-21.
-- **Klaar als:** óf de JS-suite groen met 0 skipped, óf de connector-check 7/7 (gedaan voor de kern).
+  RLS + RPC's rechtstreeks via de connector (rol/JWT-impersonatie + rollback). **13/13 PASS** op
+  2026-06-21 (tasks-zichtbaarheid/insert + `expense_shares`-kind-RLS + B1/B2/C2).
+- **Klaar als:** óf de JS-suite groen met 0 skipped, óf de connector-check 13/13 (gedaan voor de kern).
 
 ### A3. PLT-1 trap 2 flip-on — *vereist mens + 2 toestellen*
 Exact stappenplan in `docs/notify-setup.md`. Kort:
@@ -81,20 +88,18 @@ Exact stappenplan in `docs/notify-setup.md`. Kort:
 Bundel deze in één migratie + één `scan-receipt`-revisie. Bronnen: audit `docs/audit-2026-06-21.md`
 (S-M1/2/4) + de advisor-lints uit §0.
 
-| Item | Wat | Bron |
-|---|---|---|
-| B1 | `expense_shares`-write-policy aanscherpen (alleen door betaler/lid binnen huishouden) | audit S-M2 |
-| B2 | `create_expense`: membership-validatie van `paid_by` én alle `shares`-leden | audit S-M1 |
-| B3 | `scan-receipt`: rate-limit + MIME-whitelist op de upload | audit S-M4 |
-| B4 | ✅ **gedaan** — `set search_path = public` op `enable_module_rls` + `search_catalog` (migr. `0024`) | advisor |
-| B5 | `pg_trgm` uit `public` naar een eigen schema (`extensions`) verplaatsen | advisor |
-| B6 | Leaked-password-protection aanzetten (Auth-instelling, Dashboard) | advisor |
+| Item | Wat | Bron | Status |
+|---|---|---|---|
+| B1 | `create_expense`/`update_expense`: membership-validatie van `paid_by` + alle `shares`-leden | audit S-M1 | ✅ migr. `0025` |
+| B2 | `expense_shares`-write-policy aanscherpen (alleen de maker van de parent-uitgave) | audit S-M2 | ✅ migr. `0025` |
+| B3 | `scan-receipt`: rate-limit + MIME-whitelist op de upload | audit S-M4 | ⏳ edge-revisie |
+| B4 | `set search_path = public` op `enable_module_rls` + `search_catalog` | advisor | ✅ migr. `0024` |
+| B5 | `pg_trgm` uit `public` naar een eigen schema (`extensions`) verplaatsen | advisor | ⏳ apart |
+| B6 | Leaked-password-protection aanzetten (Auth-instelling, Dashboard) | advisor | ⏳ dashboard |
 
-- B4 is al gedaan (migratie `0024`, deze sessie). B1/B2 → één migratie `0025_security_hardening.sql`
-  + RLS-tests die de nieuwe afwijzingen bewijzen (vereist live-RLS-runner ter verificatie). B3 →
-  revisie + redeploy van `scan-receipt`. B5 (pg_trgm verplaatsen) → apart, vanwege de afhankelijke
-  trigram-index op `catalog_products.search`. B6 → Dashboard/Auth-toggle.
-- **Volgorde:** ná A1 (gedaan). B1/B2/B3 pas mergen als de live-RLS-tests groen draaien.
+- **B1/B2/B4 gedaan** en bewezen via `docs/rls-connector-check.sql` (13/13) + advisors (geen nieuwe
+  gaten). **Resteert:** B3 (`scan-receipt`-revisie + redeploy), B5 (apart, vanwege de afhankelijke
+  trigram-index op `catalog_products.search`), B6 (Auth-dashboard-toggle — geen connector-tool).
 
 ---
 
@@ -108,13 +113,13 @@ naar **`lib/useRealtimeReload.js`** (één plek voor channel-uniciteit + opruime
 Gedrag-behoudend; −69 regels in de hooks, lint-warnings 68 → 61 (0 errors), units 196/0. Dit is nu
 de **enige seam** waar C2/C3 landen i.p.v. 7 plekken.
 
-### C2 — Filter de brede subscripties (scale + security) — ⏳ volgende
-De `expense_shares`- en `purchase_items`-subscripties luisteren **ongefilterd** op de hele tabel:
-een wijziging in een wíllekeurig ander huishouden triggert hier een refetch (RLS blokkeert de
-payload, maar het event + de refetch gebeuren wél). Fix: denormaliseer `household_id` op die
-kindtabellen (migratie + vullen in `create_expense`/`update_expense`/`create_purchase` + backfill +
-index), en geef de bron in `useRealtimeReload` een `household_id=eq.…`-filter. Via de connector te
-verifiëren (RPC-rollbacktest + backfill-check), maar raakt productie-RPC's → eigen commit met zorg.
+### C2 — Filter de brede subscripties (scale + security) — ✅ gedaan (deze sessie)
+De `expense_shares`-subscriptie luisterde **ongefilterd** op de hele tabel: een wijziging in een
+wíllekeurig ander huishouden triggerde hier een refetch (RLS blokkeert de payload, maar het event +
+de refetch gebeuren wél). Opgelost: `expense_shares` kreeg een gedenormaliseerde `household_id`
+(migr. `0025`, gevuld in `create_expense`/`update_expense` + backfill); `purchase_items` had die al
+(0013). Beide bronnen in `useExpenses`/`usePurchases` krijgen nu een `household_id=eq.…`-filter.
+Geverifieerd via de connector (backfill `shares_null_hh=0`, RPC vult household_id) + units/lint.
 
 ### C3 — Incrementeel patchen + gedeelde kanalen — ⏳ later (vereist device-verificatie)
 Voor de platte collecties (`useCollection` met `select '*'`) kan het primitief de gewijzigde rij uit
@@ -140,17 +145,21 @@ Kleinere follow-ups die meeliften: **MLT-3** (recept-foto) samen met **STR-4 `Ph
 ---
 
 ## Aanbevolen volgorde
-1. **A1** (push 0023 + advisors) → **A2** (RLS-tests) — herstel repo↔DB-pariteit.
-2. **A3 + A4** (flip-on + rooktest) — sluit PLT-1 en INF-1 af.
-3. **Spoor B** (één security-migratie + scan-receipt-revisie + Auth-toggle).
-4. **Spoor C** (`useRealtimeQuery`) als eigen ronde, of **Spoor D** (BOO-9/PLT-6) als de voorkeur
-   naar voelbare features gaat. C is de duurzamere investering; D levert sneller zichtbaar resultaat.
+**Gedaan deze sessie (connector-only):** A1, A2′ (connector-RLS 13/13), B1, B2, B4, C1, C2.
+Resterend, gegroepeerd op wat het vereist:
+1. **Vereist een dev build / 2 toestellen:** A3 + A4 (push flip-on + rooktest) → sluit PLT-1/INF-1 af;
+   C3 (incrementeel patchen + gedeelde kanalen).
+2. **Vereist het Auth-dashboard:** B6 (leaked-password-protection).
+3. **Nog connector-/code-only mogelijk:** B3 (`scan-receipt` rate-limit + MIME), B5 (pg_trgm
+   verplaatsen, met zorg om de trigram-index), en de volledige JS-RLS-suite (env-vars + egress).
+4. **Daarna features:** Spoor D (BOO-9 barcode / PLT-6 activiteitenfeed).
 
-## Waar staat wat (ongewijzigd t.o.v. handover)
+## Waar staat wat
 | Onderwerp | Bestand |
 |---|---|
 | Overdracht / openstaande acties | `docs/HANDOVER.md` |
 | Audit + geprioriteerde roadmap | `docs/audit-2026-06-21.md` |
 | Migratie-/RLS-runbook | `VERIFICATIE.md` |
+| Connector-RLS-/RPC-verificatie (zonder secrets) | `docs/rls-connector-check.sql` |
 | Push-setup + flip-on | `docs/notify-setup.md` |
 | Backlog (canonieke status) | `huishoek-backlog.md` §6 |
