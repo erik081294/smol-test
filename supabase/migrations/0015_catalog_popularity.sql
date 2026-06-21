@@ -4,7 +4,7 @@
 -- Open Food Facts geeft per product `unique_scans_n` mee: hoe vaak het gescand
 -- is — een goede proxy voor populariteit. We bewaren dat in `popularity` en
 -- sorteren de zoek-/blader-resultaten er primair op, zodat de bekende producten
--- bovenaan staan. Het importscript vult de kolom (scripts/import-off-nl.mjs).
+-- bovenaan staan. Het importscript vult de kolom (scripts/import-off-dump.mjs).
 -- ============================================================================
 
 alter table public.catalog_products add column if not exists popularity int not null default 0;

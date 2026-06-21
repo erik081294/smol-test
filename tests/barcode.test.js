@@ -40,6 +40,14 @@ test('parseOffProduct: mapt naar de catalog-vorm (NL-naam wint)', () => {
   });
 });
 
+test('parseOffProduct: categorie wordt gemapt uit categories_tags (zelfde brein als de dump)', () => {
+  const out = parseOffProduct({
+    status: 1,
+    product: { product_name_nl: 'Halfvolle melk', categories_tags: ['en:dairies', 'en:milks'] },
+  }, '4006381333931');
+  assert.equal(out.category, 'zuivel');
+});
+
 test('parseOffProduct: niet gevonden / geen naam → null', () => {
   assert.equal(parseOffProduct({ status: 0 }, '123'), null);
   assert.equal(parseOffProduct({ status: 1, product: { product_name: '  ' } }, '123'), null);
