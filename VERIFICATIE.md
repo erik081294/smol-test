@@ -1,11 +1,11 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0022` zijn live (DB op `0022`).
-> **Nieuw deze ronde:** `0023_push_deliveries` staat in de repo en moet nog gepusht
-> (`supabase db push`, idempotent). Zie **`docs/HANDOVER.md`** voor de volledige lijst
-> openstaande Supabase-acties (migratie pushen, RLS-tests met secrets, PLT-1 trap 2 flip-on
-> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan). De stappen 1–2
-> hieronder blijven het herhaalrecept telkens als er een migratie bijkomt.
+> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0024` zijn live (**DB op `0024`**):
+> `0023_push_deliveries` en `0024_function_search_path` zijn op 2026-06-21 via de Supabase-
+> connector toegepast. **Nog open:** de live-RLS-integratietests met secrets (18 stuks skippen
+> nu zonder secrets), de PLT-1 trap 2 flip-on via `docs/notify-setup.md`, en de 2-account-
+> rooktest in Stap 3 onderaan. Zie **`docs/HANDOVER.md`** + **`docs/vervolgplan-2026-06-21.md`**.
+> De stappen 1–2 hieronder blijven het herhaalrecept telkens als er een migratie bijkomt.
 >
 > **De secrets staan lokaal in `.env`** (alle drie: `EXPO_PUBLIC_SUPABASE_URL`,
 > `EXPO_PUBLIC_SUPABASE_ANON_KEY` én `SUPABASE_SERVICE_ROLE_KEY`). De CLI is op deze

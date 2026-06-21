@@ -5,9 +5,22 @@
 > `ACTIVE_HEALTHY`). Dit plan vervangt de losse to-do's uit de handover door een geordend
 > traject met sporen, volgorde en afhankelijkheden.
 
+## Uitvoeringslog (2026-06-21, deze sessie)
+- ✅ **A1 — `0023_push_deliveries` live** via de connector. Geverifieerd met `list_migrations`.
+  Advisors ongewijzigd op één verwachte `INFO rls_enabled_no_policy` op `push_deliveries` na —
+  by-design (service-role-only, geen policies).
+- ✅ **B4 — vaste `search_path`** op `enable_module_rls` en `search_catalog` (migratie
+  **`0024_function_search_path`**, live). Beide `function_search_path_mutable`-WARN's zijn weg;
+  `search_catalog('melk')` geeft nog steeds resultaten (pg_trgm-resolutie intact).
+- ◐ **A2 — units groen** (`npm test` → **196 / 0 fail / 18 skipped**). De 18 skipped zijn de
+  live-RLS-tests; die vereisen secrets + Supabase-netwerk (niet in deze container) → nog te draaien.
+- ⏳ **Open (mens/secret/toestel nodig):** A2-live-RLS, A3 flip-on, A4 rooktest, B1/B2/B3 (RPC-/
+  edge-wijzigingen — vereisen live-RLS-verificatie), B5 (pg_trgm verplaatsen — niet-triviaal,
+  afhankelijke index), B6 (Auth-toggle leaked-password-protection).
+
 ## 0. Geverifieerde startstand (deze sessie gemeten, niet aangenomen)
-- **DB-migraties live t/m `0022_update_expense`.** `0023_push_deliveries` staat in de repo maar
-  is **nog niet toegepast** (bevestigd via `list_migrations`). Klopt met handover §2a.
+- **DB-migraties** waren bij aanvang live t/m `0022_update_expense`; `0023`/`0024` zijn deze
+  sessie toegepast (zie uitvoeringslog). DB staat nu op **`0024`**.
 - **Edge Functions:** alleen **`scan-receipt`** is gedeployed (`verify_jwt: true`). De
   **`notify`-functie is nog niet gedeployed** — PLT-1 trap 2 is dus écht nog "flip-off".
 - **Security-advisors (allen WARN, geen ERROR):** mutable `search_path` op `enable_module_rls`
@@ -24,7 +37,7 @@
 ## Spoor A — Live zetten & verifiëren (deblokkeert PLT-1 + INF-1)
 Doel: repo en live-DB weer gelijk, en de notificatie-pijplijn aantoonbaar werkend.
 
-### A1. Migratie `0023_push_deliveries` pushen — *kan via connector*
+### A1. Migratie `0023_push_deliveries` pushen — ✅ gedaan (deze sessie)
 - Idempotent; voegt alleen de audit-/idempotentietabel toe (RLS aan, geen policies → service-role).
 - Daarna `get_advisors(security)` opnieuw draaien om te bevestigen dat er geen nieuwe RLS-gaten
   ontstaan (verwacht: ongewijzigd t.o.v. §0).
@@ -62,13 +75,15 @@ Bundel deze in één migratie + één `scan-receipt`-revisie. Bronnen: audit `do
 | B1 | `expense_shares`-write-policy aanscherpen (alleen door betaler/lid binnen huishouden) | audit S-M2 |
 | B2 | `create_expense`: membership-validatie van `paid_by` én alle `shares`-leden | audit S-M1 |
 | B3 | `scan-receipt`: rate-limit + MIME-whitelist op de upload | audit S-M4 |
-| B4 | `set search_path = ''` (of expliciet) op `enable_module_rls` en `search_catalog` | advisor |
+| B4 | ✅ **gedaan** — `set search_path = public` op `enable_module_rls` + `search_catalog` (migr. `0024`) | advisor |
 | B5 | `pg_trgm` uit `public` naar een eigen schema (`extensions`) verplaatsen | advisor |
 | B6 | Leaked-password-protection aanzetten (Auth-instelling, Dashboard) | advisor |
 
-- B1/B2/B4/B5 → één migratie `0024_security_hardening.sql` + RLS-tests die de nieuwe
-  afwijzingen bewijzen. B3 → revisie + redeploy van `scan-receipt`. B6 → Dashboard-toggle.
-- **Volgorde:** ná A1 (zodat de DB op een schone, bekende staat staat).
+- B4 is al gedaan (migratie `0024`, deze sessie). B1/B2 → één migratie `0025_security_hardening.sql`
+  + RLS-tests die de nieuwe afwijzingen bewijzen (vereist live-RLS-runner ter verificatie). B3 →
+  revisie + redeploy van `scan-receipt`. B5 (pg_trgm verplaatsen) → apart, vanwege de afhankelijke
+  trigram-index op `catalog_products.search`. B6 → Dashboard/Auth-toggle.
+- **Volgorde:** ná A1 (gedaan). B1/B2/B3 pas mergen als de live-RLS-tests groen draaien.
 
 ---
 

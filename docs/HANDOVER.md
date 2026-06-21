@@ -18,14 +18,12 @@
 ## 2. Openstaande Supabase-acties (DIT vereist de volgende sessie)
 Volg het **Snelrecept** in `VERIFICATIE.md` (secrets uit `.env`, CLI ingelogd). Concreet:
 
-### 2a. Migraties pushen
-```bash
-supabase migration list      # bevestig: lokaal t/m 0023, remote t/m 0022
-supabase db push             # idempotent; past het ontbrekende 0023 toe
-```
-`0023_push_deliveries` = idempotentie-/audittabel voor remote push (RLS aan, geen policies →
-alleen service-role). `0022_update_expense` zou al live moeten zijn (zie INF-1) — `db push`
-bevestigt dat en doet niets dubbel.
+### 2a. Migraties pushen — ✅ GEDAAN (2026-06-21, via connector)
+`0023_push_deliveries` (idempotentie-/audittabel voor remote push, RLS aan zonder policies →
+alleen service-role) **én** `0024_function_search_path` (security-hardening B4: vaste
+`search_path` op `enable_module_rls`/`search_catalog`) zijn live toegepast. **DB staat nu op
+`0024`.** Geverifieerd via `list_migrations` + advisors. Zie `docs/vervolgplan-2026-06-21.md`
+(uitvoeringslog). Niets meer te pushen tot er een nieuwe migratie bijkomt.
 
 ### 2b. RLS-integratietests tegen de live DB
 ```bash
