@@ -274,28 +274,32 @@ export default function PlantScreen() {
         {/* Dagboekfoto-detail: groot beeld, notitie bewerken, verwijderen. */}
         <Modal visible={!!selectedPhoto} animationType="slide" transparent onRequestClose={() => setSelectedPhoto(null)}>
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay ?? '#0008' }}>
-            <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 18, paddingBottom: 28 }}>
+            {/* Sheet zonder horizontale rand: de ModalHeader pad zichzelf; de body krijgt
+                een eigen padded wrapper (anders zou de kop dubbel inspringen). */}
+            <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: 28 }}>
               <ModalHeader title={t('plant.diary.photo')} onClose={() => setSelectedPhoto(null)} />
-              <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
-                backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                {selectedPhotoUrl
-                  ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  : <ActivityIndicator color={colors.forest} />}
+              <View style={{ paddingHorizontal: 18 }}>
+                <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
+                  backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                  {selectedPhotoUrl
+                    ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    : <ActivityIndicator color={colors.forest} />}
+                </View>
+                {selectedPhoto ? (
+                  <Text style={[type.caption, { marginTop: 8 }]}>
+                    {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
+                  </Text>
+                ) : null}
+                <View style={{ marginTop: space.md }}>
+                  <Field label={t('plant.field.note')} value={noteText} onChangeText={setNoteText} multiline
+                    placeholder={t('plant.field.note.placeholder')}
+                    style={{ marginBottom: 0 }} />
+                </View>
+                <Row gap={space.sm} style={{ marginTop: space.md }}>
+                  <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
+                  <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
+                </Row>
               </View>
-              {selectedPhoto ? (
-                <Text style={[type.caption, { marginTop: 8 }]}>
-                  {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
-                </Text>
-              ) : null}
-              <View style={{ marginTop: space.md }}>
-                <Field label={t('plant.field.note')} value={noteText} onChangeText={setNoteText} multiline
-                  placeholder={t('plant.field.note.placeholder')}
-                  style={{ marginBottom: 0 }} />
-              </View>
-              <Row gap={space.sm} style={{ marginTop: space.md }}>
-                <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
-                <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
-              </Row>
             </View>
           </View>
         </Modal>

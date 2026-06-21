@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "vercel-plugin@vercel-vercel-plugin": false,
+    "vercel@claude-plugins-official": false,
+    "expo@claude-plugins-official": true
+  }
+}

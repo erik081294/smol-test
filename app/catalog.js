@@ -74,9 +74,9 @@ export default function Catalog() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <View style={{ paddingHorizontal: screenPadding, paddingTop: space.sm }}>
-        <ModalHeader title={t('catalog.title')} onClose={() => router.back()} />
-
+      {/* ModalHeader pad zichzelf (space.lg) — niet in de screenPadding-wrapper zetten. */}
+      <ModalHeader title={t('catalog.title')} onClose={() => router.back()} />
+      <View style={{ paddingHorizontal: screenPadding }}>
         {/* Zoekbalk */}
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm }}>
           <Icon name="search" size={20} color={colors.inkFaint} />
