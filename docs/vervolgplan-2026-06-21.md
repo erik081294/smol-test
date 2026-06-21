@@ -13,7 +13,13 @@
   **`0024_function_search_path`**, live). Beide `function_search_path_mutable`-WARN's zijn weg;
   `search_catalog('melk')` geeft nog steeds resultaten (pg_trgm-resolutie intact).
 - ◐ **A2 — units groen** (`npm test` → **196 / 0 fail / 18 skipped**). De 18 skipped zijn de
-  live-RLS-tests; die vereisen secrets + Supabase-netwerk (niet in deze container) → nog te draaien.
+  live-RLS-tests; die vereisen secrets + Supabase-netwerk (niet in deze container) → de JS-suite
+  kan hier niet draaien (egress-allowlist blokkeert `*.supabase.co`: `host_not_allowed`).
+- ✅ **A2′ — RLS live geverifieerd via de connector** (alternatief voor de geblokkeerde JS-suite).
+  `docs/rls-connector-check.sql` bouwt fixtures, dwingt RLS af als `authenticated` met wisselende
+  `request.jwt.claims.sub`, en rolt alles terug. Resultaat: **7/7 PASS, 0 residu** — lid ziet
+  household-taak, niet-gedeelde `custom`-taak blijft verborgen (ook voor leden), buitenstaander
+  ziet niets, en de insert-policy blokkeert niet-leden.
 - ⏳ **Open (mens/secret/toestel nodig):** A2-live-RLS, A3 flip-on, A4 rooktest, B1/B2/B3 (RPC-/
   edge-wijzigingen — vereisen live-RLS-verificatie), B5 (pg_trgm verplaatsen — niet-triviaal,
   afhankelijke index), B6 (Auth-toggle leaked-password-protection).
@@ -43,13 +49,15 @@ Doel: repo en live-DB weer gelijk, en de notificatie-pijplijn aantoonbaar werken
   ontstaan (verwacht: ongewijzigd t.o.v. §0).
 - **Klaar als:** `list_migrations` toont `0023`; advisors ongewijzigd.
 
-### A2. RLS-integratietests tegen live DB — *vereist secrets/runner*
-- Recept staat in `VERIFICATIE.md` (Snelrecept). Verwacht: **alle tests groen, 0 skipped**,
-  inclusief de nieuwe `update_expense`-RLS-case.
-- In de remote container kan dit alleen met `EXPO_PUBLIC_*` + `SUPABASE_SERVICE_ROLE_KEY` als
-  env-vars **en** `*.supabase.co`/`*.pooler.supabase.com` op de network-allowlist (zie kop van
-  `VERIFICATIE.md`). Anders lokaal draaien.
-- **Klaar als:** 196 tests groen, 0 skipped.
+### A2. RLS-integratietests tegen live DB — *JS-suite vereist secrets/egress; kern via connector ✅*
+- De JS-suite (`tests/rls.integration.test.js`) vereist `SUPABASE_SERVICE_ROLE_KEY` + egress naar
+  `*.supabase.co`. In de web-container is dat geblokkeerd (`host_not_allowed`) en de service-role-
+  key is niet via de connector beschikbaar → de suite skipt (18). Voor de volle run: zie de kop van
+  `VERIFICATIE.md` (env-vars + allowlist), of lokaal draaien.
+- **Alternatief dat hier wél kan, en is gedraaid:** `docs/rls-connector-check.sql` verifieert de
+  kern-RLS rechtstreeks via de connector (rol/JWT-impersonatie + rollback). **7/7 PASS** op
+  2026-06-21.
+- **Klaar als:** óf de JS-suite groen met 0 skipped, óf de connector-check 7/7 (gedaan voor de kern).
 
 ### A3. PLT-1 trap 2 flip-on — *vereist mens + 2 toestellen*
 Exact stappenplan in `docs/notify-setup.md`. Kort:

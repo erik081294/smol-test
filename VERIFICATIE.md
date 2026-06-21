@@ -44,6 +44,12 @@ Verwacht: **alle tests groen, 0 skipped** (de RLS-tests draaien i.p.v. skippen).
 De RLS-tests maken tijdelijke `rlstest+<timestamp>@example.com`-gebruikers aan en
 ruimen die na afloop op. De rest van dit document is de uitgebreide naslag.
 
+> **Geen secrets/egress (bv. Claude Code op het web)?** De JS-RLS-suite kan dan niet
+> draaien (egress-allowlist blokkeert `*.supabase.co`, en de service-role-key is niet
+> via de Supabase-connector beschikbaar). Gebruik dan **`docs/rls-connector-check.sql`**:
+> die verifieert de kern-RLS rechtstreeks via de connector met rol-/JWT-impersonatie en
+> rolt alles terug (geen persistentie). Laatst gedraaid 2026-06-21 → **7/7 PASS**.
+
 ---
 
 De pure logica is volledig getest met `npm test` (groen). Twee dingen vereisen
