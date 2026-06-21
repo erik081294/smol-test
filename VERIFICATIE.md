@@ -5,9 +5,9 @@
 > 2026-06-21 via de Supabase-connector toegepast en geverifieerd. De kern-RLS + RPC's zijn
 > bewezen via **`docs/rls-connector-check.sql`** (13/13, zonder secrets). **Nog open:** de
 > volledige JS-RLS-suite met secrets (18 stuks skippen zonder secrets), de PLT-1 trap 2 flip-on
-> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan. Zie
-> **`docs/HANDOVER.md`** + **`docs/vervolgplan-2026-06-21.md`**. De stappen 1–2 hieronder blijven
-> het herhaalrecept telkens als er een migratie bijkomt.
+> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan. De canonieke status
+> staat in **`huishoek-backlog.md`** §6 (INF-1). De stappen 1–2 hieronder blijven het herhaalrecept
+> telkens als er een migratie bijkomt.
 >
 > **De secrets staan lokaal in `.env`** (alle drie: `EXPO_PUBLIC_SUPABASE_URL`,
 > `EXPO_PUBLIC_SUPABASE_ANON_KEY` én `SUPABASE_SERVICE_ROLE_KEY`). De CLI is op deze

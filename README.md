@@ -239,11 +239,11 @@ met status, prioriteit en aanpak in [`huishoek-backlog.md`](./huishoek-backlog.m
 + tests, hooks, schermen, RLS en file-checklists) staan in
 [`docs/plans/`](./docs/plans/00-overzicht.md) — direct oppakbaar in VSC.
 
-> **Overdracht / openstaande acties.** Begin een vervolgsessie met
-> [`docs/HANDOVER.md`](./docs/HANDOVER.md): de actuele stand + de acties die Supabase-toegang
-> vereisen (migratie `0023` pushen, RLS-tests met secrets, PLT-1 trap 2 live zetten). De
-> architectuur-/security-/performance-audit met geprioriteerde roadmap staat in
-> [`docs/audit-2026-06-21.md`](./docs/audit-2026-06-21.md).
+> **Status & roadmap (single source of truth):** [`huishoek-backlog.md`](./huishoek-backlog.md)
+> §6 — de enige plek voor wat af/open is. Migratie-/RLS-runbook: [`VERIFICATIE.md`](./VERIFICATIE.md)
+> (+ `docs/rls-connector-check.sql` voor verificatie zonder secrets). De eenmalige architectuur-/
+> security-/performance-audit staat in [`docs/audit-2026-06-21.md`](./docs/audit-2026-06-21.md)
+> (historische analyse; status leeft in de backlog).
 
 ---
 
