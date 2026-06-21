@@ -9,21 +9,64 @@
   opgeslagen (`lib/notificationPrefs.js`). Web = stil no-op.
 - Werkt **niet** in Expo Go (SDK 53+): gebruik een **dev build** (zie `docs/eas-setup.md`).
 
-## Trap 2 — Remote push (optioneel)
-1. Migratie `0018_push_tokens.sql` pushen (`supabase db push`).
-2. Edge Function deployen: `supabase functions deploy notify`.
-3. Database Webhook: Dashboard → Database → Webhooks → tabel `tasks`, events
-   **insert + update**, type **Supabase Edge Functions** → functie `notify`.
-   (`SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY` worden automatisch geïnjecteerd.)
-4. De client registreert het Expo-push-token automatisch in `push_tokens` zodra
-   permissie is verleend (vereist een EAS `projectId` in de app-config).
+## Trap 2 — Remote push
 
-Effect: krijgt iemand een taak toegewezen (`assigned_to` ≠ maker), dan stuurt de
-functie die persoon een push via de Expo Push API. Uit te breiden naar uitgave-
-toewijzing en reservering-botsingen.
+### Architectuur (wat er al staat)
+- **Functie** `supabase/functions/notify/` is opgesplitst in een pure kern
+  (`core.js` — bepaalt wélke push naar wie, unit-getest in `tests/notify.test.js`) en een
+  impure schil (`index.ts` — secret-check, idempotentie, tokens ophalen, versturen, opruimen).
+  Nieuwe triggers toevoegen = een handler in `core.js` schrijven en in `HANDLERS` registreren.
+- **Token-registratie** is automatisch: `lib/useNotifications.js` upsert het Expo-push-token
+  in `push_tokens` zodra permissie is verleend (vereist de EAS `projectId`, staat in `app.config.js`).
+- **Idempotentie + audit**: elke verstuurde push claimt een rij in `push_deliveries`
+  (migratie `0023`), zodat een herhaalde webhook-fire geen dubbele melding geeft.
 
-**Dedup & robuustheid:** de functie stuurt alléén bij een echte toewijzing
-(`assigned_to` gezet én bij UPDATE gewijzigd t.o.v. `old_record`), dus geen dubbele
-push bij ongerelateerde taak-edits. Tokens staan uniek op `(profile_id, token)`
-(`push_tokens` PK), dus per apparaat hooguit één rij. Token-registratie is automatisch
-(`lib/useNotifications.js`, best-effort upsert na permissie) — geen aparte API nodig.
+### Flip-on (eenmalig, vereist Supabase-toegang — connector/CLI/dashboard)
+1. **Migraties pushen** zodat `push_tokens` (0018) én `push_deliveries` (0023) live staan:
+   ```
+   supabase db push
+   ```
+2. **Webhook-secret zetten** (gedeeld geheim tussen de webhook en de functie):
+   ```
+   supabase secrets set NOTIFY_WEBHOOK_SECRET=<lang-willekeurig-geheim>
+   ```
+   (`SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY` worden automatisch geïnjecteerd; niet zelf zetten.)
+3. **Functie deployen** (config zet al `verify_jwt = false`, zie `supabase/config.toml`):
+   ```
+   supabase functions deploy notify
+   ```
+4. **Database Webhook** aanmaken: Dashboard → Database → Webhooks → **Create**:
+   - Tabel **`public.tasks`**, events **Insert** + **Update**.
+   - Type **Supabase Edge Functions** → functie **`notify`**.
+   - HTTP-header toevoegen: **`x-notify-secret`** = exact dezelfde waarde als bij stap 2.
+
+### Toesteltest (2 accounts, dev build)
+1. Twee accounts (A en B) in **hetzelfde huishouden**, elk op een **dev build** met
+   notificatie-permissie verleend (zo staat per toestel een rij in `push_tokens`).
+2. Account A maakt een taak en wijst die toe aan **B** (`assigned_to` = B).
+3. **Verwacht:** B krijgt een push *"Nieuwe taak voor jou"* met de taaktitel.
+4. **Idempotentie:** sla dezelfde taak nog eens op zonder de toewijzing te wijzigen → **geen**
+   tweede push (de UPDATE-guard + `push_deliveries` vangen dit af).
+5. **Pruning:** verwijder de app / trek de notificatie-permissie in op B's toestel en wijs een
+   nieuwe taak toe → Expo meldt `DeviceNotRegistered` en de functie verwijdert dat token uit
+   `push_tokens`.
+
+### Effect & dedup
+Krijgt iemand een taak toegewezen (`assigned_to` ≠ maker, en bij UPDATE daadwerkelijk
+gewijzigd), dan stuurt de functie die persoon een push via de Expo Push API. Tokens staan
+uniek op `(profile_id, token)` (`push_tokens` PK); dode tokens worden automatisch opgeruimd.
+
+### Troubleshooting
+- **Webhook krijgt 401** → header `x-notify-secret` ontbreekt of komt niet overeen met
+  `NOTIFY_WEBHOOK_SECRET`. (Een 401 zónder secret-mismatch betekent dat `verify_jwt` nog op
+  `true` staat — controleer `supabase/config.toml` en herdeploy.)
+- **`skipped: "geen tokens"`** → de ontvanger heeft geen rij in `push_tokens`: permissie niet
+  verleend, geen dev build, of geen EAS `projectId`.
+- **Niets gebeurt** → check de functie-logs (`supabase functions logs notify`) en of de webhook
+  daadwerkelijk vuurt (Dashboard → Database → Webhooks → recent deliveries).
+
+### Uitbreiden (volgende rondes)
+- **Uitgave-toewijzing** (Kosten): uitgaven hebben geen enkele toegewezene maar `expense_shares`
+  → een handler die elke share-deelnemer (≠ maker) een push geeft, plus een webhook op `expenses`.
+- **Maaltijd-/voorraadmeldingen** ("diner vanavond" / "bijna over datum"): via `pg_cron` dat de
+  functie of een variant aanroept. Beide passen op de bestaande `HANDLERS`-registry in `core.js`.

@@ -8,6 +8,13 @@ alleen voor trap 2 (remote push). **Afhankelijkheden:** geen; sluit aan op de ke
 > `dailySummary`, `reminderId`). Twee trappen, **beide volledig uitgewerkt** (geen afslag):
 > trap 1 lokaal (MVP), trap 2 remote push. Web = stil no-op (zoals `lib/haptics.js`).
 
+> **Status (2026-06-21):** trap 1 af. **Trap 2 is productie-klaar in code** — de
+> `notify`-functie is opgesplitst in een pure, geteste kern (`supabase/functions/notify/core.js`,
+> event-router + handler-registry) en een impure schil (`index.ts`) met gedeeld-geheim-check,
+> idempotentie + audit (`push_deliveries`, migratie `0023`), batchen en token-opruiming.
+> `verify_jwt=false` in `config.toml`. **Resteert de flip-on** (migraties pushen, secret zetten,
+> deploy, Database Webhook, 2-account-toesteltest): exact stap-voor-stap in `docs/notify-setup.md`.
+
 ## B1. Dependencies & config
 - `npx expo install expo-notifications expo-device`. Plugin-blok in `app.config.js`
   (notificatie-icoon/kleur). Mount `useNotifications()` in `app/_layout.js` ná de Auth/
