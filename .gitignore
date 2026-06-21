@@ -4,3 +4,7 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Native projecten worden via prebuild/expo run gegenereerd (CNG) — niet committen
+/android
+/ios
