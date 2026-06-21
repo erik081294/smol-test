@@ -343,6 +343,13 @@ deno_version = 2
 [functions.scan-receipt]
 verify_jwt = true
 
+# Remote push (PLT-1, trap 2): aangeroepen door een Database Webhook, die GEEN
+# user-JWT meestuurt — daarom verify_jwt uit. De functie is daardoor publiek
+# bereikbaar en beschermt zichzelf met een gedeeld geheim (header `x-notify-secret`
+# == secret NOTIFY_WEBHOOK_SECRET). Zie supabase/functions/notify + docs/notify-setup.md.
+[functions.notify]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
