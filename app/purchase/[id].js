@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,18 +23,20 @@ export default function PurchaseEditor() {
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
-  const { addPurchase } = usePurchases();
+  const { addPurchase, updatePurchase } = usePurchases();
   const { products, addProduct, matchFor } = useProducts();
   const { restockFromPurchase } = usePantry();
   const toast = useToast();
 
-  // ----- Bestaande bon: read-only weergave -----
+  // ----- Bestaande bon: weergave (read-only) → bewerken -----
   const [existing, setExisting] = useState(null);
-  useEffect(() => {
-    if (isNew) return;
-    supabase.from('purchases').select('*, purchase_items(*)').eq('id', id).single()
-      .then(({ data }) => { if (!data) router.back(); else setExisting(data); });
+  const [editing, setEditing] = useState(false);
+  const loadExisting = useCallback(async () => {
+    const { data } = await supabase.from('purchases').select('*, purchase_items(*)').eq('id', id).single();
+    if (!data) router.back(); else setExisting(data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+  useEffect(() => { if (!isNew) loadExisting(); }, [isNew, loadExisting]);
 
   // ----- Nieuwe bon: formulier -----
   const [store, setStore] = useState('');
@@ -133,6 +135,22 @@ export default function PurchaseEditor() {
     ]);
   };
 
+  // Vul de form met de bestaande bon en schakel naar bewerk-modus.
+  const startEditing = () => {
+    setStore(existing.store ?? '');
+    setDate(existing.purchased_on ? parseISO(existing.purchased_on) : new Date());
+    setTotalText(existing.total_cents != null ? (existing.total_cents / 100).toFixed(2).replace('.', ',') : '');
+    setLines((existing.purchase_items ?? []).map((it) => ({
+      name: it.name,
+      quantity: Number(it.quantity) || 1,
+      unit: UNITS.includes(it.unit) ? it.unit : 'stuk',
+      priceText: it.unit_price_cents != null ? (it.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
+      productId: it.product_id ?? null,
+    })));
+    setError(null);
+    setEditing(true);
+  };
+
   const save = async () => {
     const filled = lines.filter((l) => l.name.trim());
     if (!filled.length) { setError(t('purchase.error.noLines')); haptics.error(); return; }
@@ -150,25 +168,31 @@ export default function PurchaseEditor() {
           line_total_cents: unitPrice != null ? unitPrice * (l.quantity || 1) : null,
         };
       });
-      await addPurchase({
-        store, purchasedOn: format(date, 'yyyy-MM-dd'),
-        totalCents: enteredTotal, items,
-      });
-      haptics.success();
-      router.back();
+      const payload = { store, purchasedOn: format(date, 'yyyy-MM-dd'), totalCents: enteredTotal, items };
+      if (isNew) {
+        await addPurchase(payload);
+        haptics.success();
+        router.back();
+      } else {
+        await updatePurchase(id, payload);
+        haptics.success();
+        await loadExisting();   // ververs de read-only weergave
+        setEditing(false);
+      }
     } catch (e) {
       haptics.error();
       Alert.alert(t('purchase.error.save'), e.message);
     } finally { setBusy(false); }
   };
 
-  // ---------- Read-only weergave bestaande bon ----------
-  if (!isNew) {
+  // ---------- Read-only weergave bestaande bon (met "Bewerken") ----------
+  if (!isNew && !editing) {
     if (!existing) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
     const nameOf = (pid) => products.find((p) => p.id === pid)?.name;
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ModalHeader title={existing.store || t('purchase.untitled')} onClose={() => router.back()} />
+        <ModalHeader title={existing.store || t('purchase.untitled')} onClose={() => router.back()}
+          onConfirm={startEditing} confirmLabel={t('common.edit')} />
         <ScrollView contentContainerStyle={{ padding: space.lg }}>
           <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.lg }]}>
             {format(parseISO(existing.purchased_on), 'd MMMM yyyy', { locale: dateLocale() })}
@@ -215,9 +239,11 @@ export default function PurchaseEditor() {
     );
   }
 
-  // ---------- Nieuwe bon ----------
+  // ---------- Nieuwe bon óf bewerken ----------
   return (
-    <Editor title={t('purchase.new')} onClose={() => router.back()} onConfirm={save} busy={busy}
+    <Editor title={isNew ? t('purchase.new') : t('purchase.edit')}
+      onClose={() => { if (editing) setEditing(false); else router.back(); }}
+      onConfirm={save} busy={busy}
       contentContainerStyle={{ paddingBottom: 60 }}>
           {/* Bonscan: vult winkel/datum/regels in één keer; daarna controleren. */}
           <Button title={t('purchase.scan')} icon="receipt" variant="soft" onPress={onScanPress}
