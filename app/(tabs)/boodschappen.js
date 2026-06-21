@@ -1,23 +1,28 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, RefreshControl, Platform, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, SectionList, TextInput, RefreshControl, Platform, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
 import { useProducts } from '../../lib/useProducts';
+import { useCatalogCategories } from '../../lib/useCatalog';
+import { groupFavorites } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
 import { EtenNav } from '../../lib/EtenNav';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
-import { t } from '../../lib/i18n';
+import { t, plural } from '../../lib/i18n';
 
 export default function Boodschappen() {
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
   const { products, suggestFor } = useProducts();
+  const { categories: productCategories } = useCatalogCategories();
   const toast = useToast();
   const router = useRouter();
   const [text, setText] = useState('');
-  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [favOpen, setFavOpen] = useState(false);   // "Vaste boodschappen"-sheet
+  const [favQuery, setFavQuery] = useState('');
 
   // Catalogus-suggesties terwijl je typt (BOO-5): koppel een boodschap aan een
   // bestaand product zodat de prijsdata uit normaal gebruik groeit.
@@ -46,6 +51,22 @@ export default function Boodschappen() {
     () => items.filter((i) => i.checked && !hiddenIds.includes(i.id)),
     [items, hiddenIds]
   );
+
+  // "Vaste boodschappen": je producten per schap, op gebruik gesorteerd. De producten
+  // die al op de open lijst staan tonen we als "✓ op je lijst" (geen dubbele toevoeging).
+  const favGroups = useMemo(
+    () => groupFavorites(products, productCategories, { query: favQuery }),
+    [products, productCategories, favQuery]
+  );
+  const openProductIds = useMemo(
+    () => new Set(open.map((i) => i.product_id).filter(Boolean)),
+    [open]
+  );
+  const addFavorite = (product) => {
+    if (openProductIds.has(product.id)) { toast.show({ message: t('groceries.favorites.onlist') }); return; }
+    addItem(product.name, product.id).catch((e) => Alert.alert(t('groceries.error.add'), e.message));
+    toast.show({ message: t('groceries.favorites.added', { name: product.name }) });
+  };
 
   const add = async () => {
     const name = text.trim();
@@ -127,8 +148,8 @@ export default function Boodschappen() {
           <Row gap={space.xs}>
             <IconButton icon="search" accessibilityLabel={t('catalog.open')} tint={colors.forest}
               onPress={() => router.push('/catalog')} />
-            <IconButton icon="catalog" accessibilityLabel={t('groceries.catalog')} tint={colors.forest}
-              onPress={() => setCatalogOpen(true)} />
+            <IconButton icon="repeat" accessibilityLabel={t('groceries.favorites')} tint={colors.forest}
+              onPress={() => setFavOpen(true)} />
             <IconButton icon="receipt" accessibilityLabel={t('groceries.receipt')} tint={colors.forest}
               onPress={() => router.push('/purchase/new')} />
           </Row>
@@ -174,7 +195,7 @@ export default function Boodschappen() {
           ) : !loading && items.length === 0 ? (
             <Empty illustration="groceries" title={t('groceries.empty.title')}
               subtitle={t('groceries.empty.subtitle')}
-              actionTitle={t('catalog.open')} onAction={() => router.push('/catalog')} />
+              actionTitle={t('groceries.favorites')} onAction={() => setFavOpen(true)} />
           ) : null
         }
         ListFooterComponent={
@@ -191,25 +212,67 @@ export default function Boodschappen() {
         }
       />
 
-      {/* Catalogus-sheet (BOO-5): blader door producten → open de prijstracker. */}
-      <Modal visible={catalogOpen} animationType="slide" onRequestClose={() => setCatalogOpen(false)}>
+      {/* "Vaste boodschappen": je eigen producten, per schap, op gebruik gesorteerd.
+          Eén tik = op de lijst (blijft open voor meerdere). De prijstracker zit op de
+          chevron ernaast. Producten die al op de lijst staan tonen we als "✓ op je lijst". */}
+      <Modal visible={favOpen} animationType="slide" onRequestClose={() => setFavOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-          <ModalHeader title={t('groceries.catalog.title')} onClose={() => setCatalogOpen(false)} />
-          <FlatList
-            data={products}
+          <ModalHeader title={t('groceries.favorites.title')} onClose={() => setFavOpen(false)} />
+          <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+            <TextInput
+              value={favQuery} onChangeText={setFavQuery}
+              placeholder={t('groceries.favorites.filter')} placeholderTextColor={colors.inkFaint}
+              accessibilityLabel={t('groceries.favorites.filter')}
+              style={{
+                minHeight: touchTarget, backgroundColor: colors.surface, borderRadius: radius.md,
+                borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md,
+                paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
+              }}
+            />
+          </View>
+          <SectionList
+            sections={favGroups.map((g) => ({ ...g, data: g.items }))}
             keyExtractor={(p) => p.id}
-            contentContainerStyle={{ padding: space.lg }}
-            renderItem={({ item }) => (
-              <ItemRow
-                title={item.name}
-                meta={<Text style={type.caption}>{item.category}</Text>}
-                chevron
-                onPress={() => { setCatalogOpen(false); router.push(`/product/${item.id}`); }}
-              />
+            contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
+            stickySectionHeadersEnabled={false}
+            keyboardShouldPersistTaps="handled"
+            renderSectionHeader={({ section }) => (
+              <SectionHeader title={`${section.emoji ? `${section.emoji} ` : ''}${section.label}`} count={section.items.length} />
             )}
+            renderItem={({ item }) => {
+              const onList = openProductIds.has(item.id);
+              return (
+                <ItemRow
+                  leading={
+                    <View style={{
+                      width: 32, height: 32, borderRadius: 16,
+                      backgroundColor: onList ? colors.forestTint : colors.ocherSoft,
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon name={onList ? 'check' : 'add'} size={18} color={colors.forest} weight="bold" />
+                    </View>
+                  }
+                  title={item.name}
+                  titleColor={onList ? colors.inkFaint : undefined}
+                  meta={
+                    onList ? <Text style={type.caption}>{t('groceries.favorites.onlist')}</Text>
+                      : item.times_added > 0
+                        ? <Text style={type.caption}>{plural(item.times_added, 'groceries.favorites.times.one', 'groceries.favorites.times.other')}</Text>
+                        : undefined
+                  }
+                  onPress={() => addFavorite(item)}
+                  accessibilityLabel={onList ? t('groceries.favorites.onlist') : t('catalog.add', { name: item.name })}
+                  trailing={
+                    <IconButton icon="price" size={20} tint={colors.inkFaint}
+                      accessibilityLabel={t('groceries.favorites.detail')}
+                      onPress={() => { setFavOpen(false); router.push(`/product/${item.id}`); }} />
+                  }
+                />
+              );
+            }}
             ListEmptyComponent={
-              <Empty illustration="groceries" title={t('groceries.catalog.title')}
-                subtitle={t('groceries.catalog.empty')} />
+              <Empty illustration="groceries" title={t('groceries.favorites.empty.title')}
+                subtitle={t('groceries.favorites.empty.subtitle')} />
             }
           />
         </SafeAreaView>
