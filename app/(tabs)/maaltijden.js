@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, RefreshControl, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO, addDays, isToday } from 'date-fns';
@@ -11,9 +11,9 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
-  Badge, ModalHeader, Field, Stepper, Checkbox,
+  Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet,
 } from '../../lib/ui';
-import { colors, space, type, radius } from '../../lib/theme';
+import { colors, space, type } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
@@ -181,14 +181,12 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
   };
 
   return (
-    <Modal visible={!!date} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '90%' }}>
-          <ModalHeader
-            title={date ? format(parseISO(date), 'EEEE d MMM', { locale: nl }) : ''}
-            onClose={onClose} onConfirm={save} busy={busy}
-            confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
-          <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+    <BottomSheet visible={!!date} onClose={onClose} avoidKeyboard>
+      <ModalHeader
+        title={date ? format(parseISO(date), 'EEEE d MMM', { locale: nl }) : ''}
+        onClose={onClose} onConfirm={save} busy={busy}
+        confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
             <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
               {MEAL_TYPES.map((m) => (
                 <Chip key={m} label={t('mealtype.' + m)} active={mealType === m} onPress={() => setMealType(m)} />
@@ -214,10 +212,8 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
             <Stepper value={servings} onChange={setServings} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
             {chosen ? <Text style={[type.caption, { marginTop: space.sm }]}>{chosen.title}</Text> : null}
             <View style={{ height: space.xl }} />
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
@@ -229,37 +225,33 @@ function ShoppingListModal({ items, onClose, onConfirm }) {
   const toggle = (key) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, selected: !r.selected } : r)));
 
   return (
-    <Modal visible={!!items} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '85%' }}>
-          <ModalHeader title={t('meals.list.title')} onClose={onClose} />
-          <Text style={[type.body, { color: colors.inkSoft, paddingHorizontal: space.lg, marginBottom: space.sm }]}>
-            {t('meals.list.subtitle')}
-          </Text>
-          {rows.length === 0 ? (
-            <View style={{ padding: space.lg }}>
-              <Empty illustration="groceries" title={t('meals.list.none')} />
-            </View>
-          ) : (
-            <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg }} style={{ maxHeight: 360 }}>
-              {rows.map((r) => (
-                <ItemRow
-                  key={r.key}
-                  leading={<Checkbox checked={r.selected} onPress={() => toggle(r.key)} size={22}
-                    accessibilityLabel={r.name} />}
-                  title={r.name}
-                  meta={<Text style={type.caption}>{(+r.quantity).toLocaleString('nl-NL')} {r.unit}</Text>}
-                  onPress={() => toggle(r.key)}
-                />
-              ))}
-            </ScrollView>
-          )}
-          <View style={{ padding: space.lg }}>
-            <Button title={t('meals.list.add')} icon="shopping" variant="accent"
-              disabled={selected.length === 0} onPress={() => onConfirm(selected)} />
-          </View>
+    <BottomSheet visible={!!items} onClose={onClose} maxHeight="85%">
+      <ModalHeader title={t('meals.list.title')} onClose={onClose} />
+      <Text style={[type.body, { color: colors.inkSoft, paddingHorizontal: space.lg, marginBottom: space.sm }]}>
+        {t('meals.list.subtitle')}
+      </Text>
+      {rows.length === 0 ? (
+        <View style={{ padding: space.lg }}>
+          <Empty illustration="groceries" title={t('meals.list.none')} />
         </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg }} style={{ maxHeight: 360 }}>
+          {rows.map((r) => (
+            <ItemRow
+              key={r.key}
+              leading={<Checkbox checked={r.selected} onPress={() => toggle(r.key)} size={22}
+                accessibilityLabel={r.name} />}
+              title={r.name}
+              meta={<Text style={type.caption}>{(+r.quantity).toLocaleString('nl-NL')} {r.unit}</Text>}
+              onPress={() => toggle(r.key)}
+            />
+          ))}
+        </ScrollView>
+      )}
+      <View style={{ padding: space.lg }}>
+        <Button title={t('meals.list.add')} icon="shopping" variant="accent"
+          disabled={selected.length === 0} onPress={() => onConfirm(selected)} />
       </View>
-    </Modal>
+    </BottomSheet>
   );
 }
