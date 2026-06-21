@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, SectionList, TextInput, RefreshControl, Platform, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, SectionList, TextInput, RefreshControl, Platform, Alert, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
 import { useProducts } from '../../lib/useProducts';
 import { useCatalogCategories } from '../../lib/useCatalog';
-import { groupFavorites } from '../../lib/favoriteGroceries';
+import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
@@ -16,13 +16,14 @@ import { t, plural } from '../../lib/i18n';
 
 export default function Boodschappen() {
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
-  const { products, suggestFor } = useProducts();
+  const { products, suggestFor, setHidden } = useProducts();
   const { categories: productCategories } = useCatalogCategories();
   const toast = useToast();
   const router = useRouter();
   const [text, setText] = useState('');
   const [favOpen, setFavOpen] = useState(false);   // "Vaste boodschappen"-sheet
   const [favQuery, setFavQuery] = useState('');
+  const [showHidden, setShowHidden] = useState(false);
 
   // Catalogus-suggesties terwijl je typt (BOO-5): koppel een boodschap aan een
   // bestaand product zodat de prijsdata uit normaal gebruik groeit.
@@ -52,12 +53,28 @@ export default function Boodschappen() {
     [items, hiddenIds]
   );
 
-  // "Vaste boodschappen": je producten per schap, op gebruik gesorteerd. De producten
-  // die al op de open lijst staan tonen we als "✓ op je lijst" (geen dubbele toevoeging).
+  // "Vaste boodschappen": een "Meest gekozen"-snelkoppeling bovenaan + je producten per
+  // schap (op gebruik gesorteerd). Verborgen producten vallen overal uit, behalve in een
+  // optionele "Verborgen"-sectie om ze weer te tonen. Producten die al op de open lijst
+  // staan tonen we als "✓ op je lijst" (geen dubbele toevoeging).
   const favGroups = useMemo(
     () => groupFavorites(products, productCategories, { query: favQuery }),
     [products, productCategories, favQuery]
   );
+  const favTop = useMemo(() => topFavorites(products, { n: 8 }), [products]);
+  const favHidden = useMemo(() => hiddenProducts(products, { query: favQuery }), [products, favQuery]);
+  const hiddenCount = useMemo(() => products.filter((p) => p.hidden).length, [products]);
+
+  // Secties voor de SectionList: top (alleen zonder filter) → schappen → verborgen (alleen
+  // als "toon verborgen" aan staat). `kind` stuurt de rij-rendering.
+  const favSections = useMemo(() => {
+    const out = [];
+    if (!favQuery && favTop.length) out.push({ key: '__top__', label: t('groceries.favorites.top'), emoji: '⭐', kind: 'top', data: favTop });
+    for (const g of favGroups) out.push({ ...g, kind: 'group', data: g.items });
+    if (showHidden && favHidden.length) out.push({ key: '__hidden__', label: t('groceries.favorites.hidden'), emoji: '🙈', kind: 'hidden', data: favHidden });
+    return out;
+  }, [favQuery, favTop, favGroups, showHidden, favHidden]);
+
   const openProductIds = useMemo(
     () => new Set(open.map((i) => i.product_id).filter(Boolean)),
     [open]
@@ -66,6 +83,20 @@ export default function Boodschappen() {
     if (openProductIds.has(product.id)) { toast.show({ message: t('groceries.favorites.onlist') }); return; }
     addItem(product.name, product.id).catch((e) => Alert.alert(t('groceries.error.add'), e.message));
     toast.show({ message: t('groceries.favorites.added', { name: product.name }) });
+  };
+  // Verbergen is subtiel (lang indrukken) en meteen terug te draaien via de toast.
+  const hideFavorite = (product) => {
+    animateNextLayout();
+    setHidden(product.id, true).catch((e) => Alert.alert(t('common.failed'), e.message));
+    toast.show({
+      message: t('groceries.favorites.hide.done', { name: product.name }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHidden(product.id, false).catch(() => {}); },
+    });
+  };
+  const unhideFavorite = (product) => {
+    animateNextLayout();
+    setHidden(product.id, false).catch((e) => Alert.alert(t('common.failed'), e.message));
   };
 
   const add = async () => {
@@ -229,17 +260,42 @@ export default function Boodschappen() {
                 paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
               }}
             />
+            {hiddenCount > 0 ? (
+              <Pressable
+                onPress={() => setShowHidden((s) => !s)} hitSlop={8}
+                accessibilityRole="button"
+                style={{ alignSelf: 'flex-end', paddingVertical: space.xs }}
+              >
+                <Text style={[type.caption, { color: colors.forest }]}>
+                  {showHidden ? t('groceries.favorites.hideHidden')
+                    : plural(hiddenCount, 'groceries.favorites.showHidden.one', 'groceries.favorites.showHidden.other')}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           <SectionList
-            sections={favGroups.map((g) => ({ ...g, data: g.items }))}
+            sections={favSections}
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
             stickySectionHeadersEnabled={false}
             keyboardShouldPersistTaps="handled"
             renderSectionHeader={({ section }) => (
-              <SectionHeader title={`${section.emoji ? `${section.emoji} ` : ''}${section.label}`} count={section.items.length} />
+              <SectionHeader title={`${section.emoji ? `${section.emoji} ` : ''}${section.label}`} count={section.data.length} />
             )}
-            renderItem={({ item }) => {
+            renderItem={({ item, section }) => {
+              // Verborgen-sectie: tik = weer tonen.
+              if (section.kind === 'hidden') {
+                return (
+                  <ItemRow
+                    leading={<Icon name="catalog" size={20} color={colors.inkFaint} />}
+                    title={item.name}
+                    titleColor={colors.inkFaint}
+                    onPress={() => unhideFavorite(item)}
+                    accessibilityLabel={`${item.name} — ${t('groceries.favorites.unhide')}`}
+                    trailing={<Text style={[type.caption, { color: colors.forest }]}>{t('groceries.favorites.unhide')}</Text>}
+                  />
+                );
+              }
               const onList = openProductIds.has(item.id);
               return (
                 <ItemRow
@@ -261,7 +317,9 @@ export default function Boodschappen() {
                         : undefined
                   }
                   onPress={() => addFavorite(item)}
+                  onLongPress={() => hideFavorite(item)}
                   accessibilityLabel={onList ? t('groceries.favorites.onlist') : t('catalog.add', { name: item.name })}
+                  accessibilityHint={t('groceries.favorites.longpress')}
                   trailing={
                     <IconButton icon="price" size={20} tint={colors.inkFaint}
                       accessibilityLabel={t('groceries.favorites.detail')}

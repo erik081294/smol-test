@@ -1,7 +1,7 @@
 // Units voor de pure "Vaste boodschappen"-groepering/sortering (lib/favoriteGroceries.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupFavorites } from '../lib/favoriteGroceries.js';
+import { groupFavorites, topFavorites, hiddenProducts } from '../lib/favoriteGroceries.js';
 
 const categories = [
   { key: 'zuivel', label: 'Zuivel & eieren', emoji: '🥛', sort: 20 },
@@ -51,4 +51,27 @@ test('groupFavorites: gelijke times_added → recency (nieuwste eerst), dan naam
 
 test('groupFavorites: lege input → lege lijst', () => {
   assert.deepEqual(groupFavorites([], categories), []);
+});
+
+test('topFavorites: globaal meest gekozen, times_added>0, gecapt', () => {
+  const top = topFavorites(products, { n: 2 });
+  assert.deepEqual(top.map((p) => p.id), ['1', '3']); // 12, 5 (id 4 heeft 0 → eruit; cap 2)
+});
+
+test('verborgen producten vallen uit groups én top', () => {
+  const withHidden = [...products, { id: '5', name: 'Verstopt', search: 'verstopt', category: 'zuivel', times_added: 99, hidden: true }];
+  const groups = groupFavorites(withHidden, categories);
+  const zuivel = groups.find((g) => g.key === 'zuivel');
+  assert.ok(!zuivel.items.some((p) => p.id === '5'), 'verborgen niet in groups');
+  assert.ok(!topFavorites(withHidden, { n: 5 }).some((p) => p.id === '5'), 'verborgen niet in top');
+});
+
+test('hiddenProducts: alleen verborgen, op naam, met filter', () => {
+  const withHidden = [
+    { id: 'a', name: 'Zeep', search: 'zeep', hidden: true },
+    { id: 'b', name: 'Appel', search: 'appel', hidden: true },
+    { id: 'c', name: 'Melk', search: 'melk', hidden: false },
+  ];
+  assert.deepEqual(hiddenProducts(withHidden).map((p) => p.id), ['b', 'a']); // op naam
+  assert.deepEqual(hiddenProducts(withHidden, { query: 'zeep' }).map((p) => p.id), ['a']);
 });
