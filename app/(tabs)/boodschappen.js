@@ -68,10 +68,13 @@ export default function Boodschappen() {
   // Secties voor de SectionList: top (alleen zonder filter) → schappen → verborgen (alleen
   // als "toon verborgen" aan staat). `kind` stuurt de rij-rendering.
   const favSections = useMemo(() => {
+    // Een product kan in "Meest gekozen" én in zijn schap staan; geef de rij een
+    // sectie-gebonden key zodat React geen dubbele keys ziet.
+    const tag = (sectionKey, arr) => arr.map((p) => ({ ...p, _favKey: `${sectionKey}:${p.id}` }));
     const out = [];
-    if (!favQuery && favTop.length) out.push({ key: '__top__', label: t('groceries.favorites.top'), emoji: '⭐', kind: 'top', data: favTop });
-    for (const g of favGroups) out.push({ ...g, kind: 'group', data: g.items });
-    if (showHidden && favHidden.length) out.push({ key: '__hidden__', label: t('groceries.favorites.hidden'), emoji: '🙈', kind: 'hidden', data: favHidden });
+    if (!favQuery && favTop.length) out.push({ key: '__top__', label: t('groceries.favorites.top'), emoji: '⭐', kind: 'top', data: tag('top', favTop) });
+    for (const g of favGroups) out.push({ ...g, kind: 'group', data: tag(g.key, g.items) });
+    if (showHidden && favHidden.length) out.push({ key: '__hidden__', label: t('groceries.favorites.hidden'), emoji: '🙈', kind: 'hidden', data: tag('hidden', favHidden) });
     return out;
   }, [favQuery, favTop, favGroups, showHidden, favHidden]);
 
@@ -275,7 +278,7 @@ export default function Boodschappen() {
           </View>
           <SectionList
             sections={favSections}
-            keyExtractor={(p) => p.id}
+            keyExtractor={(p) => p._favKey}
             contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
             stickySectionHeadersEnabled={false}
             keyboardShouldPersistTaps="handled"

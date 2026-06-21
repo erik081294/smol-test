@@ -39,6 +39,13 @@ test('selectNewDeltas: gat gedetecteerd als oudste delta ná het watermerk begin
   assert.equal(gap, true);
 });
 
+test('selectNewDeltas: overlappend venster met kleinste from ≠ kleinste to → geen vals gat', () => {
+  // [100,200] en [50,500]; watermark 75 valt binnen [50,500] → géén gat (regressietest:
+  // de delta met de kleinste `to` is niet die met de kleinste `from`).
+  const { gap } = selectNewDeltas([f(100, 200), f(50, 500)], ts(75));
+  assert.equal(gap, false);
+});
+
 test('selectNewDeltas: aansluitend (overlappend) → geen gat', () => {
   const { gap, pending } = selectNewDeltas([f(100, 200), f(150, 300)], ts(180)); // ts(180) valt in [ts(100),ts(200)]
   assert.equal(gap, false);
