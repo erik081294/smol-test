@@ -17,9 +17,17 @@
 // Vereiste secrets (zie docs/orq-receipt-scan.md):
 //   ORQ_API_KEY         — Orq.ai API-sleutel
 //   ORQ_DEPLOYMENT_KEY  — sleutel van de Orq-deployment (default 'receipt-extractor')
+//
+// Hardening (INF-9 / audit S-M4): per-gebruiker rate-limit (DB-RPC `record_receipt_scan`,
+// migratie 0026) + MIME-whitelist, beide vóór de betaalde Orq-call.
+
+// @ts-ignore — Deno laadt het .js-buurbestand; types niet nodig in deze schil.
+import { extractText, parseModelJson, normalize, effectiveMime, isAllowedMime } from './core.js';
 
 const ORQ_INVOKE_URL = 'https://api.orq.ai/v2/deployments/invoke';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // ~8MB base64-payload; grotere foto's weigeren
+const SCAN_MAX_PER_WINDOW = 20;          // max scans per gebruiker...
+const SCAN_WINDOW_SECONDS = 3600;        // ...per uur (schuivend venster)
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -40,59 +48,6 @@ const INSTRUCTION = `Je krijgt een foto van een kassabon. Lees de bon uit en gee
 {"store": <winkelnaam of null>, "purchased_on": <datum als "YYYY-MM-DD" of null>, "items": [{"name": <productnaam zoals op de bon>, "quantity": <aantal, getal>, "unit": <"stuk"|"kg"|"g"|"l"|"ml"|"pak">, "unit_price_cents": <prijs per stuk in hele centen, geheel getal>, "line_total_cents": <regeltotaal in hele centen, geheel getal>}]}
 Regels: bedragen in hele centen (1,29 euro -> 129). Sla statiegeld, kortingen, subtotalen en het eindtotaal NIET als item op. Bij twijfel over een eenheid gebruik "stuk". Geen tekst buiten de JSON, geen markdown-codeblok.`;
 
-// Haal de eerste tekstuele content uit een Orq/OpenAI-achtig antwoord, in welke
-// vorm dan ook (choices[].message.content kan een string of een content-array zijn).
-function extractText(data: unknown): string | null {
-  const d = data as Record<string, any>;
-  const choice = d?.choices?.[0]?.message ?? d?.message ?? d;
-  const content = choice?.content ?? d?.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    const textPart = content.find((c) => typeof c?.text === 'string');
-    if (textPart) return textPart.text;
-  }
-  if (typeof choice?.text === 'string') return choice.text;
-  return null;
-}
-
-// Parse de model-JSON tolerant: strip een eventueel ```json ... ``` codeblok.
-function parseModelJson(text: string): any {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const raw = (fenced ? fenced[1] : text).trim();
-  return JSON.parse(raw);
-}
-
-const UNITS = new Set(['stuk', 'kg', 'g', 'l', 'ml', 'pak']);
-const toInt = (v: unknown) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
-
-// Normaliseer/saneer naar het clientcontract; gooi rommelige regels weg.
-function normalize(parsed: any) {
-  const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  const clean = items
-    .map((i: any) => {
-      const name = typeof i?.name === 'string' ? i.name.trim() : '';
-      if (!name) return null;
-      const qty = Number(i?.quantity);
-      const unit = UNITS.has(i?.unit) ? i.unit : 'stuk';
-      return {
-        name,
-        quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
-        unit,
-        unit_price_cents: toInt(i?.unit_price_cents),
-        line_total_cents: toInt(i?.line_total_cents),
-      };
-    })
-    .filter(Boolean);
-  const date = typeof parsed?.purchased_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.purchased_on)
-    ? parsed.purchased_on
-    : null;
-  return {
-    store: typeof parsed?.store === 'string' && parsed.store.trim() ? parsed.store.trim() : null,
-    purchased_on: date,
-    items: clean,
-  };
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Methode niet toegestaan' }, 405);
@@ -110,6 +65,39 @@ Deno.serve(async (req) => {
   const { imageBase64, mimeType } = body;
   if (!imageBase64) return json({ error: 'Geen afbeelding meegegeven' }, 400);
   if (imageBase64.length > MAX_IMAGE_BYTES) return json({ error: 'Foto te groot — maak een kleinere of scherpere foto.' }, 413);
+
+  // MIME-whitelist: alleen echte foto-formaten naar de LLM-gateway.
+  const mime = effectiveMime(imageBase64, mimeType);
+  if (!isAllowedMime(mime)) {
+    return json({ error: 'Niet-ondersteund bestandstype — gebruik een JPEG-, PNG- of WebP-foto.' }, 415);
+  }
+
+  // Rate-limit per gebruiker vóór de betaalde Orq-call. De functie draait achter
+  // verify_jwt, dus het Authorization-JWT identificeert de gebruiker; de RPC telt
+  // het schuivende venster. Fail-open bij infra-fouten (een storing in de teller
+  // mag het scannen niet breken), fail-closed bij een expliciete over-de-limiet.
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && authHeader) {
+    try {
+      const rl = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_receipt_scan`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, authorization: authHeader, 'content-type': 'application/json' },
+        body: JSON.stringify({ p_max: SCAN_MAX_PER_WINDOW, p_window_seconds: SCAN_WINDOW_SECONDS }),
+      });
+      if (rl.ok) {
+        const allowed = await rl.json().catch(() => true);
+        if (allowed === false) {
+          return json({ error: 'Te veel bonscans in korte tijd — probeer het straks opnieuw.' }, 429);
+        }
+      } else {
+        console.warn('[scan-receipt] rate-limit-check status', rl.status);
+      }
+    } catch (e) {
+      console.warn('[scan-receipt] rate-limit-check faalde (fail-open)', String(e));
+    }
+  }
 
   const dataUrl = imageBase64.startsWith('data:')
     ? imageBase64

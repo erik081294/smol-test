@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, Alert, ScrollView, Pressable } from 'react-native';
+import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, Alert, ScrollView, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useCatalogCategories, useCatalogSearch } from '../lib/useCatalog';
@@ -141,7 +141,16 @@ export default function Catalog() {
           <View style={{ paddingVertical: space.lg, alignItems: 'center', gap: space.sm }}>
             {loadingMore ? <ActivityIndicator color={colors.forest} /> : null}
             {items.length > 0 ? (
-              <Text style={[type.caption, { textAlign: 'center' }]}>{t('catalog.attribution')}</Text>
+              <Pressable
+                onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
+                accessibilityRole="link"
+                accessibilityLabel={t('catalog.attribution')}
+                hitSlop={8}
+              >
+                <Text style={[type.caption, { textAlign: 'center', textDecorationLine: 'underline', color: colors.forest }]}>
+                  {t('catalog.attribution')}
+                </Text>
+              </Pressable>
             ) : null}
           </View>
         }

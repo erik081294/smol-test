@@ -7,6 +7,10 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 
 > Bron: [`huishoek-backlog.md`](../../huishoek-backlog.md) (§6 statustabel). Deze plannen
 > werken de openstaande Fase 2/3-items en cross-cutting platform-/infra-items uit.
+>
+> **Let op — dit is ontwerp-onderbouwing, geen status.** Veel van deze plannen zijn inmiddels
+> (deels) gebouwd. De actuele status staat uitsluitend in de backlog §6; lees deze plannen als
+> historische rationale bij hoe iets bedoeld is.
 
 ## De plannen
 

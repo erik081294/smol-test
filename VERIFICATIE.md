@@ -1,11 +1,13 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0022` zijn live (DB op `0022`).
-> **Nieuw deze ronde:** `0023_push_deliveries` staat in de repo en moet nog gepusht
-> (`supabase db push`, idempotent). Zie **`docs/HANDOVER.md`** voor de volledige lijst
-> openstaande Supabase-acties (migratie pushen, RLS-tests met secrets, PLT-1 trap 2 flip-on
-> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan). De stappen 1–2
-> hieronder blijven het herhaalrecept telkens als er een migratie bijkomt.
+> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0025` zijn live (**DB op `0025`**):
+> `0023_push_deliveries`, `0024_function_search_path` en `0025_expense_shares_hardening` zijn op
+> 2026-06-21 via de Supabase-connector toegepast en geverifieerd. De kern-RLS + RPC's zijn
+> bewezen via **`docs/rls-connector-check.sql`** (13/13, zonder secrets). **Nog open:** de
+> volledige JS-RLS-suite met secrets (18 stuks skippen zonder secrets), de PLT-1 trap 2 flip-on
+> via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan. De canonieke status
+> staat in **`huishoek-backlog.md`** §6 (INF-1). De stappen 1–2 hieronder blijven het herhaalrecept
+> telkens als er een migratie bijkomt.
 >
 > **De secrets staan lokaal in `.env`** (alle drie: `EXPO_PUBLIC_SUPABASE_URL`,
 > `EXPO_PUBLIC_SUPABASE_ANON_KEY` én `SUPABASE_SERVICE_ROLE_KEY`). De CLI is op deze
@@ -43,6 +45,12 @@ PATH="$NODE_BIN:$PATH" \
 Verwacht: **alle tests groen, 0 skipped** (de RLS-tests draaien i.p.v. skippen).
 De RLS-tests maken tijdelijke `rlstest+<timestamp>@example.com`-gebruikers aan en
 ruimen die na afloop op. De rest van dit document is de uitgebreide naslag.
+
+> **Geen secrets/egress (bv. Claude Code op het web)?** De JS-RLS-suite kan dan niet
+> draaien (egress-allowlist blokkeert `*.supabase.co`, en de service-role-key is niet
+> via de Supabase-connector beschikbaar). Gebruik dan **`docs/rls-connector-check.sql`**:
+> die verifieert de kern-RLS rechtstreeks via de connector met rol-/JWT-impersonatie en
+> rolt alles terug (geen persistentie). Laatst gedraaid 2026-06-21 → **7/7 PASS**.
 
 ---
 

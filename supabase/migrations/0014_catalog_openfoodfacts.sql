@@ -4,7 +4,7 @@
 -- Een GEDEELDE referentiecatalogus om de boodschappenlijst mee te vullen: de
 -- gebruiker bladert door categorieën of zoekt, en tikt een product aan. De data
 -- komt uit de Nederlandse subset van Open Food Facts (ODbL-licentie) en wordt
--- door scripts/import-off-nl.mjs gevuld via de service-role.
+-- door scripts/import-off-dump.mjs gevuld via de service-role (OFF data-dump).
 --
 -- Anders dan de boodschappen-tabellen uit 0013 is dit NIET huishouden-gescopet:
 --   • catalog_products    — globale producten (EAN, naam, merk, categorie, foto).
@@ -23,7 +23,7 @@ create extension if not exists pg_trgm with schema public;
 
 -- ---------------------------------------------------------------------------
 -- 1. Onze curated categorie-taxonomie ("schappen"). `key` is de stabiele sleutel
---    die catalog_products.category en het importscript (off-category-map.js)
+--    die catalog_products.category en het importscript (lib/offCategoryMap.js)
 --    gebruiken; `emoji` + `label` zijn voor de UI (categorie wordt áltijd met
 --    label getoond, niet met kleur/emoji alleen).
 -- ---------------------------------------------------------------------------

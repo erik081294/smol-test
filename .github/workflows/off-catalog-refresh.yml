@@ -1,0 +1,40 @@
+name: OFF catalogus delta-refresh
+
+# Houdt de globale productcatalogus (catalog_products) vers met OFF's DAGELIJKSE delta's
+# (incrementeel, idempotent — zie scripts/refresh-off-delta.mjs). Draait alleen als de
+# Supabase-secrets zijn ingesteld; zonder secret is het een bewuste no-op (geen faal-ruis).
+#
+# De periodieke VOLLE her-import (die ook verwijderingen opschoont; delta's kunnen dat niet)
+# blijft een handmatige stap — zie docs/off-catalog.md.
+on:
+  schedule:
+    - cron: '17 4 * * *' # elke dag 04:17 UTC
+  workflow_dispatch: {} # handmatig te starten
+
+concurrency:
+  group: off-catalog-refresh
+  cancel-in-progress: false
+
+jobs:
+  delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Delta-refresh
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Geen SUPABASE_SERVICE_ROLE_KEY-secret ingesteld — delta-refresh overgeslagen (no-op)."
+            exit 0
+          fi
+          node scripts/refresh-off-delta.mjs

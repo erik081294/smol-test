@@ -1,10 +1,10 @@
-// Units voor de OFF → Huishoek-categorie-mapping (scripts/off-category-map.js).
+// Units voor de OFF → Huishoek-categorie-mapping (lib/offCategoryMap.js).
 // De mapping vouwt granulaire Open Food Facts-tags tot één winkel-"schap"; deze
 // test borgt dat de bekende gevallen in het juiste schap belanden en dat ruis op
 // 'overig' terugvalt.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapCategory, CATEGORY_KEYS } from '../scripts/off-category-map.js';
+import { mapCategory, CATEGORY_KEYS } from '../lib/offCategoryMap.js';
 
 test('canonieke OFF-tags landen in het juiste schap', () => {
   assert.equal(mapCategory({ categories_tags: ['en:dairies', 'en:yogurts'] }), 'zuivel');
