@@ -5,6 +5,7 @@ import {
   monthMatrix, datedTasks, groupByDate, filterBySubgroup,
   dominantCategory, sortDayTasks, dateKey, monthLabel,
   groupByDay, weekDays, groupByWeek,
+  applyTaskFilters, countBy, activeFilterCount,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -118,4 +119,46 @@ test('groupByWeek: bucket per dag-sleutel, alleen binnen de week', () => {
   assert.deepEqual(byWeek['2026-06-22'].map((t) => t.id), ['a']);
   assert.deepEqual(byWeek['2026-06-24'].map((t) => t.id), ['b', 'c']);
   assert.equal(byWeek['2026-07-05'], undefined);
+});
+
+// === Filter-helpers (TKN-3) ===
+const sample = [
+  { id: '1', category: 'klus', assigned_to: 'a', share_subgroup_id: null, completed_at: null },
+  { id: '2', category: 'plant', assigned_to: 'b', share_subgroup_id: 'sg1', completed_at: '2026-06-22' },
+  { id: '3', category: 'klus', assigned_to: 'b', share_subgroup_id: null, completed_at: null },
+];
+
+test('applyTaskFilters: default toont alleen open', () => {
+  const r = applyTaskFilters(sample, {});
+  assert.deepEqual(r.map((t) => t.id), ['1', '3']);
+});
+
+test('applyTaskFilters: status done toont alleen afgerond', () => {
+  assert.deepEqual(applyTaskFilters(sample, { status: 'done' }).map((t) => t.id), ['2']);
+});
+
+test('applyTaskFilters: categorie + persoon combineren (AND tussen assen)', () => {
+  const r = applyTaskFilters(sample, { categories: ['klus'], assignees: ['b'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['3']);
+});
+
+test('applyTaskFilters: meerdere categorieën (OR binnen as)', () => {
+  const r = applyTaskFilters(sample, { categories: ['klus', 'plant'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['1', '2', '3']);
+});
+
+test('applyTaskFilters: subgroep-filter', () => {
+  const r = applyTaskFilters(sample, { subgroupId: 'sg1', status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['2']);
+});
+
+test('countBy: telt per categorie', () => {
+  assert.deepEqual(countBy(sample, (t) => t.category), { klus: 2, plant: 1 });
+});
+
+test('activeFilterCount: telt niet-default assen', () => {
+  assert.equal(activeFilterCount({}), 0);
+  assert.equal(activeFilterCount({ status: 'done' }), 1);
+  assert.equal(activeFilterCount({ categories: ['klus'], assignees: ['a'] }), 2);
+  assert.equal(activeFilterCount({ categories: ['klus'], subgroupId: 'sg1', status: 'all' }), 3);
 });

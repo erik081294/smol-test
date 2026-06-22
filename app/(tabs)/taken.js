@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, SectionList } from 'react-native';
+import { View, Text, ScrollView, SectionList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
@@ -8,42 +8,50 @@ import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
 import { MonthView } from '../../lib/MonthView';
 import {
-  Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader, DateStepper,
+  Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
+  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row,
 } from '../../lib/ui';
-import { colors, categoryMeta, space, type } from '../../lib/theme';
+import { Icon } from '../../lib/icons';
+import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
 import { choreToTask } from '../../lib/choreLibrary';
 import {
   groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey,
+  applyTaskFilters, countBy, activeFilterCount,
 } from '../../lib/agenda';
 import { isOverdue } from '../../lib/recurrence';
 import { dateLocale, t } from '../../lib/i18n';
 
+const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
+
 export default function Taken() {
   const { tasks, loading, reload, addTask, completeTask, uncompleteTask } = useTasks();
-  const { members } = useHousehold();
+  const { members, subgroups } = useHousehold();
   const router = useRouter();
 
   const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand'
   const [cursor, setCursor] = useState(new Date());  // anker voor Dag/Week
   const [selected, setSelected] = useState(dateKey(new Date())); // gekozen dag in Maand
-  const [cat, setCat] = useState('alle');
-  const [showDone, setShowDone] = useState(false);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   const addFromLibrary = (chore) => addTask(choreToTask(chore, { startDate: new Date() }));
 
-  // Categorie/status-filter (orthogonaal aan de scope).
-  const filtered = useMemo(() => tasks.filter((tk) => {
-    if (!showDone && tk.completed_at) return false;
-    if (showDone && !tk.completed_at) return false;
-    if (cat !== 'alle' && tk.category !== cat) return false;
-    return true;
-  }), [tasks, cat, showDone]);
+  // Filter-as-object naar de pure helper (assignee single-select → array van 0/1).
+  const filterArg = useMemo(() => ({
+    categories: filters.categories,
+    assignees: filters.assigneeId ? [filters.assigneeId] : [],
+    subgroupId: filters.subgroupId,
+    status: filters.status,
+  }), [filters]);
 
-  // Achterstallig staat altijd bovenaan (Dag/Week), los van de cursor; niet in af-modus.
-  const overdue = useMemo(() => (showDone ? [] : filtered.filter(isOverdue)), [filtered, showDone]);
+  const filtered = useMemo(() => applyTaskFilters(tasks, filterArg), [tasks, filterArg]);
+  const activeCount = activeFilterCount(filterArg);
+
+  // Achterstallig altijd bovenaan (Dag/Week), los van de cursor; niet in af-modus.
+  const overdue = useMemo(() => (filters.status === 'done' ? [] : filtered.filter(isOverdue)), [filtered, filters.status]);
 
   const toggle = (tk) => {
     animateNextLayout();
@@ -64,8 +72,7 @@ export default function Taken() {
       for (const d of weekDays(cursor)) {
         const items = sortDayTasks(byDay[d.key]).filter((tk) => !overdue.includes(tk));
         if (items.length) {
-          const label = format(d.date, 'EEEE d MMM', { locale: dateLocale() });
-          out.push({ key: d.key, title: label, data: items });
+          out.push({ key: d.key, title: format(d.date, 'EEEE d MMM', { locale: dateLocale() }), data: items });
         }
       }
     }
@@ -80,6 +87,23 @@ export default function Taken() {
 
   const week = weekDays(cursor);
   const weekLabel = `${format(week[0].date, 'd')} – ${format(week[6].date, 'd MMM', { locale: dateLocale() })}`;
+
+  // Actieve-filter-chips boven de lijst (elk verwijderbaar).
+  const activeChips = [];
+  for (const c of filters.categories) {
+    activeChips.push({ key: `c-${c}`, label: categoryMeta[c]?.label ?? c, onRemove: () => setFilters((f) => ({ ...f, categories: f.categories.filter((x) => x !== c) })) });
+  }
+  if (filters.assigneeId) {
+    const name = members.find((m) => m.id === filters.assigneeId)?.display_name?.split(' ')[0] ?? t('common.someone');
+    activeChips.push({ key: 'assignee', label: name, onRemove: () => setFilters((f) => ({ ...f, assigneeId: null })) });
+  }
+  if (filters.subgroupId) {
+    const g = subgroups.find((s) => s.id === filters.subgroupId);
+    activeChips.push({ key: 'subgroup', label: g ? `${g.emoji} ${g.name}` : t('tasks.filter.group'), onRemove: () => setFilters((f) => ({ ...f, subgroupId: null })) });
+  }
+  if (filters.status !== 'open') {
+    activeChips.push({ key: 'status', label: filters.status === 'done' ? t('tasks.filter.done') : t('tasks.filter.status.all'), onRemove: () => setFilters((f) => ({ ...f, status: 'open' })) });
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -100,19 +124,32 @@ export default function Taken() {
         />
       </View>
 
-      {/* Categorie-filter */}
+      {/* Filterbalk (TKN-3): knop met teller + actieve-filter-chips + wis-alles */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8 }}>
-        <Chip label={t('common.all')} active={cat === 'alle'} onPress={() => setCat('alle')} />
-        {Object.entries(categoryMeta).map(([k, m]) => (
-          <Chip key={k} icon={m.icon} label={m.label} active={cat === k} color={m.color} onPress={() => setCat(k)} />
+        contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, alignItems: 'center' }}>
+        <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button"
+          accessibilityLabel={t('tasks.filter.title')}
+          style={({ pressed }) => ({
+            flexDirection: 'row', alignItems: 'center', gap: 6, height: 38,
+            paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5,
+            borderColor: activeCount ? colors.forest : colors.lineStrong,
+            backgroundColor: activeCount ? colors.forest : (pressed ? colors.surfaceAlt : 'transparent'),
+          })}>
+          <Icon name="filter" size={16} color={activeCount ? colors.onDark : colors.ink} />
+          <Text style={[type.button, { fontSize: 14, color: activeCount ? colors.onDark : colors.ink }]}>
+            {t('tasks.filter.button')}{activeCount ? ` · ${activeCount}` : ''}
+          </Text>
+        </Pressable>
+        {activeChips.map((chip) => (
+          <Chip key={chip.key} label={`${chip.label}  ✕`} active onPress={chip.onRemove} />
         ))}
+        {activeCount > 0 ? (
+          <Pressable onPress={() => setFilters(EMPTY_FILTERS)} hitSlop={8} accessibilityRole="button"
+            accessibilityLabel={t('tasks.filter.clear')}>
+            <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{t('tasks.filter.clear')}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
-
-      <View style={{ flexDirection: 'row', paddingHorizontal: 18, marginBottom: 6, gap: 8 }}>
-        <Chip label={t('tasks.filter.open')} active={!showDone} onPress={() => setShowDone(false)} />
-        <Chip label={t('tasks.filter.done')} active={showDone} color={colors.done} onPress={() => setShowDone(true)} />
-      </View>
 
       {/* Dag/Week-cursor */}
       {scope === 'dag' ? (
@@ -148,8 +185,8 @@ export default function Taken() {
           renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
           ListEmptyComponent={!loading ? (
             <Empty illustration="tasks"
-              title={showDone ? t('tasks.empty.done.title') : t('tasks.scope.empty.title')}
-              subtitle={showDone ? t('tasks.empty.done.subtitle') : (scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day'))} />
+              title={filters.status === 'done' ? t('tasks.empty.done.title') : t('tasks.scope.empty.title')}
+              subtitle={filters.status === 'done' ? t('tasks.empty.done.subtitle') : (scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day'))} />
           ) : null}
         />
       )}
@@ -157,6 +194,81 @@ export default function Taken() {
       <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
 
       <ChoreLibrarySheet visible={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={addFromLibrary} />
+
+      <TaskFilterSheet
+        visible={filterOpen} onClose={() => setFilterOpen(false)}
+        filters={filters} setFilters={setFilters}
+        members={members} subgroups={subgroups} tasks={tasks} filterArg={filterArg}
+      />
     </SafeAreaView>
+  );
+}
+
+// Bottom-sheet met gegroepeerde filterkeuzes (categorie/persoon/groep/status).
+// Filters werken live; de sheet is enkel de editor. Categorie toont per-categorie
+// tellers (countBy) op de huidige selectie minus de categorie-as.
+function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tasks, filterArg }) {
+  const catCounts = useMemo(
+    () => countBy(applyTaskFilters(tasks, { ...filterArg, categories: [] }), (tk) => tk.category),
+    [tasks, filterArg],
+  );
+  const toggleCategory = (k) => setFilters((f) => ({
+    ...f, categories: f.categories.includes(k) ? f.categories.filter((x) => x !== k) : [...f.categories, k],
+  }));
+
+  return (
+    <BottomSheet visible={visible} onClose={onClose}>
+      <ModalHeader title={t('tasks.filter.title')} onClose={onClose} />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+        {/* Categorie (multi) */}
+        <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.category')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
+          {Object.entries(categoryMeta).map(([k, m]) => (
+            <Chip key={k} icon={m.icon} color={m.color}
+              label={catCounts[k] ? `${m.label} · ${catCounts[k]}` : m.label}
+              active={filters.categories.includes(k)} onPress={() => toggleCategory(k)} />
+          ))}
+        </View>
+
+        {/* Toegewezen aan (single) */}
+        <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.assignee')}</Text>
+        <AvatarSelect members={members} includeEveryone everyoneLabel={t('common.everyone')}
+          selectedId={filters.assigneeId} onSelect={(id) => setFilters((f) => ({ ...f, assigneeId: id }))}
+          style={{ marginBottom: space.lg }} />
+
+        {/* Groep (single) */}
+        {subgroups.length > 0 ? (
+          <>
+            <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.group')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
+              <Chip label={t('common.everyone')} active={!filters.subgroupId}
+                onPress={() => setFilters((f) => ({ ...f, subgroupId: null }))} />
+              {subgroups.map((g) => (
+                <Chip key={g.id} label={`${g.emoji} ${g.name}`} active={filters.subgroupId === g.id}
+                  onPress={() => setFilters((f) => ({ ...f, subgroupId: g.id }))} />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {/* Status */}
+        <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.status')}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: space.lg }}>
+          {[['open', t('tasks.filter.open')], ['done', t('tasks.filter.done')], ['all', t('tasks.filter.status.all')]].map(([v, lbl]) => (
+            <Chip key={v} label={lbl} active={filters.status === v}
+              onPress={() => setFilters((f) => ({ ...f, status: v }))} />
+          ))}
+        </View>
+
+        <Row gap={space.sm}>
+          <View style={{ flex: 1 }}>
+            <Button title={t('tasks.filter.clear')} variant="ghost" onPress={() => setFilters(EMPTY_FILTERS)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title={t('tasks.filter.apply')} onPress={onClose} />
+          </View>
+        </Row>
+      </ScrollView>
+    </BottomSheet>
   );
 }
