@@ -1,0 +1,22 @@
+# Dependabot (review A2): bewaakt npm-deps én GitHub-Actions op bekende
+# kwetsbaarheden en versie-drift. Het github-actions-ecosysteem houdt tevens de
+# SHA-pins in de workflows bij (review G1).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # Skill-subdependency buiten de hoofd-lockfile (review C2): @resvg/resvg-js.
+  - package-ecosystem: "npm"
+    directory: "/.claude/skills/svg-illustraties/scripts"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

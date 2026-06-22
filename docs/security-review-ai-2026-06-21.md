@@ -185,4 +185,51 @@ Een korte checklist om het proces structureel weerbaar te houden:
 
 ---
 
-*Volgende stap (optioneel): een implementatieronde op basis van de backlog in §3, te beginnen met de twee P1-items (A1, A2) die niet-brekend en snel door te voeren zijn.*
+## 5. Implementatieronde — 2026-06-22
+
+Afspraak: **niet-brekende maatregelen meteen doorgevoerd; brekende/gedrags­wijzigende items naar de backlog** met genoeg info om ze later gericht uit te zoeken.
+
+### ✅ Doorgevoerd (niet-brekend)
+
+| ID | Wat | Bestand(en) |
+|----|-----|-------------|
+| A1 | `packageManager: yarn`-veld verwijderd → npm is de enige manager | `package.json` |
+| A2 | Dependabot (npm hoofd + skill-dir + github-actions) + niet-blokkerende `npm audit --audit-level=high` in CI | `.github/dependabot.yml`, `.github/workflows/ci.yml` |
+| C2 | `@resvg/resvg-js` exact gepind (`2.6.2`) + `package-lock.json` gecommit in de skill-map (integrity-hashes, resolve naar npmjs) | `.claude/skills/svg-illustraties/scripts/{package.json,package-lock.json}` |
+| F1 | `SECURITY.md` toegevoegd: disclosure-contact + rotatie-policy + AI-dev-richtlijnen | `SECURITY.md` |
+| E1 | `minimum_password_length` 6 → 8 (raakt alleen nieuwe/gewijzigde wachtwoorden; bestaande gebruikers niet) | `supabase/config.toml` |
+| G1 | GitHub-Actions SHA-gepind (`checkout`/`setup-node` op commit-SHA + versie-comment) | beide workflows |
+| G2 | Expliciete top-level `permissions: contents: read` | beide workflows |
+
+### 🔬 Backlog — brekend / gedrag / extern (eerst uitzoeken)
+
+**D1 — `scan-receipt` CORS `*` → app-origins (mogelijk brekend voor de webclient).**
+Native RN-`fetch` stuurt geen browser-`Origin`; CORS raakt dáár niets — **alleen de web-build (react-native-web) wordt geraakt**. Uit te zoeken: de legitieme web-origins — lokale Expo-web-dev (bv. `http://localhost:8081`) én de productie-/preview-hosting-URL van de web-build (nu niet vastgesteld; hosting-locatie bepalen). Implementatie: vervang de statische `*` (`index.ts:33`) door **reflectie van de request-`Origin` mits in een allowlist** (anders geen `Access-Control-Allow-Origin`), in zowel het `OPTIONS`-preflight-antwoord als de `json()`-headers. Test de webclient + preflight tegen elke origin vóór deploy.
+
+**E1-vervolg — `password_requirements` (samenstellingseisen).** Lengte is al naar 8 (niet-brekend). De composition-eisen (bv. `lower_upper_letters_digits`, `config.toml:147`) zijn een sterkere signup-gedragswijziging. Uit te zoeken: UX/foutmeldingen in de signup-flow, en of dit via `supabase config push` ook op het live project moet. Bestaande gebruikers niet geraakt.
+
+**A2b — `npm audit` blokkerend maken (brekend voor merges).** Eerst een schone baseline (alle high/critical oplossen of expliciet motiveren), dáárna `continue-on-error: true` weghalen in `ci.yml`.
+
+**F1-extern — GitHub secret scanning + push protection.** Admin-toggle in GitHub (Settings → Code security and analysis), géén code in deze repo. Te zetten door een repo-admin; gedocumenteerd in `SECURITY.md`.
+
+**C1 — `.claude/settings.json` least-privilege (`ask`-regels).** Niet automatisch doorgevoerd: de Claude-Code auto-mode-classifier blokkeert dat de agent zijn eigen `settings.json` wijzigt (terecht). **Handmatig toe te voegen** onder `"permissions"`:
+```json
+"permissions": {
+  "ask": [
+    "mcp__claude_ai_Supabase__apply_migration",
+    "mcp__claude_ai_Supabase__execute_sql",
+    "mcp__claude_ai_Supabase__deploy_edge_function",
+    "mcp__claude_ai_Supabase__create_branch",
+    "mcp__claude_ai_Supabase__merge_branch",
+    "Bash(git push:*)",
+    "Bash(gh pr merge:*)"
+  ]
+}
+```
+Effect: handmatige bevestiging vóór privileged MCP-/push-/merge-acties (review C1, aanbeveling 2 & 3). De documentaire kant (untrusted-data-discipline, MCP-scope) staat al in `SECURITY.md`.
+
+**B2 — CI `--ignore-scripts` (optioneel, te verifiëren).** Voeg `--ignore-scripts` toe aan `npm ci` in de workflows. Laag risico (de RN/web-tests draaien zonder native build), maar het CI-effect was hier niet te verifiëren — eerst één CI-run bevestigen vóór vastleggen.
+
+---
+
+*Status: de zeven niet-brekende items hierboven zijn doorgevoerd in de werkboom (nog niet gecommit). De backlog-items vragen elk eerst een korte uitzoek-/verificatiestap zoals beschreven.*

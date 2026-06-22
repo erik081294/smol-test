@@ -11,6 +11,10 @@ on:
     - cron: '17 4 * * *' # elke dag 04:17 UTC
   workflow_dispatch: {} # handmatig te starten
 
+# Least-privilege workflow-token (review G2).
+permissions:
+  contents: read
+
 concurrency:
   group: off-catalog-refresh
   cancel-in-progress: false
@@ -19,9 +23,10 @@ jobs:
   delta:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Actions zijn SHA-gepind (review G1); Dependabot github-actions houdt de pins bij.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
