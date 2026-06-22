@@ -46,3 +46,27 @@ test('frequencyLabel: uitlegbare string of null', () => {
   assert.match(frequencyLabel(est), /14/);
   assert.equal(frequencyLabel(null), null);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('lege/null/ongeldige datums vallen weg bij intervallen', () => {
+  assert.deepEqual(purchaseIntervals(['2026-06-08', null, '', 'onzin', '2026-06-01']), [7]);
+});
+
+test('frequencyEstimate: mediaan sorteert de intervallen (volgorde-onafhankelijk)', () => {
+  // dag-gaps 3, 14, 7 → mediaan 7 (niet 14 of de invoervolgorde).
+  const est = frequencyEstimate(['2026-06-01', '2026-06-04', '2026-06-18', '2026-06-25'], new Date(2026, 6, 2));
+  assert.equal(est.medianDays, 7);
+});
+
+test('frequencyEstimate: even aantal intervallen → gemiddelde van de twee middelste', () => {
+  // gaps 7 en 14 → mediaan (7+14)/2 = 10,5 → 11.
+  const est = frequencyEstimate(['2026-06-01', '2026-06-08', '2026-06-22'], new Date(2026, 6, 1));
+  assert.equal(est.medianDays, 11);
+});
+
+test('frequencyEstimate: zelfde dag twee keer → mediaan 0 en dueScore 0 (geen deling door nul)', () => {
+  const est = frequencyEstimate(['2026-06-01', '2026-06-01'], new Date(2026, 5, 10));
+  assert.equal(est.medianDays, 0);
+  assert.equal(est.dueScore, 0);
+});

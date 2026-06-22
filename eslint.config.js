@@ -7,7 +7,7 @@ module.exports = defineConfig([
     // Globale ignores (los object zónder andere keys, anders geldt het niet globaal):
     // build-output, Deno-edge-functions (eigen runtime/URL-imports) en de Claude-
     // skill-scripts (los tooling met eigen deps) horen niet bij de app-lint.
-    ignores: ["dist/*", "supabase/functions/**", ".claude/**"],
+    ignores: ["dist/*", "supabase/functions/**", ".claude/**", "reports/**", ".stryker-tmp/**"],
   },
   expoConfig,
   {

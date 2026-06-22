@@ -162,3 +162,50 @@ test('cleaningSummary: open zone-taken', () => {
   const s = cleaningSummary([{ zone_id: 'z1', completed_at: null }, { zone_id: null, completed_at: null }]);
   assert.equal(s.count, 1);
 });
+
+// --- Aanvullende randgevallen voor de samenvattingen (mutatietest-analyse 2026-06-22):
+// open vs afgevinkt, namen-cap op 3, null-invoer, de "vandaag"-grens en de sortering.
+
+test('taskFocusSummary: telt alleen OPEN achterstallige taken', () => {
+  const s = taskFocusSummary([
+    { id: '1', due_date: '2026-06-20', completed_at: null },         // open overdue
+    { id: '2', due_date: '2026-06-19', completed_at: null },         // open overdue
+    { id: '3', due_date: '2026-06-20', completed_at: '2026-06-21' }, // af → niet
+  ], NOW);
+  assert.equal(s.overdue, 2);
+});
+
+test('groceriesSummary: namen gecapt op 3', () => {
+  const s = groceriesSummary([1, 2, 3, 4].map((n) => ({ name: `P${n}`, checked: false })));
+  assert.equal(s.count, 4);
+  assert.deepEqual(s.names, ['P1', 'P2', 'P3']);
+});
+
+test('expenseBalanceSummary: null-invoer → saldo 0 (geen crash)', () => {
+  assert.equal(expenseBalanceSummary(null, 'u1').cents, 0);
+});
+
+test('plantsSummary: sluit af/zonder-plant/zonder-datum uit; vandaag telt mee; namen gecapt', () => {
+  const plants = [1, 2, 3, 4].map((n) => ({ id: `p${n}`, name: `Plant${n}` }));
+  const tasks = [
+    { plant_id: 'p1', due_date: '2026-06-20', completed_at: null },         // achterstallig
+    { plant_id: 'p2', due_date: '2026-06-22', completed_at: null },         // vandaag → meetellen (<=)
+    { plant_id: 'p3', due_date: '2026-06-21', completed_at: null },
+    { plant_id: 'p4', due_date: '2026-06-20', completed_at: null },
+    { plant_id: 'p2', due_date: '2026-06-20', completed_at: '2026-06-21' }, // af → niet
+    { plant_id: null, due_date: '2026-06-20', completed_at: null },         // geen plant → niet
+    { plant_id: 'p1', completed_at: null },                                 // geen datum → niet
+  ];
+  const s = plantsSummary(plants, tasks, NOW);
+  assert.equal(s.count, 4);
+  assert.deepEqual(s.names, ['Plant1', 'Plant2', 'Plant3']);
+});
+
+test('agendaSummary: gesorteerd op datum; next = eerstvolgende', () => {
+  const s = agendaSummary([
+    { id: 'late', due_date: '2026-06-25', completed_at: null },
+    { id: 'soon', due_date: '2026-06-23', completed_at: null },
+  ], NOW);
+  assert.equal(s.count, 2);
+  assert.equal(s.next.id, 'soon');
+});

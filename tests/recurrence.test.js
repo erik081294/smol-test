@@ -2,8 +2,9 @@
 // Gebruikt Node's ingebouwde testrunner (node:test) — geen extra dependencies.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { format } from 'date-fns';
-import { nextDueDate, recurrenceLabel, isOverdue } from '../lib/recurrence.js';
+import { format, addDays } from 'date-fns';
+import { nextDueDate, recurrenceLabel, dueLabel, isOverdue } from '../lib/recurrence.js';
+import { t } from '../lib/i18n.js';
 
 const ymd = (d) => (d ? format(d, 'yyyy-MM-dd') : null);
 
@@ -44,4 +45,32 @@ test('isOverdue: afgevinkt of zonder datum nooit achterstallig', () => {
   assert.equal(isOverdue({ due_date: '2020-01-01', completed_at: '2020-01-02' }), false);
   assert.equal(isOverdue({ completed_at: null }), false);
   assert.equal(isOverdue({ due_date: '2020-01-01' }), true); // ver in het verleden
+});
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// onbekende frequentie, wekelijks-label zonder/met ongesorteerde dagen, dueLabel
+// (null/vandaag/morgen/tijd-afkapping) en een toekomstige datum bij isOverdue.
+
+test('nextDueDate: onbekende frequentie geeft null; ongeldige weekdag valt terug op +1 week', () => {
+  assert.equal(nextDueDate({ recur_freq: 'yearly', due_date: '2026-06-16' }), null);
+  // [9] is geen geldige weekdag → de lus vindt niets → +1 week (16 → 23 jun).
+  assert.equal(ymd(nextDueDate({ recur_freq: 'weekly', due_date: '2026-06-16', recur_weekdays: [9], recur_interval: 1 })), '2026-06-23');
+});
+
+test('recurrenceLabel: wekelijks zonder dagen, en dagen worden gesorteerd', () => {
+  assert.equal(recurrenceLabel({ recur_freq: 'weekly', recur_interval: 1 }), 'Elke week');
+  assert.equal(recurrenceLabel({ recur_freq: 'yearly' }), 'Eenmalig'); // onbekend → eenmalig
+  // ongesorteerde dagen [4,1] → label toch in dag-volgorde "ma, do"
+  assert.equal(recurrenceLabel({ recur_freq: 'weekly', recur_weekdays: [4, 1] }), 'Wekelijks: ma, do');
+});
+
+test('dueLabel: null zonder datum, vandaag/morgen herkend, tijd afgekapt op uu:mm', () => {
+  assert.equal(dueLabel({}), null);
+  assert.equal(dueLabel({ due_date: format(new Date(), 'yyyy-MM-dd') }), t('due.today'));
+  assert.equal(dueLabel({ due_date: format(addDays(new Date(), 1), 'yyyy-MM-dd') }), t('due.tomorrow'));
+  assert.match(dueLabel({ due_date: '2020-01-01', due_time: '09:00:00' }), /· 09:00$/);
+});
+
+test('isOverdue: een toekomstige datum is niet achterstallig', () => {
+  assert.equal(isOverdue({ due_date: format(addDays(new Date(), 7), 'yyyy-MM-dd') }), false);
 });
