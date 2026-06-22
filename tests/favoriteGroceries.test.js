@@ -75,3 +75,39 @@ test('hiddenProducts: alleen verborgen, op naam, met filter', () => {
   assert.deepEqual(hiddenProducts(withHidden).map((p) => p.id), ['b', 'a']); // op naam
   assert.deepEqual(hiddenProducts(withHidden, { query: 'zeep' }).map((p) => p.id), ['a']);
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// de tie-break-trap (recency vóór naam, dan naam), search-veld los van naam,
+// times_added-grens en een categorie buiten de taxonomie.
+
+test('sortering binnen schap: gelijke times_added → recency wint van alfabet', () => {
+  const tie = [
+    { id: 'x', name: 'Zzz', category: 'overig', times_added: 2, last_added_at: '2026-06-10T00:00:00Z' }, // recenter, naam laat
+    { id: 'y', name: 'Aaa', category: 'overig', times_added: 2, last_added_at: '2026-06-01T00:00:00Z' }, // ouder, naam vroeg
+  ];
+  assert.deepEqual(groupFavorites(tie, categories)[0].items.map((p) => p.id), ['x', 'y']);
+});
+
+test('sortering binnen schap: gelijke recency (beide null) → op naam', () => {
+  const tie = [
+    { id: 'z', name: 'Zzz', category: 'overig', times_added: 2, last_added_at: null },
+    { id: 'a', name: 'Aaa', category: 'overig', times_added: 2, last_added_at: null },
+  ];
+  assert.deepEqual(groupFavorites(tie, categories)[0].items.map((p) => p.id), ['a', 'z']);
+});
+
+test('matchesQuery: matcht op het search-veld los van de naam', () => {
+  const prods = [{ id: '1', name: 'Heel iets anders', search: 'abc', category: 'overig', times_added: 1 }];
+  assert.equal(groupFavorites(prods, categories, { query: 'abc' })[0].items.length, 1);
+});
+
+test('topFavorites: times_added 0 valt weg, ook bij ruime n', () => {
+  assert.deepEqual(topFavorites(products, { n: 5 }).map((p) => p.id), ['1', '3', '2']); // 12,5,3; id4 (0) eruit
+});
+
+test('groupFavorites: categorie buiten de taxonomie → fallback-label = key, emoji null', () => {
+  const g = groupFavorites([{ id: '1', name: 'X', category: 'onbekend-schap', times_added: 1 }], categories);
+  assert.equal(g[0].key, 'onbekend-schap');
+  assert.equal(g[0].label, 'onbekend-schap');
+  assert.equal(g[0].emoji, null);
+});

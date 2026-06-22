@@ -82,3 +82,44 @@ test('sinceDate: berekent dagen terug en respecteert ALL', () => {
   const month = sinceDate(PERIODS.MONTH, now);
   assert.equal(month.toISOString(), '2026-05-19T12:00:00.000Z');
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// null-entry/onbekend/datumloos vertekenen telling+pct niet, de periode-grens,
+// naam/emoji-fallback en de id-tie-break in beide richtingen.
+
+test('tally: null-entry, onbekende en datumloze rijen vertekenen telling/pct niet; grens telt mee', () => {
+  const since = new Date('2026-06-01T00:00:00Z');
+  const rows = tally([
+    { completed_by: 'a', completed_at: '2026-06-10T10:00:00Z' },
+    null,                                                          // null-entry → overslaan
+    { completed_by: 'zzz', completed_at: '2026-06-10T10:00:00Z' }, // geen huidig lid → overslaan
+    { completed_by: 'b', completed_at: null },                     // datumloos binnen periode → overslaan
+    { completed_by: 'b', completed_at: '2026-06-01T00:00:00Z' },   // exact op de grens → telt mee
+  ], MEMBERS, since);
+  const byId = Object.fromEntries(rows.map((r) => [r.profileId, r]));
+  assert.equal(byId.a.count, 1);
+  assert.equal(byId.b.count, 1);
+  assert.equal(byId.c.count, 0);
+  assert.equal(sum(rows), 2);
+  assert.ok(Math.abs(byId.a.pct - 50) < 1e-9, 'onbekende/datumloze rijen vertekenen het percentage niet');
+});
+
+test('tally: zonder periode tellen ook voltooiingen zónder datum mee', () => {
+  const rows = tally([{ completed_by: 'a', completed_at: null }], MEMBERS); // since = null
+  assert.equal(rows.find((r) => r.profileId === 'a').count, 1);
+});
+
+test('tally: naam en emoji komen van het lid, met fallback', () => {
+  const rows = tally([], [{ id: 'a', display_name: 'Alice', avatar_emoji: '🦊' }, { id: 'b' }]);
+  const byId = Object.fromEntries(rows.map((r) => [r.profileId, r]));
+  assert.equal(byId.a.name, 'Alice');
+  assert.equal(byId.a.emoji, '🦊');
+  assert.equal(byId.b.name, 'Onbekend');
+  assert.equal(byId.b.emoji, null);
+});
+
+test('tally: id-tie-break onafhankelijk van de leden-volgorde', () => {
+  const M = (ids) => ids.map((id) => ({ id, display_name: id }));
+  assert.deepEqual(tally([], M(['c', 'a', 'b'])).map((r) => r.profileId), ['a', 'b', 'c']);
+  assert.deepEqual(tally([], M(['a', 'b', 'c'])).map((r) => r.profileId), ['a', 'b', 'c']);
+});
