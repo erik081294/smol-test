@@ -110,7 +110,7 @@ test('yearGrid: maandlabels — 12 maanden, oplopend, geen rand-jaar', () => {
   }
 });
 
-test('yearSummary: totaal, actieve dagen, beste dag, weekdag-verdeling', () => {
+test('yearSummary: totaal, actieve dagen, weekdag-verdeling', () => {
   const counts = countsByDay([
     comp('a', 2026, 0, 5), comp('a', 2026, 0, 5), // ma 5 jan: 2
     comp('a', 2026, 0, 6),                         // di 6 jan: 1
@@ -119,8 +119,6 @@ test('yearSummary: totaal, actieve dagen, beste dag, weekdag-verdeling', () => {
   const s = yearSummary(counts, 2026, { today: new Date(2026, 5, 1) });
   assert.equal(s.total, 4);
   assert.equal(s.activeDays, 3);
-  assert.equal(s.bestDay.key, '2026-01-05');
-  assert.equal(s.bestDay.count, 2);
   // 5 jan 2026 = maandag (getDay 1), 6 jan = di (2), 8 jan = do (4).
   assert.equal(s.byWeekday[1], 2);
   assert.equal(s.byWeekday[2], 1);
@@ -166,6 +164,5 @@ test('yearSummary: leeg jaar -> veilige nullen', () => {
   assert.equal(s.activeDays, 0);
   assert.equal(s.longestStreak, 0);
   assert.equal(s.currentStreak, 0);
-  assert.equal(s.bestDay, null);
   assert.equal(s.busiestWeekday, null);
 });
