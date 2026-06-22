@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { parseISO, isToday } from 'date-fns';
@@ -9,10 +9,14 @@ import { useAuth } from '../../lib/auth';
 import { TaskRow } from '../../lib/TaskRow';
 import { FAB, SectionHeader, ItemRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
-import { HOME_CARDS } from '../../lib/home/cards';
+import { deriveDefaultLayout, packGrid } from '../../lib/widgets/grid';
+import { WIDGET_BY_KEY, DEFAULTS_BY_MODULE } from '../../lib/widgets/registry';
 import { isOverdue } from '../../lib/recurrence';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural } from '../../lib/i18n';
+
+const SCREEN_PAD = 18;
+const GRID_GAP = space.md;
 
 // Hoeveel focus-taken we bovenaan tonen voordat we doorverwijzen naar Taken.
 // Houdt het startscherm rustig: de focus is een overzicht, niet de volledige lijst.
@@ -50,9 +54,18 @@ export default function Home() {
     return t('greeting.evening');
   })();
 
-  // De ingeschakelde modules die een Home-kaart hebben (Vandaag = dit scherm,
-  // Taken zit al in de focus, dus die staan niet in HOME_CARDS).
-  const cards = modules.filter((m) => HOME_CARDS[m.key]);
+  // Widget-grid (VDG-1/2): de default-layout volgt de ingeschakelde modules; elke
+  // module levert zijn default-widget. packGrid berekent de cel-posities; we renderen
+  // 2-koloms met exacte celbreedtes (geen percentage-afronding). De stijl/layout
+  // wordt bewerkbaar in Fase C/D; hier de speelse default.
+  const { width } = useWindowDimensions();
+  const contentW = width - SCREEN_PAD * 2;
+  const colW = (contentW - GRID_GAP) / 2;
+  const widgetStyle = 'playful';
+
+  const moduleKeys = useMemo(() => modules.map((m) => m.key), [modules]);
+  const layout = useMemo(() => deriveDefaultLayout(moduleKeys, DEFAULTS_BY_MODULE), [moduleKeys]);
+  const cells = useMemo(() => packGrid(layout, { cols: 2 }), [layout]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -105,12 +118,22 @@ export default function Home() {
           </View>
         )}
 
-        {/* Wat speelt er: alleen modules mét nieuws renderen een kaart (de overige
-            geven null terug). De volledige, gegroepeerde directory leeft in "Meer". */}
-        {cards.map((m) => {
-          const Card = HOME_CARDS[m.key];
-          return <Card key={m.key} tasks={tasks} members={members} />;
-        })}
+        {/* Widget-grid: per ingeschakelde module een widget, modulair en kleurrijk.
+            Elke widget toont altijd een stand (ook "alles oké"). */}
+        {cells.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, marginBottom: space.lg }}>
+            {cells.map((cell) => {
+              const descriptor = WIDGET_BY_KEY[cell.key];
+              if (!descriptor) return null;
+              const Widget = descriptor.Render;
+              return (
+                <View key={cell.key} style={{ width: cell.w === 2 ? contentW : colW }}>
+                  <Widget size={cell.size} style={widgetStyle} tasks={tasks} members={members} />
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         {/* Eén rustige ingang naar alle onderdelen i.p.v. een tweede launchpad. */}
         <ItemRow
