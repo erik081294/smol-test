@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import { Icon } from '../../lib/icons';
 import { MODULES, MORE_TAB } from '../../lib/modules';
@@ -33,6 +34,13 @@ export default function TabsLayout() {
   const visible = new Set(modules.map((m) => m.key));
   const hasMore = modules.some((m) => !m.primary);
 
+  // Edge-to-edge is sinds Expo SDK 52+ standaard aan op Android: de app tekent
+  // áchter de transparante systeem-navigatiebalk. Een vaste `height` overschrijft
+  // de automatische inset-correctie van React Navigation, dus tellen we de
+  // onder-inset zelf bij de hoogte op én padden we de inhoud erboven (backlog
+  // UX-5). Het inset-gebied wordt rustige witruimte; de iconen blijven in beeld.
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -41,8 +49,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
-          height: 86,
+          height: 86 + insets.bottom,
           paddingTop: 8,
+          paddingBottom: insets.bottom,
         },
       }}
     >
