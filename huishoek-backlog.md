@@ -112,6 +112,15 @@ in de canonieke statustabel verderop in dit document (§6).
 >   **UX-11** kleinere FAB met label → ✅, en **UX-12** back-naar-Meer via
 >   `backBehavior="history"` → 🔧 (nog een Android-toestelcheck).
 >
+> - **Specs uitgewerkt voor de volgende ronde (2026-06-22)** — Grote-aankopen (plan 03)
+>   bewust **uitgesteld**; in plaats daarvan zijn vier andere ontwikkelingen build-ready
+>   gemaakt in [`docs/plans/`](docs/plans/00-overzicht.md): **10** Taken-redesign (TKN-1/3,
+>   TKN-2 onderzoek), **11** interactie-/navigatie-polish (UX-6 dialoogsysteem + UX-10
+>   "vorige"-lintje), **12** Vandaag-widget-grid-epic (VDG-1..8, gefaseerd) en **13** kleine
+>   features (PLA-8 cross-plant tijdlijn, BOO-8 aankoopfrequentie). Status van deze items in
+>   de tabel blijft ⏳ (gespecificeerd, nog te bouwen); zie de stap-voor-stap-volgorde in
+>   plan 00.
+>
 > Dit document blijft het waarom/overzicht; de specs zijn het hoe.
 
 ---
