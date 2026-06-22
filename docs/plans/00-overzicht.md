@@ -112,7 +112,7 @@ Alle plannen gaan hiervan uit; ze herhalen het niet. Dit is de bestaande archite
 ### Migraties (`supabase/migrations/NNNN_naam.sql`)
 - **Idempotent**: `create table if not exists`, `drop policy if exists` vóór `create policy`,
   realtime via een `do $$ … pg_publication_tables …` block.
-- **Nummering**: gebruik het eerstvolgende vrije nummer (nu is `0022` de laatste). De
+- **Nummering**: gebruik het eerstvolgende vrije nummer (nu is `0036` de laatste; volgende = `0037`). De
   plannen noemen relatieve namen; ken een nummer toe op het moment van bouwen.
 - **Module-tabel met zichtbaarheidscontract** (een "item" dat gedeeld kan worden):
   kolommen `household_id`, een creator-kolom, `visibility` / `share_subgroup_id` /
