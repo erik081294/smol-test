@@ -15,12 +15,14 @@
 //
 // Gebruik:
 //   node scripts/mutation.mjs            # volledige scope
-//   node scripts/mutation.mjs fairness   # alleen groepen waarvan de naam matcht
+//   node scripts/mutation.mjs fairness   # alleen groepen waarvan de naam/bron matcht
 //
 // Output: reports/mutation/mutation.json (gecombineerd) + samenvattingstabel.
+// Zie ook docs/mutatietesten.md en scripts/mutation-check.mjs (CI-ratchet).
 
 import { Stryker } from '@stryker-mutator/core';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 // In-scope: pure, (vrijwel) dep-loze logica met een bijbehorende unit-test.
@@ -32,7 +34,7 @@ import path from 'node:path';
 // Bewust NIET gemuteerd: React-gekoppelde lagen (lib/use*.js, lib/ui.js, schermen,
 // componenten) — die hebben geen unit-tests en zouden alleen "survived" ruis geven.
 // De RLS-integratietest vereist secrets/egress en valt buiten pure logica.
-const GROUPS = [
+export const GROUPS = [
   { test: 'activity', srcs: ['lib/activity.js'] },
   { test: 'agenda', srcs: ['lib/agenda.js'] },
   { test: 'appRoute', srcs: ['lib/appRoute.js'] },
@@ -79,17 +81,17 @@ const GROUPS = [
   { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
 ];
 
-const filter = process.argv[2];
-const groups = filter ? GROUPS.filter((g) => g.test.includes(filter) || g.srcs.some((s) => s.includes(filter))) : GROUPS;
-if (groups.length === 0) {
-  console.error(`Geen groepen matchen "${filter}". Beschikbaar: ${GROUPS.map((g) => g.test).join(', ')}`);
-  process.exit(1);
+// Alle muteerbare bronbestanden (voor het mappen van gewijzigde bestanden → groepen).
+export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
+
+// Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
+export function selectGroups(filter) {
+  if (!filter) return GROUPS;
+  return GROUPS.filter((g) => g.test.includes(filter) || g.srcs.some((s) => s.includes(filter)));
 }
 
-const allFiles = {}; // fileName -> { language, source, mutants }
-let dryError = false;
-
-for (const group of groups) {
+// Draai één groep door Stryker en geef de ruwe MutantResult[] terug.
+async function runGroup(group) {
   const stryker = new Stryker({
     packageManager: 'npm',
     testRunner: 'command',
@@ -107,76 +109,87 @@ for (const group of groups) {
     cleanTempDir: true,
     logLevel: 'error',
   });
-
-  process.stdout.write(`• ${group.test} (${group.srcs.join(', ')}) … `);
-  try {
-    const results = await stryker.runMutationTest();
-    // Groepeer resultaten per bestand voor het gecombineerde rapport.
-    const byFile = {};
-    for (const m of results) {
-      (byFile[m.fileName] ||= []).push(m);
-    }
-    let killed = 0;
-    let total = 0;
-    for (const m of results) {
-      if (m.status === 'Ignored' || m.status === 'NoCoverage') continue;
-      total += 1;
-      if (m.status === 'Killed' || m.status === 'Timeout') killed += 1;
-    }
-    const score = total ? ((killed / total) * 100).toFixed(1) : 'n.v.t.';
-    console.log(`${score}% (${killed}/${total})`);
-    // Vul het gecombineerde files-blok (relatieve paden).
-    for (const [abs, mutants] of Object.entries(byFile)) {
-      const rel = path.relative(process.cwd(), abs);
-      allFiles[rel] = {
-        language: 'javascript',
-        mutants: mutants.map((m) => ({
-          id: m.id,
-          mutatorName: m.mutatorName,
-          replacement: m.replacement,
-          status: m.status,
-          location: m.location,
-        })),
-      };
-    }
-  } catch (err) {
-    dryError = true;
-    console.log(`FOUT: ${err.message}`);
-  }
+  return stryker.runMutationTest();
 }
 
-// Schrijf gecombineerd rapport (Stryker-achtig schema, voldoende voor analyse).
-mkdirSync('reports/mutation', { recursive: true });
-const combined = { schemaVersion: '1.0', generatedAt: new Date().toISOString(), files: allFiles };
-writeFileSync('reports/mutation/mutation.json', JSON.stringify(combined, null, 2));
-
-// Samenvatting per module + totaal.
-const rows = [];
-let gKilled = 0;
-let gTotal = 0;
-for (const [file, data] of Object.entries(allFiles)) {
+// Tel een MutantResult[] om naar { killed, survived, total, score } (score in %).
+// Ignored/NoCoverage tellen niet mee (geen test draaide ze).
+export function tallyMutants(mutants) {
   let killed = 0;
-  let survived = 0;
   let total = 0;
-  for (const m of data.mutants) {
+  for (const m of mutants) {
     if (m.status === 'Ignored' || m.status === 'NoCoverage') continue;
     total += 1;
     if (m.status === 'Killed' || m.status === 'Timeout') killed += 1;
-    else survived += 1;
   }
-  gKilled += killed;
-  gTotal += total;
-  rows.push({ file, score: total ? (killed / total) * 100 : 0, killed, survived, total });
+  return { killed, survived: total - killed, total, score: total ? (killed / total) * 100 : 0 };
 }
-rows.sort((a, b) => a.score - b.score);
 
-console.log('\n=== Mutatie-score per module (zwakste eerst) ===');
-console.log('score%  killed/total  survived  module');
-for (const r of rows) {
-  console.log(`${r.score.toFixed(1).padStart(6)}  ${`${r.killed}/${r.total}`.padStart(11)}  ${String(r.survived).padStart(8)}  ${r.file}`);
+// Draai de gegeven groepen en geef per bronbestand de resultaten + score terug.
+//   -> { files: { [rel]: { mutants } }, scores: { [rel]: {killed,total,...} }, errors: [] }
+export async function runGroups(groups, { onProgress } = {}) {
+  const files = {};
+  const errors = [];
+  for (const group of groups) {
+    onProgress?.(group, null);
+    try {
+      const results = await runGroup(group);
+      const byFile = {};
+      for (const m of results) (byFile[m.fileName] ||= []).push(m);
+      for (const [abs, mutants] of Object.entries(byFile)) {
+        const rel = path.relative(process.cwd(), abs);
+        files[rel] = { language: 'javascript', mutants: mutants.map((m) => ({
+          id: m.id, mutatorName: m.mutatorName, replacement: m.replacement, status: m.status, location: m.location,
+        })) };
+      }
+      onProgress?.(group, tallyMutants(results));
+    } catch (err) {
+      errors.push({ group, error: err });
+      onProgress?.(group, { error: err });
+    }
+  }
+  const scores = {};
+  for (const [rel, data] of Object.entries(files)) scores[rel] = tallyMutants(data.mutants);
+  return { files, scores, errors };
 }
-console.log('-----------------------------------------------');
-console.log(`TOTAAL: ${gTotal ? ((gKilled / gTotal) * 100).toFixed(2) : '0'}%  (${gKilled}/${gTotal})  survived=${gTotal - gKilled}`);
-console.log('\nGecombineerd rapport: reports/mutation/mutation.json');
 
-process.exit(dryError ? 1 : 0);
+// --- CLI ---------------------------------------------------------------------
+async function main() {
+  const filter = process.argv[2];
+  const groups = selectGroups(filter);
+  if (groups.length === 0) {
+    console.error(`Geen groepen matchen "${filter}". Beschikbaar: ${GROUPS.map((g) => g.test).join(', ')}`);
+    process.exit(1);
+  }
+
+  const { files, scores, errors } = await runGroups(groups, {
+    onProgress: (group, res) => {
+      if (res == null) { process.stdout.write(`• ${group.test} (${group.srcs.join(', ')}) … `); return; }
+      if (res.error) { console.log(`FOUT: ${res.error.message}`); return; }
+      console.log(`${res.score.toFixed(1)}% (${res.killed}/${res.total})`);
+    },
+  });
+
+  mkdirSync('reports/mutation', { recursive: true });
+  writeFileSync('reports/mutation/mutation.json', JSON.stringify(
+    { schemaVersion: '1.0', generatedAt: new Date().toISOString(), files }, null, 2));
+
+  const rows = Object.entries(scores).map(([file, s]) => ({ file, ...s })).sort((a, b) => a.score - b.score);
+  let gKilled = 0;
+  let gTotal = 0;
+  console.log('\n=== Mutatie-score per module (zwakste eerst) ===');
+  console.log('score%  killed/total  survived  module');
+  for (const r of rows) {
+    gKilled += r.killed; gTotal += r.total;
+    console.log(`${r.score.toFixed(1).padStart(6)}  ${`${r.killed}/${r.total}`.padStart(11)}  ${String(r.survived).padStart(8)}  ${r.file}`);
+  }
+  console.log('-----------------------------------------------');
+  console.log(`TOTAAL: ${gTotal ? ((gKilled / gTotal) * 100).toFixed(2) : '0'}%  (${gKilled}/${gTotal})  survived=${gTotal - gKilled}`);
+  console.log('\nGecombineerd rapport: reports/mutation/mutation.json');
+  process.exit(errors.length ? 1 : 0);
+}
+
+// Alleen draaien als dit bestand direct wordt uitgevoerd (niet bij import).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

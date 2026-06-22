@@ -10,6 +10,8 @@
     "device": "bash scripts/dev-device.sh",
     "test": "node --import ./tests/register.mjs --test tests/*.test.js",
     "test:mutation": "node scripts/mutation.mjs",
+    "test:mutation:check": "node scripts/mutation-check.mjs",
+    "test:mutation:baseline": "node scripts/mutation-check.mjs --update",
     "lint": "expo lint",
     "import:catalog": "node scripts/import-off-nl.mjs"
   },
