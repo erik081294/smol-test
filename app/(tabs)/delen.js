@@ -43,7 +43,7 @@ export default function Delen() {
             ) : null
         }
       />
-      <FAB accessibilityLabel={t('share.add')} onPress={() => setAdding(true)} />
+      <FAB label={t('fab.share')} accessibilityLabel={t('share.add')} onPress={() => setAdding(true)} />
       <AddResourceModal
         visible={adding} onClose={() => setAdding(false)}
         onAdd={addResource} members={members} subgroups={subgroups}

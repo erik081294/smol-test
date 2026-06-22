@@ -170,7 +170,7 @@ export default function Voorraad() {
         }
       />
 
-      <FAB accessibilityLabel={t('pantry.add')} onPress={() => setEditor({})} />
+      <FAB label={t('fab.pantry')} accessibilityLabel={t('pantry.add')} onPress={() => setEditor({})} />
 
       <PantryEditor
         editor={editor}

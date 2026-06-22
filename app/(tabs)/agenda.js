@@ -121,7 +121,7 @@ export default function Agenda() {
         )}
       />
 
-      <FAB accessibilityLabel={t('agenda.addOnDay')} onPress={() => router.push(`/task/new?date=${selected}`)} />
+      <FAB label={t('fab.appointment')} accessibilityLabel={t('agenda.addOnDay')} onPress={() => router.push(`/task/new?date=${selected}`)} />
     </SafeAreaView>
   );
 }

@@ -98,7 +98,7 @@ export default function Planten() {
         )}
       />
 
-      <FAB accessibilityLabel={t('plant.add')} onPress={() => router.push('/plant/new')} />
+      <FAB label={t('fab.plant')} accessibilityLabel={t('plant.add')} onPress={() => router.push('/plant/new')} />
     </SafeAreaView>
   );
 }

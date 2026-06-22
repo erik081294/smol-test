@@ -122,7 +122,7 @@ export default function Home() {
       </ScrollView>
 
       {/* Snel een taak toevoegen — de kernactie van het huishouden. */}
-      <FAB accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
+      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
     </SafeAreaView>
   );
 }
