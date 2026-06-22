@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-22T20:40:13.829Z",
+  "generatedAt": "2026-06-22T21:04:50.416Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 2745,
+    "killed": 2787,
     "total": 3339,
-    "score": 82.2
+    "score": 83.5
   },
   "files": {
     "lib/activity.js": {
@@ -13,9 +13,9 @@
       "score": 86.5
     },
     "lib/agenda.js": {
-      "killed": 162,
+      "killed": 184,
       "total": 205,
-      "score": 79
+      "score": 89.8
     },
     "lib/appRoute.js": {
       "killed": 21,
@@ -83,9 +83,9 @@
       "score": 81.3
     },
     "lib/modules.js": {
-      "killed": 158,
+      "killed": 170,
       "total": 192,
-      "score": 82.3
+      "score": 88.5
     },
     "lib/navMeta.js": {
       "killed": 13,
@@ -118,9 +118,9 @@
       "score": 94.1
     },
     "lib/plantCare.js": {
-      "killed": 73,
+      "killed": 81,
       "total": 96,
-      "score": 76
+      "score": 84.4
     },
     "lib/plantPhoto.js": {
       "killed": 39,
