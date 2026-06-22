@@ -1,7 +1,8 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
-import { colors } from '../../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, space } from '../../lib/theme';
 import { Icon } from '../../lib/icons';
 import { MODULES, MORE_TAB } from '../../lib/modules';
 import { useHousehold } from '../../lib/household';
@@ -33,6 +34,16 @@ export default function TabsLayout() {
   const visible = new Set(modules.map((m) => m.key));
   const hasMore = modules.some((m) => !m.primary);
 
+  // Edge-to-edge is sinds Expo SDK 52+ standaard aan op Android: de app tekent
+  // áchter de transparante systeem-navigatiebalk. We geven de tabbalk een vaste
+  // contenthoogte (iconen + label) plus de onder-inset als ademruimte — niet
+  // bovenóp eigen witruimte gestapeld, anders wordt de balk onnodig hoog. Net als
+  // de BottomSheet houdt `Math.max` een nette minimumrand als er geen systeem-inset
+  // is (iOS zonder home-indicator / web). Het inset-gebied is rustige witruimte;
+  // de iconen blijven boven de systeemknoppen (backlog UX-5).
+  const insets = useSafeAreaInsets();
+  const tabBottom = Math.max(insets.bottom, space.sm);
+
   return (
     <Tabs
       screenOptions={{
@@ -41,8 +52,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
-          height: 86,
-          paddingTop: 8,
+          height: 56 + tabBottom,
+          paddingTop: space.sm,
+          paddingBottom: tabBottom,
         },
       }}
     >
