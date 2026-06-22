@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -95,6 +96,7 @@ export default function RootLayout() {
   const themeMode = useTheme();
   return (
     <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style={themeMode === 'donker' ? 'light' : 'dark'} />
         <AuthProvider>
@@ -107,6 +109,7 @@ export default function RootLayout() {
           </HouseholdProvider>
         </AuthProvider>
       </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

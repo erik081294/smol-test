@@ -12,9 +12,10 @@ import { TaskRow } from '../../lib/TaskRow';
 import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
-  deriveDefaultLayout, packGrid, moveWidget, removeWidget, resizeWidget, addWidget,
+  deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
 } from '../../lib/widgets/grid';
 import { WIDGET_BY_KEY, DEFAULTS_BY_MODULE, WIDGETS } from '../../lib/widgets/registry';
+import { WidgetGrid } from '../../lib/widgets/WidgetGrid';
 import { useHomeLayout } from '../../lib/useHomeLayout';
 import { isOverdue } from '../../lib/recurrence';
 import { animateNextLayout } from '../../lib/motion';
@@ -23,6 +24,8 @@ import { t, plural } from '../../lib/i18n';
 
 const SCREEN_PAD = 18;
 const GRID_GAP = space.md;
+const TILE_H = 132;       // uniforme tegelhoogte (1×1 en 2×1 even hoog → strakke grid)
+const CONTROL_H = 48;     // bewerk-controlebalk onder de tegel
 const FOCUS_CAP = 6;
 const STYLE_KEY = 'huishoek.widgetStyle';
 
@@ -82,7 +85,6 @@ export default function Home() {
   const moduleKeys = useMemo(() => modules.map((m) => m.key), [modules]);
   const defaultLayout = useMemo(() => deriveDefaultLayout(moduleKeys, DEFAULTS_BY_MODULE), [moduleKeys]);
   const { layout, save } = useHomeLayout(defaultLayout);
-  const cells = useMemo(() => packGrid(layout, { cols: 2 }), [layout]);
 
   // Bewerkmodus + stijl (VDG-3/5). Stijl is een lichte lokale pref (AsyncStorage).
   const [editing, setEditing] = useState(false);
@@ -109,6 +111,26 @@ export default function Home() {
     const idx = await dialog.menu({ title: t('widget.add.title'), options: avail.map((w) => ({ label: w.title, icon: w.icon })) });
     if (idx == null) return;
     applyLayout(addWidget(layout, avail[idx].key, avail[idx].defaultSize));
+  };
+
+  // Toegankelijke controlebalk per tegel (naast de vinger-drag): herschikken,
+  // grootte en verwijderen — ook bruikbaar met een screenreader.
+  const renderControls = (key) => {
+    const descriptor = WIDGET_BY_KEY[key];
+    return (
+      <View style={{
+        flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
+        height: CONTROL_H - 4, marginTop: 4, backgroundColor: colors.surface,
+        borderRadius: radius.md, borderWidth: 1, borderColor: colors.line,
+      }}>
+        <EditBtn icon="back" label={t('widget.move.back')} tint={colors.forest} onPress={() => onMove(key, -1)} />
+        <EditBtn icon="forward" label={t('widget.move.forward')} tint={colors.forest} onPress={() => onMove(key, 1)} />
+        {descriptor?.sizes.length > 1 ? (
+          <EditBtn icon="repeat" label={t('widget.resize')} tint={colors.inkSoft} onPress={() => onResize(key)} />
+        ) : null}
+        <EditBtn icon="delete" label={t('widget.remove')} tint={colors.danger} onPress={() => onRemove(key)} />
+      </View>
+    );
   };
 
   return (
@@ -173,49 +195,39 @@ export default function Home() {
           </Pressable>
         </Row>
 
-        {/* Stijl-keuze (alleen in bewerkmodus). */}
+        {/* Stijl-keuze + drag-hint (alleen in bewerkmodus). */}
         {editing ? (
-          <SegmentedControl
-            style={{ marginBottom: space.md }}
-            value={widgetStyle}
-            onChange={changeStyle}
-            options={[
-              { value: 'playful', label: t('widget.style.playful') },
-              { value: 'neutral', label: t('widget.style.neutral') },
-            ]}
-          />
+          <>
+            <SegmentedControl
+              style={{ marginBottom: space.sm }}
+              value={widgetStyle}
+              onChange={changeStyle}
+              options={[
+                { value: 'playful', label: t('widget.style.playful') },
+                { value: 'neutral', label: t('widget.style.neutral') },
+              ]}
+            />
+            <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
+          </>
         ) : null}
 
-        {/* Widget-grid: per cel het widget + (in bewerkmodus) een controlebalk. */}
-        {cells.length > 0 ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, marginBottom: space.md }}>
-            {cells.map((cell) => {
-              const descriptor = WIDGET_BY_KEY[cell.key];
-              if (!descriptor) return null;
-              const Widget = descriptor.Render;
-              return (
-                <View key={cell.key} style={{ width: cell.w === 2 ? contentW : colW }}>
-                  <View pointerEvents={editing ? 'none' : 'auto'}>
-                    <Widget size={cell.size} style={widgetStyle} tasks={tasks} members={members} />
-                  </View>
-                  {editing ? (
-                    <View style={{
-                      flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
-                      marginTop: space.xs, backgroundColor: colors.surface,
-                      borderRadius: radius.md, borderWidth: 1, borderColor: colors.line,
-                    }}>
-                      <EditBtn icon="back" label={t('widget.move.back')} tint={colors.forest} onPress={() => onMove(cell.key, -1)} />
-                      <EditBtn icon="forward" label={t('widget.move.forward')} tint={colors.forest} onPress={() => onMove(cell.key, 1)} />
-                      {descriptor.sizes.length > 1 ? (
-                        <EditBtn icon="repeat" label={t('widget.resize')} tint={colors.inkSoft} onPress={() => onResize(cell.key)} />
-                      ) : null}
-                      <EditBtn icon="delete" label={t('widget.remove')} tint={colors.danger} onPress={() => onRemove(cell.key)} />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+        {/* Widget-grid: absoluut gepositioneerd, met vinger-drag-herschikking in
+            bewerkmodus (long-press → optillen → realtime door de widgets schuiven). */}
+        {layout.length > 0 ? (
+          <WidgetGrid
+            layout={layout}
+            editing={editing}
+            widgetStyle={widgetStyle}
+            tasks={tasks}
+            members={members}
+            colW={colW}
+            contentW={contentW}
+            gap={GRID_GAP}
+            tileH={TILE_H}
+            controlH={CONTROL_H}
+            onReorder={(next) => save(next)}
+            renderControls={renderControls}
+          />
         ) : null}
 
         {/* Widget toevoegen (alleen in bewerkmodus). */}
