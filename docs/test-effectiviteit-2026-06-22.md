@@ -8,18 +8,22 @@ De unit-tests **raken** veel code, maar **vangen** lang niet elke gedragsfout.
 | --- | --- | --- |
 | Regel-coverage | **92,6 %** | regels die tijdens een test worden uitgevoerd |
 | Branch-coverage | **88,3 %** | takken die worden uitgevoerd |
-| **Mutatie-score** | **78,6 %** | ingebrachte bugs die een test daadwerkelijk rood maakt |
+| **Mutatie-score** | **82,2 %** | ingebrachte bugs die een test daadwerkelijk rood maakt |
 
-Met andere woorden: ~92 % van de regels draait in een test, maar ongeveer **1 op de 5
-bewust ingebrachte gedragsfouten glipt er ongemerkt doorheen** (716 van 3.339 mutanten
-overleefden). Dat gat — tussen "uitgevoerd" en "geassert" — is precies wat dit rapport
-in kaart brengt, per module en met concrete voorbeelden.
+Met andere woorden: ~92 % van de regels draait in een test. Bij de eerste meting glipte
+**1 op de 4** ingebrachte gedragsfouten er ongemerkt doorheen; na de vervolgrondes is dat
+nog **ongeveer 1 op de 6** (594 van 3.339 mutanten overleven, grotendeels equivalent of
+datatabel — zie *Methode & caveats*). Dat gat — tussen "uitgevoerd" en "geassert" — is
+precies wat dit rapport in kaart brengt, per module en met concrete voorbeelden.
 
-> **Update 2026-06-22 (vervolgronde):** alle vier de rode modules zijn aangepakt —
-> `pantry` (56,2 % → **83,5 %**), `notifications` (59,7 % → **85,1 %**),
-> `scan-receipt/core` (53,3 % → **88,3 %**) en `cleaningTemplates` (57,1 % → **73,3 %**,
-> logica ~99 %). De totaalscore ging van 74,2 % naar **78,6 %** en er zijn **geen rode
-> modules meer**. Zie [§ Vervolgronde](#vervolgronde-gerichte-tests-op-de-rode-modules).
+> **Update 2026-06-22 (vervolgrondes):** de zwakke modules zijn in meerdere rondes
+> aangepakt — eerst de vier rode (`pantry`, `notifications`, `scan-receipt/core`,
+> `cleaningTemplates`), daarna de oranje (`recurrence` 63→**91 %**, `expenses` 66→**81 %**,
+> `fairness` 70→**86 %**, `decisions` 73→**86 %**, `favoriteGroceries` 74→**82 %**,
+> `productMatch` 67→**78 %**, `buyFrequency` 79→**94 %**, `choreLibrary`, widgets-
+> samenvattingen e.a.). De totaalscore ging van 74,2 % → **82,2 %**; er zijn **geen rode
+> modules meer**. Sinds deze ronde bewaakt een **CI-ratchet** ([`docs/mutatietesten.md`](./mutatietesten.md))
+> dat de score niet meer wegzakt. Zie [§ Vervolgronde](#vervolgronde-gerichte-tests-op-de-rode-modules).
 
 > Scope: de 40 pure, (vrijwel) dep-loze logica-modules onder `lib/`, `lib/widgets/` en de
 > `core.js`-schillen van de Edge Functions — alles met een bijbehorende unit-test. De
@@ -57,36 +61,37 @@ vangt test X bugs in module X"). Resultaten landen in `reports/mutation/mutation
 
 🔴 < 60 % · 🟠 60–75 % · 🟡 75–85 % · 🟢 ≥ 85 %
 
+⬆ = opgekrikt in een vervolgronde (zie onder). De getoonde scores zijn de huidige
+baseline ([`mutation-baseline.json`](../mutation-baseline.json)).
+
 | Module | Score | killed/total | survived |
 | --- | ---: | ---: | ---: |
-| 🟠 `lib/recurrence.js` | 63,0 % | 63/100 | 37 |
 | 🟠 `lib/navMeta.js` | 65,0 % | 13/20 | 7 |
-| 🟠 `lib/expenses.js` | 65,7 % | 115/175 | 60 |
-| 🟠 `lib/productMatch.js` | 67,3 % | 72/107 | 35 |
 | 🟠 `lib/offCategoryMap.js` | 67,9 % | 53/78 | 25 |
-| 🟠 `lib/widgets/summaries.js` | 69,1 % | 85/123 | 38 |
 | 🟠 `lib/widgets/colorSchemes.js` | 69,2 % | 9/13 | 4 |
-| 🟠 `lib/fairness.js` | 69,8 % | 44/63 | 19 |
-| 🟠 `lib/choreLibrary.js` | 72,4 % | 105/145 | 40 |
-| 🟠 `lib/decisions.js` | 73,1 % | 57/78 | 21 |
 | 🟠 `lib/i18n.js` | 73,2 % | 30/41 | 11 |
 | 🟠 `lib/cleaningTemplates.js` ⬆ | 73,3 % | 77/105 | 28 |
-| 🟠 `lib/favoriteGroceries.js` | 73,9 % | 88/119 | 31 |
 | 🟡 `lib/recurringExpense.js` | 75,0 % | 33/44 | 11 |
+| 🟡 `lib/choreLibrary.js` ⬆ | 75,9 % | 110/145 | 35 |
 | 🟡 `lib/plantCare.js` | 76,0 % | 73/96 | 23 |
+| 🟡 `lib/widgets/summaries.js` ⬆ | 77,2 % | 95/123 | 28 |
 | 🟡 `lib/constants.js` | 77,3 % | 34/44 | 10 |
-| 🟡 `lib/widgets/grid.js` | 77,3 % | 75/97 | 22 |
-| 🟡 `lib/buyFrequency.js` | 78,8 % | 63/80 | 17 |
+| 🟡 `lib/widgets/grid.js` ⬆ | 77,3 % | 75/97 | 22 |
+| 🟡 `lib/productMatch.js` ⬆ | 77,6 % | 83/107 | 24 |
 | 🟡 `lib/agenda.js` | 79,0 % | 162/205 | 43 |
-| 🟡 `supabase/functions/notify/core.js` | 79,7 % | 55/69 | 14 |
 | 🟡 `lib/offDelta.js` | 79,7 % | 59/74 | 15 |
-| 🟡 `lib/priceTrack.js` | 81,3 % | 52/64 | 12 |
+| 🟡 `supabase/functions/notify/core.js` | 79,7 % | 55/69 | 14 |
+| 🟡 `lib/expenses.js` ⬆ | 81,1 % | 142/175 | 33 |
 | 🟡 `lib/mealPlan.js` | 81,3 % | 61/75 | 14 |
+| 🟡 `lib/priceTrack.js` | 81,3 % | 52/64 | 12 |
+| 🟡 `lib/favoriteGroceries.js` ⬆ | 81,5 % | 97/119 | 22 |
 | 🟡 `lib/modules.js` | 82,3 % | 158/192 | 34 |
 | 🟡 `lib/realtimePatch.js` | 82,9 % | 87/105 | 18 |
-| 🟡 `lib/pantry.js` ⬆ | 83,5 % | 101/121 | 20 |
 | 🟡 `lib/insights.js` | 83,5 % | 66/79 | 13 |
+| 🟡 `lib/pantry.js` ⬆ | 83,5 % | 101/121 | 20 |
 | 🟢 `lib/notifications.js` ⬆ | 85,1 % | 154/181 | 27 |
+| 🟢 `lib/fairness.js` ⬆ | 85,7 % | 54/63 | 9 |
+| 🟢 `lib/decisions.js` ⬆ | 85,9 % | 67/78 | 11 |
 | 🟢 `lib/activity.js` | 86,5 % | 90/104 | 14 |
 | 🟢 `lib/plantTimeline.js` | 87,5 % | 42/48 | 6 |
 | 🟢 `lib/reservations.js` | 87,5 % | 49/56 | 7 |
@@ -94,12 +99,14 @@ vangt test X bugs in module X"). Resultaten landen in `reports/mutation/mutation
 | 🟢 `lib/plantPhoto.js` | 88,6 % | 39/44 | 5 |
 | 🟢 `lib/visibility.js` | 88,9 % | 56/63 | 7 |
 | 🟢 `lib/offCatalog.js` | 90,4 % | 85/94 | 9 |
+| 🟢 `lib/recurrence.js` ⬆ | 91,0 % | 91/100 | 9 |
 | 🟢 `lib/rotation.js` | 92,3 % | 12/13 | 1 |
+| 🟢 `lib/buyFrequency.js` ⬆ | 93,8 % | 75/80 | 5 |
 | 🟢 `lib/pendingDeletes.js` | 94,1 % | 16/17 | 1 |
 | 🟢 `lib/barcode.js` | 97,1 % | 33/34 | 1 |
 | 🟢 `lib/appRoute.js` | 100,0 % | 21/21 | 0 |
 | 🟢 `lib/dataCache.js` | 100,0 % | 15/15 | 0 |
-| **TOTAAL** | **78,6 %** | **2623/3339** | **716** |
+| **TOTAAL** | **82,2 %** | **2745/3339** | **594** |
 
 > ⬆ = aangepakt in de vervolgronde (zie onder).
 
@@ -160,31 +167,42 @@ omdat maar één van de twee takken in een test voorkomt.
 
 ## Aanbevolen vervolgstappen (grootste effect eerst)
 
-1. ✅ **Alle vier de rode modules aangepakt** — `pantry`, `notifications`,
-   `scan-receipt/core` en `cleaningTemplates` (zie § Vervolgronde). Er zijn **geen rode
-   modules meer**; de zwakste zijn nu oranje.
-2. **Volgende kandidaten** (oranje, echte logica-gaten, niet enkel datatabel): `recurrence`
-   (63 %), `expenses` (65,7 %), `productMatch` (67,3 %), `fairness` (69,8 %),
-   `choreLibrary` (72,4 %). Zelfde aanpak: grenswaarden, volgorde-asserties, null-paden.
-3. **(Optioneel) een mutatie-drempel in CI** introduceren, bijv. een ratchet die de score
-   niet mag laten dalen, zodat regressies in test-effectiviteit zichtbaar worden. Nu
-   verantwoord om te overwegen omdat de basis op orde is.
+1. ✅ **Rode én oranje modules aangepakt** (zie § Vervolgronde) — totaal 74,2 % → **82,2 %**,
+   **geen rode modules meer**.
+2. ✅ **CI-ratchet actief** — `.github/workflows/mutation.yml` + [`docs/mutatietesten.md`](./mutatietesten.md)
+   bewaken dat de score per gewijzigde module niet meer onder de baseline zakt.
+3. **Resterende ruimte (optioneel)** zit in de gele modules met nog losse logica-gaten,
+   vooral `agenda` (43 survivors), `modules` (34) en `realtimePatch` (18). Daarboven
+   domineren equivalente/datatabel-mutanten (zie *Methode & caveats*) — een hogere
+   totaalscore najagen levert dan weinig echte bug-bescherming meer op.
 
-Een vervolgronde langs de oranje modules tilt de totaalscore richting ~83 %; daarboven
-domineren equivalente/datatabel-mutanten (zie *Methode & caveats*).
+## Vervolgronde: gerichte tests op de rode én oranje modules
 
-## Vervolgronde: gerichte tests op de rode modules
+*(2026-06-22, na het eerste rapport, in meerdere rondes.)* **Geen productiecode
+gewijzigd** — alleen tests toegevoegd — en na elke toevoeging is de mutatie opnieuw
+gedraaid om de winst te bevestigen.
 
-*(2026-06-22, na het eerste rapport.)* Alle vier de rode modules zijn aangepakt. Er is
-**geen productiecode gewijzigd** — alleen tests toegevoegd — en na elke toevoeging is de
-mutatie opnieuw gedraaid om de winst te bevestigen.
+| Module | Vóór | Na | Δ |
+| --- | ---: | ---: | ---: |
+| `supabase/functions/scan-receipt/core.js` | 53,3 % | **88,3 %** | +35,0 |
+| `lib/recurrence.js` | 63,0 % | **91,0 %** | +28,0 |
+| `lib/pantry.js` | 56,2 % | **83,5 %** | +27,3 |
+| `lib/notifications.js` | 59,7 % | **85,1 %** | +25,4 |
+| `lib/fairness.js` | 69,8 % | **85,7 %** | +15,9 |
+| `lib/buyFrequency.js` | 78,8 % | **93,8 %** | +15,0 |
+| `lib/expenses.js` | 65,7 % | **81,1 %** | +15,4 |
+| `lib/decisions.js` | 73,1 % | **85,9 %** | +12,8 |
+| `lib/productMatch.js` | 67,3 % | **77,6 %** | +10,3 |
+| `lib/widgets/summaries.js` | 69,1 % | **77,2 %** | +8,1 |
+| `lib/favoriteGroceries.js` | 73,9 % | **81,5 %** | +7,6 |
+| `lib/cleaningTemplates.js` | 57,1 % | **73,3 %** | +16,2 (logica ~99 %) |
+| `lib/choreLibrary.js` | 72,4 % | **75,9 %** | +3,5 (rest = load-validatie + datatabel) |
 
-| Module | Vóór | Na | Δ | Nieuwe tests |
-| --- | ---: | ---: | ---: | --- |
-| `lib/pantry.js` | 56,2 % | **83,5 %** | +27,3 | +6 (`tests/pantry.test.js`) |
-| `lib/notifications.js` | 59,7 % | **85,1 %** | +25,4 | +6 (`tests/notifications.test.js`) |
-| `supabase/functions/scan-receipt/core.js` | 53,3 % | **88,3 %** | +35,0 | +8 (`tests/scanReceipt.test.js`) |
-| `lib/cleaningTemplates.js` | 57,1 % | **73,3 %** | +16,2 | +6 (`tests/cleaningTemplates.test.js`) |
+> Twee modules zijn data-/load-gedrukt: bij `cleaningTemplates` zitten 27 van de 28
+> resterende overlevers in de `CLEANING_TEMPLATES`-tabel (logica-score ~99 %); bij
+> `choreLibrary` is de rest de import-tijd-validatielus + de bibliotheek-data. Bij
+> `scan-receipt` was de grootste winst het testen van de tot dan toe volledig ongeteste
+> `extractText` (alle antwoordvormen van de LLM-gateway + null-elementen).
 
 > `cleaningTemplates` is data-gedrukt: 27 van de 28 resterende overlevers zitten in de
 > `CLEANING_TEMPLATES`-tabel (zonenamen/emoji's/titels). De *logica* in die module scoort
@@ -235,7 +253,9 @@ dichten (grenzen, volgordes, null-paden) is dat wel.
 - **Buiten scope:** React-gekoppelde modules zonder unit-test (zouden alleen "survived"
   ruis geven) en de RLS-integratietest (vereist secrets/egress).
 - **Reproduceren:** `npm run test:mutation`; ruwe data in `reports/mutation/mutation.json`.
-  Cijfers gemeten op 2026-06-22 (testsuite na de vervolgronde: 329 pass / 18 skip).
+  Cijfers gemeten op 2026-06-22 (testsuite na de vervolgrondes: 367 pass / 18 skip).
+  De per-module baseline staat in `mutation-baseline.json`; de CI-ratchet bewaakt 'm
+  (zie `docs/mutatietesten.md`).
 - Een **overlevende mutant is niet altijd een bug** — soms is het dode/equivalente code
   of bewust ongespecificeerd gedrag. De waarde zit in het *patroon*: structureel
   ongeteste grenzen, volgordes en null-paden.
