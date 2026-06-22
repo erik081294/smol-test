@@ -11,6 +11,7 @@ import { FAB, SectionHeader, ItemRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { deriveDefaultLayout, packGrid } from '../../lib/widgets/grid';
 import { WIDGET_BY_KEY, DEFAULTS_BY_MODULE } from '../../lib/widgets/registry';
+import { useHomeLayout } from '../../lib/useHomeLayout';
 import { isOverdue } from '../../lib/recurrence';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural } from '../../lib/i18n';
@@ -64,7 +65,9 @@ export default function Home() {
   const widgetStyle = 'playful';
 
   const moduleKeys = useMemo(() => modules.map((m) => m.key), [modules]);
-  const layout = useMemo(() => deriveDefaultLayout(moduleKeys, DEFAULTS_BY_MODULE), [moduleKeys]);
+  const defaultLayout = useMemo(() => deriveDefaultLayout(moduleKeys, DEFAULTS_BY_MODULE), [moduleKeys]);
+  // Bewaarde layout (gesynct per gebruiker/huishouden) met val-terug op de default.
+  const { layout } = useHomeLayout(defaultLayout);
   const cells = useMemo(() => packGrid(layout, { cols: 2 }), [layout]);
 
   return (
