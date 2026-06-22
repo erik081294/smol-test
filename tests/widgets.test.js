@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { packGrid, deriveDefaultLayout, moveWidget, addWidget, removeWidget, resizeWidget, spanFor } from '../lib/widgets/grid.js';
 import { widgetScheme, accentFor } from '../lib/widgets/colorSchemes.js';
 import {
-  taskFocusSummary, taskProgressSummary, groceriesSummary, expenseBalanceSummary,
+  taskFocusSummary, taskProgressSummary, dayProgress, groceriesSummary, expenseBalanceSummary,
   plantsSummary, agendaSummary, cleaningSummary,
 } from '../lib/widgets/summaries.js';
 
@@ -96,6 +96,35 @@ test('taskProgressSummary: x/y van vandaag af', () => {
     { due_date: '2026-06-21', completed_at: null }, // andere dag → telt niet
   ], NOW);
   assert.deepEqual(s, { done: 1, total: 2 });
+});
+
+test('dayProgress: pct, allDone, nothingToday en achterstand', () => {
+  // 1 van 2 dagtaken af, geen achterstand.
+  let s = dayProgress([
+    { due_date: '2026-06-22', completed_at: '2026-06-22' },
+    { due_date: '2026-06-22', completed_at: null },
+  ], NOW);
+  assert.equal(s.done, 1); assert.equal(s.total, 2); assert.equal(s.overdue, 0);
+  assert.equal(s.pct, 0.5); assert.equal(s.allDone, false); assert.equal(s.nothingToday, false);
+
+  // Alles van vandaag af én geen achterstand → allDone.
+  s = dayProgress([{ due_date: '2026-06-22', completed_at: '2026-06-22' }], NOW);
+  assert.equal(s.allDone, true); assert.equal(s.pct, 1);
+
+  // Dagtaken af maar nog achterstallig → niet allDone (de ring viert niet te vroeg).
+  s = dayProgress([
+    { due_date: '2026-06-22', completed_at: '2026-06-22' },
+    { due_date: '2026-06-20', completed_at: null },
+  ], NOW);
+  assert.equal(s.allDone, false); assert.equal(s.overdue, 1); assert.equal(s.pct, 1);
+
+  // Niets te doen → rustige dag.
+  s = dayProgress([], NOW);
+  assert.equal(s.nothingToday, true); assert.equal(s.total, 0); assert.equal(s.pct, 0);
+
+  // Geen dagtaken maar wél achterstand → geen rustige dag.
+  s = dayProgress([{ due_date: '2026-06-19', completed_at: null }], NOW);
+  assert.equal(s.nothingToday, false); assert.equal(s.overdue, 1);
 });
 
 test('groceriesSummary: open + namen', () => {
