@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, Alert, ScrollView, Pressable, Linking } from 'react-native';
+import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, ScrollView, Pressable, Linking } from 'react-native';
+import { useDialog } from "../lib/dialog";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useCatalogCategories, useCatalogSearch } from '../lib/useCatalog';
@@ -14,6 +15,7 @@ import { t } from '../lib/i18n';
 // boodschappenlijst te vullen. Tik een product → het komt op de lijst, gekoppeld
 // aan het catalogusproduct (catalog_product_id).
 export default function Catalog() {
+  const dialog = useDialog();
   const router = useRouter();
   const toast = useToast();
   const { add } = useGroceries();
@@ -25,7 +27,7 @@ export default function Catalog() {
   const onAdd = (item) => {
     add(item.name, null, item.id)
       .then(() => toast.show({ message: t('catalog.added', { name: item.name }) }))
-      .catch((e) => Alert.alert(t('catalog.error.add'), e.message));
+      .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
   const renderItem = ({ item }) => (

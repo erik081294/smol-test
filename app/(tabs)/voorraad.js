@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Modal, ScrollView } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, addDays, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -43,6 +44,7 @@ function bestBeforeLabel(item) {
 }
 
 export default function Voorraad() {
+  const dialog = useDialog();
   const { items, loading, reload, add, update, adjustQuantity, remove } = usePantry();
   const { suggestFor } = useProducts();
   const { add: addGrocery } = useGroceries();
@@ -73,7 +75,7 @@ export default function Voorraad() {
       await addGrocery(item.name, item.product_id ?? null, item.catalog_product_id ?? null);
       success();
       toast.show({ message: t('pantry.toList.done', { name: item.name }) });
-    } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
   };
 
   const removeWithUndo = (item) => {
@@ -85,7 +87,7 @@ export default function Voorraad() {
       onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => x !== item.id)); },
       onExpire: async () => {
         try { await remove(item.id); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { setHiddenIds((h) => h.filter((x) => x !== item.id)); }
       },
     });
@@ -188,6 +190,7 @@ export default function Voorraad() {
 // Toevoeg-/bewerk-sheet. `editor` = {} (nieuw), een item (bewerken), of een item
 // met `_toList` (snel op de lijst zetten — opent met de focus op die actie).
 function PantryEditor({ editor, onClose, onAdd, onUpdate, onDelete, suggestFor, toast }) {
+  const dialog = useDialog();
   const isNew = editor && !editor.id;
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -243,7 +246,7 @@ function PantryEditor({ editor, onClose, onAdd, onUpdate, onDelete, suggestFor, 
         best_before: payload.bestBefore, low_threshold: payload.lowThreshold,
       });
       onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setBusy(false); }
   };
 

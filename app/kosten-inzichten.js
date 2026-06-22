@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
+import { useDialog } from "../lib/dialog";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -13,6 +14,7 @@ import { colors, space, type, radius } from '../lib/theme';
 import { t } from '../lib/i18n';
 
 export default function KostenInzichten() {
+  const dialog = useDialog();
   const router = useRouter();
   const { expenses, loading } = useExpenses();
   const { active, activeId, reload } = useHousehold();
@@ -32,12 +34,12 @@ export default function KostenInzichten() {
 
   const saveBudget = async () => {
     const cents = budgetText.trim() ? parseAmountToCents(budgetText) : null;
-    if (budgetText.trim() && cents == null) { Alert.alert(t('common.failed'), t('budget.invalid')); return; }
+    if (budgetText.trim() && cents == null) { dialog.alert({ title: t('common.failed'), body: t('budget.invalid') }); return; }
     try {
       await mutate(supabase.from('households').update({ monthly_budget_cents: cents }).eq('id', activeId),
         { context: 'budget opslaan' });
       reload();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
   };
 
   const hasData = expenses.length > 0;

@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import {
-  View, Text, Alert, TextInput,
-} from 'react-native';
+import { View, Text, TextInput } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -29,6 +28,7 @@ const SPLIT_LABELS = {
 };
 
 export default function ExpenseEditor() {
+  const dialog = useDialog();
   const { id, prefillDescription, prefillAmount, sourceType, sourceId } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
@@ -149,7 +149,7 @@ export default function ExpenseEditor() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert(t('expense.error.save'), e.message);
+      dialog.alert({ title: t('expense.error.save'), body: e.message });
     } finally { setBusy(false); }
   };
 
@@ -165,7 +165,7 @@ export default function ExpenseEditor() {
       onAction: () => unmarkPending(id),
       onExpire: async () => {
         try { await deleteExpense(id); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { unmarkPending(id); }
       },
     });

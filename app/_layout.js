@@ -7,6 +7,7 @@ import { HouseholdProvider, useHousehold } from '../lib/household';
 import { appRoute } from '../lib/appRoute';
 import { SplashWait } from '../lib/ui';
 import { ToastProvider } from '../lib/toast';
+import { DialogProvider } from '../lib/dialog';
 import { ErrorBoundary } from '../lib/ErrorBoundary';
 import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
@@ -99,7 +100,9 @@ export default function RootLayout() {
         <AuthProvider>
           <HouseholdProvider>
             <ToastProvider>
-              <Gate themeMode={themeMode} />
+              <DialogProvider>
+                <Gate themeMode={themeMode} />
+              </DialogProvider>
             </ToastProvider>
           </HouseholdProvider>
         </AuthProvider>

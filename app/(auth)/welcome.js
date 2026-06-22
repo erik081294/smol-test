@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { isConfigured } from '../../lib/supabase';
+import { useDialog } from '../../lib/dialog';
 import { Button, Field } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type } from '../../lib/theme';
@@ -10,6 +11,7 @@ import { t } from '../../lib/i18n';
 
 export default function Welcome() {
   const { signIn, signUp } = useAuth();
+  const dialog = useDialog();
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +22,7 @@ export default function Welcome() {
 
   const submit = async () => {
     if (!isConfigured) {
-      Alert.alert(t('auth.supabaseMissing.title'), t('auth.supabaseMissing.body'));
+      dialog.alert({ title: t('auth.supabaseMissing.title'), body: t('auth.supabaseMissing.body') });
       return;
     }
     const e = {};
@@ -33,7 +35,7 @@ export default function Welcome() {
       if (mode === 'signup') {
         const { error } = await signUp(email.trim(), password, name.trim() || t('auth.defaultName'));
         if (error) throw error;
-        Alert.alert(t('auth.signup.confirm.title'), t('auth.signup.confirm.body'));
+        dialog.alert({ title: t('auth.signup.confirm.title'), body: t('auth.signup.confirm.body') });
         setMode('signin');
       } else {
         const { error } = await signIn(email.trim(), password);

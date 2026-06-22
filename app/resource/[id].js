@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, Modal, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, Modal, Pressable } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -161,6 +162,7 @@ function CalendarView({ cursor, setCursor, byDay, todayKey, selectedDay, setSele
 
 // Nieuwe reservering: dag + van/tot uur + km + notitie, met dubbelboek-waarschuwing.
 function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
+  const dialog = useDialog();
   const [day, setDay] = useState(new Date());
   const [fromH, setFromH] = useState(9);
   const [toH, setToH] = useState(17);
@@ -182,7 +184,7 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
     try {
       await onAdd({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), note: note.trim() || null, usageValue: km.trim() ? Number(km.replace(',', '.')) : null });
       success(); onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 
@@ -225,6 +227,7 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
 
 // AUT-2: kosten verdelen over de reserveerders — gelijk of naar gebruik (km).
 function SplitModal({ visible, onClose, resource, reservations, members }) {
+  const dialog = useDialog();
   const { addExpense } = useExpenses();
   const { user } = useAuth();
   const toast = useToast();
@@ -264,7 +267,7 @@ function SplitModal({ visible, onClose, resource, reservations, members }) {
       success();
       toast.show({ message: t('share.split.done') });
       onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 

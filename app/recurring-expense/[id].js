@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Switch, Alert } from 'react-native';
+import { View, Text, Switch } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -19,6 +20,7 @@ import { t } from '../../lib/i18n';
 const FREQS = [RECUR.DAILY, RECUR.WEEKLY, RECUR.MONTHLY];
 
 export default function RecurringExpenseEditor() {
+  const dialog = useDialog();
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
@@ -90,7 +92,7 @@ export default function RecurringExpenseEditor() {
       else await updateTemplate(id, payload);
       success();
       router.back();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 
@@ -105,7 +107,7 @@ export default function RecurringExpenseEditor() {
       onAction: () => unmarkPending(id),
       onExpire: async () => {
         try { await removeTemplate(id); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { unmarkPending(id); }
       },
     });

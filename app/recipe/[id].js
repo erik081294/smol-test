@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Alert, Image, Pressable } from 'react-native';
+import { View, Text, ScrollView, Image, Pressable } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +18,7 @@ import { UNITS } from '../../lib/constants';
 import { t } from '../../lib/i18n';
 
 export default function RecipeEditor() {
+  const dialog = useDialog();
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
@@ -46,7 +48,7 @@ export default function RecipeEditor() {
     offerImagePicker(async (asset) => {
       setPhotoBusy(true);
       try { await addRecipePhoto({ householdId: activeId, recipeId: id, asset }); await reload(); setPhotoNonce((n) => n + 1); }
-      catch (e) { Alert.alert(t('common.failed'), e.message); }
+      catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
       finally { setPhotoBusy(false); }
     });
   };
@@ -99,7 +101,7 @@ export default function RecipeEditor() {
         resetIngInput();
       } else {
         try { await updateIngredient(editingKey, { name: ing.name, quantity: ing.quantity, unit: ing.unit, product_id: ing.productId }); resetIngInput(); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
       }
       return;
     }
@@ -108,14 +110,14 @@ export default function RecipeEditor() {
       resetIngInput();
     } else {
       try { await addIngredient(ing); resetIngInput(); }
-      catch (e) { Alert.alert(t('common.failed'), e.message); }
+      catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     }
   };
 
   const removeIng = (item) => {
     if (editingKey && editingKey === (item.id ?? item._key)) resetIngInput();
     if (isNew) setDraft((d) => d.filter((x) => x._key !== item._key));
-    else removeIngredient(item.id).catch((e) => Alert.alert(t('common.failed'), e.message));
+    else removeIngredient(item.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   const save = async () => {
@@ -147,7 +149,7 @@ export default function RecipeEditor() {
       }
       success();
       router.back();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 

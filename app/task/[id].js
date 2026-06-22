@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View, Text, ScrollView, Pressable, Alert,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, addDays } from 'date-fns';
@@ -27,6 +26,7 @@ const WEEKDAYS = [
 ];
 
 export default function TaskEditor() {
+  const dialog = useDialog();
   const { id, date, zone } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
@@ -153,7 +153,7 @@ export default function TaskEditor() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert(t('common.failed'), e.message);
+      dialog.alert({ title: t('common.failed'), body: e.message });
     } finally { setBusy(false); }
   };
 
@@ -170,7 +170,7 @@ export default function TaskEditor() {
       onAction: () => unmarkPending(id),
       onExpire: async () => {
         try { await deleteTask(id); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { unmarkPending(id); }
       },
     });
