@@ -46,6 +46,10 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // backBehavior="history": Android-hardware-back keert terug naar de vórige
+      // tab i.p.v. altijd naar de eerste (Thuis). Zo komt back vanuit een via "Meer"
+      // geopende module netjes terug op Meer i.p.v. op Home (UX-12).
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
