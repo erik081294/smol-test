@@ -23,7 +23,16 @@
 import { Stryker } from '@stryker-mutator/core';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import os from 'node:os';
 import path from 'node:path';
+
+// V8 compile-cache: elke mutant start een vers `node`-proces dat dezelfde modules
+// (date-fns!) opnieuw inlaadt. Eén gedeelde, absolute cache laat die processen de
+// bytecode hergebruiken i.p.v. telkens opnieuw compileren. Staat in node_modules/.cache
+// (git-genegeerd) en wordt door alle sandboxes via de node_modules-symlink gedeeld.
+process.env.NODE_COMPILE_CACHE ||= path.resolve('node_modules/.cache/huishoek-mutation-cc');
+
+const CORES = os.cpus()?.length || 4;
 
 // In-scope: pure, (vrijwel) dep-loze logica met een bijbehorende unit-test.
 // Gegroepeerd per testfile: { test, srcs, exclude? }.
@@ -90,6 +99,11 @@ export function selectGroups(filter) {
   return GROUPS.filter((g) => g.test.includes(filter) || g.srcs.some((s) => s.includes(filter)));
 }
 
+// Hoeveel mutanten Stryker tegelijk draait. Elke mutant is een vers node-proces dat
+// tijdens het laden van date-fns even op I/O wacht; licht oversubscriben (2× cores)
+// vult die gaten en is in de praktijk het snelst. Override met MUTATION_CONCURRENCY.
+const CONCURRENCY = Number(process.env.MUTATION_CONCURRENCY) || 2 * CORES;
+
 // Draai één groep door Stryker en geef de ruwe MutantResult[] terug.
 async function runGroup(group) {
   const stryker = new Stryker({
@@ -103,7 +117,7 @@ async function runGroup(group) {
     // injecteert (anders: "Cannot use the decorators and decorators-legacy plugin together").
     mutator: { plugins: ['jsx'], ...(group.exclude ? { excludedMutations: group.exclude } : {}) },
     reporters: [],
-    concurrency: Number(process.env.MUTATION_CONCURRENCY) || 6,
+    concurrency: CONCURRENCY,
     timeoutMS: 20000,
     tempDirName: '.stryker-tmp',
     cleanTempDir: true,
@@ -125,13 +139,17 @@ export function tallyMutants(mutants) {
   return { killed, survived: total - killed, total, score: total ? (killed / total) * 100 : 0 };
 }
 
-// Draai de gegeven groepen en geef per bronbestand de resultaten + score terug.
+// Draai de gegeven groepen (sequentieel) en geef per bronbestand de resultaten + score.
 //   -> { files: { [rel]: { mutants } }, scores: { [rel]: {killed,total,...} }, errors: [] }
+//
+// Snelheid: binnen één groep saturteert Stryker de cores al (mutanten draaien parallel),
+// dus groepen tégelijk draaien helpt niet — het voegt alleen sandbox-/coördinatie-
+// overhead toe (gemeten: langzamer). De winst zit in de V8 compile-cache (boven) +
+// lichte oversubscription, en vooral in de ratchet die enkel de gewijzigde modules draait.
 export async function runGroups(groups, { onProgress } = {}) {
   const files = {};
   const errors = [];
   for (const group of groups) {
-    onProgress?.(group, null);
     try {
       const results = await runGroup(group);
       const byFile = {};
@@ -164,9 +182,9 @@ async function main() {
 
   const { files, scores, errors } = await runGroups(groups, {
     onProgress: (group, res) => {
-      if (res == null) { process.stdout.write(`• ${group.test} (${group.srcs.join(', ')}) … `); return; }
-      if (res.error) { console.log(`FOUT: ${res.error.message}`); return; }
-      console.log(`${res.score.toFixed(1)}% (${res.killed}/${res.total})`);
+      const label = `• ${group.test} (${group.srcs.join(', ')})`;
+      if (res.error) { console.log(`${label} … FOUT: ${res.error.message}`); return; }
+      console.log(`${label} … ${res.score.toFixed(1)}% (${res.killed}/${res.total})`);
     },
   });
 

@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-22T21:04:50.416Z",
+  "generatedAt": "2026-06-22T22:13:43.237Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 2787,
-    "total": 3339,
-    "score": 83.5
+    "killed": 2870,
+    "total": 3381,
+    "score": 84.9
   },
   "files": {
     "lib/activity.js": {
@@ -73,14 +73,14 @@
       "score": 73.2
     },
     "lib/insights.js": {
-      "killed": 66,
+      "killed": 70,
       "total": 79,
-      "score": 83.5
+      "score": 88.6
     },
     "lib/mealPlan.js": {
-      "killed": 61,
+      "killed": 69,
       "total": 75,
-      "score": 81.3
+      "score": 92
     },
     "lib/modules.js": {
       "killed": 170,
@@ -103,9 +103,9 @@
       "score": 90.4
     },
     "lib/offDelta.js": {
-      "killed": 59,
+      "killed": 64,
       "total": 74,
-      "score": 79.7
+      "score": 86.5
     },
     "lib/pantry.js": {
       "killed": 101,
@@ -133,9 +133,9 @@
       "score": 87.5
     },
     "lib/priceTrack.js": {
-      "killed": 52,
+      "killed": 58,
       "total": 64,
-      "score": 81.3
+      "score": 90.6
     },
     "lib/productMatch.js": {
       "killed": 83,
@@ -143,9 +143,9 @@
       "score": 77.6
     },
     "lib/realtimePatch.js": {
-      "killed": 87,
+      "killed": 102,
       "total": 105,
-      "score": 82.9
+      "score": 97.1
     },
     "lib/recurrence.js": {
       "killed": 91,
@@ -153,9 +153,9 @@
       "score": 91
     },
     "lib/recurringExpense.js": {
-      "killed": 33,
+      "killed": 41,
       "total": 44,
-      "score": 75
+      "score": 93.2
     },
     "lib/reservations.js": {
       "killed": 49,
@@ -188,9 +188,9 @@
       "score": 77.3
     },
     "lib/widgets/summaries.js": {
-      "killed": 95,
-      "total": 123,
-      "score": 77.2
+      "killed": 132,
+      "total": 165,
+      "score": 80
     },
     "lib/widgets/colorSchemes.js": {
       "killed": 9,

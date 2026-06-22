@@ -60,3 +60,14 @@ test('budgetStatus: pct/rest/over, null zonder budget', () => {
   assert.equal(over.remainingCents, -1000);
   assert.equal(over.pct, 120);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('monthKeyOf werkt ook met een Date-object als spent_on', () => {
+  assert.equal(monthTotal([{ amount_cents: 100, spent_on: new Date(2026, 5, 15) }], '2026-06'), 100);
+});
+
+test('budgetStatus: precies op budget is niet "over"', () => {
+  assert.equal(budgetStatus(5000, 5000).over, false);
+  assert.equal(budgetStatus(5001, 5000).over, true);
+});
