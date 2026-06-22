@@ -8,12 +8,16 @@ De unit-tests **raken** veel code, maar **vangen** lang niet elke gedragsfout.
 | --- | --- | --- |
 | Regel-coverage | **92,6 %** | regels die tijdens een test worden uitgevoerd |
 | Branch-coverage | **88,3 %** | takken die worden uitgevoerd |
-| **Mutatie-score** | **74,2 %** | ingebrachte bugs die een test daadwerkelijk rood maakt |
+| **Mutatie-score** | **76,6 %** | ingebrachte bugs die een test daadwerkelijk rood maakt |
 
 Met andere woorden: ~92 % van de regels draait in een test, maar ongeveer **1 op de 4
-bewust ingebrachte gedragsfouten glipt er ongemerkt doorheen** (860 van 3.339 mutanten
+bewust ingebrachte gedragsfouten glipt er ongemerkt doorheen** (781 van 3.339 mutanten
 overleefden). Dat gat — tussen "uitgevoerd" en "geassert" — is precies wat dit rapport
 in kaart brengt, per module en met concrete voorbeelden.
+
+> **Update 2026-06-22 (vervolgronde):** de eerste twee rode modules zijn aangepakt —
+> `pantry` (56,2 % → **83,5 %**) en `notifications` (59,7 % → **85,1 %**) — waardoor de
+> totaalscore van 74,2 % naar **76,6 %** ging. Zie [§ Vervolgronde](#vervolgronde-gerichte-tests-op-de-rode-modules).
 
 > Scope: de 40 pure, (vrijwel) dep-loze logica-modules onder `lib/`, `lib/widgets/` en de
 > `core.js`-schillen van de Edge Functions — alles met een bijbehorende unit-test. De
@@ -54,9 +58,7 @@ vangt test X bugs in module X"). Resultaten landen in `reports/mutation/mutation
 | Module | Score | killed/total | survived |
 | --- | ---: | ---: | ---: |
 | 🔴 `supabase/functions/scan-receipt/core.js` | 53,3 % | 73/137 | 64 |
-| 🔴 `lib/pantry.js` | 56,2 % | 68/121 | 53 |
 | 🔴 `lib/cleaningTemplates.js` | 57,1 % | 60/105 | 45 |
-| 🔴 `lib/notifications.js` | 59,7 % | 108/181 | 73 |
 | 🟠 `lib/recurrence.js` | 63,0 % | 63/100 | 37 |
 | 🟠 `lib/navMeta.js` | 65,0 % | 13/20 | 7 |
 | 🟠 `lib/expenses.js` | 65,7 % | 115/175 | 60 |
@@ -81,7 +83,9 @@ vangt test X bugs in module X"). Resultaten landen in `reports/mutation/mutation
 | 🟡 `lib/mealPlan.js` | 81,3 % | 61/75 | 14 |
 | 🟡 `lib/modules.js` | 82,3 % | 158/192 | 34 |
 | 🟡 `lib/realtimePatch.js` | 82,9 % | 87/105 | 18 |
+| 🟡 `lib/pantry.js` ⬆ | 83,5 % | 101/121 | 20 |
 | 🟡 `lib/insights.js` | 83,5 % | 66/79 | 13 |
+| 🟢 `lib/notifications.js` ⬆ | 85,1 % | 154/181 | 27 |
 | 🟢 `lib/activity.js` | 86,5 % | 90/104 | 14 |
 | 🟢 `lib/plantTimeline.js` | 87,5 % | 42/48 | 6 |
 | 🟢 `lib/reservations.js` | 87,5 % | 49/56 | 7 |
@@ -91,9 +95,11 @@ vangt test X bugs in module X"). Resultaten landen in `reports/mutation/mutation
 | 🟢 `lib/rotation.js` | 92,3 % | 12/13 | 1 |
 | 🟢 `lib/pendingDeletes.js` | 94,1 % | 16/17 | 1 |
 | 🟢 `lib/barcode.js` | 97,1 % | 33/34 | 1 |
-| 🟢 `lib/appRoute.js` | 100 % | 21/21 | 0 |
-| 🟢 `lib/dataCache.js` | 100 % | 15/15 | 0 |
-| **TOTAAL** | **74,2 %** | **2479/3339** | **860** |
+| 🟢 `lib/appRoute.js` | 100,0 % | 21/21 | 0 |
+| 🟢 `lib/dataCache.js` | 100,0 % | 15/15 | 0 |
+| **TOTAAL** | **76,6 %** | **2558/3339** | **781** |
+
+> ⬆ = aangepakt in de vervolgronde (zie onder).
 
 ## Terugkerende patronen in de overlevers
 
@@ -152,25 +158,62 @@ omdat maar één van de twee takken in een test voorkomt.
 
 ## Aanbevolen vervolgstappen (grootste effect eerst)
 
-1. **Grenswaarden vastpinnen in de vier rode modules** (`scan-receipt/core`, `pantry`,
-   `cleaningTemplates`, `notifications`). Voeg per grens een test met de *exacte*
-   randwaarde toe (verloopt-vandaag, hoeveelheid 0, eerste/laatste lus-iteratie). Dit
-   doodt het leeuwendeel van de `EqualityOperator`- en lus-overlevers.
-2. **Volgorde asserteren** waar de output een gesorteerde lijst is (notifications,
-   recurrence, fairness, agenda): vervang `assert membership` door `assert.deepEqual` op
-   de volledige, geordende lijst.
+1. ✅ **`pantry` en `notifications` aangepakt** (zie § Vervolgronde). Resteert van de rode
+   modules: **`scan-receipt/core`** (53,3 %) en **`cleaningTemplates`** (57,1 %).
+2. **Grenswaarden vastpinnen** in die twee modules: per grens een test met de *exacte*
+   randwaarde (eerste/laatste lus-iteratie, drempel precies geraakt). Doodt het
+   leeuwendeel van de `EqualityOperator`- en lus-overlevers.
 3. **Null-/ontbrekende-veld-paden toevoegen** voor records die uit de DB/AI komen
-   (pantry-items zonder `best_before`/`low_threshold`, scan-receipt met afwijkende
-   antwoordvorm).
-4. **Negatieve guard-gevallen** toevoegen: lege input, ongeldige MIME, taak zonder
-   datum — telkens de tak die nu ontbreekt.
-5. **(Optioneel) een mutatie-drempel in CI** introduceren *nadat* de score is opgekrikt,
-   bijv. `--break 70` per module, zodat regressies in test-effectiviteit zichtbaar
-   worden. Bewust nu nog niet ingebouwd — eerst de basis verhogen.
+   (scan-receipt met afwijkende antwoordvorm: `OptionalChaining` is daar de #2-overlever).
+4. **Negatieve guard-gevallen** toevoegen: lege input, ongeldige MIME — telkens de tak
+   die nu ontbreekt.
+5. **(Optioneel) een mutatie-drempel in CI** introduceren *nadat* de score verder is
+   opgekrikt, bijv. een ratchet die de score niet mag laten dalen, zodat regressies in
+   test-effectiviteit zichtbaar worden. Bewust nog niet ingebouwd — eerst de basis verhogen.
 
-Een gerichte ronde langs punten 1–4 voor alleen de vier rode modules tilt de
+Een gerichte ronde langs punten 2–4 voor de twee resterende rode modules tilt de
 totaalscore naar schatting richting ~80 % en dicht de meest waarschijnlijke
 "bug-glipt-door"-gevallen.
+
+## Vervolgronde: gerichte tests op de rode modules
+
+*(2026-06-22, na het eerste rapport.)* De twee meest gebruikersgerichte rode modules zijn
+als eerste aangepakt. Er is **geen productiecode gewijzigd** — alleen tests toegevoegd —
+en na elke toevoeging is de mutatie opnieuw gedraaid om de winst te bevestigen.
+
+| Module | Vóór | Na | Δ | Nieuwe tests |
+| --- | ---: | ---: | ---: | --- |
+| `lib/pantry.js` | 56,2 % | **83,5 %** | +27,3 | +6 (`tests/pantry.test.js`) |
+| `lib/notifications.js` | 59,7 % | **85,1 %** | +25,4 | +6 (`tests/notifications.test.js`) |
+
+Wat de nieuwe tests vastpinnen (precies de patronen uit dit rapport):
+
+- **Grenswaarden:** item dat *exact* op `soonDays` verloopt, hoeveelheid gelijk aan de
+  drempel, rest precies 0, en `fireAt`/diner-tijd precies gelijk aan "nu".
+- **Volgorde:** `assert.deepEqual` op de volledige, chronologisch geordende lijst
+  (i.p.v. alleen lidmaatschap) — doodt het "`.sort()` mag weg / omgedraaid"-patroon. Voor
+  de urgentie-sortering met bewust *tegen de datum in lopende namen*, zodat de datum-tie-
+  break niet door de naamsortering wordt gemaskeerd, en met beide invoervolgordes zodat de
+  comparator in béide richtingen wordt aangeroepen.
+- **Null-/Date-/ontbrekende velden:** `daysUntil` met een `Date`-object, `status(null)`,
+  pantry-items zonder datum/drempel, taken met een ongeldige datum.
+- **Pref-gates & parsing:** voltooide taken eruit, voorraad-pref uit ⇒ geen alert, en de
+  tijd-parsing met een niet-nul minuut (`08:15`).
+
+**Plafond per module.** De resterende overlevers zijn grotendeels *equivalente* mutanten,
+niet te doden zónder kunstmatige tests:
+
+- De `PANTRY_STATUS`-enum-strings (`'vers'`, `'bijna-op'`, …): tests vergelijken tegen
+  diezelfde constante, dus een gemuteerde waarde breekt de vergelijking niet — principieel
+  onvangbaar (~12 overlevers in `pantry`).
+- `if (days != null && days < 0)` → `if (true && days < 0)`: equivalent, want `null < 0`
+  is sowieso `false`.
+- `Number.isNaN(+at)` → `Number.isNaN(-at)`: `+x` en `-x` zijn beide `NaN` of beide niet.
+- `prefs.x ?? '16:30'` → `prefs.x && '16:30'`: de functie-parameter heeft dezelfde default,
+  die `undefined` alsnog opvangt.
+
+Dit illustreert het algemene punt: ~100 % mutatie-score is geen doel — het *patroon*
+dichten (grenzen, volgordes, null-paden) is dat wel.
 
 ## Methode & caveats
 
@@ -185,7 +228,7 @@ totaalscore naar schatting richting ~80 % en dicht de meest waarschijnlijke
 - **Buiten scope:** React-gekoppelde modules zonder unit-test (zouden alleen "survived"
   ruis geven) en de RLS-integratietest (vereist secrets/egress).
 - **Reproduceren:** `npm run test:mutation`; ruwe data in `reports/mutation/mutation.json`.
-  Cijfers gemeten op 2026-06-22 (testsuite: 298 pass / 18 skip).
+  Cijfers gemeten op 2026-06-22 (testsuite na de vervolgronde: 310 pass / 18 skip).
 - Een **overlevende mutant is niet altijd een bug** — soms is het dode/equivalente code
   of bewust ongespecificeerd gedrag. De waarde zit in het *patroon*: structureel
   ongeteste grenzen, volgordes en null-paden.

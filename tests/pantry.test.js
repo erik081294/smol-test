@@ -49,3 +49,59 @@ test('sortByUrgency: verlopen eerst, dan binnenkort, dan bijna-op, dan vers', ()
   const sorted = sortByUrgency(items, { now }).map((x) => x.name);
   assert.deepEqual(sorted, ['Verlopen', 'Binnenkort', 'BijnaOp', 'Vers']);
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// grenswaarden, een Date-object i.p.v. string, null-input en de tie-break binnen één
+// status — gedrag dat de suite wél uitvoerde maar niet vastpinde.
+
+test('daysUntil: accepteert ook een Date-object (niet alleen een string)', () => {
+  assert.equal(daysUntil(new Date(2026, 5, 20), now), 2);
+  assert.equal(daysUntil(new Date(2026, 5, 18), now), 0);
+});
+
+test('status: grenswaarde — exact op soonDays telt nog als binnenkort', () => {
+  // 3 dagen vooruit met soonDays 3: precies óp de grens (<=), dus binnenkort.
+  assert.equal(status({ best_before: '2026-06-21', quantity: 5 }, { now, soonDays: 3 }), PANTRY_STATUS.SOON);
+  // 4 dagen vooruit valt er net buiten.
+  assert.equal(status({ best_before: '2026-06-22', quantity: 5 }, { now, soonDays: 3 }), PANTRY_STATUS.FRESH);
+});
+
+test('status: grenswaarde — hoeveelheid gelijk aan drempel is bijna-op', () => {
+  assert.equal(status({ best_before: '2026-07-01', quantity: 2, low_threshold: 2 }, { now }), PANTRY_STATUS.LOW);
+  assert.equal(status({ best_before: '2026-07-01', quantity: 3, low_threshold: 2 }, { now }), PANTRY_STATUS.FRESH);
+});
+
+test('status: zonder item (undefined/null) is vers en crasht niet', () => {
+  assert.equal(status(undefined, { now }), PANTRY_STATUS.FRESH);
+  assert.equal(status(null, { now }), PANTRY_STATUS.FRESH);
+});
+
+test('shoppingGap: precies genoeg in huis (rest 0) valt weg', () => {
+  const needed = [{ key: 'p1', name: 'Melk', unit: 'l', quantity: 2 }];
+  const pantry = [{ product_id: 'p1', name: 'Melk', unit: 'l', quantity: 2 }];
+  assert.deepEqual(shoppingGap(needed, pantry), []); // 2 - 2 = 0, niet > 0
+});
+
+test('sortByUrgency: binnen dezelfde status op datum (vroegst eerst), ongedateerd daarna op naam', () => {
+  // Namen bewust tégen de verwachte volgorde in, zodat een ontbrekende datum-/naam-
+  // tie-break niet per ongeluk door de naamsortering wordt gemaskeerd.
+  const items = [
+    { name: 'aaa-sep', best_before: '2026-09-01', quantity: 5 }, // FRESH, latere datum, naam vroeg
+    { name: 'zzz-aug', best_before: '2026-08-01', quantity: 5 }, // FRESH, vroege datum, naam laat
+    { name: 'mmm-geen', quantity: 5 },                           // FRESH, geen datum
+    { name: 'bbb-geen', quantity: 5 },                           // FRESH, geen datum
+  ];
+  const sorted = sortByUrgency(items, { now }).map((x) => x.name);
+  // gedateerd vóór ongedateerd; gedateerd onderling op datum (aug < sep);
+  // ongedateerd onderling op naam (bbb < mmm).
+  assert.deepEqual(sorted, ['zzz-aug', 'aaa-sep', 'bbb-geen', 'mmm-geen']);
+});
+
+test('sortByUrgency: gedateerd vóór ongedateerd, ongeacht de invoervolgorde', () => {
+  // Beide invoervolgordes, zodat de comparator in béide argumentrichtingen wordt
+  // aangeroepen (anders blijft de "andere kant" van de tie-break onbeproefd).
+  const dated = { name: 'wel', best_before: '2026-08-01', quantity: 5 };
+  const undated = { name: 'geen', quantity: 5 };
+  assert.deepEqual(sortByUrgency([undated, dated], { now }).map((x) => x.name), ['wel', 'geen']);
+  assert.deepEqual(sortByUrgency([dated, undated], { now }).map((x) => x.name), ['wel', 'geen']);
+});
