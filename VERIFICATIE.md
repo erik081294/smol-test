@@ -1,8 +1,8 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-21).** Migraties `0004`–`0025` zijn live (**DB op `0025`**):
-> `0023_push_deliveries`, `0024_function_search_path` en `0025_expense_shares_hardening` zijn op
-> 2026-06-21 via de Supabase-connector toegepast en geverifieerd. De kern-RLS + RPC's zijn
+> **Status (bijgewerkt 2026-06-22).** Alle migraties `0001`–`0036` zijn live (**DB op `0036`**),
+> geverifieerd via `list_migrations` (36 versies; `0035` = `plant_diary_note`, `0036` = `home_layout`,
+> beide toegepast op 2026-06-22). De kern-RLS + RPC's zijn
 > bewezen via **`docs/rls-connector-check.sql`** (13/13, zonder secrets). **Nog open:** de
 > volledige JS-RLS-suite met secrets (18 stuks skippen zonder secrets), de PLT-1 trap 2 flip-on
 > via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan. De canonieke status

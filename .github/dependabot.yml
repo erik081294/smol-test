@@ -8,6 +8,21 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    # Dit is een **managed Expo-app (SDK 56)**: de React-Native-/Expo-runtime-deps
+    # worden door de Expo SDK gepind en horen via `expo install` / een SDK-upgrade
+    # gebumpt te worden — niet los via dependabot. Losse bumps breken de SDK-lockstep
+    # (reanimated/worklets/react-dom faalden aantoonbaar de CI). Major-bumps van de
+    # overige deps surfacen we ook niet automatisch (eerst bewust beoordelen).
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native-*"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Skill-subdependency buiten de hoofd-lockfile (review C2): @resvg/resvg-js.
   - package-ecosystem: "npm"
