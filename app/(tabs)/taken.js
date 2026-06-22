@@ -15,6 +15,7 @@ import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
+import { YearActivity } from '../../lib/YearActivity';
 import { choreToTask } from '../../lib/choreLibrary';
 import {
   groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey,
@@ -30,7 +31,7 @@ export default function Taken() {
   const { members, subgroups } = useHousehold();
   const router = useRouter();
 
-  const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand'
+  const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand' | 'jaar'
   const [cursor, setCursor] = useState(new Date());  // anker voor Dag/Week
   const [selected, setSelected] = useState(dateKey(new Date())); // gekozen dag in Maand
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -120,11 +121,15 @@ export default function Taken() {
             { value: 'dag', label: t('tasks.scope.day') },
             { value: 'week', label: t('tasks.scope.week') },
             { value: 'maand', label: t('tasks.scope.month') },
+            { value: 'jaar', label: t('tasks.scope.year') },
           ]}
         />
       </View>
 
-      {/* Filterbalk (TKN-3): knop met teller + actieve-filter-chips + wis-alles */}
+      {/* Filterbalk (TKN-3): knop met teller + actieve-filter-chips + wis-alles.
+          Niet in Jaar-scope: die kijkt naar de voltooiingen-log met een eigen
+          lid-selector, niet naar de open/geplande taken die deze filters sturen. */}
+      {scope !== 'jaar' ? (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, alignItems: 'center' }}>
         <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button"
@@ -150,6 +155,7 @@ export default function Taken() {
           </Pressable>
         ) : null}
       </ScrollView>
+      ) : null}
 
       {/* Dag/Week-cursor */}
       {scope === 'dag' ? (
@@ -166,7 +172,9 @@ export default function Taken() {
       ) : null}
 
       {/* Scope-inhoud */}
-      {scope === 'maand' ? (
+      {scope === 'jaar' ? (
+        <YearActivity members={members} />
+      ) : scope === 'maand' ? (
         <MonthView tasks={filtered} members={members} onToggle={toggle}
           selectedKey={selected} onSelectDay={setSelected}
           emptyIllustration="tasks" emptyTitle={t('tasks.scope.empty.title')} emptySubtitle={t('tasks.scope.empty.day')} />
