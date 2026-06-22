@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Alert, Share, Platform, Modal, KeyboardAvoidingView, Switch } from 'react-native';
+import { View, Text, ScrollView, Pressable, Share, Platform, Modal, KeyboardAvoidingView, Switch } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHousehold } from '../../lib/household';
@@ -15,6 +16,7 @@ import { TOGGLEABLE_MODULES } from '../../lib/modules';
 import { t, plural } from '../../lib/i18n';
 
 export default function HuishoudenTab() {
+  const dialog = useDialog();
   const { active, households, members, subgroups, selectHousehold, leaveHousehold,
           createSubgroup, updateSubgroupMembers, deleteSubgroup,
           householdDisabled, userDisabled, setHouseholdModule, setUserModule } = useHousehold();
@@ -23,9 +25,9 @@ export default function HuishoudenTab() {
   const isOwner = active?.role === 'owner';
 
   const toggleHouseholdModule = (key, enabled) =>
-    setHouseholdModule(key, enabled).catch((e) => Alert.alert(t('common.failed'), e.message));
+    setHouseholdModule(key, enabled).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   const toggleUserModule = (key, enabled) =>
-    setUserModule(key, enabled).catch((e) => Alert.alert(t('common.failed'), e.message));
+    setUserModule(key, enabled).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
 
   // Subgroep-editor (inline modal)
   const [editorOpen, setEditorOpen] = useState(false);
@@ -60,14 +62,16 @@ export default function HuishoudenTab() {
       if (editId) await updateSubgroupMembers(editId, sgMembers);
       else await createSubgroup(sgName.trim(), sgEmoji, sgMembers);
       setEditorOpen(false);
-    } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setSgBusy(false); }
   };
 
-  const confirmDeleteSubgroup = (g) => {
-    Alert.alert(t('household.subgroup.delete.title'), t('household.subgroup.delete.body', { name: g.name }),
-      [{ text: t('common.cancel'), style: 'cancel' },
-       { text: t('common.delete'), style: 'destructive', onPress: () => deleteSubgroup(g.id) }]);
+  const confirmDeleteSubgroup = async (g) => {
+    if (await dialog.confirm({
+      title: t('household.subgroup.delete.title'),
+      body: t('household.subgroup.delete.body', { name: g.name }),
+      confirmLabel: t('common.delete'), cancelLabel: t('common.cancel'), tone: 'danger',
+    })) deleteSubgroup(g.id);
   };
 
   const sgEmojis = ['👥', '👩‍❤️‍👨', '⚽', '🎓', '🏠', '🧒', '🎸', '🐾'];
@@ -81,10 +85,12 @@ export default function HuishoudenTab() {
     } catch {}
   };
 
-  const confirmLeave = () => {
-    Alert.alert(t('household.leave.title'), t('household.leave.body', { name: active.name }),
-      [{ text: t('common.cancel'), style: 'cancel' },
-       { text: t('household.leave.confirm'), style: 'destructive', onPress: () => leaveHousehold(active.id) }]);
+  const confirmLeave = async () => {
+    if (await dialog.confirm({
+      title: t('household.leave.title'),
+      body: t('household.leave.body', { name: active.name }),
+      confirmLabel: t('household.leave.confirm'), cancelLabel: t('common.cancel'), tone: 'danger',
+    })) leaveHousehold(active.id);
   };
 
   return (

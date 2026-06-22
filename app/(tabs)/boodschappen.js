@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, SectionList, TextInput, RefreshControl, Platform, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, FlatList, SectionList, ScrollView, TextInput, RefreshControl, Platform, Modal, Pressable } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
-import { useProducts } from '../../lib/useProducts';
+import { useProducts, useProductFrequencies } from '../../lib/useProducts';
+import { frequencyLabel } from '../../lib/buyFrequency';
 import { useCatalogCategories } from '../../lib/useCatalog';
 import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
@@ -15,8 +17,10 @@ import { animateNextLayout } from '../../lib/motion';
 import { t, plural } from '../../lib/i18n';
 
 export default function Boodschappen() {
+  const dialog = useDialog();
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
   const { products, suggestFor, setHidden } = useProducts();
+  const { byProduct: freqByProduct } = useProductFrequencies();
   const { categories: productCategories } = useCatalogCategories();
   const toast = useToast();
   const router = useRouter();
@@ -35,7 +39,7 @@ export default function Boodschappen() {
   const addLinked = (product) => {
     setText('');
     animateNextLayout();
-    addItem(product.name, product.id).catch((e) => Alert.alert(t('groceries.error.add'), e.message));
+    addItem(product.name, product.id).catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
   };
   // Ids die we lokaal verbergen zolang de "ongedaan maken"-toast loopt; de echte
   // verwijdering gebeurt pas als die toast verloopt.
@@ -82,15 +86,29 @@ export default function Boodschappen() {
     () => new Set(open.map((i) => i.product_id).filter(Boolean)),
     [open]
   );
+
+  // "Misschien weer nodig" (BOO-8): producten waarvan het historische koopinterval
+  // verstreken is (dueScore >= 1) en die nog niet op de lijst staan. Zacht en
+  // uitlegbaar; alleen tonen als je niet aan het typen bent (anders staan de
+  // catalogus-hints in de weg).
+  const dueSuggestions = useMemo(() => {
+    if (text.trim()) return [];
+    return products
+      .filter((p) => !p.hidden && !openProductIds.has(p.id))
+      .map((p) => ({ product: p, est: freqByProduct[p.id] }))
+      .filter((x) => x.est && x.est.dueScore >= 1)
+      .sort((a, b) => b.est.dueScore - a.est.dueScore)
+      .slice(0, 6);
+  }, [products, freqByProduct, openProductIds, text]);
   const addFavorite = (product) => {
     if (openProductIds.has(product.id)) { toast.show({ message: t('groceries.favorites.onlist') }); return; }
-    addItem(product.name, product.id).catch((e) => Alert.alert(t('groceries.error.add'), e.message));
+    addItem(product.name, product.id).catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
     toast.show({ message: t('groceries.favorites.added', { name: product.name }) });
   };
   // Verbergen is subtiel (lang indrukken) en meteen terug te draaien via de toast.
   const hideFavorite = (product) => {
     animateNextLayout();
-    setHidden(product.id, true).catch((e) => Alert.alert(t('common.failed'), e.message));
+    setHidden(product.id, true).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
     toast.show({
       message: t('groceries.favorites.hide.done', { name: product.name }),
       actionLabel: t('common.undo'),
@@ -99,7 +117,7 @@ export default function Boodschappen() {
   };
   const unhideFavorite = (product) => {
     animateNextLayout();
-    setHidden(product.id, false).catch((e) => Alert.alert(t('common.failed'), e.message));
+    setHidden(product.id, false).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   const add = async () => {
@@ -107,12 +125,12 @@ export default function Boodschappen() {
     if (!name) return;
     setText('');
     animateNextLayout();
-    try { await addItem(name); } catch (e) { Alert.alert(t('groceries.error.add'), e.message); }
+    try { await addItem(name); } catch (e) { dialog.alert({ title: t('groceries.error.add'), body: e.message }); }
   };
 
   const toggle = async (item) => {
     animateNextLayout(); // het item glijdt zacht tussen "te halen" en "afgevinkt"
-    try { await toggleItem(item); } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    try { await toggleItem(item); } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
   };
 
   // Eén item wissen is óók terug te draaien: verberg het lokaal, verwijder pas
@@ -126,7 +144,7 @@ export default function Boodschappen() {
       onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => x !== item.id)); },
       onExpire: async () => {
         try { await removeItem(item.id); }
-        catch (e) { Alert.alert(t('groceries.error.delete'), e.message); }
+        catch (e) { dialog.alert({ title: t('groceries.error.delete'), body: e.message }); }
         finally { setHiddenIds((h) => h.filter((x) => x !== item.id)); }
       },
     });
@@ -143,7 +161,7 @@ export default function Boodschappen() {
       onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }, // weer tonen
       onExpire: async () => {                // pas nu de echte verwijdering
         try { await removeMany(ids); }
-        catch (e) { Alert.alert(t('common.failed'), e.message); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }
       },
     });
@@ -214,6 +232,35 @@ export default function Boodschappen() {
             <Chip key={p.id} label={p.name} icon="catalog" onPress={() => addLinked(p)} />
           ))}
         </Row>
+      ) : null}
+
+      {/* "Misschien weer nodig" (BOO-8): zachte frequentie-suggesties, één tik = toevoegen */}
+      {dueSuggestions.length > 0 ? (
+        <View style={{ marginBottom: space.sm }}>
+          <View style={{ paddingHorizontal: space.lg }}>
+            <SectionHeader title={t('groceries.again.section')} count={dueSuggestions.length} />
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}>
+            {dueSuggestions.map(({ product, est }) => (
+              <Pressable key={product.id} onPress={() => addLinked(product)} accessibilityRole="button"
+                accessibilityLabel={t('groceries.again.add', { name: product.name })}
+                style={({ pressed }) => ({
+                  width: 168, padding: space.md, borderRadius: radius.md, borderWidth: 1,
+                  borderColor: colors.line, backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+                })}>
+                <Row justify="space-between" align="center" gap={space.xs}>
+                  <Text style={[type.title, { fontSize: 14, flex: 1 }]} numberOfLines={1}>{product.name}</Text>
+                  <Icon name="add" size={16} color={colors.forest} />
+                </Row>
+                <Text style={[type.caption, { marginTop: 2 }]} numberOfLines={1}>{frequencyLabel(est)}</Text>
+                <Text style={[type.caption, { color: colors.inkFaint }]} numberOfLines={1}>
+                  {t('groceries.again.lastBought', { n: est.daysSince })}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       ) : null}
 
       <FlatList

@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
+import { appRoute } from '../lib/appRoute';
+import { SplashWait } from '../lib/ui';
 import { ToastProvider } from '../lib/toast';
+import { DialogProvider } from '../lib/dialog';
 import { ErrorBoundary } from '../lib/ErrorBoundary';
 import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
@@ -26,7 +28,7 @@ function NotificationsMount() {
 
 function Gate({ themeMode }) {
   const { session, loading: authLoading } = useAuth();
-  const { households, loading: hhLoading } = useHousehold();
+  const { households, loading: hhLoading, hasFetched } = useHousehold();
   const segments = useSegments();
   const router = useRouter();
   const lang = useLang();
@@ -34,34 +36,32 @@ function Gate({ themeMode }) {
   // Eénmalig de taal bepalen (opgeslagen keuze → apparaat-taal → default).
   useEffect(() => { initLocale(); }, []);
 
+  // Eén bron van waarheid voor de gate-beslissing (puur, unit-getest in household.js).
+  const route = appRoute({ authLoading, session, hhLoading, hasFetched, households });
+
   useEffect(() => {
-    if (authLoading || (session && hhLoading)) return;
+    if (route === 'loading') return;
     const group = segments[0];
 
-    if (!session) {
+    if (route === 'auth') {
       if (group !== '(auth)') router.replace('/(auth)/welcome');
       return;
     }
-    // Ingelogd maar geen huishouden -> onboarding
-    if (households.length === 0) {
+    if (route === 'onboarding') {
       if (group !== 'onboarding') router.replace('/onboarding');
       return;
     }
-    // Ingelogd mét huishouden -> naar app als we nog in auth/onboarding zitten
+    // route === 'app' -> naar de app als we nog in auth/onboarding/root zitten
     if (group === '(auth)' || group === 'onboarding' || group === undefined) {
       router.replace('/(tabs)/vandaag');
     }
-  }, [session, authLoading, hhLoading, households.length, segments]);
+  }, [route, segments]);
 
-  // Toon de laad-indicator zolang auth nog laadt, óf zolang we ingelogd zijn maar
-  // het huishouden nog laadt. Anders rendert de Stack al terwijl de redirect-
-  // useEffect nog wacht op hhLoading, en flitst de root als "Unmatched Route".
-  if (authLoading || (session && hhLoading)) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#fff" size="large" />
-      </View>
-    );
+  // Toon het wachtscherm zolang auth/huishoudens nog laden. Pas hierna beslist de
+  // redirect-useEffect, zodat een nog-niet-geladen lege lijst nooit het onboarding-
+  // scherm laat flitsen (UX-8). Een merkvast scherm i.p.v. een kale spinner.
+  if (route === 'loading') {
+    return <SplashWait />;
   }
 
   return (
@@ -100,7 +100,9 @@ export default function RootLayout() {
         <AuthProvider>
           <HouseholdProvider>
             <ToastProvider>
-              <Gate themeMode={themeMode} />
+              <DialogProvider>
+                <Gate themeMode={themeMode} />
+              </DialogProvider>
             </ToastProvider>
           </HouseholdProvider>
         </AuthProvider>

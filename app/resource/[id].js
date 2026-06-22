@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, Modal, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, Modal, Pressable } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -12,6 +13,7 @@ import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { hasConflict, usageParticipants, reservationsByDay } from '../../lib/reservations';
 import { monthMatrix, monthLabel, dateKey, parseKey } from '../../lib/agenda';
+import { backLabelFor } from '../../lib/navMeta';
 import {
   ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Banner, Empty, SectionHeader, Chip, AvatarSelect, DateStepper,
 } from '../../lib/ui';
@@ -48,7 +50,7 @@ export default function ResourceDetail() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={resource.name} onClose={() => router.back()} />
+      <ModalHeader title={resource.name} onClose={() => router.back()} backLabel={backLabelFor('resource')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         <Row gap={space.sm} style={{ marginBottom: space.md }}>
           <Button title={t('share.reserve')} icon="add" variant="accent" onPress={() => openReserve(selectedDay)} style={{ flex: 1 }} />
@@ -161,6 +163,7 @@ function CalendarView({ cursor, setCursor, byDay, todayKey, selectedDay, setSele
 
 // Nieuwe reservering: dag + van/tot uur + km + notitie, met dubbelboek-waarschuwing.
 function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
+  const dialog = useDialog();
   const [day, setDay] = useState(new Date());
   const [fromH, setFromH] = useState(9);
   const [toH, setToH] = useState(17);
@@ -182,7 +185,7 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
     try {
       await onAdd({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), note: note.trim() || null, usageValue: km.trim() ? Number(km.replace(',', '.')) : null });
       success(); onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 
@@ -225,6 +228,7 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
 
 // AUT-2: kosten verdelen over de reserveerders — gelijk of naar gebruik (km).
 function SplitModal({ visible, onClose, resource, reservations, members }) {
+  const dialog = useDialog();
   const { addExpense } = useExpenses();
   const { user } = useAuth();
   const toast = useToast();
@@ -264,7 +268,7 @@ function SplitModal({ visible, onClose, resource, reservations, members }) {
       success();
       toast.show({ message: t('share.split.done') });
       onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); hapticError(); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); hapticError(); }
     finally { setBusy(false); }
   };
 

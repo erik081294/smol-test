@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, RefreshControl, ScrollView } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO, addDays, isToday } from 'date-fns';
@@ -22,6 +23,7 @@ import { EtenNav } from '../../lib/EtenNav';
 import { t } from '../../lib/i18n';
 
 export default function Maaltijden() {
+  const dialog = useDialog();
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(new Date());
   const { entries, loading, reload, weekDays, addEntry, removeEntry, buildShoppingList, commitShoppingList } = useMealPlan(weekStart);
@@ -42,7 +44,7 @@ export default function Maaltijden() {
 
   const weekLabel = `${format(parseISO(weekDays[0]), 'd MMM', { locale: nl })} – ${format(parseISO(weekDays[6]), 'd MMM', { locale: nl })}`;
 
-  const remove = (entry) => { animateNextLayout(); removeEntry(entry.id).catch((e) => Alert.alert(t('common.failed'), e.message)); };
+  const remove = (entry) => { animateNextLayout(); removeEntry(entry.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message })); };
 
   const openShoppingList = async () => {
     const gap = await buildShoppingList(pantryItems);
@@ -142,7 +144,7 @@ export default function Maaltijden() {
               actionLabel: t('common.undo'),
               onAction: () => { if (ids.length) removeGroceries(ids); },
             });
-          } catch (e) { Alert.alert(t('common.failed'), e.message); }
+          } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         }}
       />
     </SafeAreaView>
@@ -151,6 +153,7 @@ export default function Maaltijden() {
 
 // Maaltijd toevoegen voor één dag: recept kiezen óf vrije tekst, type + servings.
 function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
+  const dialog = useDialog();
   const [mealType, setMealType] = useState('diner');
   const [query, setQuery] = useState('');
   const [recipeId, setRecipeId] = useState(null);
@@ -176,7 +179,7 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
     try {
       await onAdd({ planDate: date, mealType, recipeId, title: recipeId ? null : freeTitle, servings });
       onClose();
-    } catch (e) { Alert.alert(t('common.failed'), e.message); }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setBusy(false); }
   };
 

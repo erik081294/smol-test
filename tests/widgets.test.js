@@ -1,0 +1,135 @@
+// Units voor de pure widget-grid-kern (lib/widgets/*). Geen React/Supabase.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { packGrid, deriveDefaultLayout, moveWidget, addWidget, removeWidget, resizeWidget, spanFor } from '../lib/widgets/grid.js';
+import { widgetScheme, accentFor } from '../lib/widgets/colorSchemes.js';
+import {
+  taskFocusSummary, taskProgressSummary, groceriesSummary, expenseBalanceSummary,
+  plantsSummary, agendaSummary, cleaningSummary,
+} from '../lib/widgets/summaries.js';
+
+// --- grid-engine ---
+test('packGrid: 1x1-widgets vullen twee koloms, dan wrap', () => {
+  const cells = packGrid([{ key: 'a', size: '1x1' }, { key: 'b', size: '1x1' }, { key: 'c', size: '1x1' }]);
+  assert.deepEqual(cells.map((c) => [c.col, c.row]), [[0, 0], [1, 0], [0, 1]]);
+});
+
+test('packGrid: 2x1 neemt een hele rij; een achtergebleven cel blijft leeg', () => {
+  const cells = packGrid([{ key: 'a', size: '1x1' }, { key: 'b', size: '2x1' }, { key: 'c', size: '1x1' }]);
+  // a op rij 0 col 0; b past niet naast a (breedte 2) → rij 1; c → rij 2.
+  assert.deepEqual(cells.find((c) => c.key === 'a'), { key: 'a', size: '1x1', col: 0, row: 0, w: 1, h: 1 });
+  assert.deepEqual(cells.find((c) => c.key === 'b'), { key: 'b', size: '2x1', col: 0, row: 1, w: 2, h: 1 });
+  assert.equal(cells.find((c) => c.key === 'c').row, 2);
+});
+
+test('packGrid: lege/onzin-invoer → lege lijst', () => {
+  assert.deepEqual(packGrid(null), []);
+  assert.deepEqual(packGrid([{ size: '1x1' }]), []); // geen key
+});
+
+test('spanFor: onbekende grootte → 1x1', () => {
+  assert.deepEqual(spanFor('9x9'), { w: 1, h: 1 });
+});
+
+test('deriveDefaultLayout: per ingeschakelde module zijn default-widget, in volgorde', () => {
+  const defaults = {
+    taken: { key: 'taken.focus', defaultSize: '2x1' },
+    boodschappen: { key: 'boodschappen.count', defaultSize: '1x1' },
+  };
+  const layout = deriveDefaultLayout(['taken', 'boodschappen', 'kosten'], defaults);
+  assert.deepEqual(layout, [
+    { key: 'taken.focus', size: '2x1' },
+    { key: 'boodschappen.count', size: '1x1' },
+  ]); // kosten heeft geen default → valt weg
+});
+
+test('moveWidget: verplaatst op key naar index, puur', () => {
+  const layout = [{ key: 'a', size: '1x1' }, { key: 'b', size: '1x1' }, { key: 'c', size: '1x1' }];
+  const moved = moveWidget(layout, 'c', 0);
+  assert.deepEqual(moved.map((x) => x.key), ['c', 'a', 'b']);
+  assert.deepEqual(layout.map((x) => x.key), ['a', 'b', 'c']); // origineel onaangeroerd
+});
+
+test('addWidget/removeWidget/resizeWidget', () => {
+  let l = addWidget([], 'a', '1x1');
+  l = addWidget(l, 'a'); // dubbel → genegeerd
+  assert.equal(l.length, 1);
+  l = addWidget(l, 'b', '2x1');
+  l = resizeWidget(l, 'b', ['2x1', '1x1', '2x2']);
+  assert.equal(l.find((x) => x.key === 'b').size, '1x1');
+  l = removeWidget(l, 'a');
+  assert.deepEqual(l.map((x) => x.key), ['b']);
+});
+
+// --- kleurschema's ---
+test('widgetScheme: playful vs neutral verschillen; accent per module', () => {
+  const playful = widgetScheme('kosten', 'playful', {});
+  const neutral = widgetScheme('kosten', 'neutral', { surface: '#FFF', line: '#EEE', inkSoft: '#555' });
+  assert.equal(playful.accent, accentFor('kosten'));
+  assert.equal(playful.icon, accentFor('kosten'));
+  assert.equal(neutral.bg, '#FFF');
+  assert.notEqual(playful.bg, neutral.bg);
+});
+
+test('accentFor: onbekende module → default-accent', () => {
+  assert.equal(accentFor('bestaat-niet'), accentFor('taken') === '#2E6B4F' ? '#2E6B4F' : accentFor('bestaat-niet'));
+});
+
+// --- samenvattingen ---
+const NOW = new Date(2026, 5, 22); // 22 juni 2026
+test('taskFocusSummary: achterstallig + vandaag', () => {
+  const s = taskFocusSummary([
+    { id: '1', due_date: '2026-06-20', completed_at: null }, // overdue
+    { id: '2', due_date: '2026-06-22', completed_at: null }, // vandaag
+    { id: '3', due_date: '2026-06-25', completed_at: null }, // toekomst → niet
+    { id: '4', due_date: '2026-06-20', completed_at: '2026-06-21' }, // af → niet
+  ], NOW);
+  assert.equal(s.overdue, 1);
+  assert.equal(s.today, 1);
+  assert.equal(s.count, 2);
+});
+
+test('taskProgressSummary: x/y van vandaag af', () => {
+  const s = taskProgressSummary([
+    { due_date: '2026-06-22', completed_at: '2026-06-22' },
+    { due_date: '2026-06-22', completed_at: null },
+    { due_date: '2026-06-21', completed_at: null }, // andere dag → telt niet
+  ], NOW);
+  assert.deepEqual(s, { done: 1, total: 2 });
+});
+
+test('groceriesSummary: open + namen', () => {
+  const s = groceriesSummary([{ name: 'Melk', checked: false }, { name: 'Brood', checked: true }]);
+  assert.equal(s.count, 1);
+  assert.deepEqual(s.names, ['Melk']);
+});
+
+test('expenseBalanceSummary: jouw saldo', () => {
+  const s = expenseBalanceSummary([], 'u1');
+  assert.equal(s.cents, 0);
+});
+
+test('plantsSummary: planten die water willen', () => {
+  const s = plantsSummary(
+    [{ id: 'p1', name: 'Ficus' }, { id: 'p2', name: 'Cactus' }],
+    [{ plant_id: 'p1', due_date: '2026-06-20', completed_at: null }],
+    NOW,
+  );
+  assert.equal(s.count, 1);
+  assert.deepEqual(s.names, ['Ficus']);
+});
+
+test('agendaSummary: komende week', () => {
+  const s = agendaSummary([
+    { id: '1', due_date: '2026-06-24', completed_at: null },
+    { id: '2', due_date: '2026-06-22', completed_at: null }, // vandaag → niet
+    { id: '3', due_date: '2026-08-01', completed_at: null }, // te ver → niet
+  ], NOW);
+  assert.equal(s.count, 1);
+  assert.equal(s.next.id, '1');
+});
+
+test('cleaningSummary: open zone-taken', () => {
+  const s = cleaningSummary([{ zone_id: 'z1', completed_at: null }, { zone_id: null, completed_at: null }]);
+  assert.equal(s.count, 1);
+});

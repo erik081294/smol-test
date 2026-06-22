@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View, Text, FlatList, ScrollView, Modal, RefreshControl, Alert,
-} from 'react-native';
+import { View, Text, FlatList, ScrollView, Modal, RefreshControl } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
@@ -28,6 +27,7 @@ const FAIRNESS_PERIODS = [
 ];
 
 export default function Schoonmaak() {
+  const dialog = useDialog();
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
   const { completions } = useTaskCompletions();
   const { zones, reload: reloadZones } = useZones();
@@ -98,7 +98,7 @@ export default function Schoonmaak() {
       reloadZones();
       reload();
     } catch (e) {
-      Alert.alert(t('cleaning.error.setup'), e.message);
+      dialog.alert({ title: t('cleaning.error.setup'), body: e.message });
     } finally {
       setBusy(false);
     }

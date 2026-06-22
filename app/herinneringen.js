@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { backLabelFor } from '../lib/navMeta';
 import { ModalHeader, Card, Row, Chip, Banner, SectionHeader } from '../lib/ui';
 import { colors, space, type } from '../lib/theme';
 import { getPrefs, setPrefs, NOTIF_DEFAULTS } from '../lib/notificationPrefs';
@@ -50,7 +51,7 @@ export default function Instellingen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={t('notif.title')} onClose={() => router.back()} />
+      <ModalHeader title={t('notif.title')} onClose={() => router.back()} backLabel={backLabelFor('herinneringen')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         {Platform.OS === 'web' ? (
           <Banner tone="info" style={{ marginBottom: space.lg }}>{t('notif.onlyMobile')}</Banner>

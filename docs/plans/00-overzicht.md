@@ -25,6 +25,10 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 07 | [Strakke app (Fase 1.5)](./07-strakke-app.md) | STR-1 t/m STR-11 | UX-cohesie + interactie-polish + IA | Nee |
 | 08 | [Professionele app: hardening & afmaken](./08-professioneel-hardening.md) | INF-3/4/5/7, STR-7/9/10, INF-1-rest | Productie-readiness | Nee |
 | 09 | [Slimme keuken-loop](./09-slimme-keuken.md) | MLT-1, MLT-2, VOO-1 | Twee nieuwe modules (op de catalogus) | Ja |
+| 10 | [Taken-pagina redesign](./10-taken-redesign.md) | TKN-1, TKN-3 (TKN-2 onderzoek) | UX-redesign + pure logica | Nee |
+| 11 | [Interactie- & navigatie-polish](./11-interactie-navigatie-polish.md) | UX-6, UX-10 | Design-systeem + cross-cutting | Nee |
+| 12 | [Vandaag widget-grid](./12-vandaag-widgetgrid.md) | VDG-1 t/m VDG-8 | Home-epic (gefaseerd) | Optioneel (VDG-4) |
+| 13 | [Kleine features op bestaande data](./13-kleine-features.md) | PLA-8, BOO-8 | Twee kleine features | Nee |
 
 > **Volgende ronde (gekozen 2026-06-20): drie elkaar versterkende features** met maximale
 > gebruikerswaarde — **09 Slimme keuken-loop** (Maaltijden + Voorraad, bovenop de catalogus),
@@ -38,6 +42,39 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 > — zie backlog §6 en `VERIFICATIE.md`. ✅
 >
 > *(Plannen 01, 02, 06/INF-6, 07 en 08 zijn (groten)deels gereed; zie backlog §6.)*
+
+> **Volgende ronde gespecificeerd (2026-06-22): plannen 10–13.** De Grote-aankopen-module
+> (03) is bewust **uitgesteld**. In plaats daarvan zijn vier andere ontwikkelingen uitgewerkt
+> die grotendeels **vanuit een dev-omgeving te bouwen én te testen** zijn (pure logica + units
+> + lint; meestal geen migratie): **10 Taken-redesign**, **11 Interactie-/navigatie-polish**,
+> **13 Kleine features** en de grote **12 Vandaag-widget-grid-epic**. Stap-voor-stap-volgorde
+> hieronder.
+
+## Stap-voor-stap: plannen 10–13 oppakken
+
+Geordend op **waarde-per-inspanning** en **bouwbaarheid vanuit hier** (geen device nodig tot
+expliciet vermeld). Elke stap is een afgeronde, commit-/PR-bare eenheid.
+
+```
+Stap 1 — Plan 13 PLA-8 (cross-plant tijdlijn)      S · geen migratie · puur + UI
+Stap 2 — Plan 11 UX-6 (dialoog/actiesheet-systeem)  M · geen migratie · raakt ~21 call-sites
+Stap 3 — Plan 11 UX-10 ("vorige"-lintje)            M · geen migratie · ~12-18 schermen, units
+Stap 4 — Plan 10 TKN-1 (tijdscope-switcher)         L · geen migratie · agenda-helpers + MonthView
+Stap 5 — Plan 10 TKN-3 (filter-bediening)           M · geen migratie · filter-helpers + sheet
+Stap 6 — Plan 13 BOO-8 (aankoopfrequentie)          M · geen migratie · pure heuristiek + units
+Stap 7 — Plan 12 Fase A+B (widget-registry+grid+stijlen) L · geen migratie · puur, units
+Stap 8 — Plan 12 Fase C (layout-persistentie)       M · migratie optioneel (0036 home_layouts)
+Stap 9 — Plan 12 Fase D (drag-and-drop, a11y/perf)  L · DEVICE-validatie vereist
+```
+
+**Waarom deze volgorde.** Begin klein en zelfstandig (**13/PLA-8**) om het patroon warm te
+draaien. Doe daarna **11 (UX-6 → UX-10)**: het dialoogsysteem en het "vorige"-lintje verhogen de
+afwerking overal en sluiten aan op de net geleverde UX-12. Pak dan de **Taken-redesign (10)** —
+de meest gebruikte tab, met herbruikbare pure logica. **13/BOO-8** is een fijne losse
+toevoeging. Bewaar de **widget-grid-epic (12)** voor het laatst en bouw 'm **gefaseerd**: A+B
+leveren al een modulaire, kleurrijke Home zónder migratie of device; C voegt sync toe; D
+(drag-and-drop) als laatste, want dat vraagt toestel-validatie. Plannen 10, 11 en 13 zijn
+**parallelliseerbaar** (raken verschillende bestanden); 12 leunt op de cohesie die 10/11 brengen.
 
 ## Aanbevolen volgorde & afhankelijkheden
 

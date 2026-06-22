@@ -1,44 +1,25 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, FlatList, Pressable } from 'react-native';
+import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { isToday } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
-import { TaskRow } from '../../lib/TaskRow';
-import { Empty, Chip, FAB, ScreenHeader, IconButton } from '../../lib/ui';
-import { colors, type, space, categoryMeta } from '../../lib/theme';
-import {
-  monthMatrix, groupByDate, filterBySubgroup, dominantCategory,
-  sortDayTasks, monthLabel, dateKey,
-} from '../../lib/agenda';
+import { Chip, FAB, ScreenHeader } from '../../lib/ui';
+import { MonthView } from '../../lib/MonthView';
+import { colors } from '../../lib/theme';
+import { filterBySubgroup, dateKey } from '../../lib/agenda';
 import { t } from '../../lib/i18n';
 
 export default function Agenda() {
-  const { tasks, loading, completeTask, uncompleteTask } = useTasks();
+  const { tasks, completeTask, uncompleteTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
 
-  // Weekdag-koppen (ma-eerst), opgebouwd uit de gedeelde weekdag-sleutels zodat
-  // ze meebewegen met de taal. Binnen de component, niet op module-niveau.
-  const WD = [1, 2, 3, 4, 5, 6, 0].map((d) => t(`weekday.min.${d}`));
-
-  const today = new Date();
-  const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });
-  const [selected, setSelected] = useState(dateKey(today));
+  const [selected, setSelected] = useState(dateKey(new Date()));
   const [subgroupId, setSubgroupId] = useState(null); // null = Iedereen
 
   const visible = useMemo(() => filterBySubgroup(tasks, subgroupId), [tasks, subgroupId]);
-  const grouped = useMemo(() => groupByDate(visible), [visible]);
-  const weeks = useMemo(() => monthMatrix(cursor.y, cursor.m), [cursor]);
-  const dayItems = useMemo(() => sortDayTasks(grouped[selected]), [grouped, selected]);
-
-  const stepMonth = (delta) => {
-    const d = new Date(cursor.y, cursor.m + delta, 1);
-    setCursor({ y: d.getFullYear(), m: d.getMonth() });
-  };
-
-  const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
+  const toggle = (tk) => (tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -54,74 +35,12 @@ export default function Agenda() {
         ))}
       </ScrollView>
 
-      {/* Maandnavigatie */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: space.lg, marginBottom: space.sm }}>
-        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('agenda.prevMonth')} onPress={() => stepMonth(-1)} />
-        <Text style={[type.title, { textTransform: 'capitalize' }]}>{monthLabel(cursor.y, cursor.m)}</Text>
-        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('agenda.nextMonth')} onPress={() => stepMonth(1)} />
-      </View>
+      {/* Gedeeld maand-overzicht (grid + daglijst) */}
+      <MonthView tasks={visible} members={members} onToggle={toggle}
+        selectedKey={selected} onSelectDay={setSelected} />
 
-      {/* Weekdag-koppen */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 12 }}>
-        {WD.map((d) => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: colors.inkFaint, fontWeight: '600' }}>
-            {d}
-          </Text>
-        ))}
-      </View>
-
-      {/* Maandgrid */}
-      <View style={{ paddingHorizontal: 12, paddingTop: 4 }}>
-        {weeks.map((week, wi) => (
-          <View key={wi} style={{ flexDirection: 'row' }}>
-            {week.map((cell) => {
-              const dayTasks = grouped[cell.key];
-              const cat = dominantCategory(dayTasks);
-              const dotColor = (categoryMeta[cat] ?? categoryMeta.overig)?.color;
-              const isSel = cell.key === selected;
-              const isTod = isToday(cell.date);
-              return (
-                <Pressable key={cell.key} onPress={() => setSelected(cell.key)}
-                  accessibilityRole="button" accessibilityState={{ selected: isSel }}
-                  style={{ flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <View style={{
-                    width: 34, height: 34, borderRadius: 17,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: isSel ? colors.forest : isTod ? colors.ocherSoft : 'transparent',
-                  }}>
-                    <Text style={{
-                      fontSize: 14,
-                      color: isSel ? colors.onDark : cell.inMonth ? colors.ink : colors.inkFaint,
-                      fontWeight: isTod || isSel ? '700' : '500',
-                    }}>{cell.date.getDate()}</Text>
-                  </View>
-                  <View style={{ height: 6, marginTop: 1 }}>
-                    {dayTasks?.length ? (
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dotColor }} />
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-
-      {/* Dag-agenda */}
-      <FlatList
-        style={{ marginTop: 6 }}
-        contentContainerStyle={{ padding: 18, paddingTop: 8, paddingBottom: 40 }}
-        data={dayItems}
-        keyExtractor={(t) => t.id}
-        renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
-        ListEmptyComponent={!loading && (
-          <Empty illustration="agenda" title={t('agenda.empty.title')}
-            subtitle={t('agenda.empty.subtitle')} />
-        )}
-      />
-
-      <FAB accessibilityLabel={t('agenda.addOnDay')} onPress={() => router.push(`/task/new?date=${selected}`)} />
+      <FAB label={t('fab.appointment')} accessibilityLabel={t('agenda.addOnDay')}
+        onPress={() => router.push(`/task/new?date=${selected}`)} />
     </SafeAreaView>
   );
 }

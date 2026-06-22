@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, Pressable, Platform, Alert, Image, ActivityIndicator,
+  View, Text, ScrollView, Pressable, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,6 +12,7 @@ import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPh
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
+import { backLabelFor } from '../../lib/navMeta';
 import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -22,6 +23,7 @@ import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
 import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
 import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t, dateLocale } from '../../lib/i18n';
 
@@ -32,6 +34,7 @@ export default function PlantScreen() {
   const isNew = id === 'new';
   const router = useRouter();
   const toast = useToast();
+  const dialog = useDialog();
   const { addPlant, removePlant } = usePlants();
   const { species } = usePlantSpecies();
   const { tasks, completeTask, uncompleteTask } = useTasks();
@@ -68,7 +71,7 @@ export default function PlantScreen() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
       // Op web is permission soms een no-op; alleen blokkeren als expliciet geweigerd.
       if (perm?.granted === false) {
-        Alert.alert(t('plant.photo.noAccess.title'), t('plant.photo.noAccess.body')); return null;
+        dialog.alert({ title: t('plant.photo.noAccess.title'), body: t('plant.photo.noAccess.body') }); return null;
       }
       const launch = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
       // Geen allowsEditing/aspect: op web niet ondersteund en kan het dialoog blokkeren.
@@ -79,24 +82,28 @@ export default function PlantScreen() {
       const data = parseDataUrl(a.uri);
       const base64 = a.base64 ?? data?.base64 ?? null;
       const ext = data?.ext ?? extFromUri(a.uri);
-      if (!base64) { Alert.alert(t('plant.photo.title'), t('plant.photo.readError')); return null; }
+      if (!base64) { dialog.alert({ title: t('plant.photo.title'), body: t('plant.photo.readError') }); return null; }
       return { uri: a.uri, base64, ext };
     } catch (e) {
-      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.openError'));
+      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.openError') });
       return null;
     }
   };
 
-  // Op web werkt een Alert-actiesheet met knoppen niet (de callbacks vuren niet),
-  // dus daar openen we direct de bibliotheek. `onPicked` krijgt het gekozen asset.
-  const offerPicker = (onPicked, { allowRemove = false, onRemove } = {}) => {
-    if (Platform.OS === 'web') { pickAsset(false).then((a) => { if (a) onPicked(a); }); return; }
-    Alert.alert(t('plant.photo.source.title'), t('plant.photo.source.body'), [
-      { text: t('plant.photo.camera'), onPress: async () => { const a = await pickAsset(true); if (a) onPicked(a); } },
-      { text: t('plant.photo.library'), onPress: async () => { const a = await pickAsset(false); if (a) onPicked(a); } },
-      ...(allowRemove ? [{ text: t('common.remove'), style: 'destructive', onPress: onRemove }] : []),
-      { text: t('common.cancelLong'), style: 'cancel' },
-    ]);
+  // Keuze camera/bibliotheek (+ optioneel verwijderen) via het eigen actiesheet —
+  // één codepad voor alle platforms (UX-6). `onPicked` krijgt het gekozen asset.
+  const offerPicker = async (onPicked, { allowRemove = false, onRemove } = {}) => {
+    const idx = await dialog.menu({
+      title: t('plant.photo.source.title'), body: t('plant.photo.source.body'),
+      options: [
+        { label: t('plant.photo.camera'), icon: 'photo' },
+        { label: t('plant.photo.library'), icon: 'library' },
+        ...(allowRemove ? [{ label: t('common.remove'), icon: 'delete', tone: 'danger' }] : []),
+      ],
+    });
+    if (idx === 0) { const a = await pickAsset(true); if (a) onPicked(a); }
+    else if (idx === 1) { const a = await pickAsset(false); if (a) onPicked(a); }
+    else if (idx === 2) onRemove?.();
   };
 
   // Nieuwe-plant-flow: asset bewaren tot opslaan.
@@ -123,7 +130,7 @@ export default function PlantScreen() {
       router.back();
     } catch (e) {
       haptics.error();
-      Alert.alert(t('plant.error.save'), e.message);
+      dialog.alert({ title: t('plant.error.save'), body: e.message });
     } finally { setBusy(false); }
   };
 
@@ -160,7 +167,7 @@ export default function PlantScreen() {
       setComposeText('');
       reloadDiary();
     } catch (e) {
-      Alert.alert(t('plant.timeline.noteError'), e.message);
+      dialog.alert({ title: t('plant.timeline.noteError'), body: e.message });
     } finally { setComposeBusy(false); }
   };
 
@@ -173,7 +180,7 @@ export default function PlantScreen() {
       setPhotoNonce((n) => n + 1); // verse signed URL
       reloadDiary();
     } catch (e) {
-      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.uploadError'));
+      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.uploadError') });
     } finally { setPhotoBusy(false); }
   });
 
@@ -187,7 +194,7 @@ export default function PlantScreen() {
       setSelectedPhoto(null);
       reloadDiary();
     } catch (e) {
-      Alert.alert(t('plant.timeline.noteError'), e.message);
+      dialog.alert({ title: t('plant.timeline.noteError'), body: e.message });
     }
   };
 
@@ -201,21 +208,16 @@ export default function PlantScreen() {
       setPhotoNonce((n) => n + 1);
       reloadDiary();
     } catch (e) {
-      Alert.alert(t('plant.photo.title'), e.message ?? t('plant.photo.deleteError'));
+      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.deleteError') });
     }
   };
 
-  // Verwijder-bevestiging: Alert-knoppen vuren niet op web → daar window.confirm.
-  const confirmRemovePhoto = () => {
-    if (Platform.OS === 'web') {
-       
-      if (typeof window !== 'undefined' && window.confirm(t('plant.photo.confirmDelete.web'))) removeSelectedPhoto();
-      return;
-    }
-    Alert.alert(t('plant.photo.delete.title'), t('plant.photo.delete.body'), [
-      { text: t('common.cancelLong'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: removeSelectedPhoto },
-    ]);
+  // Verwijder-bevestiging via het eigen dialoogsysteem (UX-6) — één codepad.
+  const confirmRemovePhoto = async () => {
+    if (await dialog.confirm({
+      title: t('plant.photo.delete.title'), body: t('plant.photo.delete.body'),
+      confirmLabel: t('common.delete'), cancelLabel: t('common.cancelLong'), tone: 'danger',
+    })) removeSelectedPhoto();
   };
 
   if (!isNew) {
@@ -236,14 +238,14 @@ export default function PlantScreen() {
         onAction: () => unmarkPending(plant.id),
         onExpire: async () => {
           try { await removePlant(plant.id); }
-          catch (e) { Alert.alert(t('common.failed'), e.message); }
+          catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
           finally { unmarkPending(plant.id); }
         },
       });
     };
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ModalHeader title={plant.name} onClose={() => router.back()} />
+        <ModalHeader title={plant.name} onClose={() => router.back()} backLabel={backLabelFor('plant')} />
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
           <View style={{ alignItems: 'center', marginVertical: space.lg }}>
             <Pressable onPress={changePhoto} disabled={photoBusy} accessibilityRole="button"

@@ -106,7 +106,7 @@ export default function Kosten() {
         )}
       />
 
-      <FAB accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
+      <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
 
       {/* Terugkerende uitgaven beheren */}
       <Modal visible={recurringOpen} animationType="slide" onRequestClose={() => setRecurringOpen(false)}>

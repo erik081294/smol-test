@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +21,7 @@ const UNITS = ['stuk', 'pak', 'kg', 'g', 'l', 'ml'];
 const emptyLine = () => ({ name: '', quantity: 1, unit: 'stuk', priceText: '', productId: null });
 
 export default function PurchaseEditor() {
+  const dialog = useDialog();
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
@@ -69,7 +71,7 @@ export default function PurchaseEditor() {
       const p = await addProduct({ name, defaultUnit: lines[i].unit });
       if (p) updateLine(i, { productId: p.id, name: p.name });
     } catch (e) {
-      Alert.alert(t('common.failed'), e.message);
+      dialog.alert({ title: t('common.failed'), body: e.message });
     }
   };
 
@@ -94,7 +96,7 @@ export default function PurchaseEditor() {
 
   const runScan = async (asset) => {
     const base64 = asset.base64 ?? parseDataUrl(asset.uri)?.base64;
-    if (!base64) { Alert.alert(t('purchase.scan.error'), t('purchase.scan.readError')); return; }
+    if (!base64) { dialog.alert({ title: t('purchase.scan.error'), body: t('purchase.scan.readError') }); return; }
     setScanning(true);
     try {
       const { data, error: fnErr } = await supabase.functions.invoke('scan-receipt', {
@@ -106,7 +108,7 @@ export default function PurchaseEditor() {
       haptics.success();
     } catch (e) {
       haptics.error();
-      Alert.alert(t('purchase.scan.error'), e.message);
+      dialog.alert({ title: t('purchase.scan.error'), body: e.message });
     } finally { setScanning(false); }
   };
 
@@ -115,24 +117,27 @@ export default function PurchaseEditor() {
       const perm = camera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm?.granted === false) { Alert.alert(t('purchase.scan.noAccess')); return; }
+      if (perm?.granted === false) { dialog.alert({ title: t('purchase.scan.noAccess') }); return; }
       const fn = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
       const res = await fn({ mediaTypes: ['images'], quality: 0.5, base64: true });
       if (res.canceled) return;
       await runScan(res.assets[0]);
     } catch (e) {
-      Alert.alert(t('purchase.scan.error'), e.message);
+      dialog.alert({ title: t('purchase.scan.error'), body: e.message });
     }
   };
 
-  // Web: Alert-actiesheets vuren niet, dus direct de bibliotheek. Native: keuze camera/bibliotheek.
-  const onScanPress = () => {
-    if (Platform.OS === 'web') { launchScan(false); return; }
-    Alert.alert(t('purchase.scan.title'), undefined, [
-      { text: t('purchase.scan.camera'), onPress: () => launchScan(true) },
-      { text: t('purchase.scan.library'), onPress: () => launchScan(false) },
-      { text: t('common.cancelLong'), style: 'cancel' },
-    ]);
+  // Keuze camera/bibliotheek via het eigen actiesheet — één codepad (UX-6).
+  const onScanPress = async () => {
+    const idx = await dialog.menu({
+      title: t('purchase.scan.title'),
+      options: [
+        { label: t('purchase.scan.camera'), icon: 'photo' },
+        { label: t('purchase.scan.library'), icon: 'library' },
+      ],
+    });
+    if (idx === 0) launchScan(true);
+    else if (idx === 1) launchScan(false);
   };
 
   // Vul de form met de bestaande bon en schakel naar bewerk-modus.
@@ -181,7 +186,7 @@ export default function PurchaseEditor() {
       }
     } catch (e) {
       haptics.error();
-      Alert.alert(t('purchase.error.save'), e.message);
+      dialog.alert({ title: t('purchase.error.save'), body: e.message });
     } finally { setBusy(false); }
   };
 
@@ -230,7 +235,7 @@ export default function PurchaseEditor() {
                     await restockFromPurchase(existing.purchase_items ?? []);
                     haptics.success();
                     toast.show({ message: t('pantry.fromPurchase.done', { n: (existing.purchase_items ?? []).length }) });
-                  } catch (e) { Alert.alert(t('common.failed'), e.message); }
+                  } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
                 }} />
             </View>
           ) : null}

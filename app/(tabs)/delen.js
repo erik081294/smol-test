@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Modal, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Modal, ScrollView } from 'react-native';
+import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useResources } from '../../lib/useResources';
@@ -43,7 +44,7 @@ export default function Delen() {
             ) : null
         }
       />
-      <FAB accessibilityLabel={t('share.add')} onPress={() => setAdding(true)} />
+      <FAB label={t('fab.share')} accessibilityLabel={t('share.add')} onPress={() => setAdding(true)} />
       <AddResourceModal
         visible={adding} onClose={() => setAdding(false)}
         onAdd={addResource} members={members} subgroups={subgroups}
@@ -53,6 +54,7 @@ export default function Delen() {
 }
 
 function AddResourceModal({ visible, onClose, onAdd, members, subgroups }) {
+  const dialog = useDialog();
   const [name, setName] = useState('');
   const [kind, setKind] = useState('auto');
   const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
@@ -69,10 +71,10 @@ function AddResourceModal({ visible, onClose, onAdd, members, subgroups }) {
   const save = async () => {
     if (!name.trim()) return;
     const visErr = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visErr) { Alert.alert(t('share.title'), visErr); return; }
+    if (visErr) { dialog.alert({ title: t('share.title'), body: visErr }); return; }
     setBusy(true);
     try { await onAdd({ name, kind, visibility, shareSubgroupId, shareWith }); onClose(); }
-    catch (e) { Alert.alert(t('common.failed'), e.message); }
+    catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setBusy(false); }
   };
 
