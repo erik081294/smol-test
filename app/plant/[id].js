@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
-import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, usePlantDiary, deletePlantPhoto, updatePlantPhotoNote } from '../../lib/usePlants';
+import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPhoto, addPlantNote, usePlantDiary, deletePlantPhoto, updatePlantPhotoNote } from '../../lib/usePlants';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
@@ -140,11 +140,29 @@ export default function PlantScreen() {
   const detailPhotoUrl = usePlantPhotoUrl(plant?.photo_path, photoNonce);
   const { photos: diary, reload: reloadDiary } = usePlantDiary(plant?.id);
 
-  // Dagboekfoto-detail (modal): grote foto, notitie bewerken, verwijderen.
+  // Tijdlijnpost-detail (modal): grote foto (indien aanwezig), notitie bewerken,
+  // verwijderen.
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [noteText, setNoteText] = useState('');
   const selectedPhotoUrl = usePlantPhotoUrl(selectedPhoto?.photo_path);
   useEffect(() => { setNoteText(selectedPhoto?.note ?? ''); }, [selectedPhoto?.id]);
+
+  // Losse notitie toevoegen aan de tijdlijn (zonder foto).
+  const [composing, setComposing] = useState(false);
+  const [composeText, setComposeText] = useState('');
+  const [composeBusy, setComposeBusy] = useState(false);
+  const saveComposedNote = async () => {
+    if (!composeText.trim()) return;
+    setComposeBusy(true);
+    try {
+      await addPlantNote({ householdId: activeId, plantId: plant.id, userId: user.id, note: composeText });
+      setComposing(false);
+      setComposeText('');
+      reloadDiary();
+    } catch (e) {
+      Alert.alert(t('plant.timeline.noteError'), e.message);
+    } finally { setComposeBusy(false); }
+  };
 
   // Foto toevoegen aan een bestaande plant: dagboekfoto + meteen de nieuwe omslag.
   const changePhoto = () => offerPicker(async (asset) => {
@@ -161,9 +179,16 @@ export default function PlantScreen() {
 
   const saveNote = async () => {
     if (!selectedPhoto) return;
-    await updatePlantPhotoNote(selectedPhoto.id, noteText);
-    setSelectedPhoto(null);
-    reloadDiary();
+    // Een notitie-only post zonder tekst heeft geen betekenis (en de DB weigert 'm):
+    // leegmaken + bewaren betekent dan "verwijderen".
+    if (!selectedPhoto.photo_path && !noteText.trim()) { removeSelectedPhoto(); return; }
+    try {
+      await updatePlantPhotoNote(selectedPhoto.id, noteText);
+      setSelectedPhoto(null);
+      reloadDiary();
+    } catch (e) {
+      Alert.alert(t('plant.timeline.noteError'), e.message);
+    }
   };
 
   const removeSelectedPhoto = async () => {
@@ -258,38 +283,42 @@ export default function PlantScreen() {
             ? <Text style={[type.caption]}>{t('plant.noTasks')}</Text>
             : plantTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle} />)}
 
-          {/* Plantendagboek: foto's over tijd, nieuwste eerst. Een snelle horizontale
-              strip bovenaan, en daaronder een echte verticale tijdlijn om de groei
-              rustig terug te bladeren. */}
-          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>{t('plant.diary')}</Text>
+          {/* Tijdlijn: foto's én losse notities over tijd, nieuwste eerst — een
+              rustige verticale rail om de groei terug te bladeren. Een foto voeg je
+              toe via de cirkel bovenaan; een losse notitie via de knop hiernaast. */}
+          <Row justify="space-between" align="center" style={{ marginTop: 20, marginBottom: 8 }}>
+            <Text style={type.label}>{t('plant.timeline')}</Text>
+            <Pressable onPress={() => setComposing(true)} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('plant.timeline.addNote')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="add" size={16} color={colors.forest} />
+              <Text style={[type.caption, { color: colors.forest }]}>{t('plant.timeline.addNote')}</Text>
+            </Pressable>
+          </Row>
           {diary.length === 0 ? (
-            <Text style={[type.caption]}>{t('plant.diary.empty')}</Text>
+            <Text style={[type.caption]}>{t('plant.timeline.empty')}</Text>
           ) : (
-            <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-                {diary.map((ph) => <DiaryThumb key={ph.id} photo={ph} onPress={() => setSelectedPhoto(ph)} />)}
-              </ScrollView>
-              <Text style={[type.label, { marginTop: 24, marginBottom: space.sm }]}>{t('plant.timeline')}</Text>
-              <DiaryTimeline photos={diary} onSelect={setSelectedPhoto} />
-            </>
+            <DiaryTimeline photos={diary} onSelect={setSelectedPhoto} />
           )}
 
           <Button title={t('plant.deleteButton')} variant="ghost" onPress={confirmRemove} style={{ marginTop: 24 }} />
         </ScrollView>
 
-        {/* Dagboekfoto-detail: groot beeld, notitie bewerken, verwijderen. De sheet
-            houdt zelf de onderrand vrij van de systeemnavigatie en wijkt voor het
-            toetsenbord als je de notitie bewerkt. */}
+        {/* Tijdlijnpost-detail: (bij een foto) groot beeld, notitie bewerken,
+            verwijderen. De sheet houdt zelf de onderrand vrij van de systeem-
+            navigatie en wijkt voor het toetsenbord als je de notitie bewerkt. */}
         <BottomSheet visible={!!selectedPhoto} onClose={() => setSelectedPhoto(null)} avoidKeyboard>
-          <ModalHeader title={t('plant.diary.photo')} onClose={() => setSelectedPhoto(null)} />
+          <ModalHeader title={selectedPhoto?.photo_path ? t('plant.timeline.photo') : t('plant.timeline.note')} onClose={() => setSelectedPhoto(null)} />
           {/* De body krijgt een eigen padded wrapper (de ModalHeader pad zichzelf al). */}
           <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
-            <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
-              backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-              {selectedPhotoUrl
-                ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                : <ActivityIndicator color={colors.forest} />}
-            </View>
+            {selectedPhoto?.photo_path ? (
+              <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
+                backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                {selectedPhotoUrl
+                  ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  : <ActivityIndicator color={colors.forest} />}
+              </View>
+            ) : null}
             {selectedPhoto ? (
               <Text style={[type.caption, { marginTop: 8 }]}>
                 {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
@@ -304,6 +333,17 @@ export default function PlantScreen() {
               <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
               <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
             </Row>
+          </ScrollView>
+        </BottomSheet>
+
+        {/* Losse notitie toevoegen aan de tijdlijn (zonder foto). */}
+        <BottomSheet visible={composing} onClose={() => setComposing(false)} avoidKeyboard>
+          <ModalHeader title={t('plant.timeline.addNote')} onClose={() => setComposing(false)} />
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
+            <Field label={t('plant.field.note')} value={composeText} onChangeText={setComposeText} multiline
+              placeholder={t('plant.field.note.placeholder')} autoFocus style={{ marginBottom: 0 }} />
+            <Button title={t('plant.note.save')} onPress={saveComposedNote} loading={composeBusy}
+              disabled={!composeText.trim()} style={{ marginTop: space.md }} />
           </ScrollView>
         </BottomSheet>
       </SafeAreaView>
@@ -389,31 +429,9 @@ export default function PlantScreen() {
   );
 }
 
-// Eén dagboekfoto. Eigen component zodat de signed-URL-hook per foto kan draaien.
-// Tikken opent het detail (notitie bewerken / verwijderen). Een hoekje toont of
-// er een notitie bij hoort.
-function DiaryThumb({ photo, onPress }) {
-  const url = usePlantPhotoUrl(photo.photo_path);
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('plant.diary.photo')} style={{ alignItems: 'center' }}>
-      <View style={{ width: 92, height: 92, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
-        overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-        {url ? <Image source={{ uri: url }} style={{ width: 92, height: 92 }} resizeMode="cover" /> : <Icon name="plants" size={28} color={colors.inkSoft} />}
-        {photo.note ? (
-          <View style={{ position: 'absolute', right: space.xs, bottom: space.xs, backgroundColor: colors.forest,
-            borderRadius: radius.pill, paddingHorizontal: 5, paddingVertical: 2 }}>
-            <Icon name="note" size={11} color={colors.onDark} />
-          </View>
-        ) : null}
-      </View>
-      <Text style={[type.caption, { marginTop: space.xs }]} numberOfLines={1}>{format(parseISO(photo.created_at), 'd MMM', { locale: dateLocale() })}</Text>
-    </Pressable>
-  );
-}
-
-// Verticale tijdlijn van het plantendagboek: elke foto is een knooppunt op een
-// doorlopende rail, nieuwste bovenaan. Rustig terugbladeren door de groei; tikken
-// opent hetzelfde detail-sheet als de strip erboven.
+// Verticale tijdlijn van de plant: elke post (foto of notitie) is een knooppunt op
+// een doorlopende rail, nieuwste bovenaan. Rustig terugbladeren door de groei;
+// tikken opent het detail-sheet (notitie bewerken / verwijderen).
 function DiaryTimeline({ photos, onSelect }) {
   return (
     <View>
@@ -437,13 +455,14 @@ const TL_DOT = 14;
 const TL_DOT_TOP = 36;
 
 function TimelineEntry({ photo, first, last, onPress }) {
+  const isNote = !photo.photo_path; // notitie-only post (geen foto)
   const url = usePlantPhotoUrl(photo.photo_path);
   const dateLabel = format(parseISO(photo.created_at), 'd MMMM yyyy', { locale: dateLocale() });
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${t('plant.diary.photo')} · ${dateLabel}`}
+      accessibilityLabel={`${isNote ? t('plant.timeline.note') : t('plant.timeline.photo')} · ${dateLabel}`}
       style={({ pressed }) => ({ flexDirection: 'row', opacity: pressed ? 0.7 : 1 })}
     >
       {/* Rail-kolom: doorlopende lijn (boven/onder het knooppunt) + de stip. */}
@@ -465,9 +484,11 @@ function TimelineEntry({ photo, first, last, onPress }) {
           borderWidth: 1, borderColor: colors.line, padding: space.sm,
         }}>
           <View style={{ width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
-            backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            {url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} resizeMode="cover" />
-              : <Icon name="plants" size={20} color={colors.inkSoft} />}
+            backgroundColor: isNote ? colors.forestSoft : colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            {isNote
+              ? <Icon name="note" size={22} color={colors.forest} />
+              : url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+                : <Icon name="plants" size={20} color={colors.inkSoft} />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[type.title, { fontSize: 15 }]}>{dateLabel}</Text>
