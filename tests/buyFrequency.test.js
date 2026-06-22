@@ -1,0 +1,48 @@
+// Units voor de pure aankoopfrequentie-heuristiek (lib/buyFrequency.js).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { purchaseIntervals, frequencyEstimate, frequencyLabel } from '../lib/buyFrequency.js';
+
+test('purchaseIntervals: dagen tussen opeenvolgende (gesorteerde) aankopen', () => {
+  // 1 jun, 8 jun, 22 jun → 7 en 14 dagen.
+  assert.deepEqual(purchaseIntervals(['2026-06-22', '2026-06-01', '2026-06-08']), [7, 14]);
+});
+
+test('purchaseIntervals: < 2 datums → leeg', () => {
+  assert.deepEqual(purchaseIntervals(['2026-06-01']), []);
+  assert.deepEqual(purchaseIntervals([]), []);
+});
+
+test('frequencyEstimate: null bij minder dan 2 aankopen', () => {
+  assert.equal(frequencyEstimate(['2026-06-01']), null);
+  assert.equal(frequencyEstimate([]), null);
+});
+
+test('frequencyEstimate: mediaan-interval + dueScore', () => {
+  // Aankopen om de ~7 dagen; nu = 14 dagen na de laatste → dueScore ~2.
+  const est = frequencyEstimate(['2026-06-01', '2026-06-08', '2026-06-15'], new Date(2026, 5, 29));
+  assert.equal(est.count, 3);
+  assert.equal(est.medianDays, 7);
+  assert.equal(est.lastPurchasedOn, '2026-06-15');
+  assert.equal(est.daysSince, 14);
+  assert.equal(est.dueScore, 2);
+});
+
+test('frequencyEstimate: mediaan is robuust tegen een uitschieter', () => {
+  // Intervallen 7, 7, 60 → mediaan 7 (gemiddelde zou ~25 zijn).
+  const est = frequencyEstimate(['2026-01-01', '2026-01-08', '2026-01-15', '2026-03-16'], new Date(2026, 2, 23));
+  assert.equal(est.medianDays, 7);
+});
+
+test('frequencyEstimate: dueScore < 1 als het nog geen tijd is', () => {
+  const est = frequencyEstimate(['2026-06-01', '2026-06-15'], new Date(2026, 5, 20));
+  assert.equal(est.medianDays, 14);
+  assert.equal(est.daysSince, 5);
+  assert.ok(est.dueScore < 1);
+});
+
+test('frequencyLabel: uitlegbare string of null', () => {
+  const est = frequencyEstimate(['2026-06-01', '2026-06-15'], new Date(2026, 5, 20));
+  assert.match(frequencyLabel(est), /14/);
+  assert.equal(frequencyLabel(null), null);
+});

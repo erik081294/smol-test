@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, SectionList, TextInput, RefreshControl, Platform, Modal, Pressable } from 'react-native';
+import { View, Text, FlatList, SectionList, ScrollView, TextInput, RefreshControl, Platform, Modal, Pressable } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
-import { useProducts } from '../../lib/useProducts';
+import { useProducts, useProductFrequencies } from '../../lib/useProducts';
+import { frequencyLabel } from '../../lib/buyFrequency';
 import { useCatalogCategories } from '../../lib/useCatalog';
 import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
@@ -19,6 +20,7 @@ export default function Boodschappen() {
   const dialog = useDialog();
   const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
   const { products, suggestFor, setHidden } = useProducts();
+  const { byProduct: freqByProduct } = useProductFrequencies();
   const { categories: productCategories } = useCatalogCategories();
   const toast = useToast();
   const router = useRouter();
@@ -84,6 +86,20 @@ export default function Boodschappen() {
     () => new Set(open.map((i) => i.product_id).filter(Boolean)),
     [open]
   );
+
+  // "Misschien weer nodig" (BOO-8): producten waarvan het historische koopinterval
+  // verstreken is (dueScore >= 1) en die nog niet op de lijst staan. Zacht en
+  // uitlegbaar; alleen tonen als je niet aan het typen bent (anders staan de
+  // catalogus-hints in de weg).
+  const dueSuggestions = useMemo(() => {
+    if (text.trim()) return [];
+    return products
+      .filter((p) => !p.hidden && !openProductIds.has(p.id))
+      .map((p) => ({ product: p, est: freqByProduct[p.id] }))
+      .filter((x) => x.est && x.est.dueScore >= 1)
+      .sort((a, b) => b.est.dueScore - a.est.dueScore)
+      .slice(0, 6);
+  }, [products, freqByProduct, openProductIds, text]);
   const addFavorite = (product) => {
     if (openProductIds.has(product.id)) { toast.show({ message: t('groceries.favorites.onlist') }); return; }
     addItem(product.name, product.id).catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
@@ -216,6 +232,35 @@ export default function Boodschappen() {
             <Chip key={p.id} label={p.name} icon="catalog" onPress={() => addLinked(p)} />
           ))}
         </Row>
+      ) : null}
+
+      {/* "Misschien weer nodig" (BOO-8): zachte frequentie-suggesties, één tik = toevoegen */}
+      {dueSuggestions.length > 0 ? (
+        <View style={{ marginBottom: space.sm }}>
+          <View style={{ paddingHorizontal: space.lg }}>
+            <SectionHeader title={t('groceries.again.section')} count={dueSuggestions.length} />
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}>
+            {dueSuggestions.map(({ product, est }) => (
+              <Pressable key={product.id} onPress={() => addLinked(product)} accessibilityRole="button"
+                accessibilityLabel={t('groceries.again.add', { name: product.name })}
+                style={({ pressed }) => ({
+                  width: 168, padding: space.md, borderRadius: radius.md, borderWidth: 1,
+                  borderColor: colors.line, backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+                })}>
+                <Row justify="space-between" align="center" gap={space.xs}>
+                  <Text style={[type.title, { fontSize: 14, flex: 1 }]} numberOfLines={1}>{product.name}</Text>
+                  <Icon name="add" size={16} color={colors.forest} />
+                </Row>
+                <Text style={[type.caption, { marginTop: 2 }]} numberOfLines={1}>{frequencyLabel(est)}</Text>
+                <Text style={[type.caption, { color: colors.inkFaint }]} numberOfLines={1}>
+                  {t('groceries.again.lastBought', { n: est.daysSince })}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       ) : null}
 
       <FlatList
