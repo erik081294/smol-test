@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { useHouseholdPlantTimeline, usePlantPhotoUrl } from '../../lib/usePlants';
 import { groupTimelineByDay, relativeDayLabel } from '../../lib/plantTimeline';
+import { backLabelFor } from '../../lib/navMeta';
 import { Empty, ModalHeader, SectionHeader, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -72,7 +73,7 @@ export default function PlantTimelineScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ModalHeader title={t('plants.timeline.title')} onClose={() => router.back()} />
+      <ModalHeader title={t('plants.timeline.title')} onClose={() => router.back()} backLabel={backLabelFor('plant')} />
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}

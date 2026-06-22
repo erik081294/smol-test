@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { useProducts } from '../../lib/useProducts';
 import { useProductPrices } from '../../lib/usePurchases';
+import { backLabelFor } from '../../lib/navMeta';
 import { ModalHeader, Row, SectionHeader, Empty, Sparkline } from '../../lib/ui';
 import { colors, type, space, radius } from '../../lib/theme';
 import { formatCents } from '../../lib/expenses';
@@ -28,7 +29,7 @@ export default function ProductDetail() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={product?.name ?? t('product.title')} onClose={() => router.back()} />
+      <ModalHeader title={product?.name ?? t('product.title')} onClose={() => router.back()} backLabel={backLabelFor('product')} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 60 }}>
         {st.count === 0 ? (
           loading ? null : (

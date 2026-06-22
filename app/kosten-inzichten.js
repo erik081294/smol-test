@@ -9,6 +9,7 @@ import { useExpenses } from '../lib/useExpenses';
 import { useHousehold } from '../lib/household';
 import { byMonth, byCategory, monthTotal, budgetStatus } from '../lib/insights';
 import { formatCents, parseAmountToCents } from '../lib/expenses';
+import { backLabelFor } from '../lib/navMeta';
 import { ModalHeader, SectionHeader, Row, Chip, Card, Field, BarChart, Empty } from '../lib/ui';
 import { colors, space, type, radius } from '../lib/theme';
 import { t } from '../lib/i18n';
@@ -47,7 +48,7 @@ export default function KostenInzichten() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={t('insights.title')} onClose={() => router.back()} />
+      <ModalHeader title={t('insights.title')} onClose={() => router.back()} backLabel={backLabelFor('kosten-inzichten')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         {!hasData ? (
           loading ? null : <Empty illustration="expenses" title={t('insights.empty.title')} subtitle={t('insights.empty.subtitle')} />

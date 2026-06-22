@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { hasConflict, usageParticipants, reservationsByDay } from '../../lib/reservations';
 import { monthMatrix, monthLabel, dateKey, parseKey } from '../../lib/agenda';
+import { backLabelFor } from '../../lib/navMeta';
 import {
   ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Banner, Empty, SectionHeader, Chip, AvatarSelect, DateStepper,
 } from '../../lib/ui';
@@ -49,7 +50,7 @@ export default function ResourceDetail() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={resource.name} onClose={() => router.back()} />
+      <ModalHeader title={resource.name} onClose={() => router.back()} backLabel={backLabelFor('resource')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         <Row gap={space.sm} style={{ marginBottom: space.md }}>
           <Button title={t('share.reserve')} icon="add" variant="accent" onPress={() => openReserve(selectedDay)} style={{ flex: 1 }} />

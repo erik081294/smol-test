@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { backLabelFor } from '../lib/navMeta';
 import { ModalHeader, Card, Row, Chip } from '../lib/ui';
 import { colors, space, type } from '../lib/theme';
 import { getThemePrefs, setThemePrefs, THEME_MODES, THEME_DEFAULTS } from '../lib/themePrefs';
@@ -19,7 +20,7 @@ export default function Beeldstijl() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ModalHeader title={t('appearance.title')} onClose={() => router.back()} />
+      <ModalHeader title={t('appearance.title')} onClose={() => router.back()} backLabel={backLabelFor('beeldstijl')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         <Text style={[type.label, { marginBottom: space.xs }]}>{t('appearance.theme')}</Text>
         <Card>

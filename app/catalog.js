@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useCatalogCategories, useCatalogSearch } from '../lib/useCatalog';
 import { useGroceries } from '../lib/useGroceries';
 import { useToast } from '../lib/toast';
+import { backLabelFor } from '../lib/navMeta';
 import { ModalHeader, ItemRow, Empty, ListSkeleton, Chip } from '../lib/ui';
 import { Icon } from '../lib/icons';
 import { colors, space, radius, type, touchTarget, screenPadding } from '../lib/theme';
@@ -77,7 +78,7 @@ export default function Catalog() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       {/* ModalHeader pad zichzelf (space.lg) — niet in de screenPadding-wrapper zetten. */}
-      <ModalHeader title={t('catalog.title')} onClose={() => router.back()} />
+      <ModalHeader title={t('catalog.title')} onClose={() => router.back()} backLabel={backLabelFor('catalog')} />
       <View style={{ paddingHorizontal: screenPadding }}>
         {/* Zoekbalk */}
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm }}>

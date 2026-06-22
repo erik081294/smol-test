@@ -12,6 +12,7 @@ import { usePlants, usePlantSpecies, searchSpecies, usePlantPhotoUrl, addPlantPh
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
+import { backLabelFor } from '../../lib/navMeta';
 import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -244,7 +245,7 @@ export default function PlantScreen() {
     };
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ModalHeader title={plant.name} onClose={() => router.back()} />
+        <ModalHeader title={plant.name} onClose={() => router.back()} backLabel={backLabelFor('plant')} />
         <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl }}>
           <View style={{ alignItems: 'center', marginVertical: space.lg }}>
             <Pressable onPress={changePhoto} disabled={photoBusy} accessibilityRole="button"
