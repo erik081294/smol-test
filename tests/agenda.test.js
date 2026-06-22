@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   monthMatrix, datedTasks, groupByDate, filterBySubgroup,
   dominantCategory, sortDayTasks, dateKey, monthLabel,
+  groupByDay, weekDays, groupByWeek,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -81,4 +82,40 @@ test('dateKey: accepteert string en Date', () => {
 
 test('monthLabel: Nederlands', () => {
   assert.match(monthLabel(2026, 5).toLowerCase(), /juni 2026/);
+});
+
+// === Tijdscope-helpers (TKN-1) ===
+test('groupByDay: splitst taken op de dag vs. zonder datum', () => {
+  const tasks = [
+    { id: 'a', due_date: '2026-06-22' },
+    { id: 'b', due_date: '2026-06-23' },
+    { id: 'c', due_date: null },
+  ];
+  const { dated, undated } = groupByDay(tasks, new Date(2026, 5, 22));
+  assert.deepEqual(dated.map((t) => t.id), ['a']);
+  assert.deepEqual(undated.map((t) => t.id), ['c']);
+});
+
+test('weekDays: 7 dagen, maandag-start, isToday gemarkeerd', () => {
+  const wed = new Date(2026, 5, 24); // woensdag 24 juni 2026
+  const days = weekDays(wed, new Date(2026, 5, 24));
+  assert.equal(days.length, 7);
+  assert.equal(days[0].key, '2026-06-22'); // maandag
+  assert.equal(days[6].key, '2026-06-28'); // zondag
+  assert.equal(days.find((d) => d.isToday)?.key, '2026-06-24');
+});
+
+test('groupByWeek: bucket per dag-sleutel, alleen binnen de week', () => {
+  const tasks = [
+    { id: 'a', due_date: '2026-06-22' },
+    { id: 'b', due_date: '2026-06-24' },
+    { id: 'c', due_date: '2026-06-24' },
+    { id: 'd', due_date: '2026-07-05' }, // buiten de week → valt weg
+    { id: 'e', due_date: null },
+  ];
+  const byWeek = groupByWeek(tasks, new Date(2026, 5, 24));
+  assert.equal(Object.keys(byWeek).length, 7);
+  assert.deepEqual(byWeek['2026-06-22'].map((t) => t.id), ['a']);
+  assert.deepEqual(byWeek['2026-06-24'].map((t) => t.id), ['b', 'c']);
+  assert.equal(byWeek['2026-07-05'], undefined);
 });
