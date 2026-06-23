@@ -34,7 +34,7 @@ export default function PlantScreen() {
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
-  const { addPlant, removePlant } = usePlants();
+  const { addPlant, updatePlant, removePlant } = usePlants();
   const { species } = usePlantSpecies();
   const { tasks, completeTask, uncompleteTask } = useTasks();
   const { subgroups, members, activeId } = useHousehold();
@@ -175,6 +175,33 @@ export default function PlantScreen() {
     })) removeSelectedPhoto();
   };
 
+  // Bestaande plant bewerken (UX-21): naam/soort/locatie aanpassen via een sheet.
+  // Hergebruikt het formulier-state van de nieuw-plant-flow (in detail ongebruikt),
+  // voorgevuld uit de plant. updatePlant = c.update (optimistisch + server).
+  const [editing, setEditing] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const openEdit = () => {
+    setName(plant.name ?? '');
+    setSpeciesId(plant.species_id ?? null);
+    setQuery(species.find((s) => s.id === plant.species_id)?.common_name ?? '');
+    setLocation(plant.location ?? null);
+    setErrors({});
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    if (!name.trim()) { setErrors({ name: t('plant.error.name') }); haptics.error(); return; }
+    setEditBusy(true);
+    try {
+      const patch = { name: name.trim(), species_id: speciesId, location };
+      await updatePlant(plant.id, patch);
+      setPlant((p) => ({ ...p, ...patch }));
+      haptics.success();
+      setEditing(false);
+    } catch (e) {
+      dialog.alert({ title: t('plant.error.save'), body: e.message });
+    } finally { setEditBusy(false); }
+  };
+
   if (!isNew) {
     if (!plant) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
     const sp = species.find((s) => s.id === plant.species_id) ?? null;
@@ -225,6 +252,13 @@ export default function PlantScreen() {
                 <Text style={[type.caption]}>{plant.location}</Text>
               </Row>
             ) : null}
+            {/* Zichtbare bewerk-affordance (UX-21): naam/soort/locatie aanpassen. */}
+            <Pressable onPress={openEdit} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('plant.edit')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: space.sm, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="settings" size={15} color={colors.forest} />
+              <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{t('plant.edit')}</Text>
+            </Pressable>
           </View>
 
           <Text style={[type.label, { marginBottom: space.sm }]}>{t('plant.careCard')}</Text>
@@ -301,6 +335,50 @@ export default function PlantScreen() {
               placeholder={t('plant.field.note.placeholder')} autoFocus style={{ marginBottom: 0 }} />
             <Button title={t('plant.note.save')} onPress={saveComposedNote} loading={composeBusy}
               disabled={!composeText.trim()} style={{ marginTop: space.md }} />
+          </ScrollView>
+        </BottomSheet>
+
+        {/* Plant bewerken (UX-21): naam, soort en locatie. */}
+        <BottomSheet visible={editing} onClose={() => setEditing(false)} avoidKeyboard>
+          <ModalHeader title={t('plant.edit')} onClose={() => setEditing(false)}
+            onConfirm={saveEdit} busy={editBusy} />
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: space.lg }} keyboardShouldPersistTaps="handled">
+            <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+              placeholder={t('plant.field.name.placeholder')} error={errors.name} />
+
+            <Field label={t('plant.field.species')} value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
+              placeholder={t('plant.field.species.placeholder')} />
+            {query.length > 0 && !speciesId && (
+              <View style={{ marginBottom: space.md }}>
+                {matches.map((s) => (
+                  <Pressable key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); }}
+                    accessibilityRole="button" accessibilityLabel={s.common_name}
+                    style={({ pressed }) => ({ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line,
+                      backgroundColor: pressed ? colors.surfaceAlt : 'transparent' })}>
+                    <Text style={type.body}>{s.common_name}</Text>
+                    <Text style={type.caption}>{s.latin_name}</Text>
+                  </Pressable>
+                ))}
+                {matches.length === 0 && (
+                  <Text style={[type.caption, { paddingVertical: space.sm }]}>{t('plant.species.none')}</Text>
+                )}
+              </View>
+            )}
+            {chosen && (
+              <Row gap={4} align="center" style={{ marginBottom: 12 }}>
+                <Icon name="check" size={14} color={colors.forest} weight="bold" />
+                <Text style={[type.caption, { color: colors.forest, flex: 1 }]}>
+                  {t('plant.species.chosen', { name: chosen.common_name })}
+                </Text>
+              </Row>
+            )}
+
+            <Text style={[type.label, { marginBottom: 6 }]}>{t('plant.field.location')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {LOCATIONS.map((loc) => (
+                <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(location === loc ? null : loc)} />
+              ))}
+            </View>
           </ScrollView>
         </BottomSheet>
       </SafeAreaView>
