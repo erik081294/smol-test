@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
 import { TaskRow } from '../../lib/TaskRow';
 import { FairnessBars } from '../../lib/FairnessBars';
-import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader } from '../../lib/ui';
+import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ListSkeleton } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
@@ -159,11 +159,15 @@ export default function Schoonmaak() {
             onPress={() => setPicker(CLEANING_TEMPLATES[0])}
             style={{ marginTop: space.sm }} />
         ) : null}
-        ListEmptyComponent={!loading && (
-          <Empty illustration="cleaning" title={t('cleaning.empty.title')}
-            subtitle={t('cleaning.empty.subtitle')}
-            actionTitle={t('cleaning.setup')} onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
-        )}
+        ListEmptyComponent={
+          loading && zones.length === 0 ? (
+            <ListSkeleton count={4} />
+          ) : !loading && zones.length === 0 ? (
+            <Empty illustration="cleaning" title={t('cleaning.empty.title')}
+              subtitle={t('cleaning.empty.subtitle')}
+              actionTitle={t('cleaning.setup')} onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
+          ) : null
+        }
       />
 
       {/* Sjabloon-preview */}

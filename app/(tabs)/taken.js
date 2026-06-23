@@ -9,7 +9,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { MonthView } from '../../lib/MonthView';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row,
+  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
@@ -191,11 +191,18 @@ export default function Taken() {
               tint={section.key === 'overdue' ? colors.danger : colors.inkSoft} />
           )}
           renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
-          ListEmptyComponent={!loading ? (
-            <Empty illustration="tasks"
-              title={filters.status === 'done' ? t('tasks.empty.done.title') : t('tasks.scope.empty.title')}
-              subtitle={filters.status === 'done' ? t('tasks.empty.done.subtitle') : (scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day'))} />
-          ) : null}
+          ListEmptyComponent={
+            loading ? (
+              <ListSkeleton count={5} />
+            ) : filters.status === 'done' ? (
+              <Empty illustration="tasks" title={t('tasks.empty.done.title')}
+                subtitle={t('tasks.empty.done.subtitle')} />
+            ) : (
+              <Empty illustration="tasks" title={t('tasks.scope.empty.title')}
+                subtitle={scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day')}
+                actionTitle={t('task.add')} onAction={() => router.push('/task/new')} />
+            )
+          }
         />
       )}
 

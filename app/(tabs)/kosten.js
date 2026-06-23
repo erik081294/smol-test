@@ -8,7 +8,7 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button, Row } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button, Row, ListSkeleton } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
@@ -107,10 +107,15 @@ export default function Kosten() {
             />
           );
         }}
-        ListEmptyComponent={!loading && (
-          <Empty illustration="expenses" title={t('expenses.empty.title')}
-            subtitle={t('expenses.empty.subtitle')} />
-        )}
+        ListEmptyComponent={
+          loading && filtered.length === 0 ? (
+            <ListSkeleton count={5} />
+          ) : !loading && filtered.length === 0 ? (
+            <Empty illustration="expenses" title={t('expenses.empty.title')}
+              subtitle={t('expenses.empty.subtitle')}
+              actionTitle={t('expense.add')} onAction={() => router.push('/expense/new')} />
+          ) : null
+        }
       />
 
       <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
