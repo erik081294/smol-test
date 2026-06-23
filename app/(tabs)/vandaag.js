@@ -11,7 +11,7 @@ import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
 import { dayProgress } from '../../lib/widgets/summaries';
-import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row, Banner, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
   deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
@@ -26,7 +26,8 @@ import { t } from '../../lib/i18n';
 
 const SCREEN_PAD = 18;
 const GRID_GAP = space.md;
-const TILE_H = 132;       // uniforme tegelhoogte (1×1 en 2×1 even hoog → strakke grid)
+const TILE_H = 148;       // uniforme tegelhoogte (1×1 en 2×1 even hoog → strakke grid);
+                          // ruim genoeg dat een 2×1-preview (balk + 2 regels) past (UX-24)
 const CONTROL_H = 48;     // bewerk-controlebalk onder de tegel
 const FOCUS_CAP = 6;
 const STYLE_KEY = 'huishoek.widgetStyle';
@@ -50,7 +51,7 @@ function EditBtn({ icon, label, tint = colors.ink, onPress }) {
 // afvinkbaar; (2) een modulaire, kleurrijke widget-grid die je zelf samenstelt
 // (toevoegen/herschikken/grootte/stijl), gesynct per gebruiker/huishouden.
 export default function Home() {
-  const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
+  const { tasks, loading, error, reload, completeTask, uncompleteTask } = useTasks();
   const { active, members, modules } = useHousehold();
   const { profile } = useAuth();
   const dialog = useDialog();
@@ -142,7 +143,9 @@ export default function Home() {
         contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
       >
-        {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag). */}
+        {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag).
+            Ring is tikbaar → Taken (UX-22); `loading` voorkomt de misleidende
+            "rustige dag" tijdens het koud laden (UX-23). */}
         <HomeHero
           householdName={active?.name}
           householdEmoji={active?.emoji}
@@ -150,11 +153,29 @@ export default function Home() {
           firstName={profile?.display_name?.split(' ')[0] ?? ''}
           progress={progress}
           remaining={focus.length}
+          loading={loading}
+          onPress={() => router.push('/(tabs)/taken')}
         />
 
+        {/* Foutstaat (UX-23): een mislukte (her)laadbeurt — bv. offline — toont een
+            nette banner met opnieuw-proberen i.p.v. een stil leeg scherm. */}
+        {error && !loading ? (
+          <Banner tone="warning" icon="warning" title={t('home.error.title')} style={{ marginBottom: space.lg }}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        ) : null}
+
         {/* Focus: achterstallig + vandaag, afvinkbaar. Leeg → overslaan. In bewerkmodus
-            bewust verborgen zodat de aandacht op het samenstellen van de grid ligt. */}
-        {!editing && focus.length > 0 && (
+            bewust verborgen zodat de aandacht op het samenstellen van de grid ligt.
+            Koud laden zonder data → skeleton i.p.v. blanco (UX-23). */}
+        {!editing && loading && tasks.length === 0 ? (
+          <View style={{ marginBottom: space.lg }}>
+            <ListSkeleton count={3} />
+          </View>
+        ) : !editing && focus.length > 0 ? (
           <View style={{ marginBottom: space.lg }}>
             <SectionHeader
               title={t('home.focus.title')}
@@ -180,37 +201,10 @@ export default function Home() {
               </Pressable>
             )}
           </View>
-        )}
-
-        {/* Grid-kop: titel + bewerk-toggle. */}
-        <Row justify="space-between" align="center" style={{ marginBottom: space.sm }}>
-          <Text style={type.label}>{t('home.widgets.title')}</Text>
-          <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={editing ? t('widget.edit.done') : t('widget.edit')}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
-            <Icon name={editing ? 'check' : 'appearance'} size={16} color={colors.forest} />
-            <Text style={[type.label, { color: colors.forest }]}>{editing ? t('widget.edit.done') : t('widget.edit')}</Text>
-          </Pressable>
-        </Row>
-
-        {/* Stijl-keuze + drag-hint (alleen in bewerkmodus). */}
-        {editing ? (
-          <>
-            <SegmentedControl
-              style={{ marginBottom: space.sm }}
-              value={widgetStyle}
-              onChange={changeStyle}
-              options={[
-                { value: 'playful', label: t('widget.style.playful') },
-                { value: 'neutral', label: t('widget.style.neutral') },
-              ]}
-            />
-            <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
-          </>
         ) : null}
 
-        {/* Widget-grid: absoluut gepositioneerd, met vinger-drag-herschikking in
-            bewerkmodus (long-press → optillen → realtime door de widgets schuiven). */}
+        {/* Widget-grid: absoluut gepositioneerd, met long-press-drag-herschikking in
+            béíde modi (UX-25); de tegels tonen hun preview binnen hun ruimte (UX-24). */}
         {layout.length > 0 ? (
           <WidgetGrid
             layout={layout}
@@ -228,20 +222,42 @@ export default function Home() {
           />
         ) : null}
 
-        {/* Widget toevoegen (alleen in bewerkmodus). */}
-        {editing ? (
-          <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.lg }} />
-        ) : null}
+        {/* Grid-kop + bewerk-toggle — bewust ónder de tegels (UX-26): je stelt eerst
+            de grid samen en vindt de "Aanpassen"-knop waar je 'm verwacht, eronder. */}
+        <Row justify="space-between" align="center" style={{ marginTop: space.xs, marginBottom: space.sm }}>
+          <Text style={type.label}>{t('home.widgets.title')}</Text>
+          <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityRole="button"
+            accessibilityLabel={editing ? t('widget.edit.done') : t('widget.edit')}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
+            <Icon name={editing ? 'check' : 'appearance'} size={16} color={colors.forest} />
+            <Text style={[type.label, { color: colors.forest }]}>{editing ? t('widget.edit.done') : t('widget.edit')}</Text>
+          </Pressable>
+        </Row>
 
-        {/* Eén rustige ingang naar alle onderdelen i.p.v. een tweede launchpad. */}
-        {!editing ? (
+        {/* In bewerkmodus: stijl-keuze + drag-hint + "widget toevoegen", gegroepeerd
+            onder de toggle. Buiten bewerkmodus: één rustige ingang naar alle modules. */}
+        {editing ? (
+          <>
+            <SegmentedControl
+              style={{ marginBottom: space.sm }}
+              value={widgetStyle}
+              onChange={changeStyle}
+              options={[
+                { value: 'playful', label: t('widget.style.playful') },
+                { value: 'neutral', label: t('widget.style.neutral') },
+              ]}
+            />
+            <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
+            <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.lg }} />
+          </>
+        ) : (
           <ItemRow
             leading={<Icon name="more" size={24} color={colors.forest} />}
             title={t('home.allModules')}
             chevron
             onPress={() => router.push('/(tabs)/meer')}
           />
-        ) : null}
+        )}
       </ScrollView>
 
       {/* Snel een taak toevoegen — verborgen in bewerkmodus. */}
