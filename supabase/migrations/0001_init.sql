@@ -133,7 +133,7 @@ create table if not exists public.tasks (
   title         text not null,
   notes         text,
   category      text not null default 'klus'
-                  check (category in ('klus','huishouden','plant','afspraak','overig')),
+                  check (category in ('klus','huishouden','plant','huisdier','afspraak','overig')),
   -- Toewijzing
   assigned_to   uuid references public.profiles(id) on delete set null,
   -- Planning

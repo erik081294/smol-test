@@ -131,3 +131,25 @@ de live DB (118 tests, 0 skipped) → item **INF-1** ✅. Resteert alleen de han
   de cache + schrijven terug; cache household-gescopet + `clearCache()` op sign-out. **Rest:**
   soepelheid + realtime-patch op web/Android-emulator/toestel bevestigen (→ 🔧).
 
+
+- **Fase 2 — PERF-1 aggregaat-RPC's + HUI-1 Huisdieren-module (2026-06-23)** — twee blokken,
+  beide met groene units en lint 0 errors; migraties `0037`/`0038` **live gepusht** (geverifieerd
+  via `list_migrations` + RPC-rooktest; `get_advisors` ongewijzigd t.o.v. de INF-10-basislijn).
+  - **PERF-1 (rest):** `0037` voegt `household_expense_totals` + `household_completion_totals`
+    toe (SECURITY INVOKER → de bestaande RLS scopet de payload, `search_path=public`). De
+    data-hooks (`useExpenses`/`useTaskCompletions`) halen exacte all-time-totalen *lazy* op zodra
+    hun `.limit(2000)`-venster vol is; `lib/expenses.js#balancesFromTotals` voedt het kosten-saldo
+    en `lib/fairness.js#tallyFromCounts` het schoonmaak-eerlijkheidsoverzicht (all-time). Onder de
+    drempel verandert er niets (geen extra query). Units: `tests/perfAggregates.test.js`.
+  - **HUI-1:** nieuwe **Huisdieren-module**. `0038` = `pets`/`pet_log` (tijdlijn met foto/notitie/
+    **gewicht**) + private bucket `pets` + `tasks.pet_id` + categorie `huisdier`. De
+    verzorgingsroutines per diersoort leven in code (`lib/petCare.js`, 8 diertypen) en worden als
+    **voor-aangevinkte checklist** aangeboden: de gebruiker kiest soort → bevestigt/schaaft bij →
+    de gekozen taken landen meteen als `tasks` (category `huisdier`) in Vandaag/Taken. Hooks
+    `lib/usePets.js`/`petPhoto.js` (hergebruiken plant-foto-/tijdlijn-helpers), schermen
+    `app/(tabs)/huisdieren.js` + `app/pet/[id].js` (detail + add-flow met checklist) + `app/pet/timeline.js`.
+    Registry/wiring: `lib/modules.js`, `lib/icons.js` (`pets`/`huisdier` + weight/birthday/vet/chip),
+    `lib/illustrations.js` (`pets`-pootafdruk), `lib/theme.js` (categorie `huisdier`), `lib/constants.js`
+    (CATEGORIES + de 0001-CHECK bijgewerkt voor constants-sync). Units: `tests/petCare.test.js`.
+    Totaal **439 (421 pass / 0 fail / 18 skip)**. **Rest (toestel):** foto kiezen/uploaden,
+    checklist-flow, tijdlijn + gewicht-log + realtime bevestigen (→ 🔧).
