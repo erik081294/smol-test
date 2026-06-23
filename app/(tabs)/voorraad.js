@@ -45,7 +45,7 @@ function bestBeforeLabel(item) {
 
 export default function Voorraad() {
   const dialog = useDialog();
-  const { items, loading, reload, add, update, adjustQuantity, remove } = usePantry();
+  const { items, loading, reload, add, update, adjustQuantity, remove, removeMany } = usePantry();
   const { suggestFor } = useProducts();
   const { add: addGrocery } = useGroceries();
   const toast = useToast();
@@ -59,6 +59,7 @@ export default function Voorraad() {
     () => visible.filter((i) => [PANTRY_STATUS.EXPIRED, PANTRY_STATUS.SOON].includes(status(i))).length,
     [visible]
   );
+  const expired = useMemo(() => visible.filter((i) => status(i) === PANTRY_STATUS.EXPIRED), [visible]);
 
   // Per bewaarplaats groeperen voor de "plaats"-weergave.
   const sections = useMemo(() => {
@@ -89,6 +90,24 @@ export default function Voorraad() {
         try { await remove(item.id); }
         catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
         finally { setHiddenIds((h) => h.filter((x) => x !== item.id)); }
+      },
+    });
+  };
+
+  // Alle verlopen producten in één keer opruimen — zelfde undo-vangnet als boodschappen.
+  const onClearExpired = () => {
+    const ids = expired.map((i) => i.id);
+    if (!ids.length) return;
+    animateNextLayout();
+    setHiddenIds((h) => [...h, ...ids]);
+    toast.show({
+      message: t('pantry.clearedExpired', { n: ids.length }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => !ids.includes(x))); },
+      onExpire: async () => {
+        try { await removeMany(ids); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }
       },
     });
   };
@@ -141,6 +160,10 @@ export default function Voorraad() {
           <Banner tone="warning">
             {expiringCount === 1 ? t('pantry.expiring.one') : t('pantry.expiring.other', { n: expiringCount })}
           </Banner>
+          {expired.length > 0 ? (
+            <Button title={t('pantry.clearExpired', { n: expired.length })} variant="ghost" icon="delete"
+              fullWidth={false} onPress={onClearExpired} style={{ marginTop: space.xs, alignSelf: 'flex-start' }} />
+          ) : null}
         </View>
       ) : null}
 

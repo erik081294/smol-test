@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, SectionList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,7 +9,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { MonthView } from '../../lib/MonthView';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton,
+  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
@@ -22,14 +22,19 @@ import {
   applyTaskFilters, countBy, activeFilterCount,
 } from '../../lib/agenda';
 import { isOverdue } from '../../lib/recurrence';
+import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
 
 const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
 
 export default function Taken() {
-  const { tasks, loading, reload, addTask, completeTask, uncompleteTask } = useTasks();
+  const { tasks, loading, reload, addTask, completeTask, uncompleteTask, deleteTasks } = useTasks();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
+  const toast = useToast();
+  const dialog = useDialog();
+  const [hiddenIds, setHiddenIds] = useState([]);
 
   const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand' | 'jaar'
   const [cursor, setCursor] = useState(new Date());  // anker voor Dag/Week
@@ -48,8 +53,32 @@ export default function Taken() {
     status: filters.status,
   }), [filters]);
 
-  const filtered = useMemo(() => applyTaskFilters(tasks, filterArg), [tasks, filterArg]);
+  // Lokaal verborgen taken (optimistisch wissen met undo) wegfilteren vóór de filters.
+  const visibleTasks = useMemo(
+    () => (hiddenIds.length ? tasks.filter((tk) => !hiddenIds.includes(tk.id)) : tasks),
+    [tasks, hiddenIds],
+  );
+  const filtered = useMemo(() => applyTaskFilters(visibleTasks, filterArg), [visibleTasks, filterArg]);
   const activeCount = activeFilterCount(filterArg);
+
+  // "Voltooide wissen": ruim alle nu getoonde afgevinkte taken in één keer op,
+  // met hetzelfde undo-vangnet als boodschappen/voorraad.
+  const onClearCompleted = () => {
+    const ids = filtered.map((tk) => tk.id);
+    if (!ids.length) return;
+    animateNextLayout();
+    setHiddenIds((h) => [...h, ...ids]);
+    toast.show({
+      message: t('tasks.clearedDone', { n: ids.length }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => !ids.includes(x))); },
+      onExpire: async () => {
+        try { await deleteTasks(ids); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }
+      },
+    });
+  };
 
   // Achterstallig altijd bovenaan (Dag/Week), los van de cursor; niet in af-modus.
   const overdue = useMemo(() => (filters.status === 'done' ? [] : filtered.filter(isOverdue)), [filtered, filters.status]);
@@ -79,6 +108,17 @@ export default function Taken() {
     }
     return out;
   }, [scope, filtered, overdue, cursor]);
+
+  // "Alles af vandaag"-viering: vier het moment dat de laatste open taak van vandaag
+  // afgevinkt wordt (alleen in de Dag-weergave van vandaag, open-filter).
+  const isTodayOpenView = scope === 'dag' && filters.status === 'open' && dateKey(cursor) === dateKey(new Date());
+  const openTodayCount = isTodayOpenView ? sections.reduce((n, s) => n + s.data.length, 0) : null;
+  const prevOpenToday = useRef(null);
+  const [celebrate, setCelebrate] = useState(false);
+  useEffect(() => {
+    if (openTodayCount === 0 && prevOpenToday.current > 0) setCelebrate(true);
+    prevOpenToday.current = openTodayCount;
+  }, [openTodayCount]);
 
   const stepCursor = (delta) => {
     const d = new Date(cursor);
@@ -186,6 +226,12 @@ export default function Taken() {
           stickySectionHeadersEnabled={false}
           onRefresh={reload}
           refreshing={loading}
+          ListHeaderComponent={
+            filters.status === 'done' && filtered.length > 0 ? (
+              <Button title={t('tasks.clearDone', { n: filtered.length })} variant="ghost" icon="delete"
+                fullWidth={false} onPress={onClearCompleted} style={{ alignSelf: 'flex-start', marginBottom: space.sm }} />
+            ) : null
+          }
           renderSectionHeader={({ section }) => (
             <SectionHeader title={section.title} count={section.data.length}
               tint={section.key === 'overdue' ? colors.danger : colors.inkSoft} />
@@ -215,6 +261,8 @@ export default function Taken() {
         filters={filters} setFilters={setFilters}
         members={members} subgroups={subgroups} tasks={tasks} filterArg={filterArg}
       />
+
+      <Celebrate show={celebrate} message={t('tasks.allDoneToday')} onDone={() => setCelebrate(false)} />
     </SafeAreaView>
   );
 }
