@@ -61,10 +61,10 @@ export default function Taken() {
   const filtered = useMemo(() => applyTaskFilters(visibleTasks, filterArg), [visibleTasks, filterArg]);
   const activeCount = activeFilterCount(filterArg);
 
-  // "Voltooide wissen": ruim alle nu getoonde afgevinkte taken in één keer op,
+  // "Voltooide wissen": ruim de nu zichtbare afgevinkte taken op (de secties van
+  // de huidige Dag/Week-weergave — niet stilletjes ook taken van andere dagen),
   // met hetzelfde undo-vangnet als boodschappen/voorraad.
-  const onClearCompleted = () => {
-    const ids = filtered.map((tk) => tk.id);
+  const onClearCompleted = (ids) => {
     if (!ids.length) return;
     animateNextLayout();
     setHiddenIds((h) => [...h, ...ids]);
@@ -255,12 +255,14 @@ export default function Taken() {
           stickySectionHeadersEnabled={false}
           onRefresh={reload}
           refreshing={loading}
-          ListHeaderComponent={
-            filters.status === 'done' && filtered.length > 0 ? (
-              <Button title={t('tasks.clearDone', { n: filtered.length })} variant="ghost" icon="delete"
-                fullWidth={false} onPress={onClearCompleted} style={{ alignSelf: 'flex-start', marginBottom: space.sm }} />
-            ) : null
-          }
+          ListHeaderComponent={(() => {
+            if (filters.status !== 'done') return null;
+            const doneIds = sections.flatMap((s) => s.data.map((tk) => tk.id));
+            return doneIds.length > 0 ? (
+              <Button title={t('tasks.clearDone', { n: doneIds.length })} variant="ghost" icon="delete"
+                fullWidth={false} onPress={() => onClearCompleted(doneIds)} style={{ alignSelf: 'flex-start', marginBottom: space.sm }} />
+            ) : null;
+          })()}
           renderSectionHeader={({ section }) => (
             <SectionHeader title={section.title} count={section.data.length}
               tint={section.key === 'overdue' ? colors.danger : colors.inkSoft} />
