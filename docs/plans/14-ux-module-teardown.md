@@ -161,6 +161,61 @@ FAB-keuze) zijn **bewust verworpen** en niet als rij opgenomen.
 
 ---
 
+## UXR-2 — Taken & tasks-weergaven · sessie-notitie 2026-06-23
+
+Doorlopen op de Moto g72 + broncode (`taken.js`, `agenda.js`, `schoonmaak.js`,
+`task/[id].js`). **Kernbeslissing (STR-1 herijkt):** Taken wordt het centrale
+**afspraken/agenda**-oppervlak. Het wordt *handmatig* gevuld met afspraken én
+*automatisch* door de modules (plant/huisdier/schoonmaak/…). De Taken-editor focust op
+handmatige afspraken; module-items hóren bij hun module en linken daarheen terug — zo
+voorkomen we "parallelle werelden" (een plant-taak zónder plant). Feit dat dit haalbaar
+maakt: module-taken dragen al hun bron-koppeling (`category:'plant' + plant_id`,
+`zone_id`, etc.).
+
+### Reframe & navigatie
+
+| ID | Bevinding | Bron | Insp. | Status |
+|----|-----------|------|-------|--------|
+| UX-27 | **Agenda samenvoegen met Taken; Agenda-tab vervalt.** Maand-scope in Taken neemt de rol over (de subgroep-filter uit Agenda erbij). Agenda is nu een feature-arme kopie van Taken/Maand (zelfde `MonthView`, alleen subgroep-chips, geen filter/loading/leeg/swipe). | `agenda.js` ↔ `taken.js:246` | M | ⏳ |
+| UX-28 | **Module-taken linken terug naar hun bron-element.** Tik op een afspraak die via een module is ontstaan (bv. `category:'plant'` met `plant_id`) → navigeer naar de logische detailview in díe module (plant/huisdier/…), niet naar de generieke editor. De handmatige afspraken openen wél de editor. Voorkomt parallelle werelden. | `lib/TaskRow.js` + `usePlants.js:70` | M | ⏳ |
+
+### Overzicht-interactie (Taken)
+
+| ID | Bevinding | Bron | Insp. | Status |
+|----|-----------|------|-------|--------|
+| UX-29 | **Horizontaal swipen tussen periodes.** Veeg links/rechts = vorige/volgende reeks (dag/week/maand). Let op: verticaal scrollen mag niet wiebelig worden — gesture-conflict (horizontaal pannen vs verticaal scrollen) netjes afvangen. | `taken.js:251` (SectionList) | M | ⏳ |
+| UX-30 | **Kalender pas op klik.** Standaard alleen het periode-/datumlabel tonen; tik erop opent de kalenderkiezer, met het schaalniveau van de actieve tab (dag/week/maand). Maandview toont dus niet meer standaard de kalender. | `taken.js:230-241` + `MonthView` | M | ⏳ |
+| UX-31 | **Default = week-view** bij openen van Taken (nu `'dag'`). | `taken.js:39` | S | ⏳ |
+| UX-32 | **Jaar-scope gelijktrekken** met de andere tabs (zelfde lijst-/periodebediening), maar zónder kalenderkiezer (niet nodig op jaar). | `taken.js:244` | S | ⏳ |
+| UX-33 | **YearActivity-statistieken naar een aparte, vriendelijke plek.** Niet schrappen — ze zijn waardevol. Locatie nog TBD (kandidaat: een "inzichten"-/profielplek). | `lib/YearActivity.js` | M | ⏳ |
+
+### Editor vereenvoudigen (`task/[id].js` → afspraken-editor)
+
+| ID | Bevinding | Bron | Insp. | Status |
+|----|-----------|------|-------|--------|
+| UX-34 | **Zone-keuze eruit.** Bij alleen-afspraken is de zone-koppeling overbodig; zones horen bij de Schoonmaak-flow. | `task/[id].js:204-215` | S | ⏳ |
+| UX-35 | **"Voor wie?" → multi-select + groepen.** Meerdere leden selecteerbaar (nu single-select `assignedTo`); subgroepen verschijnen hier indien aanwezig. | `task/[id].js:217-220` | M | ⏳ |
+| UX-36 | **Datumselectie herontwerpen.** Default = **vandaag** (nu "geen datum"). Andere datum via een datum-icoon; terugkerend via een vinkje dat pas dán de herhaalinstellingen onthult. Weg met "expander-op-expander"; nette, gefaseerde stappen. | `task/[id].js:222-327` | L | ⏳ |
+| UX-37 | **"Delen met" + "Voor wie" samenvoegen** tot één begrijpelijk blok, ook in de copy: "Voor wie is deze afspraak?" / "Wie ziet deze afspraak in de agenda?". | `task/[id].js:217-220, 336-347` | M | ⏳ |
+| UX-38 | **Beschrijving via progressive disclosure.** "Notitie (optioneel)" wordt een nette toggle onder de titel ("Beschrijving toevoegen?") die het veld pas op klik onthult. | `task/[id].js:329-334` | S | ⏳ |
+| UX-39 | **Primaire actieknop óók onderaan.** Naast de bevestiging rechtsboven een duidelijke, goed-gelabelde knop onderaan ("Afspraak opslaan"/"Toevoegen") — niet alleen de rechtsboven-knop (zwakke UX). | `lib/ui.js` (`Editor`) | M | ⏳ |
+| UX-40 | **Rotatie/rouleren eruit.** Beurtrotatie hoort bij de modules waar dat telt; afspraken zijn agenda-items. | `task/[id].js:289-325` | S | ⏳ |
+
+### Flexibiliteit
+
+| ID | Bevinding | Bron | Insp. | Status |
+|----|-----------|------|-------|--------|
+| UX-41 | **Door gebruiker gemaakte, gekleurde tags** koppelbaar aan afspraken; voeding voor de filters. Behoudt ultieme flexibiliteit voor afspraaktypes die de modules niet dekken. **Let op:** raakt de datalaag (tag-entiteit + kleur + koppeling) — valt buiten de "geen-migratie"-belofte van dit plan; apart inplannen. | nieuw (filters: `lib/agenda.js`) | L | ⏳ |
+
+> **Niet behandeld / nog open (geparkeerd, geen besluit deze sessie):** Taken mist een
+> **foutstaat** (alleen pull-to-refresh); de editor toont een **blanco scherm** tijdens het
+> laden van een bestaande taak i.p.v. een skeleton (`task/[id].js:179`); **Schoonmaak**
+> gebruikt voor de inricht-preview een rauwe `Modal` i.p.v. de gedeelde `BottomSheet`
+> (`schoonmaak.js:181`) en heeft **geen swipe-verwijderen** op zijn TaskRows. Schoonmaak
+> zelf krijgt een eigen teardown (UXR-2 richtte zich op Taken/Agenda/editor).
+
+---
+
 ## Acceptatie
 
 - Elke aangepakte module heeft een nette **loading-, lege- en foutstaat**.
