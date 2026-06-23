@@ -12,10 +12,12 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 - [`docs/plans/`](docs/plans/00-overzicht.md) — build-ready, direct-implementeerbare plannen per ronde.
 - Naslag (how-to): `README.md`, `DESIGN.md`, `VERIFICATIE.md`, `docs/*-setup.md`.
 
-> **Status (laatst herzien: 2026-06-22).** Fase 0, 1 en 1.5 zijn af; Fase 2 grotendeels
-> gebouwd (boodschappen-intelligentie, keuken-loop, kosten/autodelen, notificaties,
-> de Vandaag-widgetgrid en het taken-redesign). De actuele open/te-verifiëren punten
-> staan in de tabel (§6); het volledige chronologische verloop in
+> **Status (laatst herzien: 2026-06-23).** Fase 0, 1 en 1.5 zijn af; Fase 1.6 quick wins
+> (UX-15 t/m UX-20) af incl. herbruikbaar `SwipeRow`-veegprimitief (PR #37, op toestel
+> geverifieerd) — de teardown-sessies (UXR-1..8) zijn de resterende 1.6-stap. Fase 2
+> grotendeels gebouwd (boodschappen-intelligentie, keuken-loop, kosten/autodelen,
+> notificaties, de Vandaag-widgetgrid en het taken-redesign). De actuele open/te-verifiëren
+> punten staan in de tabel (§6); het volledige chronologische verloop in
 > [`huishoek-voortgang.md`](huishoek-voortgang.md).
 
 ---
@@ -252,7 +254,7 @@ helderheid van bediening (zichtbare item-acties i.p.v. verborgen long-press, inl
 validatie) en empty states + beweging. Geen migratie; leunt volledig op het bestaande
 design-systeem. Build-ready in [`docs/plans/07`](docs/plans/07-strakke-app.md).
 
-**Fase 1.6 — Modules van half naar af (UX-diepgang) — ⏳ NIEUW**
+**Fase 1.6 — Modules van half naar af (UX-diepgang) — ◐ DEELS (quick wins af)**
 Geen nieuwe features en geen migratie: we ontleden de *bestaande* modules scherm voor
 scherm, beslissing voor beslissing en flow voor flow, en dichten de "halve" randen.
 Waar Fase 1.5 de app *visueel cohesief* maakte (tokens/componenten/feel), gaat deze ronde

@@ -11,8 +11,9 @@ Afgeronde backlog-items met hun volledige notities staan in
 
 ---
 
-**Status-update (laatst herzien: 2026-06-22).** Fase 0 **én** Fase 1 zijn **af in de
-code** (werkboom). Gebouwd en aanwezig:
+**Status-update (laatst herzien: 2026-06-23).** Fase 0 **én** Fase 1 zijn **af in de
+code** (werkboom); Fase 1.6 quick wins (UX-15 t/m UX-20) af — zie de nieuwste entry onderaan.
+Gebouwd en aanwezig:
 - **Fase 0** — **FND-1** (subgroepen + zichtbaarheid: `subgroups`/`subgroup_members`,
   RLS-helpers `can_view`/`in_subgroup`, `lib/visibility.js`, `VisibilityPicker`,
   subgroep-beheer in `huishouden.js`) en **FND-2** (module-framework: `lib/modules.js`,
@@ -153,3 +154,24 @@ de live DB (118 tests, 0 skipped) → item **INF-1** ✅. Resteert alleen de han
     (CATEGORIES + de 0001-CHECK bijgewerkt voor constants-sync). Units: `tests/petCare.test.js`.
     Totaal **439 (421 pass / 0 fail / 18 skip)**. **Rest (toestel):** foto kiezen/uploaden,
     checklist-flow, tijdlijn + gewicht-log + realtime bevestigen (→ 🔧).
+
+
+- **Fase 1.6 — UX quick wins UX-15 t/m UX-20 + SwipeRow-primitief (2026-06-23)** — geen migratie,
+  volledig op het bestaande design-systeem; alle units groen, lint 0 errors, mutatie-ratchet groen
+  (`insights` 88,4% · `recurrence` 90,7% · `i18n`). PR #37, op de Motorola (moto_g72) E2E geverifieerd.
+  - **UX-15/16:** `ListSkeleton` uitgerold op Taken/Kosten/Activiteit/Planten/Huisdieren/Schoonmaak/
+    Kosten-inzichten/Plant-timeline (waren blanco bij laden); kale lege staten kregen een next-step-
+    actie + illustratie via `Empty` (Taken/Kosten/Planten een knop, Activiteit een illustratie).
+  - **UX-17:** nieuw herbruikbaar **`SwipeRow`** (`lib/ui.js`, op `ReanimatedSwipeable`) met
+    declaratieve actie-descriptors — **links = verwijderen**, **rechts = uitstellen** (`snoozeDate`
+    in `lib/recurrence.js`, units). Zichtbare knop + web-fallback blijven. Uitgerold op Taken,
+    Boodschappen, Voorraad en Maaltijden (laatste was delete zónder undo → nu mét). E2E ving een
+    **richting-inversie** (gesture-handler rapporteert de veegrichting) → gecorrigeerd; Maestro-flow
+    `.maestro/04-swipe.yaml`. **Leerpunt:** `adb input swipe` moet traag (~1200ms) om een
+    gesture-handler-gesture te triggeren; een snelle fling komt niet aan.
+  - **UX-18:** zichtbare `chevron`-bewerk-affordance op recept-ingrediënten; huisdier-verzorging had
+    al een knop. Plant-verzorging bleek niet bewerkbaar → follow-up **UX-21** (geen `updatePlant`-flow).
+  - **UX-19:** bulk "voltooide/verlopen wissen" (Taken/Voorraad, undo-toast + `removeMany`/`deleteTasks`)
+    + nieuw `Celebrate`-component ("alles af vandaag", respecteert verminder beweging).
+  - **UX-20:** periode-telling — "{n} voltooiingen in deze periode" (schoonmaak) en "{n} uitgaven
+    deze maand" (kosten-inzichten); nieuwe pure `insights.monthCount` + unit.
