@@ -35,3 +35,32 @@ test('trendPct: % laatste vs eerste; null bij <2 punten; days-filter', () => {
   // days-filter: alleen punten binnen 30 dagen voor `now` -> <2 punten -> null
   assert.equal(trendPct(items, 30, new Date('2026-05-01')), null);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('latestPerStore: bij gelijke datum wint de laatste prijs', () => {
+  const m = latestPerStore([
+    { purchased_on: '2026-02-01', store: 'AH', unit_price_cents: 100 },
+    { purchased_on: '2026-02-01', store: 'AH', unit_price_cents: 200 },
+  ]);
+  assert.equal(m['AH'].cents, 200);
+});
+
+test('trendPct: days-filter behoudt punten binnen het venster (grens telt mee)', () => {
+  const pts = [
+    { purchased_on: '2026-01-01', store: 'AH', unit_price_cents: 100 }, // exact 90 dagen vóór 1 apr
+    { purchased_on: '2026-03-01', store: 'AH', unit_price_cents: 110 },
+  ];
+  assert.equal(typeof trendPct(pts, 90, new Date('2026-04-01')), 'number');
+});
+
+test('trendPct: exact 2 punten levert een getal; eerste prijs 0 → null', () => {
+  assert.equal(typeof trendPct([
+    { purchased_on: '2026-01-01', store: 'AH', unit_price_cents: 100 },
+    { purchased_on: '2026-02-01', store: 'AH', unit_price_cents: 90 },
+  ], null), 'number');
+  assert.equal(trendPct([
+    { purchased_on: '2026-01-01', store: 'AH', unit_price_cents: 0 },
+    { purchased_on: '2026-02-01', store: 'AH', unit_price_cents: 50 },
+  ], null), null);
+});

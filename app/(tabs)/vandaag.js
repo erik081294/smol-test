@@ -9,6 +9,8 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
+import { HomeHero } from '../../lib/HomeHero';
+import { dayProgress } from '../../lib/widgets/summaries';
 import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
@@ -20,7 +22,7 @@ import { useHomeLayout } from '../../lib/useHomeLayout';
 import { isOverdue } from '../../lib/recurrence';
 import { animateNextLayout } from '../../lib/motion';
 import { colors, type, space, radius } from '../../lib/theme';
-import { t, plural } from '../../lib/i18n';
+import { t } from '../../lib/i18n';
 
 const SCREEN_PAD = 18;
 const GRID_GAP = space.md;
@@ -65,6 +67,7 @@ export default function Home() {
   const focus = useMemo(() => [...overdue, ...today], [overdue, today]);
   const visibleFocus = focus.slice(0, FOCUS_CAP);
   const extraFocus = focus.length - visibleFocus.length;
+  const progress = useMemo(() => dayProgress(tasks), [tasks]);
 
   const toggle = (tk) => (tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk));
 
@@ -139,20 +142,15 @@ export default function Home() {
         contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
       >
-        {/* Kop: huishouden + persoonlijke groet + stand van zaken vandaag */}
-        <View style={{ marginBottom: space.lg }}>
-          <Text style={[type.caption, { textTransform: 'uppercase', letterSpacing: 1 }]}>
-            {active?.emoji} {active?.name}
-          </Text>
-          <Text style={[type.h1, { marginTop: 2 }]}>
-            {greeting}, {profile?.display_name?.split(' ')[0] ?? ''}
-          </Text>
-          <Text style={[type.body, { color: colors.inkSoft, marginTop: 4 }]}>
-            {focus.length === 0
-              ? t('today.allDone')
-              : plural(focus.length, 'today.remaining.one', 'today.remaining.other')}
-          </Text>
-        </View>
+        {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag). */}
+        <HomeHero
+          householdName={active?.name}
+          householdEmoji={active?.emoji}
+          greeting={greeting}
+          firstName={profile?.display_name?.split(' ')[0] ?? ''}
+          progress={progress}
+          remaining={focus.length}
+        />
 
         {/* Focus: achterstallig + vandaag, afvinkbaar. Leeg → overslaan. In bewerkmodus
             bewust verborgen zodat de aandacht op het samenstellen van de grid ligt. */}

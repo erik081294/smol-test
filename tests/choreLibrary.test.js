@@ -74,3 +74,17 @@ test('choreToTask: eenmalige (seizoens)klus heeft recur_freq null en interval 1'
   assert.equal(task.due_date, '2026-11-01');
   assert.equal(task.notes, getChore('tuinslang').notes);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('yearRoundChores: telt de niet-seizoensklussen (Veiligheid + Onderhoud = 8); lege months telt mee', () => {
+  assert.equal(yearRoundChores().length, 8);
+  const custom = [{ key: 'x', group: 'g', category: 'klus', months: [] }]; // lege months → jaar-rond
+  assert.deepEqual(yearRoundChores(custom).map((c) => c.key), ['x']);
+});
+
+test('choreToTask: interval volgt de klus (≠1) bij terugkerend', () => {
+  const wk = choreToTask(getChore('waterkoker'), { startDate: new Date(2026, 5, 1) });
+  assert.equal(wk.recur_freq, 'monthly');
+  assert.equal(wk.recur_interval, 2); // waterkoker = elke 2 maanden, niet de default 1
+});

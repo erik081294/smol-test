@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  effectiveMime, isAllowedMime, parseModelJson, normalize,
+  effectiveMime, isAllowedMime, extractText, parseModelJson, normalize,
 } from '../supabase/functions/scan-receipt/core.js';
 
 test('effectiveMime: leest de MIME uit een data:-URL', () => {
@@ -53,4 +53,72 @@ test('normalize: ongeldige datum en lege winkel worden null', () => {
   assert.equal(out.store, null);
   assert.equal(out.purchased_on, null);
   assert.deepEqual(out.items, []);
+});
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// de tot nu toe ongeteste extractText, plus grens-/null-/regex-ankergevallen in
+// effectiveMime, normalize en parseModelJson.
+
+test('extractText: leest content uit choices[].message als string', () => {
+  assert.equal(extractText({ choices: [{ message: { content: 'Hallo' } }] }), 'Hallo');
+});
+
+test('extractText: pakt het eerste tekst-part uit een content-array', () => {
+  assert.equal(extractText({ choices: [{ message: { content: [{ type: 'image' }, { text: 'Deel' }] } }] }), 'Deel');
+});
+
+test('extractText: valt terug op message.content, dan content, dan choice.text', () => {
+  assert.equal(extractText({ message: { content: 'M' } }), 'M');
+  assert.equal(extractText({ content: 'C' }), 'C');
+  assert.equal(extractText({ choices: [{ message: { text: 'T' } }] }), 'T');
+});
+
+test('extractText: null als er geen bruikbare tekst is', () => {
+  assert.equal(extractText({}), null);
+  assert.equal(extractText(null), null);
+  assert.equal(extractText(undefined), null);
+  assert.equal(extractText({ choices: [null] }), null);          // choices[0] null → niet crashen
+  assert.equal(extractText({ choices: [{ message: {} }] }), null);
+  assert.equal(extractText({ choices: [{ message: { content: [{ niet: 'tekst' }] } }] }), null);
+});
+
+test('extractText: slaat null-elementen in de content-array veilig over', () => {
+  assert.equal(extractText({ content: [null, { text: 'X' }] }), 'X');
+});
+
+test('effectiveMime: niet-string imageBase64 valt veilig terug op mimeType', () => {
+  assert.equal(effectiveMime(null, 'image/png'), 'image/png');
+  assert.equal(effectiveMime(undefined, 'image/webp'), 'image/webp');
+});
+
+test('effectiveMime: malformed data:-URL (zonder ; of ,) valt terug op mimeType', () => {
+  assert.equal(effectiveMime('data:image/png', 'image/jpeg'), 'image/jpeg');
+});
+
+test('effectiveMime: trimt en lowercased de MIME uit de data:-URL', () => {
+  assert.equal(effectiveMime('data: IMAGE/PNG ;base64,AAAA', null), 'image/png');
+});
+
+test('effectiveMime: trimt en lowercased ook het losse mimeType-veld', () => {
+  assert.equal(effectiveMime('AAAAbase64', '  IMAGE/PNG  '), 'image/png');
+});
+
+test('parseModelJson: codeblok zónder json-label werkt ook', () => {
+  assert.deepEqual(parseModelJson('```\n{"store":"AH"}\n```'), { store: 'AH' });
+});
+
+test('normalize: tolerant voor ontbrekende/lege/rommelige input', () => {
+  assert.deepEqual(normalize(undefined), { store: null, purchased_on: null, items: [] });
+  assert.deepEqual(normalize({}), { store: null, purchased_on: null, items: [] });
+  assert.deepEqual(normalize({ items: [null, { name: '   ' }] }), { store: null, purchased_on: null, items: [] });
+});
+
+test('normalize: hoeveelheid 0 wordt 1 (grens > 0, niet >= 0)', () => {
+  const out = normalize({ items: [{ name: 'Appel', quantity: 0, unit: 'kg' }] });
+  assert.equal(out.items[0].quantity, 1);
+});
+
+test('normalize: datum moet exact yyyy-mm-dd zijn (ankers ^ en $)', () => {
+  assert.equal(normalize({ purchased_on: '2026-06-21extra', items: [] }).purchased_on, null);
+  assert.equal(normalize({ purchased_on: 'x 2026-06-21', items: [] }).purchased_on, null);
 });

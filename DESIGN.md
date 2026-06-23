@@ -64,6 +64,13 @@ Afvinken hoort goed te voelen. Voltooid werk krijgt een eigen, vriendelijk groen
 (`done`). Microcopy is menselijk en bemoedigend ("Lekker bezig!", niet "0 items
 remaining"). De app viert mee in plaats van alleen te registreren.
 
+> In de praktijk: de **Vandaag-hero** (`lib/HomeHero.js`) is hét ankerpunt — een
+> diepgroene merkkaart met groet en een **voortgangsring** (`lib/widgets/ProgressRing.js`,
+> gevoed door `dayProgress`) die de stand van de dag in één blik toont en bij een
+> volledige dag een feestelijke check laat zien. Widget-tegels fade-in'en gestaggerd
+> (eenmalig, respecteert "verminder beweging") en de Taken-widget toont een mini
+> voortgangsbalk (`x/y vandaag af`). Alle voortgang in `done`/accent-groen.
+
 ### 7. Vergevingsgezind
 Mensen maken fouten; de app straft ze niet. Acties zijn makkelijk ongedaan te
 maken. Foutteksten leggen uit wat er aan de hand is en wat je kunt doen, in

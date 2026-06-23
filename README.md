@@ -176,6 +176,11 @@ en CRUD opnieuw uitvinden:
 - **`useCollection(table, opts)`** ([lib/useCollection.js](./lib/useCollection.js)) —
   gescopet laden, een realtime-subscription en `create/update/remove` met nette
   foutafhandeling. Module-hooks (`useTasks`, `useExpenses`, …) bouwen hierop voort.
+- **Snelle (her)bezoeken** — hooks seeden hun begintoestand uit een lichte in-memory
+  cache ([lib/dataCache.js](./lib/dataCache.js), stale-while-revalidate, gekeyd op
+  `tabel:householdId`) zodat een herbezochte tab geen laad-skelet toont, en patchen platte
+  collecties incrementeel op realtime-events ([lib/realtimePatch.js](./lib/realtimePatch.js))
+  i.p.v. een volledige refetch. De `Tabs` staan op `freezeOnBlur` (state-behoud).
 - **Pure logica los getest** — de "slimme" laag van elke module (herhaling, agenda-grid,
   sjablonen, splitsing, verzorgingsschema) zit in losse bestanden zonder React/Supabase,
   met units onder `tests/`.

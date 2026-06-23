@@ -50,6 +50,12 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 > **13 Kleine features** en de grote **12 Vandaag-widget-grid-epic**. Stap-voor-stap-volgorde
 > hieronder.
 
+> **Vervolg (2026-06-22): performance-pakket GEBOUWD.** Na 10–13 een "waargenomen snelheid"-ronde
+> i.p.v. een nieuwe feature: **PERF-2** (instant tab-wissel — in-memory SWR-cache `lib/dataCache.js`
+> + `freezeOnBlur`), **INF-8 C3** (incrementeel realtime-patchen `lib/realtimePatch.js`) en de veilige
+> helft van **PERF-1** (query-limits). Géén migratie; units + lint groen. Status uitsluitend in
+> backlog §6 (PERF-2/INF-8/PERF-1 → 🔧, toestel-/web-bevestiging resteert).
+
 ## Stap-voor-stap: plannen 10–13 oppakken
 
 Geordend op **waarde-per-inspanning** en **bouwbaarheid vanuit hier** (geen device nodig tot
