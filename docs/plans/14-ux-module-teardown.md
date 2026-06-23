@@ -139,6 +139,28 @@ componenten/tokens, draai `npm test` (blijft groen — raakt geen pure logica, t
 heuristiek toevoegt; dan een unit erbij), korte rooktest op web. Per UXR-sessie: leg de
 bevindingen vast als nieuwe §6-rijen en commit de meegnomen quick wins per logische stap.
 
+## UXR-1 — Vandaag (Thuis) · sessie-notitie 2026-06-23
+
+Doorlopen op de Moto g72 (screenshots) + broncode (`app/(tabs)/vandaag.js`,
+`lib/HomeHero.js`, `lib/widgets/WidgetGrid.js`, `lib/widgets/WidgetHost.js`). Drie passes
+gelopen; hieronder alleen de bevindingen die **Erik akkoord** heeft bevonden — de overige
+suggesties (accent-regen, dubbele dag-stand, stijl-toggle schrappen, dubbele /meer-ingang,
+FAB-keuze) zijn **bewust verworpen** en niet als rij opgenomen.
+
+| ID | Bevinding (Vandaag) | Bron | Insp. | Status |
+|----|---------------------|------|-------|--------|
+| UX-22 | **Hero-ring leest als knop maar is dood.** In de lege staat (`nothingToday`) toont de `ProgressRing` een zon-achtig `today`-icoon in een cirkel met accentrand → schreeuwt "tik mij", doet niets. Geef 'm betekenis (tik → Taken) óf maak 'm visueel platter/minder knop-achtig in de lege staat. | `lib/HomeHero.js:70-74` | S | ⏳ |
+| UX-23 | **Geen loading-/fout-/offline-staat op Vandaag.** Alleen `RefreshControl`; tijdens laden is `tasks` leeg → hero toont vrolijk "Een rustige dag" terwijl er nog niets binnen is (misleidend). Geen skeleton (sluit aan op UX-15), geen foutstaat als `reload` faalt, geen offline-indicatie. | `app/(tabs)/vandaag.js:141-144` | M | ⏳ |
+| UX-24 | **Widget-preview puilt uit de tegel.** Tegel-inhoud zit in een harde `height: tileH` (132px) zonder `overflow:hidden`; zodra de preview (taaktitels, afgevinkte activiteit) hoger wordt, tekent die over de tegel/elementen eronder. Brede tegels hebben juist veel ongebruikte ruimte. Fix-richting: laat brede tegels hun ruimte benutten om de items netjes te tónen (i.p.v. overflow) — bv. tegel groeit mee of preview vult de breedte. | `lib/widgets/WidgetGrid.js:143` + `lib/widgets/WidgetHost.js:28,51` | M | ⏳ |
+| UX-25 | **Widgets slepen met long-press óók buiten aanpas-modus.** Drag staat nu op `.enabled(editing)`; gewenst: long-press (≈220ms) tilt een tegel op en herschikt, terwijl een korte tik blijft navigeren. Let op: buiten bewerkmodus is er geen controlebalk — dit is puur herschikken; per-ongeluk optillen tijdens scrollen vermijden. | `lib/widgets/WidgetGrid.js:177` | M | ⏳ |
+| UX-26 | **"Aanpassen"-regel onder de widget-grid.** De grid-kop (`Overzicht` + Aanpassen-toggle) staat nu bóven de tegels; verplaats naar onder de grid. Gevolg: de stijl-keuze + drag-hint die bij bewerkmodus horen verschijnen dan ook onder de grid — meenemen in de verplaatsing. | `app/(tabs)/vandaag.js:186-210` | S | ⏳ |
+
+> Verworpen in deze sessie (vastgelegd zodat ze niet terugkomen): accent-regen in de grid,
+> dubbele dag-stand hero↔Taken-tegel, `playful`/`neutral`-stijltoggle schrappen, dubbele
+> ingang naar /meer, en de hard-gecodeerde "+ Taak"-FAB. Erik vindt deze niet passend.
+
+---
+
 ## Acceptatie
 
 - Elke aangepakte module heeft een nette **loading-, lege- en foutstaat**.

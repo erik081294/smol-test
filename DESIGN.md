@@ -194,3 +194,18 @@ formulier gewijzigd is; bij sluiten/terug-drukken vraagt 'ie dan eerst om bevest
 (`confirmDiscard`, cross-platform: `Alert` native / `window.confirm` web, Android-back
 onderschept) i.p.v. een ingevuld formulier stil weg te gooien. Een schoon formulier
 sluit direct — geen frictie. (De native `Alert` wordt later het eigen dialoog-systeem.)
+
+### Drawers & sheets — toetsenbord-ontwijking en sluiten
+
+Elke onderaan-ingeschoven drawer/sheet gebruikt het gedeelde `BottomSheet`-omhulsel
+uit `lib/ui.js` — bouw geen losse `Modal`-variant per scherm. Twee dingen zijn een
+**harde eis**, geen optie:
+
+- **Nooit onder het toetsenbord.** Bevat de sheet een invoerveld, dan schuift de
+  inhoud omhoog zodra het toetsenbord opent — je ziet altijd wat je typt. Gebruik
+  `BottomSheet avoidKeyboard`; voor sheets met invoer is dat de standaard, niet de
+  uitzondering. Een veld dat onder het toetsenbord verdwijnt is een bug, geen detail —
+  een stabiele UI waarin de gebruiker z'n invoer ziet gaat vóór alles.
+- **Drie sluit-routes, altijd alledrie.** Een sheet sluit via (1) een veeg omlaag,
+  (2) een tik op de gedimde achtergrond, én (3) het kruisje/Annuleren in de
+  `ModalHeader`. Niet één ervan in plaats van de andere — alledrie moeten werken.

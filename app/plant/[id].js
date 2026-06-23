@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { offerImagePicker } from '../../lib/photoPicker';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
@@ -21,7 +21,6 @@ import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
-import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
@@ -35,7 +34,7 @@ export default function PlantScreen() {
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
-  const { addPlant, removePlant } = usePlants();
+  const { addPlant, updatePlant, removePlant } = usePlants();
   const { species } = usePlantSpecies();
   const { tasks, completeTask, uncompleteTask } = useTasks();
   const { subgroups, members, activeId } = useHousehold();
@@ -61,53 +60,9 @@ export default function PlantScreen() {
   const toggleShareWith = (pid) =>
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
 
-  // Kies een foto (bibliotheek of camera) en geef het asset terug, of null bij
-  // annuleren/weigeren. Géén state-effect — zo bruikbaar voor zowel de nieuwe
-  // plant (asset bewaren tot opslaan) als een bestaande plant (meteen uploaden).
-  const pickAsset = async (camera) => {
-    try {
-      const perm = camera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      // Op web is permission soms een no-op; alleen blokkeren als expliciet geweigerd.
-      if (perm?.granted === false) {
-        dialog.alert({ title: t('plant.photo.noAccess.title'), body: t('plant.photo.noAccess.body') }); return null;
-      }
-      const launch = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-      // Geen allowsEditing/aspect: op web niet ondersteund en kan het dialoog blokkeren.
-      const res = await launch({ mediaTypes: ['images'], quality: 0.6, base64: true });
-      if (res.canceled) return null;
-      const a = res.assets[0];
-      // Native levert base64 + file://-uri; web levert vaak een data-URL.
-      const data = parseDataUrl(a.uri);
-      const base64 = a.base64 ?? data?.base64 ?? null;
-      const ext = data?.ext ?? extFromUri(a.uri);
-      if (!base64) { dialog.alert({ title: t('plant.photo.title'), body: t('plant.photo.readError') }); return null; }
-      return { uri: a.uri, base64, ext };
-    } catch (e) {
-      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.openError') });
-      return null;
-    }
-  };
-
-  // Keuze camera/bibliotheek (+ optioneel verwijderen) via het eigen actiesheet —
-  // één codepad voor alle platforms (UX-6). `onPicked` krijgt het gekozen asset.
-  const offerPicker = async (onPicked, { allowRemove = false, onRemove } = {}) => {
-    const idx = await dialog.menu({
-      title: t('plant.photo.source.title'), body: t('plant.photo.source.body'),
-      options: [
-        { label: t('plant.photo.camera'), icon: 'photo' },
-        { label: t('plant.photo.library'), icon: 'library' },
-        ...(allowRemove ? [{ label: t('common.remove'), icon: 'delete', tone: 'danger' }] : []),
-      ],
-    });
-    if (idx === 0) { const a = await pickAsset(true); if (a) onPicked(a); }
-    else if (idx === 1) { const a = await pickAsset(false); if (a) onPicked(a); }
-    else if (idx === 2) onRemove?.();
-  };
-
-  // Nieuwe-plant-flow: asset bewaren tot opslaan.
-  const choosePhoto = () => offerPicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
+  // Nieuwe-plant-flow: asset bewaren tot opslaan. Foto kiezen via de gedeelde
+  // picker (`lib/photoPicker.js`, STR-4) — één codepad voor alle modules/platforms.
+  const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
     const e = {};
@@ -172,7 +127,7 @@ export default function PlantScreen() {
   };
 
   // Foto toevoegen aan een bestaande plant: dagboekfoto + meteen de nieuwe omslag.
-  const changePhoto = () => offerPicker(async (asset) => {
+  const changePhoto = () => offerImagePicker(async (asset) => {
     setPhotoBusy(true);
     try {
       const path = await addPlantPhoto({ householdId: activeId, plantId: plant.id, userId: user.id, asset });
@@ -218,6 +173,33 @@ export default function PlantScreen() {
       title: t('plant.photo.delete.title'), body: t('plant.photo.delete.body'),
       confirmLabel: t('common.delete'), cancelLabel: t('common.cancelLong'), tone: 'danger',
     })) removeSelectedPhoto();
+  };
+
+  // Bestaande plant bewerken (UX-21): naam/soort/locatie aanpassen via een sheet.
+  // Hergebruikt het formulier-state van de nieuw-plant-flow (in detail ongebruikt),
+  // voorgevuld uit de plant. updatePlant = c.update (optimistisch + server).
+  const [editing, setEditing] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const openEdit = () => {
+    setName(plant.name ?? '');
+    setSpeciesId(plant.species_id ?? null);
+    setQuery(species.find((s) => s.id === plant.species_id)?.common_name ?? '');
+    setLocation(plant.location ?? null);
+    setErrors({});
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    if (!name.trim()) { setErrors({ name: t('plant.error.name') }); haptics.error(); return; }
+    setEditBusy(true);
+    try {
+      const patch = { name: name.trim(), species_id: speciesId, location };
+      await updatePlant(plant.id, patch);
+      setPlant((p) => ({ ...p, ...patch }));
+      haptics.success();
+      setEditing(false);
+    } catch (e) {
+      dialog.alert({ title: t('plant.error.save'), body: e.message });
+    } finally { setEditBusy(false); }
   };
 
   if (!isNew) {
@@ -270,6 +252,13 @@ export default function PlantScreen() {
                 <Text style={[type.caption]}>{plant.location}</Text>
               </Row>
             ) : null}
+            {/* Zichtbare bewerk-affordance (UX-21): naam/soort/locatie aanpassen. */}
+            <Pressable onPress={openEdit} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('plant.edit')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: space.sm, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="settings" size={15} color={colors.forest} />
+              <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{t('plant.edit')}</Text>
+            </Pressable>
           </View>
 
           <Text style={[type.label, { marginBottom: space.sm }]}>{t('plant.careCard')}</Text>
@@ -346,6 +335,50 @@ export default function PlantScreen() {
               placeholder={t('plant.field.note.placeholder')} autoFocus style={{ marginBottom: 0 }} />
             <Button title={t('plant.note.save')} onPress={saveComposedNote} loading={composeBusy}
               disabled={!composeText.trim()} style={{ marginTop: space.md }} />
+          </ScrollView>
+        </BottomSheet>
+
+        {/* Plant bewerken (UX-21): naam, soort en locatie. */}
+        <BottomSheet visible={editing} onClose={() => setEditing(false)} avoidKeyboard>
+          <ModalHeader title={t('plant.edit')} onClose={() => setEditing(false)}
+            onConfirm={saveEdit} busy={editBusy} />
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: space.lg }} keyboardShouldPersistTaps="handled">
+            <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+              placeholder={t('plant.field.name.placeholder')} error={errors.name} />
+
+            <Field label={t('plant.field.species')} value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
+              placeholder={t('plant.field.species.placeholder')} />
+            {query.length > 0 && !speciesId && (
+              <View style={{ marginBottom: space.md }}>
+                {matches.map((s) => (
+                  <Pressable key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); }}
+                    accessibilityRole="button" accessibilityLabel={s.common_name}
+                    style={({ pressed }) => ({ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line,
+                      backgroundColor: pressed ? colors.surfaceAlt : 'transparent' })}>
+                    <Text style={type.body}>{s.common_name}</Text>
+                    <Text style={type.caption}>{s.latin_name}</Text>
+                  </Pressable>
+                ))}
+                {matches.length === 0 && (
+                  <Text style={[type.caption, { paddingVertical: space.sm }]}>{t('plant.species.none')}</Text>
+                )}
+              </View>
+            )}
+            {chosen && (
+              <Row gap={4} align="center" style={{ marginBottom: 12 }}>
+                <Icon name="check" size={14} color={colors.forest} weight="bold" />
+                <Text style={[type.caption, { color: colors.forest, flex: 1 }]}>
+                  {t('plant.species.chosen', { name: chosen.common_name })}
+                </Text>
+              </Row>
+            )}
+
+            <Text style={[type.label, { marginBottom: 6 }]}>{t('plant.field.location')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {LOCATIONS.map((loc) => (
+                <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(location === loc ? null : loc)} />
+              ))}
+            </View>
           </ScrollView>
         </BottomSheet>
       </SafeAreaView>
