@@ -214,7 +214,8 @@ export default function Boodschappen() {
       {/* Toevoegbalk */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
         <TextInput
-          value={text} onChangeText={setText} onSubmitEditing={add} returnKeyType="done"
+          value={text} onChangeText={setText} onSubmitEditing={add}
+          returnKeyType="done" blurOnSubmit={false}
           placeholder={t('groceries.placeholder')}
           placeholderTextColor={colors.inkFaint}
           accessibilityLabel={t('groceries.addLabel')}
