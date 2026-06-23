@@ -108,3 +108,26 @@ Faalt de check, dan heb je drie opties:
 - De Babel-parser-plugins staan expliciet op `["jsx"]` omdat `babel-preset-expo` de
   `decorators`-plugin aanzet (anders botst dat met Stryker's `decorators-legacy`).
 - `coverageAnalysis` staat op `off` (de command-runner ondersteunt geen per-test-coverage).
+
+## Snelheid
+
+Mutatietesten is hier **CPU-gebonden**: elke mutant draait een vers `node`-proces dat de
+testfile + zijn imports herlaadt. De grootste kost is `date-fns` (een module die 'm
+importeert doet ~0,6 s/run; eentje zonder ~0,2 s). Wat we daaraan doen:
+
+- **De ratchet draait alleen de gewijzigde modules** — dat is veruit de belangrijkste
+  versneller. Een typische PR (1–2 modules) is in ~1 minuut klaar; de volledige set
+  (`--update` / een PR die alles raakt) duurt ~10 min.
+- **V8 compile-cache** (`NODE_COMPILE_CACHE`, automatisch gezet in `scripts/mutation.mjs`
+  naar `node_modules/.cache/…`): de mutant-processen hergebruiken de gecompileerde
+  bytecode i.p.v. telkens opnieuw te compileren. Eén gedeelde, absolute cache betekent dat
+  `date-fns` één keer wordt gecompileerd en door álle groepen wordt hergebruikt — de
+  volledige run ging daarmee van ~13 min naar ~9 min (~28 %).
+- **Lichte oversubscription**: Stryker draait `2 × cores` mutanten tegelijk (override met
+  `MUTATION_CONCURRENCY`) om de I/O-gaten tijdens het laden te vullen.
+
+Bewust **niet** gedaan: groepen parallel draaien. Eén groep saturteert de cores al; meerdere
+Stryker-instanties tegelijk bleken in metingen juist trager (extra sandbox-/coördinatie-
+overhead). De winst zit dus in "minder werk doen" (alleen gewijzigde modules), niet in
+"meer parallelisme". Een echte stap verder zou vragen om de `date-fns`-importkost te
+drukken (bv. subpath-imports in de bron) — bewust buiten scope want dat raakt productiecode.

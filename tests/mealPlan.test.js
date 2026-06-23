@@ -62,3 +62,34 @@ test('aggregateIngredients: verschillende units blijven gescheiden; vrije tekst 
 test('aggregateIngredients: vrije-tekst-maaltijd (geen recipe) levert niets', () => {
   assert.deepEqual(aggregateIngredients([{ recipe_id: null, servings: 2, title: 'Uit eten' }], {}), []);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('groupByDate: zelfde maaltijdtype → tie-break op created_at (oplopend)', () => {
+  const g = groupByDate([
+    { plan_date: 'd', meal_type: 'diner', created_at: '2' },
+    { plan_date: 'd', meal_type: 'diner', created_at: '1' },
+  ]);
+  assert.deepEqual(g.d.map((e) => e.created_at), ['1', '2']);
+});
+
+test('aggregateIngredients: onbekend recept of recept zonder ingrediënten-array → overslaan (geen crash)', () => {
+  assert.deepEqual(aggregateIngredients([{ recipe_id: 'ghost' }], {}), []);
+  assert.deepEqual(aggregateIngredients([{ recipe_id: 'r' }], { r: { servings: 2 } }), []);
+});
+
+test('aggregateIngredients: servings 0 valt terug op 1 (geen deling door nul)', () => {
+  const out = aggregateIngredients(
+    [{ recipe_id: 'r', servings: 3 }],
+    { r: { servings: 0, ingredients: [{ name: 'X', quantity: 2, unit: 'stuk' }] } },
+  );
+  assert.equal(out[0].quantity, 6); // scale = 3 / 1
+});
+
+test('aggregateIngredients: catalog_product_id wordt overgenomen', () => {
+  const out = aggregateIngredients(
+    [{ recipe_id: 'r', servings: 1 }],
+    { r: { servings: 1, ingredients: [{ catalog_product_id: 'c1', name: 'X', quantity: 1, unit: 'stuk' }] } },
+  );
+  assert.equal(out[0].catalogProductId, 'c1');
+});

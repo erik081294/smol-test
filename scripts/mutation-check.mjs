@@ -27,9 +27,9 @@ const sinceArg = args.find((a) => a.startsWith('--since='))?.slice('--since='.le
 const isUpdate = args.includes('--update');
 
 function progress(group, res) {
-  if (res == null) { process.stdout.write(`• ${group.test} (${group.srcs.join(', ')}) … `); return; }
-  if (res.error) { console.log(`FOUT: ${res.error.message}`); return; }
-  console.log(`${res.score.toFixed(1)}% (${res.killed}/${res.total})`);
+  const label = `• ${group.test} (${group.srcs.join(', ')})`;
+  if (res.error) { console.log(`${label} … FOUT: ${res.error.message}`); return; }
+  console.log(`${label} … ${res.score.toFixed(1)}% (${res.killed}/${res.total})`);
 }
 
 // --- baseline (her)genereren -------------------------------------------------

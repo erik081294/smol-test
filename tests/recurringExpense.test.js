@@ -38,3 +38,26 @@ test('dueRun: onbekende freq -> geen occurrences', () => {
   const { occurrences } = dueRun({ next_date: '2020-01-01', recur_freq: 'jaarlijks', recur_interval: 1 }, new Date());
   assert.equal(occurrences.length, 0);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('advance: onbekende frequentie laat de datum ongewijzigd', () => {
+  assert.equal(ymd(advance('2026-06-18', 'jaarlijks', 1)), '2026-06-18');
+});
+
+test('dueRun: tolerant voor een ontbrekend/leeg sjabloon', () => {
+  assert.deepEqual(dueRun(undefined, new Date(2026, 5, 18)).occurrences, []);
+  assert.deepEqual(dueRun({}, new Date(2026, 5, 18)).occurrences, []);
+});
+
+test('dueRun: respecteert recur_interval (elke 2 maanden)', () => {
+  const { occurrences } = dueRun(
+    { next_date: '2026-01-01', recur_freq: 'monthly', recur_interval: 2 }, new Date(2026, 5, 1));
+  assert.deepEqual(occurrences.map(ymd), ['2026-01-01', '2026-03-01', '2026-05-01']);
+});
+
+test('dueRun: een occurrence exact op `now` telt nog mee (grens)', () => {
+  const now = new Date(2026, 5, 18); // lokale middernacht 2026-06-18
+  const { occurrences } = dueRun({ next_date: '2026-06-18', recur_freq: 'monthly', recur_interval: 1 }, now);
+  assert.deepEqual(occurrences.map(ymd), ['2026-06-18']);
+});
