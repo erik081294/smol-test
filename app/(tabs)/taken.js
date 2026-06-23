@@ -1,24 +1,26 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, SectionList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { format } from 'date-fns';
+import { format, addDays, addMonths, addYears } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
-import { MonthView } from '../../lib/MonthView';
+import { PeriodPicker } from '../../lib/PeriodPicker';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow,
+  BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
-import { YearActivity } from '../../lib/YearActivity';
 import { choreToTask } from '../../lib/choreLibrary';
 import {
-  groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey,
+  groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey, groupByDate,
+  monthDays, yearMonths, groupByMonth, monthLabel,
   applyTaskFilters, countBy, activeFilterCount,
 } from '../../lib/agenda';
 import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
@@ -28,17 +30,32 @@ import { dateLocale, t } from '../../lib/i18n';
 
 const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
 
+// Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+// Sorteer een maand-/jaarbucket op datum, dan tijd, dan titel (de buckets spannen
+// meerdere dagen, dus eerst op datum — sortDayTasks gaat van één dag uit).
+const sortByDate = (items) => [...(items ?? [])].sort((a, b) => {
+  const da = a.due_date ?? '';
+  const db = b.due_date ?? '';
+  if (da !== db) return da < db ? -1 : 1;
+  const ta = a.due_time ?? '99:99';
+  const tb = b.due_time ?? '99:99';
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  return (a.title ?? '').localeCompare(b.title ?? '');
+});
+
 export default function Taken() {
-  const { tasks, loading, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
+  const { tasks, loading, error, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
   const [hiddenIds, setHiddenIds] = useState([]);
 
-  const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand' | 'jaar'
-  const [cursor, setCursor] = useState(new Date());  // anker voor Dag/Week
-  const [selected, setSelected] = useState(dateKey(new Date())); // gekozen dag in Maand
+  const [scope, setScope] = useState('week');        // 'dag' | 'week' | 'maand' | 'jaar' — week is de standaard (UX-31)
+  const [cursor, setCursor] = useState(new Date());  // anker voor de actieve periode
+  const [pickerOpen, setPickerOpen] = useState(false); // kalenderkiezer pas op klik (UX-30)
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -117,10 +134,14 @@ export default function Taken() {
     });
   };
 
-  // Secties per scope (Dag/Week). Maand rendert los via MonthView.
+  // Secties per scope. Dag/Week/Maand/Jaar leveren nu állemaal een lijst (UX-32):
+  // de kalender is verhuisd naar de kiezer-on-klik (UX-30). Achterstallig staat
+  // bovenaan voor dag/week/maand (niet in de brede Jaar-weergave).
   const sections = useMemo(() => {
     const out = [];
-    if (overdue.length) out.push({ key: 'overdue', title: t('tasks.overdue'), data: sortDayTasks(overdue) });
+    if (scope !== 'jaar' && overdue.length) {
+      out.push({ key: 'overdue', title: t('tasks.overdue'), data: sortDayTasks(overdue) });
+    }
     if (scope === 'dag') {
       const { dated, undated } = groupByDay(filtered, cursor);
       const onDay = sortDayTasks(dated).filter((tk) => !overdue.includes(tk));
@@ -130,9 +151,18 @@ export default function Taken() {
       const byDay = groupByWeek(filtered, cursor);
       for (const d of weekDays(cursor)) {
         const items = sortDayTasks(byDay[d.key]).filter((tk) => !overdue.includes(tk));
-        if (items.length) {
-          out.push({ key: d.key, title: format(d.date, 'EEEE d MMM', { locale: dateLocale() }), data: items });
-        }
+        if (items.length) out.push({ key: d.key, title: cap(format(d.date, 'EEEE d MMM', { locale: dateLocale() })), data: items });
+      }
+    } else if (scope === 'maand') {
+      const byDate = groupByDate(filtered);
+      for (const day of monthDays(cursor.getFullYear(), cursor.getMonth())) {
+        const items = sortDayTasks(byDate[day.key]).filter((tk) => !overdue.includes(tk));
+        if (items.length) out.push({ key: day.key, title: cap(format(day.date, 'EEEE d MMM', { locale: dateLocale() })), data: items });
+      }
+    } else if (scope === 'jaar') {
+      const byMonth = groupByMonth(filtered);
+      for (const mo of yearMonths(cursor.getFullYear())) {
+        if (byMonth[mo.key]?.length) out.push({ key: mo.key, title: cap(mo.label), data: sortByDate(byMonth[mo.key]) });
       }
     }
     return out;
@@ -149,14 +179,32 @@ export default function Taken() {
     prevOpenToday.current = openTodayCount;
   }, [openTodayCount]);
 
-  const stepCursor = (delta) => {
-    const d = new Date(cursor);
-    d.setDate(d.getDate() + (scope === 'week' ? delta * 7 : delta));
-    setCursor(d);
-  };
+  // Eén periode vooruit/terug, afhankelijk van de scope (dag/week/maand/jaar).
+  const stepPeriod = (delta) => setCursor((c) => {
+    if (scope === 'week') return addDays(c, delta * 7);
+    if (scope === 'maand') return addMonths(c, delta);
+    if (scope === 'jaar') return addYears(c, delta);
+    return addDays(c, delta);
+  });
 
+  // Periode-label voor de kop.
   const week = weekDays(cursor);
-  const weekLabel = `${format(week[0].date, 'd')} – ${format(week[6].date, 'd MMM', { locale: dateLocale() })}`;
+  const periodLabel = scope === 'dag' ? cap(format(cursor, 'EEEE d MMMM', { locale: dateLocale() }))
+    : scope === 'week' ? `${format(week[0].date, 'd')} – ${format(week[6].date, 'd MMM', { locale: dateLocale() })}`
+      : scope === 'maand' ? cap(monthLabel(cursor.getFullYear(), cursor.getMonth()))
+        : String(cursor.getFullYear());
+
+  // Horizontaal vegen → vorige/volgende periode (UX-29). activeOffsetX zorgt dat 'ie
+  // pas bij een duidelijk-horizontale beweging aanslaat en failOffsetY laat verticaal
+  // scrollen ongemoeid — zo wordt de lijst niet wiebelig.
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-16, 16])
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX <= -56) runOnJS(stepPeriod)(1);
+      else if (e.translationX >= 56) runOnJS(stepPeriod)(-1);
+    });
 
   // Actieve-filter-chips boven de lijst (elk verwijderbaar).
   const activeChips = [];
@@ -196,9 +244,7 @@ export default function Taken() {
       </View>
 
       {/* Filterbalk (TKN-3): knop met teller + actieve-filter-chips + wis-alles.
-          Niet in Jaar-scope: die kijkt naar de voltooiingen-log met een eigen
-          lid-selector, niet naar de open/geplande taken die deze filters sturen. */}
-      {scope !== 'jaar' ? (
+          Geldt nu voor élke scope — ook Jaar is een gewone, gefilterde lijst (UX-32). */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, alignItems: 'center' }}>
         <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button"
@@ -224,30 +270,37 @@ export default function Taken() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      {/* Periode-kop: ‹ label › — het label is tikbaar en opent pas dán de kalender
+          (UX-30); pijlen + horizontaal vegen springen een periode (UX-29). Jaar heeft
+          geen kalenderkiezer (niet nodig), dus daar is het label niet tikbaar. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: space.lg, marginBottom: space.sm }}>
+        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.period.prev')} onPress={() => stepPeriod(-1)} />
+        {scope === 'jaar' ? (
+          <Text style={[type.title, { fontWeight: '700' }]}>{periodLabel}</Text>
+        ) : (
+          <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button"
+            accessibilityLabel={periodLabel} accessibilityHint={t('tasks.picker.hint')}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: pressed ? 0.6 : 1 })}>
+            <Text style={[type.title, { fontWeight: '700' }]}>{periodLabel}</Text>
+            <Icon name="agenda" size={15} color={colors.forest} />
+          </Pressable>
+        )}
+        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.period.next')} onPress={() => stepPeriod(1)} />
+      </View>
+
+      {error && !loading ? (
+        <Banner tone="warning" icon="warning" title={t('home.error.title')} style={{ marginHorizontal: space.lg, marginBottom: space.sm }}>
+          <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+            <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+          </Pressable>
+        </Banner>
       ) : null}
 
-      {/* Dag/Week-cursor */}
-      {scope === 'dag' ? (
-        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          <DateStepper date={cursor} onChange={setCursor} />
-        </View>
-      ) : scope === 'week' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.week.prev')} onPress={() => stepCursor(-1)} />
-          <Text style={[type.title, { fontWeight: '700' }]}>{weekLabel}</Text>
-          <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.week.next')} onPress={() => stepCursor(1)} />
-        </View>
-      ) : null}
-
-      {/* Scope-inhoud */}
-      {scope === 'jaar' ? (
-        <YearActivity members={members} />
-      ) : scope === 'maand' ? (
-        <MonthView tasks={filtered} members={members} onToggle={toggle}
-          selectedKey={selected} onSelectDay={setSelected}
-          emptyIllustration="tasks" emptyTitle={t('tasks.scope.empty.title')} emptySubtitle={t('tasks.scope.empty.day')} />
-      ) : (
+      {/* Eén lijst voor élke scope; horizontaal vegen → vorige/volgende periode (UX-29). */}
+      <GestureDetector gesture={swipe}>
         <SectionList
           contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: 40, flexGrow: 1 }}
           sections={sections}
@@ -283,16 +336,25 @@ export default function Taken() {
                 subtitle={t('tasks.empty.done.subtitle')} />
             ) : (
               <Empty illustration="tasks" title={t('tasks.scope.empty.title')}
-                subtitle={scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day')}
+                subtitle={scope === 'week' ? t('tasks.scope.empty.week')
+                  : scope === 'maand' ? t('tasks.scope.empty.month')
+                    : scope === 'jaar' ? t('tasks.scope.empty.year')
+                      : t('tasks.scope.empty.day')}
                 actionTitle={t('task.add')} onAction={() => router.push('/task/new')} />
             )
           }
         />
-      )}
+      </GestureDetector>
 
-      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
+      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')}
+        onPress={() => router.push(scope === 'dag' ? `/task/new?date=${dateKey(cursor)}` : '/task/new')} />
 
       <ChoreLibrarySheet visible={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={addFromLibrary} />
+
+      <PeriodPicker
+        visible={pickerOpen} onClose={() => setPickerOpen(false)}
+        scope={scope} value={cursor} tasks={filtered} onPick={setCursor}
+      />
 
       <TaskFilterSheet
         visible={filterOpen} onClose={() => setFilterOpen(false)}

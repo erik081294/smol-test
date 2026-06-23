@@ -7,6 +7,7 @@ import {
   groupByDay, weekDays, groupByWeek,
   applyTaskFilters, countBy, activeFilterCount,
   isOpen, isDone, inCategory, forAssignee, parseKey,
+  monthKey, monthDays, yearMonths, groupByMonth, taskHref,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -200,4 +201,65 @@ test('sortDayTasks: gelijke tijd → op titel', () => {
 
 test('parseKey: yyyy-MM-dd → Date op lokale middernacht', () => {
   assert.equal(dateKey(parseKey('2026-06-10')), '2026-06-10');
+});
+
+// === Maand-/Jaar-lijst-helpers (UX-32) ===================================
+
+test('monthKey: yyyy-MM uit string én Date', () => {
+  assert.equal(monthKey('2026-06-10'), '2026-06');
+  assert.equal(monthKey(new Date(2026, 5, 10)), '2026-06');
+  assert.equal(monthKey(new Date(2026, 0, 1)), '2026-01'); // januari = maand 0
+});
+
+test('monthDays: alle echte dagen van de maand, geen uitlopers (0-gebaseerd)', () => {
+  const jun = monthDays(2026, 5); // juni = 30 dagen
+  assert.equal(jun.length, 30);
+  assert.equal(jun[0].key, '2026-06-01');
+  assert.equal(jun.at(-1).key, '2026-06-30');
+});
+
+test('monthDays: februari schrikkel (29) vs niet-schrikkel (28)', () => {
+  assert.equal(monthDays(2024, 1).length, 29); // 2024 is schrikkeljaar
+  assert.equal(monthDays(2026, 1).length, 28);
+  assert.equal(monthDays(2024, 1).at(-1).key, '2024-02-29');
+});
+
+test('yearMonths: 12 maanden met juiste index, sleutel en datum', () => {
+  const ms = yearMonths(2026);
+  assert.equal(ms.length, 12);
+  assert.equal(ms[0].month, 0);
+  assert.equal(ms[0].key, '2026-01');
+  assert.equal(ms[11].key, '2026-12');
+  assert.equal(dateKey(ms[5].date), '2026-06-01');
+  assert.ok(typeof ms[0].label === 'string' && ms[0].label.length > 0);
+});
+
+test('groupByMonth: groepeert per maand, negeert datumloze taken', () => {
+  const g = groupByMonth([
+    { id: 1, due_date: '2026-06-10' },
+    { id: 2, due_date: '2026-06-28' },
+    { id: 3, due_date: '2026-07-01' },
+    { id: 4, due_date: null },
+    { id: 5 },
+  ]);
+  assert.deepEqual(g['2026-06'].map((t) => t.id), [1, 2]);
+  assert.deepEqual(g['2026-07'].map((t) => t.id), [3]);
+  assert.equal(Object.keys(g).length, 2);
+});
+
+// === Navigatie (UX-28) ===================================================
+
+test('taskHref: module-taak → bron-element, prioriteit plant > pet > zone', () => {
+  assert.equal(taskHref({ id: 't1', plant_id: 'p9' }), '/plant/p9');
+  assert.equal(taskHref({ id: 't2', pet_id: 'd4' }), '/pet/d4');
+  assert.equal(taskHref({ id: 't3', zone_id: 'z2' }), '/(tabs)/schoonmaak');
+  // prioriteit: plant wint van pet wint van zone
+  assert.equal(taskHref({ id: 't4', plant_id: 'p1', pet_id: 'd1', zone_id: 'z1' }), '/plant/p1');
+  assert.equal(taskHref({ id: 't5', pet_id: 'd1', zone_id: 'z1' }), '/pet/d1');
+});
+
+test('taskHref: handmatige afspraak → editor; null veilig', () => {
+  assert.equal(taskHref({ id: 't6', category: 'afspraak' }), '/task/t6');
+  assert.equal(taskHref({ id: 't7' }), '/task/t7');
+  assert.equal(taskHref(null), null);
 });
