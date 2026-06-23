@@ -175,3 +175,15 @@ de live DB (118 tests, 0 skipped) → item **INF-1** ✅. Resteert alleen de han
     + nieuw `Celebrate`-component ("alles af vandaag", respecteert verminder beweging).
   - **UX-20:** periode-telling — "{n} voltooiingen in deze periode" (schoonmaak) en "{n} uitgaven
     deze maand" (kosten-inzichten); nieuwe pure `insights.monthCount` + unit.
+
+
+- **UX-14 — Dark-mode titels & pill-teksten leesbaar (2026-06-23)** — op de Motorola geverifieerd.
+  **Kernbug:** de New Architecture (Fabric) cachet de geflatte stijl **per object-identiteit** bij
+  de eerste render. De `type`/`categoryMeta`-tokens droegen hun kleur via een live `get color()`
+  op gedeelde style-objecten → één keer uitgelezen (licht, want dev-client `Appearance`='light')
+  en daarna vast. Gevolg: `ScreenHeader`-titels (`type.h1`, bv. "Taken") donkergroen-op-donker,
+  terwijl een ná-de-switch-gemounte `type.h2` ("Niets in beeld") wél wit was. **Fix:**
+  `rebuildTokens()` geeft `type`/`categoryMeta` bij elke `applyTheme()` een verse identiteit met
+  platte kleurwaarde (`lib/theme.js`) → cache herrekent. Plus brand-`Badge` naar een nieuw
+  `brandText`-token (AA op donker, was ~2:1). Geen migratie. Leerpunt vastgelegd: nooit een live
+  getter op een gedeeld style-object op Fabric.
