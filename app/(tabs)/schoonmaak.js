@@ -48,7 +48,8 @@ export default function Schoonmaak() {
     const cleaning = completions.filter((c) => c.task?.zone_id != null);
     return tally(cleaning, members, sinceDate(days));
   }, [completions, exactCounts, members, period]);
-  const hasAnyCompletion = fairnessRows.some((r) => r.count > 0);
+  const periodTotal = fairnessRows.reduce((s, r) => s + r.count, 0);
+  const hasAnyCompletion = periodTotal > 0;
 
   // Schoonmaaktaken = taken die aan een zone hangen.
   const byZone = useMemo(() => {
@@ -121,13 +122,19 @@ export default function Schoonmaak() {
           <Card style={{ marginBottom: 14 }}>
             <SectionHeader title={t('cleaning.fairness.title')} />
             <Text style={[type.caption, { marginTop: -6, marginBottom: 12 }]}>{t('cleaning.fairness.subtitle')}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
               {FAIRNESS_PERIODS.map((p) => (
                 <Chip key={p.key} label={t(p.labelKey)} active={period === p.key} onPress={() => setPeriod(p.key)} />
               ))}
             </View>
             {hasAnyCompletion ? (
-              <FairnessBars rows={fairnessRows} />
+              <>
+                {/* Periode-transparantie: hoeveel voltooiingen de balken beslaan. */}
+                <Text style={[type.caption, { marginBottom: 12 }]}>
+                  {plural(periodTotal, 'cleaning.fairness.count.one', 'cleaning.fairness.count.other')}
+                </Text>
+                <FairnessBars rows={fairnessRows} />
+              </>
             ) : (
               <Text style={[type.caption]}>
                 {t('cleaning.fairness.empty')}
