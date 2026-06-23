@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { format, addDays } from 'date-fns';
-import { nextDueDate, recurrenceLabel, dueLabel, isOverdue } from '../lib/recurrence.js';
+import { nextDueDate, recurrenceLabel, dueLabel, isOverdue, snoozeDate } from '../lib/recurrence.js';
 import { t } from '../lib/i18n.js';
 
 const ymd = (d) => (d ? format(d, 'yyyy-MM-dd') : null);
@@ -73,4 +73,33 @@ test('dueLabel: null zonder datum, vandaag/morgen herkend, tijd afgekapt op uu:m
 
 test('isOverdue: een toekomstige datum is niet achterstallig', () => {
   assert.equal(isOverdue({ due_date: format(addDays(new Date(), 7), 'yyyy-MM-dd') }), false);
+});
+
+// --- snoozeDate (UX-17 rechts-swipe "uitstellen").
+const NOW = new Date(2026, 5, 16, 10, 0); // di 16 jun 2026, 10:00
+
+test('snoozeDate: taak van vandaag → morgen (+1)', () => {
+  assert.equal(snoozeDate({ due_date: '2026-06-16' }, 1, NOW), '2026-06-17');
+});
+
+test('snoozeDate: grens — precies vandaag telt als basis, niet "vandaag" via fallback', () => {
+  // due == vandaag is NIET vóór vandaag → basis = due (16) → +1 = 17, niet +2.
+  assert.equal(snoozeDate({ due_date: '2026-06-16' }, 1, NOW), '2026-06-17');
+});
+
+test('snoozeDate: achterstallige taak schuift vanaf vandaag, niet vanaf de oude datum', () => {
+  // due ver in het verleden → basis = vandaag (16) → +1 = 17 (niet 2020-...-+1).
+  assert.equal(snoozeDate({ due_date: '2020-01-01' }, 1, NOW), '2026-06-17');
+});
+
+test('snoozeDate: toekomstige taak schuift vanaf zijn eigen datum', () => {
+  assert.equal(snoozeDate({ due_date: '2026-06-20' }, 1, NOW), '2026-06-21');
+});
+
+test('snoozeDate: zonder due_date → vanaf vandaag; default-arg = +1 dag', () => {
+  assert.equal(snoozeDate({}, 1, NOW), '2026-06-17');
+  assert.equal(snoozeDate({ due_date: null }, 7, NOW), '2026-06-23'); // +7 telt mee
+  // Aanroep met alleen een taak gebruikt de byDays-default (1).
+  const expected = format(addDays(new Date(new Date().setHours(0, 0, 0, 0)), 1), 'yyyy-MM-dd');
+  assert.equal(snoozeDate({}), expected);
 });
