@@ -112,3 +112,42 @@ test('parseAmountToCents: accepteert komma en punt, weigert onzin', () => {
   assert.equal(parseAmountToCents('abc'), null);
   assert.equal(parseAmountToCents('1,234'), null); // te veel decimalen
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// deling-door-nul, de exacte restcent-volgorde (fractie dan id), deterministisch
+// vereffenen bij gelijke bedragen, en een getal-invoer.
+
+test('computeShares shares: alle gewichten 0 → iedereen 0 (geen deling door nul)', () => {
+  const out = computeShares({
+    amountCents: 1000, splitType: SPLIT.SHARES,
+    participants: [{ profileId: 'a', weight: 0 }, { profileId: 'b', weight: 0 }],
+  });
+  assert.deepEqual(out, { a: 0, b: 0 });
+});
+
+test('computeShares: restcenten gaan naar grootste fractie, dan op id', () => {
+  // gewichten 1:2:3 op 100 ct → 16,67 / 33,33 / 50,0 → floor 16/33/50, 1 restcent
+  // naar de grootste fractie (z = ,67), niet naar het kleinste id.
+  const out = computeShares({
+    amountCents: 100, splitType: SPLIT.SHARES,
+    participants: [{ profileId: 'z', weight: 1 }, { profileId: 'a', weight: 2 }, { profileId: 'm', weight: 3 }],
+  });
+  assert.deepEqual(out, { z: 17, a: 33, m: 50 });
+  // gelijke fracties (4 × 250,5 op 1002) → 2 restcenten naar de twee kleinste id's.
+  const out2 = computeShares({ amountCents: 1002, splitType: SPLIT.EQUAL, participants: P('d', 'a', 'c', 'b') });
+  assert.deepEqual(out2, { a: 251, b: 251, c: 250, d: 250 });
+  assert.equal(sum(out2), 1002);
+});
+
+test('settle: deterministische koppeling bij gelijke bedragen (op id)', () => {
+  const payments = settle({ x: -500, a: -500, c: 500, z: 500 });
+  assert.deepEqual(payments, [
+    { from: 'a', to: 'c', amountCents: 500 },
+    { from: 'x', to: 'z', amountCents: 500 },
+  ]);
+});
+
+test('parseAmountToCents: accepteert ook een getal als invoer', () => {
+  assert.equal(parseAmountToCents(7.5), 750);
+  assert.equal(parseAmountToCents(12), 1200);
+});

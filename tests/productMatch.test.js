@@ -43,3 +43,46 @@ test('suggestions: gesorteerd op score, deterministische tie-break op id', () =>
   assert.equal(s[2].product.id, 'c');
   assert.ok(s[0].score >= s[1].score && s[1].score >= s[2].score);
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22):
+// leestekens, meercijferige/decimale hoeveelheden, exacte similariteitswaarden
+// (bigram-grens, telling, min vs max), top-N afkapping en de drempelgrens.
+
+test('normalize: leestekens worden spaties (niet behouden)', () => {
+  assert.equal(normalize('AH! Melk & Brood'), 'ah melk brood');
+  assert.equal(normalize('Choco-pasta'), 'choco pasta');
+});
+
+test('normalize: meercijferige en decimale hoeveelheden vallen volledig weg', () => {
+  assert.equal(normalize('Cola 1500 ml'), 'cola');
+  assert.equal(normalize('Melk 1,50 l'), 'melk');
+  assert.equal(normalize('Yoghurt 0,5kg'), 'yoghurt');
+  assert.equal(normalize('Brood 1500'), 'brood'); // los meercijferig getal zonder eenheid
+});
+
+test('similarity: exacte Dice-waarden (grens, telling en doorsnede)', () => {
+  // 'abc' vs 'abd': gedeelde bigram {ab}; 2*1/(2+2) = 0,5
+  assert.equal(similarity('abc', 'abd'), 0.5);
+  // herhaalde bigram: 'aaa' {aa:2} vs 'aa' {aa:1} → 2*min(2,1)/(2+1) = 2/3
+  assert.ok(Math.abs(similarity('aaa', 'aa') - 2 / 3) < 1e-9);
+});
+
+test('suggestions: kapt af op n (niet de hele lijst)', () => {
+  const products = [
+    { id: 'p1', name: 'Melk' }, { id: 'p2', name: 'Melkpak' },
+    { id: 'p3', name: 'Brood' }, { id: 'p4', name: 'Kaas' },
+  ];
+  assert.equal(suggestions('melk', products, 2).length, 2);
+});
+
+test('suggestions: id-tie-break onafhankelijk van de invoervolgorde', () => {
+  const mk = (ids) => ids.map((id) => ({ id, name: 'Melk' })); // gelijke score
+  assert.deepEqual(suggestions('melk', mk(['b', 'a']), 2).map((s) => s.product.id), ['a', 'b']);
+  assert.deepEqual(suggestions('melk', mk(['a', 'b']), 2).map((s) => s.product.id), ['a', 'b']);
+});
+
+test('bestMatch: score precies op de drempel telt nog mee (>=)', () => {
+  const products = [{ id: 'p', name: 'abd' }];
+  assert.equal(bestMatch('abc', products, 0.5).product.id, 'p'); // 0,5 >= 0,5
+  assert.equal(bestMatch('abc', products, 0.5000001), null);     // net te hoog
+});

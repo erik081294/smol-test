@@ -1,0 +1,211 @@
+{
+  "generatedAt": "2026-06-22T22:13:43.237Z",
+  "tolerancePp": 1,
+  "total": {
+    "killed": 2870,
+    "total": 3381,
+    "score": 84.9
+  },
+  "files": {
+    "lib/activity.js": {
+      "killed": 90,
+      "total": 104,
+      "score": 86.5
+    },
+    "lib/agenda.js": {
+      "killed": 184,
+      "total": 205,
+      "score": 89.8
+    },
+    "lib/appRoute.js": {
+      "killed": 21,
+      "total": 21,
+      "score": 100
+    },
+    "lib/barcode.js": {
+      "killed": 33,
+      "total": 34,
+      "score": 97.1
+    },
+    "lib/buyFrequency.js": {
+      "killed": 75,
+      "total": 80,
+      "score": 93.8
+    },
+    "lib/choreLibrary.js": {
+      "killed": 110,
+      "total": 145,
+      "score": 75.9
+    },
+    "lib/cleaningTemplates.js": {
+      "killed": 77,
+      "total": 105,
+      "score": 73.3
+    },
+    "lib/dataCache.js": {
+      "killed": 15,
+      "total": 15,
+      "score": 100
+    },
+    "lib/decisions.js": {
+      "killed": 67,
+      "total": 78,
+      "score": 85.9
+    },
+    "lib/expenses.js": {
+      "killed": 142,
+      "total": 175,
+      "score": 81.1
+    },
+    "lib/fairness.js": {
+      "killed": 54,
+      "total": 63,
+      "score": 85.7
+    },
+    "lib/favoriteGroceries.js": {
+      "killed": 97,
+      "total": 119,
+      "score": 81.5
+    },
+    "lib/i18n.js": {
+      "killed": 30,
+      "total": 41,
+      "score": 73.2
+    },
+    "lib/insights.js": {
+      "killed": 70,
+      "total": 79,
+      "score": 88.6
+    },
+    "lib/mealPlan.js": {
+      "killed": 69,
+      "total": 75,
+      "score": 92
+    },
+    "lib/modules.js": {
+      "killed": 170,
+      "total": 192,
+      "score": 88.5
+    },
+    "lib/navMeta.js": {
+      "killed": 13,
+      "total": 20,
+      "score": 65
+    },
+    "lib/notifications.js": {
+      "killed": 154,
+      "total": 181,
+      "score": 85.1
+    },
+    "lib/offCatalog.js": {
+      "killed": 85,
+      "total": 94,
+      "score": 90.4
+    },
+    "lib/offDelta.js": {
+      "killed": 64,
+      "total": 74,
+      "score": 86.5
+    },
+    "lib/pantry.js": {
+      "killed": 101,
+      "total": 121,
+      "score": 83.5
+    },
+    "lib/pendingDeletes.js": {
+      "killed": 16,
+      "total": 17,
+      "score": 94.1
+    },
+    "lib/plantCare.js": {
+      "killed": 81,
+      "total": 96,
+      "score": 84.4
+    },
+    "lib/plantPhoto.js": {
+      "killed": 39,
+      "total": 44,
+      "score": 88.6
+    },
+    "lib/plantTimeline.js": {
+      "killed": 42,
+      "total": 48,
+      "score": 87.5
+    },
+    "lib/priceTrack.js": {
+      "killed": 58,
+      "total": 64,
+      "score": 90.6
+    },
+    "lib/productMatch.js": {
+      "killed": 83,
+      "total": 107,
+      "score": 77.6
+    },
+    "lib/realtimePatch.js": {
+      "killed": 102,
+      "total": 105,
+      "score": 97.1
+    },
+    "lib/recurrence.js": {
+      "killed": 91,
+      "total": 100,
+      "score": 91
+    },
+    "lib/recurringExpense.js": {
+      "killed": 41,
+      "total": 44,
+      "score": 93.2
+    },
+    "lib/reservations.js": {
+      "killed": 49,
+      "total": 56,
+      "score": 87.5
+    },
+    "lib/rotation.js": {
+      "killed": 12,
+      "total": 13,
+      "score": 92.3
+    },
+    "lib/visibility.js": {
+      "killed": 56,
+      "total": 63,
+      "score": 88.9
+    },
+    "lib/offCategoryMap.js": {
+      "killed": 53,
+      "total": 78,
+      "score": 67.9
+    },
+    "lib/constants.js": {
+      "killed": 34,
+      "total": 44,
+      "score": 77.3
+    },
+    "lib/widgets/grid.js": {
+      "killed": 75,
+      "total": 97,
+      "score": 77.3
+    },
+    "lib/widgets/summaries.js": {
+      "killed": 132,
+      "total": 165,
+      "score": 80
+    },
+    "lib/widgets/colorSchemes.js": {
+      "killed": 9,
+      "total": 13,
+      "score": 69.2
+    },
+    "supabase/functions/notify/core.js": {
+      "killed": 55,
+      "total": 69,
+      "score": 79.7
+    },
+    "supabase/functions/scan-receipt/core.js": {
+      "killed": 121,
+      "total": 137,
+      "score": 88.3
+    }
+  }
+}

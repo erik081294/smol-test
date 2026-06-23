@@ -89,3 +89,25 @@ test('searchSpecies: zoekt op naam, latijn en search-veld; lege query = alles', 
   assert.equal(searchSpecies(list, 'aloe')[0].common_name, 'Aloë vera');
   assert.equal(searchSpecies(list, 'xyz').length, 0);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('buildCareTasks: household-plant met stale share-velden blijft household (geen lek)', () => {
+  const plant = { id: 'p1', name: 'X', visibility: 'household', share_subgroup_id: 'sg-oud', share_with: ['u9'] };
+  const [water] = buildCareTasks(plant, MONSTERA, { startDate: new Date(2026, 5, 1) });
+  assert.equal(water.share_subgroup_id, null);
+  assert.equal(water.share_with, null);
+});
+
+test('buildCareTasks: custom-plant erft de gedeelde-met-lijst', () => {
+  const plant = { id: 'p1', name: 'X', visibility: 'custom', share_with: ['u1', 'u2'] };
+  const [water] = buildCareTasks(plant, MONSTERA, { startDate: new Date(2026, 5, 1) });
+  assert.deepEqual(water.share_with, ['u1', 'u2']);
+  assert.equal(water.share_subgroup_id, null);
+});
+
+test('searchSpecies: trimt+lowercased de query en matcht naam/latijn los van het search-veld', () => {
+  assert.equal(searchSpecies([{ common_name: 'Monstera', search: 'monstera gatenplant' }], '  GATEN ')[0].common_name, 'Monstera');
+  assert.equal(searchSpecies([{ common_name: 'Ficus' }], 'ficus').length, 1);   // alleen common_name
+  assert.equal(searchSpecies([{ latin_name: 'Aloe vera' }], 'aloe').length, 1); // alleen latin_name
+});

@@ -1,0 +1,40 @@
+name: Mutatietesten (effectiviteit-ratchet)
+
+# Bewaakt dat de test-EFFECTIVITEIT niet wegzakt: muteert de gewijzigde logica-modules
+# en faalt als hun mutatie-score onder de vastgelegde baseline (mutation-baseline.json)
+# duikt. Draait BEWUST alleen voor de modules die in deze PR wijzigden — een PR die
+# module X niet raakt kan dus nooit op module Y vastlopen. Zie docs/mutatietesten.md.
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'supabase/functions/**'
+      - 'tests/**'
+      - 'mutation-baseline.json'
+      - 'scripts/mutation*.mjs'
+
+# Least-privilege workflow-token (review G2): lezen volstaat.
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions zijn SHA-gepind (review G1); Dependabot github-actions houdt de pins bij.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # volledige historie nodig voor de diff tegen de PR-basis
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Mutatie-ratchet (alleen gewijzigde modules)
+        # Vergelijkt de score van de gewijzigde modules met mutation-baseline.json.
+        # Faalt alleen bij een echte daling; geeft dan precies aan welke module en hoe
+        # je het oplost (test toevoegen of — bij een equivalente mutant — baseline bijwerken).
+        run: node scripts/mutation-check.mjs --since=${{ github.event.pull_request.base.sha }}

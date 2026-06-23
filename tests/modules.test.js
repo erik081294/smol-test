@@ -79,6 +79,13 @@ test('elke module heeft een geldige group (null of bekend) en niet-primaire data
   }
 });
 
+test('precies de dagelijkse modules zijn primair (vormen de tabbalk)', () => {
+  assert.deepEqual(
+    MODULES.filter((m) => m.primary).map((m) => m.key).sort(),
+    ['boodschappen', 'taken', 'vandaag'],
+  );
+});
+
 test('er is precies één kern-skelet (Vandaag + Huishouden + Instellingen) dat niet uitzetbaar is', () => {
   const coreKeys = MODULES.filter((m) => m.core).map((m) => m.key).sort();
   assert.deepEqual(coreKeys, ['huishouden', 'instellingen', 'vandaag']);

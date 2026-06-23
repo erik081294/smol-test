@@ -6,6 +6,7 @@ import {
   dominantCategory, sortDayTasks, dateKey, monthLabel,
   groupByDay, weekDays, groupByWeek,
   applyTaskFilters, countBy, activeFilterCount,
+  isOpen, isDone, inCategory, forAssignee, parseKey,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -161,4 +162,42 @@ test('activeFilterCount: telt niet-default assen', () => {
   assert.equal(activeFilterCount({ status: 'done' }), 1);
   assert.equal(activeFilterCount({ categories: ['klus'], assignees: ['a'] }), 2);
   assert.equal(activeFilterCount({ categories: ['klus'], subgroupId: 'sg1', status: 'all' }), 3);
+});
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('isOpen/isDone spiegelen completed_at', () => {
+  assert.equal(isOpen({ completed_at: null }), true);
+  assert.equal(isOpen({ completed_at: '2026-06-22' }), false);
+  assert.equal(isDone({ completed_at: '2026-06-22' }), true);
+  assert.equal(isDone({ completed_at: null }), false);
+});
+
+test('inCategory/forAssignee: exacte match', () => {
+  assert.equal(inCategory('klus')({ category: 'klus' }), true);
+  assert.equal(inCategory('klus')({ category: 'plant' }), false);
+  assert.equal(forAssignee('a')({ assigned_to: 'a' }), true);
+  assert.equal(forAssignee('a')({ assigned_to: 'b' }), false);
+});
+
+test('countBy: null-keys tellen niet mee', () => {
+  assert.deepEqual(countBy([{ category: 'a' }, { category: null }, { category: 'a' }], (t) => t.category), { a: 2 });
+});
+
+test('dominantCategory: null/undefined → null; onbekende of lege categorie als fallback', () => {
+  assert.equal(dominantCategory(undefined), null);
+  assert.equal(dominantCategory(null), null);
+  assert.equal(dominantCategory([{ category: 'zzz' }]), 'zzz');   // geen prioriteits-match → eerste categorie
+  assert.equal(dominantCategory([{ category: null }]), 'overig'); // geen categorie → fallback
+});
+
+test('sortDayTasks: gelijke tijd → op titel', () => {
+  assert.deepEqual(
+    sortDayTasks([{ title: 'B', due_time: '09:00' }, { title: 'A', due_time: '09:00' }]).map((t) => t.title),
+    ['A', 'B'],
+  );
+});
+
+test('parseKey: yyyy-MM-dd → Date op lokale middernacht', () => {
+  assert.equal(dateKey(parseKey('2026-06-10')), '2026-06-10');
 });

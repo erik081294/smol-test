@@ -8,3 +8,7 @@ dist/
 # Native projecten worden via prebuild/expo run gegenereerd (CNG) — niet committen
 /android
 /ios
+
+# Mutatietesten: Stryker-sandbox + (regenereerbaar) rapport — niet committen
+.stryker-tmp/
+reports/

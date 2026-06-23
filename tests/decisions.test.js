@@ -30,3 +30,24 @@ test('withinBudget: binnen/boven/onbekend', () => {
   assert.equal(withinBudget(90000, 50000, 80000), 'boven');
   assert.equal(withinBudget(null, 50000, 80000), 'onbekend');
 });
+
+// --- Aanvullende randgevallen (toegevoegd n.a.v. de mutatietest-analyse, 2026-06-22).
+
+test('leadingOption: lege opties → null (geen crash)', () => {
+  assert.equal(leadingOption([], []), null);
+});
+
+test('leadingOption: één optie met stem → die optie (geen valse gelijkspel-check)', () => {
+  assert.equal(leadingOption([{ id: 'a', title: 'A' }], [{ option_id: 'a' }]).optionId, 'a');
+});
+
+test('withinBudget: zonder maximum is alles binnen', () => {
+  assert.equal(withinBudget(90000, 50000, null), 'binnen');
+  assert.equal(withinBudget(90000, null, null), 'binnen');
+});
+
+test('tallyVotes: id-tie-break onafhankelijk van de optie-volgorde', () => {
+  const mk = (ids) => ids.map((id) => ({ id, title: id }));
+  assert.deepEqual(tallyVotes(mk(['b', 'a']), []).map((x) => x.optionId), ['a', 'b']);
+  assert.deepEqual(tallyVotes(mk(['a', 'b']), []).map((x) => x.optionId), ['a', 'b']);
+});

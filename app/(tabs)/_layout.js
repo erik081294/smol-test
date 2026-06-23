@@ -52,6 +52,12 @@ export default function TabsLayout() {
       backBehavior="history"
       screenOptions={{
         headerShown: false,
+        // Een bezochte tab blijft gemount (state + realtime-subscriptie behouden) en
+        // wordt enkel render-bevroren als 'ie niet zichtbaar is. Terugkeren rendert
+        // direct uit de behouden state i.p.v. opnieuw te mounten + een laad-skelet te
+        // tonen (PERF-2). lazy (default) laten staan: nog niet bezochte tabs worden
+        // niet voorbarig gemount.
+        freezeOnBlur: true,
         tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: colors.surface,
