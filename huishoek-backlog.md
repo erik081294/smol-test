@@ -211,8 +211,8 @@ Boodschappen-bonnetjes (trap 1→2) met productcatalogus + prijstracker (BOO-2/3
 Grote-aankopen-dossiers (AAN-1 t/m AAN-4),
 kosten-koppeling aan modules (KOS-3) en de autodeel-basis (AUT-1/2). Hier zit het meeste
 bouwwerk; lever in trappen op. **Al af:** KLU-2 klus-bibliotheek, KLU-3 seizoenssuggesties,
-PLA-7 plantfoto-cover (no-migratie-voorlopers) en — via plan 01 (migratie 0012) —
-beurtrotatie/eerlijkheid (KLU-4, SCH-3) op een nieuwe voltooiingen-log.
+PLA-7 plantfoto-cover (no-migratie-voorlopers), de **Huisdieren-module** (HUI-1, migr. 0038),
+en — via plan 01 (migratie 0012) — beurtrotatie/eerlijkheid (KLU-4, SCH-3) op een nieuwe voltooiingen-log.
 
 **Fase 3 — Slim & verbonden — ⏳ LATER**
 AI-soortherkenning planten (PLA-6), AI-bonextractie (BOO-7), supermarktvergelijking (BOO-4)
@@ -271,6 +271,7 @@ Inspanning is een T-shirt-maat (S/M/L).
 | BOO-10 | Boodschappen | Bonnen bewerkbaar maken | 2 | Could | M | 🔧 | BOO-2 | **Gebouwd.** `update_purchase`-RPC (migr. `0033`) + "Bewerken"-knop opent de bon in dezelfde editor. **Rest:** bewerken op toestel bevestigen. |
 | PLA-6 | Planten | AI-soortherkenning | 3 | Could | L | ⏳ | PLA-1 | Plant-ID API of eigen model; handmatige keuze blijft terugval. |
 | PLA-9 | Planten | Bulk planten toevoegen ("plant-rondje" met rollende camera) | 3 | Could | L | ⏳ | PLA-1, UX-7 | **Idee (gebruikerswens):** in één doorlopende camera-flow plant ná plant vastleggen (foto + naam + evt. notitie), details achteraf afmaken; elke plant direct persisteren via `addPlant`. Leunt op UX-7 (in-app camera, `CaptureSession`-primitief). Vereist dev build; geen migratie. |
+| HUI-1 | Huisdieren | Huisdier-verzorging (module) | 2 | Should | L | 🔧 | — | **Gebouwd (migr. `0038`, live).** Nieuwe module die de plant-infra hergebruikt maar een eigen domein heeft: `pets`/`pet_log` + private bucket `pets`. Verzorgingsroutines per diersoort in `lib/petCare.js` (8 diertypen) → voor-aangevinkte checklist die `tasks` (category `huisdier` + `pet_id`) aanmaakt; tijdlijn met foto/notitie/**gewicht**; cross-pet tijdlijn. `lib/usePets.js`/`petPhoto.js`, `app/(tabs)/huisdieren.js` + `app/pet/*`. **Rest:** foto kiezen/uploaden, checklist-flow, tijdlijn + gewicht-log + realtime op toestel bevestigen. |
 | AAN-1 | Grote aankopen | Aankoop-dossier | 2 | Should | M | ⏳ | FND-1 | Titel, budgetrange, deadline, wie beslist mee. Subgroep-gescoped. |
 | AAN-2 | Grote aankopen | Opties verzamelen | 2 | Should | M | ⏳ | AAN-1 | Kandidaten met prijs/link/foto + voor/tegen per lid. |
 | AAN-3 | Grote aankopen | Vergelijktabel | 2 | Should | M | ⏳ | AAN-2 | Opties naast elkaar op zelfgekozen criteria. |
@@ -292,7 +293,7 @@ Inspanning is een T-shirt-maat (S/M/L).
 | INF-8 | Platform | Realtime-primitief & scoping | 1.5 | Should | M | 🔧 | — | **Af (C1–C4).** `lib/useRealtimeReload.js` (C1) + household-gefilterde subscripties (C2, migr. `0025`) + incrementeel patchen `lib/realtimePatch.js` (C3) + gebundelde household-channel `lib/realtimeHub.js` (C4). **Rest:** patch + gebundelde subscriptie 2-richtingen op toestel bevestigen. |
 | INF-9 | Platform | Edge-hardening `scan-receipt` | 2 | Should | S | 🔧 | — | **Gebouwd + gedeployed.** Per-gebruiker rate-limit (20/uur) via `record_receipt_scan`-RPC + `receipt_scans` (migr. `0026`) vóór de Orq-call + MIME-whitelist. **Rest:** happy-path (echte foto → Orq) op toestel bevestigen. |
 | INF-10 | Platform | DB-advisor-hardening | 1.5 | Could | S | 🔧 | — | **B4 af** (vaste `search_path`, migr. `0024`). **Open (advisor 2026-06-22):** B5 `pg_trgm` uit `public`, B6 leaked-password-protection aan, + `EXECUTE` op SECURITY DEFINER-functies voor `anon` strakker. (3× `rls_enabled_no_policy` = bewust deny-all, geen lek.) |
-| PERF-1 | Platform | Query-vensters & bulk-RPC | 2 | Could | M | 🔧 | INF-8 | **Veilige helft gebouwd.** Ruime `.limit(2000)` (desc) op voltooiingen-log + uitgaven (P-H2). **Rest:** server-side aggregaat-RPC voor exacte all-time-totalen bij >2000 rijen; P-H4 bulk-RPC bon→voorraad. |
+| PERF-1 | Platform | Query-vensters & bulk-RPC | 2 | Could | M | 🔧 | INF-8 | **Aggregaat-RPC af (migr. `0037`, live).** `household_expense_totals`/`household_completion_totals` (SECURITY INVOKER → RLS scopet de payload). Kosten-saldo en schoonmaak-eerlijkheid (all-time) rekenen exact zodra het `.limit(2000)`-venster vol is, anders ongewijzigd. **Rest:** P-H4 bulk-RPC bon→voorraad. |
 | PERF-2 | Platform/UX | Waargenomen snelheid: instant tab-wissel (geen laad-flits) | 2 | Should | M | 🔧 | INF-8 | **Gebouwd.** Instant tab-wissel via in-memory SWR-cache `lib/dataCache.js` (household-gescopet, `clearCache()` op sign-out) — alle hooks seeden uit cache — + `freezeOnBlur` op de Tabs. Verweven met INF-8 C3. **Rest:** soepelheid op web/toestel bevestigen. |
 | TKN-2 | Taken/UX | Jaarweergave — activiteit-heatmap | 3 | Could | M | 🔧 | TKN-1 | **Gebouwd (activiteit-heatmap).** Jaar-scope van Taken: GitHub-achtig voltooiingen-raster uit `task_completions` (geen migratie) — `lib/yearHeatmap.js` + `YearHeatmap.js`/`YearActivity.js` (lazy realtime, lid-/categoriefilter). **Rest:** rendering + scroll + realtime op web/toestel bevestigen. |
 | UX-9 | Platform/UX | Eigen lettertype verkennen (weg van het systeemfont/Inter) | 2 | Could | S | ⏳ | UX-1 | **Verkenning:** een eigen, leesbaar **variable font** (Inter bewust niet) — centraal via `expo-font` + `fontFamily` op de `type`-tokens in `lib/theme.js`. Eisen: Latin-Extended (NL-diacrieten), prettige cijfers, OFL. Kandidaten naast elkaar op toestel testen; keuze in `DESIGN.md`. |
@@ -322,8 +323,6 @@ Voorgestelde ID's reserveren ruimte; zodra een idee "echt" wordt, krijgt het een
 ### 7.3 Nieuwe module-ideeën
 - **Documenten- & garantiekluis** (DOC-1) — bonnetjes/handleidingen/garanties/contracten per item;
   herinnering bij aflopende garantie. Hergebruikt het Storage-patroon van Planten.
-- **Huisdier-verzorging** (HUI-1) — analoog aan Planten: voeren/medicatie/dierenarts als
-  terugkerende taken; deelt vrijwel de hele plant-infrastructuur.
 - **Gezamenlijke wensen-/cadeaulijst** (WEN-1) — verlanglijst per lid; subgroep-privacy zorgt dat
   de ontvanger zijn eigen cadeau niet ziet (precies het scenario uit §1).
 

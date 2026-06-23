@@ -17,7 +17,7 @@ import { colors, radius, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
 import { CLEANING_TEMPLATES, planTemplate } from '../../lib/cleaningTemplates';
-import { tally, sinceDate, PERIODS } from '../../lib/fairness';
+import { tally, tallyFromCounts, sinceDate, PERIODS } from '../../lib/fairness';
 import { t, plural } from '../../lib/i18n';
 
 const FAIRNESS_PERIODS = [
@@ -29,7 +29,7 @@ const FAIRNESS_PERIODS = [
 export default function Schoonmaak() {
   const dialog = useDialog();
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
-  const { completions } = useTaskCompletions();
+  const { completions, exactCounts } = useTaskCompletions();
   const { zones, reload: reloadZones } = useZones();
   const { members, activeId } = useHousehold();
   const { user } = useAuth();
@@ -39,11 +39,15 @@ export default function Schoonmaak() {
   const [period, setPeriod] = useState('WEEK'); // eerlijkheidsoverzicht-periode
 
   // "Wie deed hoeveel": tel alleen schoonmaakvoltooiingen (taak hangt aan een zone).
+  // Bij de "alle tijd"-periode én een vol laad-venster (>2000 voltooiingen) rekenen
+  // we exact uit de server-side aggregaat-tellingen (PERF-1) i.p.v. uit het venster;
+  // week/maand blijven uit het venster (de RPC is all-time).
   const fairnessRows = useMemo(() => {
-    const cleaning = completions.filter((c) => c.task?.zone_id != null);
     const days = FAIRNESS_PERIODS.find((p) => p.key === period)?.days ?? null;
+    if (days == null && exactCounts) return tallyFromCounts(exactCounts, members, 'cleaning_completions');
+    const cleaning = completions.filter((c) => c.task?.zone_id != null);
     return tally(cleaning, members, sinceDate(days));
-  }, [completions, members, period]);
+  }, [completions, exactCounts, members, period]);
   const hasAnyCompletion = fairnessRows.some((r) => r.count > 0);
 
   // Schoonmaaktaken = taken die aan een zone hangen.

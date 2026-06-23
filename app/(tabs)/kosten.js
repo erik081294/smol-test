@@ -7,13 +7,13 @@ import { useExpenses } from '../../lib/useExpenses';
 import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { computeBalances, settle, formatCents } from '../../lib/expenses';
+import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
 import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button, Row } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
 export default function Kosten() {
-  const { expenses, loading, reload } = useExpenses();
+  const { expenses, loading, reload, exactTotals } = useExpenses();
   const { templates } = useRecurringExpenses(); // laadt + materialiseert verschuldigde occurrences
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
@@ -29,7 +29,14 @@ export default function Kosten() {
     () => (subgroupId ? expenses.filter((e) => e.share_subgroup_id === subgroupId) : expenses),
     [expenses, subgroupId]
   );
-  const balances = useMemo(() => computeBalances(filtered), [filtered]);
+  // Saldo uit de zichtbare rijen — behalve op de ongefilterde "iedereen"-weergave
+  // wanneer het laad-venster vol is (>2000 uitgaven): dan rekenen we exact uit de
+  // server-side aggregaat-totalen (PERF-1) i.p.v. uit het afgekapte venster. Een
+  // subgroep-filter kan de RPC niet toepassen, dus daar blijft de client-berekening.
+  const balances = useMemo(
+    () => (!subgroupId && exactTotals ? balancesFromTotals(exactTotals) : computeBalances(filtered)),
+    [filtered, subgroupId, exactTotals]
+  );
   const payments = useMemo(() => settle(balances), [balances]);
 
   const myBalance = balances[user?.id] ?? 0;
