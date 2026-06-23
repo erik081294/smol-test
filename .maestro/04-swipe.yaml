@@ -1,0 +1,42 @@
+# Kritieke flow 4: veeg-acties op een taak (UX-17).
+# Links vegen = verwijderen (undo-toast), rechts vegen = uitstellen (undo-toast).
+# Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+#
+# Op toestel geverifieerd (Motorola moto_g72, 2026-06-23): de swipe-richtingen en
+# undo-toasts kloppen. Let op bij handmatig adb-testen: `adb input swipe` moet
+# traag genoeg zijn (~1200ms) om de gesture-handler-gesture te triggeren; een snelle
+# fling komt niet aan. Maestro `swipe` doet dit zelf goed.
+appId: app.huishoek
+---
+- launchApp
+- tapOn: "Taken"                      # tab
+- assertVisible: "Taken"              # scherm-titel
+
+# Maak een verse taak om op te vegen (datum op vandaag).
+- tapOn:
+    accessibilityText: "Taak toevoegen"   # FAB (task.add)
+- assertVisible: "Nieuwe taak"
+- tapOn: "Wat moet er gebeuren?"      # titel-veld (task.field.title)
+- inputText: "E2E veeg taak"
+- tapOn: "Vandaag"                    # datum-chip, zodat de taak in de Dag-weergave staat
+- tapOn:
+    accessibilityText: "Bewaar"       # ModalHeader bevestigen (common.save)
+- assertVisible: "E2E veeg taak"
+
+# Rechts vegen = uitstellen → undo-toast "Uitgesteld naar …" (tasks.snoozed).
+- swipe:
+    from:
+      text: "E2E veeg taak"
+    direction: RIGHT
+- assertVisible: "Uitgesteld.*"       # tasks.snoozed (regex)
+
+# Links vegen = verwijderen → undo-toast "'E2E veeg taak' verwijderd" (tasks.deleted).
+- swipe:
+    from:
+      text: "E2E veeg taak"
+    direction: LEFT
+- assertVisible: ".*verwijderd"       # tasks.deleted (regex)
+
+# Ongedaan maken → de taak komt terug in de lijst.
+- tapOn: "Ongedaan maken"             # common.undo
+- assertVisible: "E2E veeg taak"
