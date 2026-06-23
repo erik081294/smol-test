@@ -9,7 +9,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { MonthView } from '../../lib/MonthView';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate,
+  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
@@ -21,7 +21,7 @@ import {
   groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey,
   applyTaskFilters, countBy, activeFilterCount,
 } from '../../lib/agenda';
-import { isOverdue } from '../../lib/recurrence';
+import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
@@ -29,7 +29,7 @@ import { dateLocale, t } from '../../lib/i18n';
 const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
 
 export default function Taken() {
-  const { tasks, loading, reload, addTask, completeTask, uncompleteTask, deleteTasks } = useTasks();
+  const { tasks, loading, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
   const toast = useToast();
@@ -86,6 +86,35 @@ export default function Taken() {
   const toggle = (tk) => {
     animateNextLayout();
     return tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
+  };
+
+  // Veeg-acties (UX-17). Links = verwijderen (met undo-vangnet), rechts = uitstellen
+  // (vervaldatum een dag vooruit, ook terug te draaien).
+  const removeTaskWithUndo = (task) => {
+    animateNextLayout();
+    setHiddenIds((h) => [...h, task.id]);
+    toast.show({
+      message: t('tasks.deleted', { name: task.title }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => x !== task.id)); },
+      onExpire: async () => {
+        try { await deleteTask(task.id); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { setHiddenIds((h) => h.filter((x) => x !== task.id)); }
+      },
+    });
+  };
+
+  const snoozeTaskWithUndo = (task) => {
+    const prev = task.due_date ?? null;
+    const next = snoozeDate(task, 1);
+    animateNextLayout();
+    updateTask(task.id, { due_date: next });
+    toast.show({
+      message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); updateTask(task.id, { due_date: prev }); },
+    });
   };
 
   // Secties per scope (Dag/Week). Maand rendert los via MonthView.
@@ -236,7 +265,14 @@ export default function Taken() {
             <SectionHeader title={section.title} count={section.data.length}
               tint={section.key === 'overdue' ? colors.danger : colors.inkSoft} />
           )}
-          renderItem={({ item }) => <TaskRow task={item} members={members} onToggle={toggle} />}
+          renderItem={({ item }) => (
+            <SwipeRow
+              left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(item) }}
+              right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(item) }}
+            >
+              <TaskRow task={item} members={members} onToggle={toggle} />
+            </SwipeRow>
+          )}
           ListEmptyComponent={
             loading ? (
               <ListSkeleton count={5} />

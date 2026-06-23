@@ -9,7 +9,7 @@ import { frequencyLabel } from '../../lib/buyFrequency';
 import { useCatalogCategories } from '../../lib/useCatalog';
 import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader, SwipeRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { EtenNav } from '../../lib/EtenNav';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
@@ -168,29 +168,31 @@ export default function Boodschappen() {
   };
 
   const renderRow = (item) => (
-    <ItemRow
-      leading={
-        <Checkbox
-          checked={item.checked}
-          onPress={() => toggle(item)}
-          shape="round"
-          size={24}
-          color={item.checked ? colors.done : colors.inkFaint}
-          accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`}
-        />
-      }
-      title={item.name}
-      titleColor={item.checked ? colors.inkFaint : undefined}
-      strikethrough={item.checked}
-      dimmed={item.checked}
-      meta={item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
-      onPress={() => toggle(item)}
-      accessibilityHint={t('a11y.tapToToggle')}
-      trailing={
-        <IconButton icon="delete" size={20} tint={colors.inkFaint}
-          accessibilityLabel={t('groceries.deleteItem', { name: item.name })} onPress={() => removeWithUndo(item)} />
-      }
-    />
+    <SwipeRow left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}>
+      <ItemRow
+        leading={
+          <Checkbox
+            checked={item.checked}
+            onPress={() => toggle(item)}
+            shape="round"
+            size={24}
+            color={item.checked ? colors.done : colors.inkFaint}
+            accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`}
+          />
+        }
+        title={item.name}
+        titleColor={item.checked ? colors.inkFaint : undefined}
+        strikethrough={item.checked}
+        dimmed={item.checked}
+        meta={item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
+        onPress={() => toggle(item)}
+        accessibilityHint={t('a11y.tapToToggle')}
+        trailing={
+          <IconButton icon="delete" size={20} tint={colors.inkFaint}
+            accessibilityLabel={t('groceries.deleteItem', { name: item.name })} onPress={() => removeWithUndo(item)} />
+        }
+      />
+    </SwipeRow>
   );
 
   return (

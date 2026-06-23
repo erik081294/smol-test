@@ -11,7 +11,7 @@ import { useToast } from '../../lib/toast';
 import { status, daysUntil, sortByUrgency, PANTRY_STATUS } from '../../lib/pantry';
 import {
   Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Stack,
-  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader,
+  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
 import { EtenNav } from '../../lib/EtenNav';
@@ -116,29 +116,31 @@ export default function Voorraad() {
     const st = status(item);
     const bb = bestBeforeLabel(item);
     return (
-      <ItemRow
-        key={item.id}
-        leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
-        title={item.name}
-        meta={
-          <Row gap={space.sm}>
-            <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
-            {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
-          </Row>
-        }
-        onPress={() => setEditor(item)}
-        accessibilityHint={t('pantry.editHint')}
-        trailing={
-          <Row gap={2}>
-            <IconButton icon="back" size={18} tint={colors.inkSoft}
-              accessibilityLabel={t('pantry.less')} onPress={() => adjustQuantity(item, -1)} />
-            <IconButton icon="forward" size={18} tint={colors.forest}
-              accessibilityLabel={t('pantry.more')} onPress={() => adjustQuantity(item, +1)} />
-            <IconButton icon="shopping" size={18} tint={colors.ocher}
-              accessibilityLabel={t('pantry.toList')} onPress={() => toList(item)} />
-          </Row>
-        }
-      />
+      <SwipeRow key={item.id}
+        left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}>
+        <ItemRow
+          leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
+          title={item.name}
+          meta={
+            <Row gap={space.sm}>
+              <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
+              {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
+            </Row>
+          }
+          onPress={() => setEditor(item)}
+          accessibilityHint={t('pantry.editHint')}
+          trailing={
+            <Row gap={2}>
+              <IconButton icon="back" size={18} tint={colors.inkSoft}
+                accessibilityLabel={t('pantry.less')} onPress={() => adjustQuantity(item, -1)} />
+              <IconButton icon="forward" size={18} tint={colors.forest}
+                accessibilityLabel={t('pantry.more')} onPress={() => adjustQuantity(item, +1)} />
+              <IconButton icon="shopping" size={18} tint={colors.ocher}
+                accessibilityLabel={t('pantry.toList')} onPress={() => toList(item)} />
+            </Row>
+          }
+        />
+      </SwipeRow>
     );
   };
 
