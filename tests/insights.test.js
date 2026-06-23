@@ -1,7 +1,7 @@
 // Units voor de pure kosten-inzicht-logica (lib/insights.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { byMonth, monthTotal, byCategory, budgetStatus } from '../lib/insights.js';
+import { byMonth, monthTotal, monthCount, byCategory, budgetStatus } from '../lib/insights.js';
 
 const now = new Date(2026, 5, 15); // 15 jun 2026
 const expenses = [
@@ -35,6 +35,13 @@ test('monthTotal: totaal van één maand', () => {
   assert.equal(monthTotal(expenses, '2026-06'), 4000);
   assert.equal(monthTotal(expenses, '2026-05'), 800);
   assert.equal(monthTotal(expenses, '2026-07'), 0);
+});
+
+test('monthCount: aantal uitgaven in één maand', () => {
+  assert.equal(monthCount(expenses, '2026-06'), 3); // 1 jun, 20 jun, 3 jun
+  assert.equal(monthCount(expenses, '2026-05'), 1);
+  assert.equal(monthCount(expenses, '2026-07'), 0); // geen enkele in juli
+  assert.equal(monthCount([], '2026-06'), 0);        // leeg / default-arg
 });
 
 test('byCategory: aflopend gesorteerd, optioneel binnen een maand', () => {

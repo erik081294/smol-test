@@ -149,6 +149,13 @@ Zodat elke actie op een voorspelbare plek staat:
   **Nooit óók een Bewaar-knop onderaan** — één bevestigplek per scherm.
 - **Verwijderen → onderaan**, als `Button variant="ghost"`/`danger`, los van de
   bevestiging. Destructief hoort niet naast Bewaar.
+- **Veeg-acties op lijstrijen → `SwipeRow`** (`lib/ui.js`, op `ReanimatedSwipeable`):
+  **links vegen = verwijderen** (rood), **rechts vegen = uitstellen / secundair**
+  (groen). De acties zijn declaratieve descriptors (`{ icon, label, color, onTrigger }`),
+  uitbreidbaar naar nieuwe acties zonder het component te wijzigen. De **zichtbare
+  knop in de rij blijft** als toegankelijke + web-fallback (op web rendert `SwipeRow`
+  de kale rij); de veeg is alleen een snellere ingang. Altijd met **undo-toast** — de
+  actie zelf leeft in `onTrigger`, niet in een tweede delete-pad.
 - **Secundair/navigatie → header-rechts `IconButton`(s)** (zoeken, bibliotheek,
   terugkerend). Houd het bij maximaal een handvol.
 - **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →

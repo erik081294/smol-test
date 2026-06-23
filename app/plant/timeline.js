@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { useHouseholdPlantTimeline, usePlantPhotoUrl } from '../../lib/usePlants';
 import { groupTimelineByDay, relativeDayLabel } from '../../lib/plantTimeline';
 import { backLabelFor } from '../../lib/navMeta';
-import { Empty, ModalHeader, SectionHeader, Row } from '../../lib/ui';
+import { Empty, ModalHeader, SectionHeader, Row, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, space } from '../../lib/theme';
 import { parseKey } from '../../lib/agenda';
@@ -86,7 +86,9 @@ export default function PlantTimelineScreen() {
         renderItem={({ item }) => (
           <PlantTimelineCard entry={item} onPress={() => item.plant?.id && router.push(`/plant/${item.plant.id}`)} />
         )}
-        ListEmptyComponent={!loading && (
+        ListEmptyComponent={loading ? (
+          <ListSkeleton count={5} />
+        ) : (
           <Empty illustration="plants" title={t('plants.timeline.empty.title')}
             subtitle={t('plants.timeline.empty.subtitle')} />
         )}

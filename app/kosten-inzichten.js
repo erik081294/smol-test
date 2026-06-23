@@ -7,12 +7,12 @@ import { supabase } from '../lib/supabase';
 import { mutate } from '../lib/db';
 import { useExpenses } from '../lib/useExpenses';
 import { useHousehold } from '../lib/household';
-import { byMonth, byCategory, monthTotal, budgetStatus } from '../lib/insights';
+import { byMonth, byCategory, monthTotal, monthCount, budgetStatus } from '../lib/insights';
 import { formatCents, parseAmountToCents } from '../lib/expenses';
 import { backLabelFor } from '../lib/navMeta';
-import { ModalHeader, SectionHeader, Row, Chip, Card, Field, BarChart, Empty } from '../lib/ui';
+import { ModalHeader, SectionHeader, Row, Chip, Card, Field, BarChart, Empty, ListSkeleton } from '../lib/ui';
 import { colors, space, type, radius } from '../lib/theme';
-import { t } from '../lib/i18n';
+import { t, plural } from '../lib/i18n';
 
 export default function KostenInzichten() {
   const dialog = useDialog();
@@ -26,6 +26,7 @@ export default function KostenInzichten() {
 
   const cats = useMemo(() => byCategory(expenses, { month }), [expenses, month]);
   const total = useMemo(() => monthTotal(expenses, month), [expenses, month]);
+  const count = useMemo(() => monthCount(expenses, month), [expenses, month]);
   const status = budgetStatus(total, active?.monthly_budget_cents ?? null);
 
   const [budgetText, setBudgetText] = useState('');
@@ -51,7 +52,7 @@ export default function KostenInzichten() {
       <ModalHeader title={t('insights.title')} onClose={() => router.back()} backLabel={backLabelFor('kosten-inzichten')} />
       <ScrollView contentContainerStyle={{ padding: space.lg }}>
         {!hasData ? (
-          loading ? null : <Empty illustration="expenses" title={t('insights.empty.title')} subtitle={t('insights.empty.subtitle')} />
+          loading ? <ListSkeleton count={5} /> : <Empty illustration="expenses" title={t('insights.empty.title')} subtitle={t('insights.empty.subtitle')} />
         ) : (
           <>
             {/* Maandgrafiek (laatste 6 maanden) */}
@@ -61,11 +62,16 @@ export default function KostenInzichten() {
             </Card>
 
             {/* Maandkiezer */}
-            <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
+            <Row gap={space.xs} wrap style={{ marginBottom: space.sm }}>
               {months.map((m) => (
                 <Chip key={m.month} label={m.label} active={m.month === month} onPress={() => setSelected(m.month)} />
               ))}
             </Row>
+
+            {/* Periode-transparantie: hoeveel uitgaven het gekozen maandtotaal beslaat. */}
+            <Text style={[type.caption, { marginBottom: space.lg }]}>
+              {plural(count, 'insights.count.one', 'insights.count.other')}
+            </Text>
 
             {/* Budget */}
             <SectionHeader title={t('budget.title')} />

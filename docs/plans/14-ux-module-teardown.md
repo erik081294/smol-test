@@ -1,6 +1,11 @@
 # Plan 14 — Module-voor-module UX-ontleding (Fase 1.6 "van half naar af")
 
-**Backlog:** UXR-1 t/m UXR-8 (verkennend) + UX-15 t/m UX-20 (voor de hand liggend).
+> **Status (2026-06-23):** de **quick wins UX-15 t/m UX-20 zijn af** (PR #37, op de Motorola
+> E2E geverifieerd; incl. herbruikbaar `SwipeRow`-veegprimitief en de `snoozeDate`/`monthCount`-
+> logica). De **verkennende teardown-sessies UXR-1 t/m UXR-8** staan nog open — dáár gaat dit plan
+> nu vooral over. Bevinding uit UX-18: een bestaande plant is niet bewerkbaar → nieuwe rij **UX-21**.
+
+**Backlog:** UXR-1 t/m UXR-8 (verkennend) + UX-15 t/m UX-20 (voor de hand liggend, ✅ af).
 **Soort:** UX-diepgang — geen nieuwe datalaag, geen migratie. Leunt volledig op het
 bestaande design-systeem (`lib/theme.js`, `lib/ui.js`, `DESIGN.md`).
 **Verhouding tot Fase 1.5 (plan 07):** plan 07 maakte de app *visueel cohesief* (tokens,

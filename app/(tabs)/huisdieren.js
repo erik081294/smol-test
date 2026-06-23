@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePets, usePetPhotoUrl } from '../../lib/usePets';
 import { petType } from '../../lib/petCare';
-import { Empty, FAB, ScreenHeader, IconButton } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, IconButton, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
@@ -91,11 +91,15 @@ export default function Huisdieren() {
             />
           )
         }
-        ListEmptyComponent={!loading && (
-          <Empty illustration="pets" title={t('pets.empty.title')}
-            subtitle={t('pets.empty.subtitle')}
-            actionTitle={t('pet.add')} onAction={() => router.push('/pet/new')} />
-        )}
+        ListEmptyComponent={
+          loading ? (
+            <ListSkeleton count={4} />
+          ) : (
+            <Empty illustration="pets" title={t('pets.empty.title')}
+              subtitle={t('pets.empty.subtitle')}
+              actionTitle={t('pet.add')} onAction={() => router.push('/pet/new')} />
+          )
+        }
       />
 
       <FAB label={t('fab.pet')} accessibilityLabel={t('pet.add')} onPress={() => router.push('/pet/new')} />

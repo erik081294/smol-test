@@ -202,6 +202,7 @@ export default function RecipeEditor() {
                 onPress={() => startEdit(ing)}
                 accessibilityHint={t('recipe.ingredient.editHint')}
                 meta={<Text style={type.caption}>{(+ing.quantity).toLocaleString('nl-NL')} {ing.unit}</Text>}
+                chevron
                 trailing={<IconButton icon="delete" size={18} tint={colors.inkFaint}
                   accessibilityLabel={t('common.delete')} onPress={() => removeIng(ing)} />}
               />

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePlants, usePlantSpecies, usePlantPhotoUrl } from '../../lib/usePlants';
-import { Empty, FAB, ScreenHeader, IconButton } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, IconButton, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
@@ -97,10 +97,15 @@ export default function Planten() {
             />
           )
         }
-        ListEmptyComponent={!loading && (
-          <Empty illustration="plants" title={t('plants.empty.title')}
-            subtitle={t('plants.empty.subtitle')} />
-        )}
+        ListEmptyComponent={
+          loading ? (
+            <ListSkeleton count={4} />
+          ) : (
+            <Empty illustration="plants" title={t('plants.empty.title')}
+              subtitle={t('plants.empty.subtitle')}
+              actionTitle={t('plant.add')} onAction={() => router.push('/plant/new')} />
+          )
+        }
       />
 
       <FAB label={t('fab.plant')} accessibilityLabel={t('plant.add')} onPress={() => router.push('/plant/new')} />

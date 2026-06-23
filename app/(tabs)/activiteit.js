@@ -2,7 +2,7 @@ import React from 'react';
 import { FlatList, Text, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useActivity } from '../../lib/useActivity';
-import { ScreenHeader, ItemRow, Empty } from '../../lib/ui';
+import { ScreenHeader, ItemRow, Empty, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type, space } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -27,8 +27,10 @@ export default function Activiteit() {
             trailing={<Text style={type.caption}>{item.when}</Text>}
           />
         )}
-        ListEmptyComponent={loading ? null : (
-          <Empty icon="feed" title={t('activity.empty.title')} subtitle={t('activity.empty.subtitle')} />
+        ListEmptyComponent={loading ? (
+          <ListSkeleton count={5} />
+        ) : (
+          <Empty illustration="today" title={t('activity.empty.title')} subtitle={t('activity.empty.subtitle')} />
         )}
       />
     </SafeAreaView>

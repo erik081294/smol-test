@@ -12,7 +12,7 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
-  Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet,
+  Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow,
 } from '../../lib/ui';
 import { colors, space, type } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
@@ -34,17 +34,35 @@ export default function Maaltijden() {
 
   const [addFor, setAddFor] = useState(null);    // 'yyyy-MM-dd' waarvoor we toevoegen
   const [listItems, setListItems] = useState(null); // boodschappenlijst-preview of null
+  const [hiddenIds, setHiddenIds] = useState([]);   // optimistisch verborgen tijdens undo
 
   const byDay = useMemo(() => {
     const m = {};
-    for (const e of entries) (m[e.plan_date] ??= []).push(e);
+    for (const e of entries) {
+      if (hiddenIds.includes(e.id)) continue;
+      (m[e.plan_date] ??= []).push(e);
+    }
     for (const d of Object.keys(m)) m[d].sort((a, b) => MEAL_TYPES.indexOf(a.meal_type) - MEAL_TYPES.indexOf(b.meal_type));
     return m;
-  }, [entries]);
+  }, [entries, hiddenIds]);
 
   const weekLabel = `${format(parseISO(weekDays[0]), 'd MMM', { locale: nl })} – ${format(parseISO(weekDays[6]), 'd MMM', { locale: nl })}`;
 
-  const remove = (entry) => { animateNextLayout(); removeEntry(entry.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message })); };
+  // Verwijderen mét undo-vangnet (was een directe delete zonder terugdraaien).
+  const remove = (entry) => {
+    animateNextLayout();
+    setHiddenIds((h) => [...h, entry.id]);
+    toast.show({
+      message: t('meals.deleted', { name: entry.recipe?.title || entry.title || t('mealtype.' + entry.meal_type) }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => x !== entry.id)); },
+      onExpire: async () => {
+        try { await removeEntry(entry.id); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { setHiddenIds((h) => h.filter((x) => x !== entry.id)); }
+      },
+    });
+  };
 
   const openShoppingList = async () => {
     const gap = await buildShoppingList(pantryItems);
@@ -64,20 +82,22 @@ export default function Maaltijden() {
             accessibilityLabel={t('meals.addForDay')} onPress={() => setAddFor(date)} />
         </Row>
         {dayEntries.map((e) => (
-          <ItemRow
-            key={e.id}
-            title={e.recipe?.title || e.title || t('mealtype.' + e.meal_type)}
-            meta={
-              <Row gap={space.sm}>
-                <Badge label={t('mealtype.' + e.meal_type)} tone="brand" />
-                <Text style={type.caption}>{t('meals.entry.servings', { n: e.servings })}</Text>
-              </Row>
-            }
-            trailing={
-              <IconButton icon="delete" size={18} tint={colors.inkFaint}
-                accessibilityLabel={t('common.delete')} onPress={() => remove(e)} />
-            }
-          />
+          <SwipeRow key={e.id}
+            left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => remove(e) }}>
+            <ItemRow
+              title={e.recipe?.title || e.title || t('mealtype.' + e.meal_type)}
+              meta={
+                <Row gap={space.sm}>
+                  <Badge label={t('mealtype.' + e.meal_type)} tone="brand" />
+                  <Text style={type.caption}>{t('meals.entry.servings', { n: e.servings })}</Text>
+                </Row>
+              }
+              trailing={
+                <IconButton icon="delete" size={18} tint={colors.inkFaint}
+                  accessibilityLabel={t('common.delete')} onPress={() => remove(e)} />
+              }
+            />
+          </SwipeRow>
         ))}
       </Card>
     );

@@ -11,7 +11,7 @@ import { useToast } from '../../lib/toast';
 import { status, daysUntil, sortByUrgency, PANTRY_STATUS } from '../../lib/pantry';
 import {
   Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Stack,
-  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader,
+  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
 import { EtenNav } from '../../lib/EtenNav';
@@ -45,7 +45,7 @@ function bestBeforeLabel(item) {
 
 export default function Voorraad() {
   const dialog = useDialog();
-  const { items, loading, reload, add, update, adjustQuantity, remove } = usePantry();
+  const { items, loading, reload, add, update, adjustQuantity, remove, removeMany } = usePantry();
   const { suggestFor } = useProducts();
   const { add: addGrocery } = useGroceries();
   const toast = useToast();
@@ -59,6 +59,7 @@ export default function Voorraad() {
     () => visible.filter((i) => [PANTRY_STATUS.EXPIRED, PANTRY_STATUS.SOON].includes(status(i))).length,
     [visible]
   );
+  const expired = useMemo(() => visible.filter((i) => status(i) === PANTRY_STATUS.EXPIRED), [visible]);
 
   // Per bewaarplaats groeperen voor de "plaats"-weergave.
   const sections = useMemo(() => {
@@ -93,33 +94,53 @@ export default function Voorraad() {
     });
   };
 
+  // Alle verlopen producten in één keer opruimen — zelfde undo-vangnet als boodschappen.
+  const onClearExpired = () => {
+    const ids = expired.map((i) => i.id);
+    if (!ids.length) return;
+    animateNextLayout();
+    setHiddenIds((h) => [...h, ...ids]);
+    toast.show({
+      message: t('pantry.clearedExpired', { n: ids.length }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setHiddenIds((h) => h.filter((x) => !ids.includes(x))); },
+      onExpire: async () => {
+        try { await removeMany(ids); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { setHiddenIds((h) => h.filter((x) => !ids.includes(x))); }
+      },
+    });
+  };
+
   const renderRow = (item) => {
     const st = status(item);
     const bb = bestBeforeLabel(item);
     return (
-      <ItemRow
-        key={item.id}
-        leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
-        title={item.name}
-        meta={
-          <Row gap={space.sm}>
-            <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
-            {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
-          </Row>
-        }
-        onPress={() => setEditor(item)}
-        accessibilityHint={t('pantry.editHint')}
-        trailing={
-          <Row gap={2}>
-            <IconButton icon="back" size={18} tint={colors.inkSoft}
-              accessibilityLabel={t('pantry.less')} onPress={() => adjustQuantity(item, -1)} />
-            <IconButton icon="forward" size={18} tint={colors.forest}
-              accessibilityLabel={t('pantry.more')} onPress={() => adjustQuantity(item, +1)} />
-            <IconButton icon="shopping" size={18} tint={colors.ocher}
-              accessibilityLabel={t('pantry.toList')} onPress={() => toList(item)} />
-          </Row>
-        }
-      />
+      <SwipeRow key={item.id}
+        left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}>
+        <ItemRow
+          leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
+          title={item.name}
+          meta={
+            <Row gap={space.sm}>
+              <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
+              {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
+            </Row>
+          }
+          onPress={() => setEditor(item)}
+          accessibilityHint={t('pantry.editHint')}
+          trailing={
+            <Row gap={2}>
+              <IconButton icon="back" size={18} tint={colors.inkSoft}
+                accessibilityLabel={t('pantry.less')} onPress={() => adjustQuantity(item, -1)} />
+              <IconButton icon="forward" size={18} tint={colors.forest}
+                accessibilityLabel={t('pantry.more')} onPress={() => adjustQuantity(item, +1)} />
+              <IconButton icon="shopping" size={18} tint={colors.ocher}
+                accessibilityLabel={t('pantry.toList')} onPress={() => toList(item)} />
+            </Row>
+          }
+        />
+      </SwipeRow>
     );
   };
 
@@ -141,6 +162,10 @@ export default function Voorraad() {
           <Banner tone="warning">
             {expiringCount === 1 ? t('pantry.expiring.one') : t('pantry.expiring.other', { n: expiringCount })}
           </Banner>
+          {expired.length > 0 ? (
+            <Button title={t('pantry.clearExpired', { n: expired.length })} variant="ghost" icon="delete"
+              fullWidth={false} onPress={onClearExpired} style={{ marginTop: space.xs, alignSelf: 'flex-start' }} />
+          ) : null}
         </View>
       ) : null}
 
