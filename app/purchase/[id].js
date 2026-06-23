@@ -3,7 +3,7 @@ import { View, Text, ScrollView } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { offerImagePicker } from '../../lib/photoPicker';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { parseDataUrl } from '../../lib/plantPhoto';
@@ -112,33 +112,9 @@ export default function PurchaseEditor() {
     } finally { setScanning(false); }
   };
 
-  const launchScan = async (camera) => {
-    try {
-      const perm = camera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm?.granted === false) { dialog.alert({ title: t('purchase.scan.noAccess') }); return; }
-      const fn = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-      const res = await fn({ mediaTypes: ['images'], quality: 0.5, base64: true });
-      if (res.canceled) return;
-      await runScan(res.assets[0]);
-    } catch (e) {
-      dialog.alert({ title: t('purchase.scan.error'), body: e.message });
-    }
-  };
-
-  // Keuze camera/bibliotheek via het eigen actiesheet — één codepad (UX-6).
-  const onScanPress = async () => {
-    const idx = await dialog.menu({
-      title: t('purchase.scan.title'),
-      options: [
-        { label: t('purchase.scan.camera'), icon: 'photo' },
-        { label: t('purchase.scan.library'), icon: 'library' },
-      ],
-    });
-    if (idx === 0) launchScan(true);
-    else if (idx === 1) launchScan(false);
-  };
+  // Bon kiezen + scannen via de gedeelde foto-picker (`lib/photoPicker.js`, STR-4):
+  // camera/bibliotheek-actiesheet → genormaliseerd asset → OCR-scan. Eén codepad.
+  const onScanPress = () => offerImagePicker((asset) => runScan(asset), { quality: 0.5 });
 
   // Vul de form met de bestaande bon en schakel naar bewerk-modus.
   const startEditing = () => {

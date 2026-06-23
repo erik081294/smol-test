@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
+import { offerImagePicker } from '../../lib/photoPicker';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
@@ -21,7 +21,6 @@ import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { validateVisibility } from '../../lib/visibility';
 import { careCard } from '../../lib/plantCare';
-import { extFromUri, parseDataUrl } from '../../lib/plantPhoto';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
@@ -61,53 +60,9 @@ export default function PlantScreen() {
   const toggleShareWith = (pid) =>
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
 
-  // Kies een foto (bibliotheek of camera) en geef het asset terug, of null bij
-  // annuleren/weigeren. Géén state-effect — zo bruikbaar voor zowel de nieuwe
-  // plant (asset bewaren tot opslaan) als een bestaande plant (meteen uploaden).
-  const pickAsset = async (camera) => {
-    try {
-      const perm = camera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      // Op web is permission soms een no-op; alleen blokkeren als expliciet geweigerd.
-      if (perm?.granted === false) {
-        dialog.alert({ title: t('plant.photo.noAccess.title'), body: t('plant.photo.noAccess.body') }); return null;
-      }
-      const launch = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-      // Geen allowsEditing/aspect: op web niet ondersteund en kan het dialoog blokkeren.
-      const res = await launch({ mediaTypes: ['images'], quality: 0.6, base64: true });
-      if (res.canceled) return null;
-      const a = res.assets[0];
-      // Native levert base64 + file://-uri; web levert vaak een data-URL.
-      const data = parseDataUrl(a.uri);
-      const base64 = a.base64 ?? data?.base64 ?? null;
-      const ext = data?.ext ?? extFromUri(a.uri);
-      if (!base64) { dialog.alert({ title: t('plant.photo.title'), body: t('plant.photo.readError') }); return null; }
-      return { uri: a.uri, base64, ext };
-    } catch (e) {
-      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.openError') });
-      return null;
-    }
-  };
-
-  // Keuze camera/bibliotheek (+ optioneel verwijderen) via het eigen actiesheet —
-  // één codepad voor alle platforms (UX-6). `onPicked` krijgt het gekozen asset.
-  const offerPicker = async (onPicked, { allowRemove = false, onRemove } = {}) => {
-    const idx = await dialog.menu({
-      title: t('plant.photo.source.title'), body: t('plant.photo.source.body'),
-      options: [
-        { label: t('plant.photo.camera'), icon: 'photo' },
-        { label: t('plant.photo.library'), icon: 'library' },
-        ...(allowRemove ? [{ label: t('common.remove'), icon: 'delete', tone: 'danger' }] : []),
-      ],
-    });
-    if (idx === 0) { const a = await pickAsset(true); if (a) onPicked(a); }
-    else if (idx === 1) { const a = await pickAsset(false); if (a) onPicked(a); }
-    else if (idx === 2) onRemove?.();
-  };
-
-  // Nieuwe-plant-flow: asset bewaren tot opslaan.
-  const choosePhoto = () => offerPicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
+  // Nieuwe-plant-flow: asset bewaren tot opslaan. Foto kiezen via de gedeelde
+  // picker (`lib/photoPicker.js`, STR-4) — één codepad voor alle modules/platforms.
+  const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
     const e = {};
@@ -172,7 +127,7 @@ export default function PlantScreen() {
   };
 
   // Foto toevoegen aan een bestaande plant: dagboekfoto + meteen de nieuwe omslag.
-  const changePhoto = () => offerPicker(async (asset) => {
+  const changePhoto = () => offerImagePicker(async (asset) => {
     setPhotoBusy(true);
     try {
       const path = await addPlantPhoto({ householdId: activeId, plantId: plant.id, userId: user.id, asset });
