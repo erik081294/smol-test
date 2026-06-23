@@ -252,6 +252,16 @@ helderheid van bediening (zichtbare item-acties i.p.v. verborgen long-press, inl
 validatie) en empty states + beweging. Geen migratie; leunt volledig op het bestaande
 design-systeem. Build-ready in [`docs/plans/07`](docs/plans/07-strakke-app.md).
 
+**Fase 1.6 — Modules van half naar af (UX-diepgang) — ⏳ NIEUW**
+Geen nieuwe features en geen migratie: we ontleden de *bestaande* modules scherm voor
+scherm, beslissing voor beslissing en flow voor flow, en dichten de "halve" randen.
+Waar Fase 1.5 de app *visueel cohesief* maakte (tokens/componenten/feel), gaat deze ronde
+over de **interactie-laag**: ontbrekende states (laden/leeg/fout), data die je niet kunt
+bedienen, inconsistente verwijder-/bulk-acties en onduidelijke beslismomenten. Twee sporen:
+voor-de-hand-liggende quick wins (UX-15 t/m UX-20) en verkennende, gezamenlijke
+module-teardowns (UXR-1 t/m UXR-8) die zelf weer concrete §6-rijen opleveren. De lens en
+werkwijze staan build-ready in [`docs/plans/14`](docs/plans/14-ux-module-teardown.md).
+
 **Fase 2 — De ambitieuze data-features — ⏳ DAARNA**
 Boodschappen-bonnetjes (trap 1→2) met productcatalogus + prijstracker (BOO-2/3/5),
 Grote-aankopen-dossiers (AAN-1 t/m AAN-4),
@@ -353,6 +363,20 @@ Inspanning is een T-shirt-maat (S/M/L).
 | UX-12 | Platform/UX | Back vanuit een via-"Meer"-geopende tab gaat naar Home i.p.v. Meer | 1.5 | Should | S | 🔧 | UX-2 | **Gebouwd.** `backBehavior="history"` op de Tabs: Android-back keert naar de vórige tab. **Rest:** op Android-toestel (hardware-back + gebaar) + web verifiëren; anders de stack-push-variant (UX-10). |
 | UX-13 | Platform/UX | Flexibele avatars: foto-upload + zelf-gebouwde avatar (personen én huishouden) | 2 | Should | M | ⏳ | UX-1, STR-4 | **Idee (gebruikerswens):** avatar van enkel emoji → keuze **emoji/foto/zelfgebouwde avatar**, voor leden én huishouden. Generieke descriptor (`kind: emoji\|photo\|builder`), nieuwe `avatars`-bucket + RLS, `Avatar`-component als switch. Builder via lokaal-gevendorde of zelf-getekende SVG (`react-native-svg`/`lib/illustrations.js`), geen runtime-dependency. Migratie nodig. |
 | UX-14 | Platform/UX | Dark-mode: donkere titels & pill-teksten leesbaar maken | 1.5 | Should | S | ⏳ | — | **Bug (gebruikerswens):** in donker thema blijven diverse **titels** en **teksten in pills/chips/badges** donker → te laag contrast. Oorzaak = hardcoded hex of fg-kleuren die niet op rendertijd uit de dark-tokens komen (`darkColors` in `lib/theme.js`); ook `*Soft`-tint-bg's (Badge) tegen een donkere fg nalopen. **Aanpak:** audit alle pill-achtige componenten (`Chip`/`Badge` in `lib/ui.js` + categorie-/status-labels) en sectie-titels op tokengebruik (`colors.ink`/`inkSoft`), verwijder vaste kleuren, check AA-contrast. Sluit aan op `DESIGN.md` en de toegankelijkheids-audit (PLT-5). Borg met een token-/contrast-check tegen regressie. |
+| UX-15 | Platform/UX | Laad-skeletons op alle lijstschermen | 1.6 | Should | S | ⏳ | STR-4 | **Quick win (UX-review).** `ListSkeleton` bestaat (STR-4) maar wordt op de ná Fase 1.5 gebouwde modules niet gebruikt → blanco scherm tijdens laden, je weet niet of het laadt/leeg/stuk is. Rol uit op Maaltijden, Voorraad, Huisdieren, Delen, Kosten-inzichten en de plant-/agenda-/schoonmaak-schermen waar nog geen skeleton staat. Geen migratie. Zie [`docs/plans/14`](docs/plans/14-ux-module-teardown.md). |
+| UX-16 | Platform/UX | Lege staten met next-step compleet maken | 1.6 | Should | S | ⏳ | STR-10 | **Quick win (UX-review).** STR-10 dekte de hoofdtabs; de nieuwere modules (Maaltijden, Voorraad, Huisdieren, Delen, Agenda) hebben nog een doodlopende of kale lege staat. Geef elke lege lijst één uitnodigende vervolgactie + illustratie via de bestaande `Empty`-component (`actionTitle`/`onAction`/`illustration`). Geen migratie. |
+| UX-17 | Platform/UX | Eén verwijder-/veeg-interactie overal (swipe + undo) | 1.6 | Should | M | ⏳ | STR-5, STR-9 | **Quick win (UX-review).** Verwijderen is nu inconsistent: undo-toast in de ene module, verborgen long-press in de andere, kale modal in de derde. Harmoniseer naar het STR-5/STR-9-patroon (zichtbare swipe-to-delete + undo-toast) op o.a. Boodschappen, Voorraad en de modules die nog afwijken. Vergevingsgezind + voorspelbaar (`DESIGN.md` 5/7). Geen migratie. |
+| UX-18 | Platform/UX | Inline "bewerken"-affordance op verzorging & ingrediënten | 1.6 | Should | S | ⏳ | — | **Quick win (UX-review).** De verzorgingskaart (plant/huisdier) en recept-ingrediënten tónen data maar lezen als statisch — bewerken zit verborgen achter een sheet. Maak bewerkbaarheid zichtbaar (potlood-/chevron-affordance op de kaart/rij), zodat "data tonen" weer "kunnen handelen" wordt. Schermen: `plant/[id].js`, `pet/[id].js`, `recipe/[id].js`. Geen migratie. |
+| UX-19 | Platform/UX | "Voltooide wissen" + vier-de-voortgang consistent | 1.6 | Could | S | ⏳ | STR-11 | **Quick win (UX-review).** Boodschappen heeft een bulk-opruim van afgevinkte items; Taken (done-sectie) en Voorraad (verlopen) niet. Geef ze dezelfde bulk-actie, en een kleine "alles af vandaag"-viering (schaal/fade, respecteert "verminder beweging") in lijn met STR-11 + `DESIGN.md` principe 6. Geen migratie. |
+| UX-20 | Platform/UX | Periode-transparantie in eerlijkheid & kosten-inzichten | 1.6 | Could | S | ⏳ | — | **Quick win (UX-review).** In Schoonmaak-eerlijkheid en `kosten-inzichten.js` is de WEEK/MAAND/ALLES-keuze zichtbaar, maar niet *welke* items in die periode meetellen → cijfers ogen ondoorzichtig. Toon een subkop/telling ("12 voltooiingen deze week", "8 uitgaven"), zodat de cijfers navolgbaar zijn. Geen migratie. |
+| UXR-1 | UX-review | Ontleding: Vandaag / overzicht | 1.6 | Should | S | ⏳ | — | **Verkennend (gebruikerswens — samen ontleden).** Scherm-voor-scherm / beslissing-voor-beslissing / flow-voor-flow op `vandaag.js` (hero, voortgangsring, widgetgrid, bewerk-modus, widget-stijlen). Levert concrete §6-rijen op. Lens + werkwijze in [`docs/plans/14`](docs/plans/14-ux-module-teardown.md). |
+| UXR-2 | UX-review | Ontleding: Taken & de tasks-weergaven | 1.6 | Should | M | ⏳ | STR-1 | **Verkennend.** `taken.js` + de weergaven `agenda.js`/`schoonmaak.js` + `task/[id].js`. Kerntoets: klopt de STR-1-rolverdeling (één bron, drie weergaven) écht in gebruik, of voelt Agenda redundant? Rotatie-/filter-microcopy, dode einden, ontbrekende snelle acties. Zie plan 14. |
+| UXR-3 | UX-review | Ontleding: Boodschappen | 1.6 | Should | S | ⏳ | — | **Verkennend.** `boodschappen.js` + favorieten-/vaste-boodschappen-sheet + catalogus. Flow: snel toevoegen → afvinken → opruimen; discoverability van favorieten/verborgen producten; bulk-toevoegen. Zie plan 14. |
+| UXR-4 | UX-review | Ontleding: Kosten & delen | 1.6 | Should | M | ⏳ | — | **Verkennend.** `kosten.js`, `expense/[id].js`, `kosten-inzichten.js`, `delen.js`, `resource/[id].js`. Beslismomenten: split-type wijzigen, "settle"-suggesties uitleggen, reservering-conflict-waarschuwing, saldo-transparantie. Zie plan 14. |
+| UXR-5 | UX-review | Ontleding: Keuken-loop (Maaltijden + Voorraad) | 1.6 | Should | M | ⏳ | — | **Verkennend.** `maaltijden.js`, `recipe/[id].js`, `voorraad.js` — de reis menu → boodschappen → koken → voorraad bijwerken. Ingrediënt-bewerk-affordance, "deze week boodschappen halen", porties-stepper, voorraad-urgentie. Zie plan 14. |
+| UXR-6 | UX-review | Ontleding: Zorg-modules (Planten + Huisdieren) | 1.6 | Should | M | ⏳ | — | **Verkennend.** `planten.js`/`plant/*` + `huisdieren.js`/`pet/*` (gedeelde verzorgings-/tijdlijn-infra). Kaart zonder handeling (waterbeurt/dierzorg niet af te vinken vanaf de kaart), verzorging bewerken, soort wijzigen, tijdlijn-acties. Zie plan 14. |
+| UXR-7 | UX-review | Ontleding: Setup & beheer | 1.6 | Should | S | ⏳ | — | **Verkennend.** `huishouden.js` (leden/subgroepen/module-toggles), `onboarding.js`, `instellingen.js`. Eerste-keer-flow, behoud van invoer bij tab-wissel, zichtbaarheid van trigger-knoppen en toggle-feedback. Zie plan 14. |
+| UXR-8 | UX-review | Ontleding: Activiteit & navigatie-weefsel | 1.6 | Could | S | ⏳ | UX-12 | **Verkennend.** `activiteit.js` (read-only feed: filter/zoek/duiding van iconen, naar-bron-deeplink) + cross-module terugkeer/deeplinks. Sluit aan op UX-10 ("vorige"-lintje) en UX-12 (back-gedrag). Zie plan 14. |
 
 ---
 
@@ -363,6 +387,9 @@ Voorgestelde ID's reserveren ruimte; zodra een idee "echt" wordt, krijgt het een
 §6 (en verdwijnt hier). Gegroepeerd naar afstand/aard.
 
 ### 7.1 Bestaande modules verdiepen
+- **UX-diepgang per module (Fase 1.6)** — de gestructureerde teardowns (UXR-1 t/m UXR-8) en
+  quick wins (UX-15 t/m UX-20) staan nu in §6; elke teardown-sessie levert hier of in §6 weer
+  nieuwe, concrete verbeterrijen op. Framework: [`docs/plans/14`](docs/plans/14-ux-module-teardown.md).
 - **Agenda: losse afspraken zonder taak-overhead** (AGE-3) — nu is elke afspraak een `tasks`-rij;
   overweeg een lichtere "event"-flow voor puur-agenda-items (begin/eindtijd, geen afvinken).
 
