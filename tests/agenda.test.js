@@ -263,3 +263,36 @@ test('taskHref: handmatige afspraak → editor; null veilig', () => {
   assert.equal(taskHref({ id: 't7' }), '/task/t7');
   assert.equal(taskHref(null), null);
 });
+
+// === Tag-filter (UX-41) ==================================================
+
+const tagged = [
+  { id: '1', category: 'afspraak', tag_ids: ['t-school'], completed_at: null },
+  { id: '2', category: 'afspraak', tag_ids: ['t-sport', 't-school'], completed_at: null },
+  { id: '3', category: 'klus', tag_ids: [], completed_at: null },
+  { id: '4', category: 'afspraak', tag_ids: ['t-sport'], completed_at: null },
+];
+
+test('applyTaskFilters: tagIds — OR binnen de as (minstens één tag)', () => {
+  const r = applyTaskFilters(tagged, { tagIds: ['t-school'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['1', '2']);
+  const r2 = applyTaskFilters(tagged, { tagIds: ['t-school', 't-sport'], status: 'all' });
+  assert.deepEqual(r2.map((t) => t.id), ['1', '2', '4']);
+});
+
+test('applyTaskFilters: lege tagIds filtert niet; taak zonder tags valt weg bij een tagfilter', () => {
+  assert.equal(applyTaskFilters(tagged, { tagIds: [], status: 'all' }).length, 4);
+  const r = applyTaskFilters(tagged, { tagIds: ['t-sport'], status: 'all' });
+  assert.ok(!r.some((t) => t.id === '3')); // id 3 heeft geen tags
+});
+
+test('applyTaskFilters: tag + categorie combineren (AND tussen assen)', () => {
+  const r = applyTaskFilters(tagged, { tagIds: ['t-school'], categories: ['klus'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), []); // geen klus-taak met t-school
+});
+
+test('activeFilterCount: tag-as telt mee', () => {
+  assert.equal(activeFilterCount({ tagIds: ['t-school'] }), 1);
+  assert.equal(activeFilterCount({ tagIds: ['a', 'b'], status: 'done' }), 2);
+  assert.equal(activeFilterCount({ tagIds: [] }), 0);
+});

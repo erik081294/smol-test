@@ -7,8 +7,10 @@ import { format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
 import { useTasks } from '../../lib/useTasks';
+import { useTags } from '../../lib/useTags';
 import { useHousehold } from '../../lib/household';
 import { Field, Button, Chip, Row, Stepper, Editor, Checkbox, IconButton } from '../../lib/ui';
+import { TagPicker } from '../../lib/TagPicker';
 import { PeriodPicker } from '../../lib/PeriodPicker';
 import { Icon } from '../../lib/icons';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -41,6 +43,7 @@ export default function TaskEditor() {
   const router = useRouter();
   const toast = useToast();
   const { addTask, updateTask, deleteTask } = useTasks();
+  const { tags, addTag } = useTags();
   const { members, subgroups } = useHousehold();
 
   const [loaded, setLoaded] = useState(isNew);
@@ -58,6 +61,7 @@ export default function TaskEditor() {
   const [interval, setIntervalN] = useState(1);
   const [weekdays, setWeekdays] = useState([]);
   const [rotation, setRotation] = useState([]);    // passthrough (UX-40)
+  const [tagIds, setTagIds] = useState([]);        // zelfgemaakte labels (UX-41)
   // Voor wie / wie ziet 'm: household | subgroup | custom
   const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
   const [shareSubgroupId, setShareSubgroupId] = useState(null);
@@ -83,6 +87,7 @@ export default function TaskEditor() {
       setIntervalN(data.recur_interval ?? 1);
       setWeekdays(data.recur_weekdays ?? []);
       setRotation(data.rotation ?? []);
+      setTagIds(data.tag_ids ?? []);
       setVisibility(data.visibility ?? VISIBILITY.HOUSEHOLD);
       setShareSubgroupId(data.share_subgroup_id ?? null);
       setShareWith(data.share_with ?? []);
@@ -94,7 +99,7 @@ export default function TaskEditor() {
   const buildSnapshot = () => JSON.stringify({
     title: title.trim(), notes: notes.trim(), category, zoneId, assignedTo,
     dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
-    freq, interval, weekdays, rotation, visibility, shareSubgroupId, shareWith,
+    freq, interval, weekdays, rotation, tagIds, visibility, shareSubgroupId, shareWith,
   });
   useEffect(() => {
     if (loaded && initialSnap === null) setInitialSnap(buildSnapshot());
@@ -149,6 +154,7 @@ export default function TaskEditor() {
       recur_interval: freq && !(freq === RECUR.WEEKLY && weekdays.length) ? interval : 1,
       recur_weekdays: freq === RECUR.WEEKLY && weekdays.length ? weekdays : null,
       rotation: rotation.length ? rotation : null,
+      tag_ids: tagIds,
       ...visibilityPayload({ visibility, shareSubgroupId, shareWith }),
     };
     try {
@@ -205,6 +211,10 @@ export default function TaskEditor() {
           <Text style={[type.label, { color: colors.forest }]}>{t('task.notes.add')}</Text>
         </Pressable>
       )}
+
+      {/* Labels — zelfgemaakte, gekleurde tags voor maximale flexibiliteit (UX-41). */}
+      <TagPicker tags={tags} selectedIds={tagIds} onCreate={addTag}
+        onToggle={(id) => setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))} />
 
       {/* Wanneer — standaard vandaag; tik op de datum (of het icoon) om te kiezen (UX-36). */}
       <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.when')}</Text>

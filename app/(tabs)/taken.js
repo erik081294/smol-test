@@ -6,6 +6,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { format, addDays, addMonths, addYears } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
+import { useTags } from '../../lib/useTags';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
 import { PeriodPicker } from '../../lib/PeriodPicker';
@@ -28,7 +29,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
 
-const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
+const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open' };
 
 // Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -48,6 +49,7 @@ const sortByDate = (items) => [...(items ?? [])].sort((a, b) => {
 export default function Taken() {
   const { tasks, loading, error, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
+  const { tags } = useTags();
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
@@ -67,6 +69,7 @@ export default function Taken() {
     categories: filters.categories,
     assignees: filters.assigneeId ? [filters.assigneeId] : [],
     subgroupId: filters.subgroupId,
+    tagIds: filters.tagIds,
     status: filters.status,
   }), [filters]);
 
@@ -219,6 +222,10 @@ export default function Taken() {
     const g = subgroups.find((s) => s.id === filters.subgroupId);
     activeChips.push({ key: 'subgroup', label: g ? `${g.emoji} ${g.name}` : t('tasks.filter.group'), onRemove: () => setFilters((f) => ({ ...f, subgroupId: null })) });
   }
+  for (const tagId of filters.tagIds) {
+    const tag = tags.find((tg) => tg.id === tagId);
+    activeChips.push({ key: `tag-${tagId}`, label: tag?.name ?? t('tasks.filter.tags'), onRemove: () => setFilters((f) => ({ ...f, tagIds: f.tagIds.filter((x) => x !== tagId) })) });
+  }
   if (filters.status !== 'open') {
     activeChips.push({ key: 'status', label: filters.status === 'done' ? t('tasks.filter.done') : t('tasks.filter.status.all'), onRemove: () => setFilters((f) => ({ ...f, status: 'open' })) });
   }
@@ -325,7 +332,7 @@ export default function Taken() {
               left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(item) }}
               right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(item) }}
             >
-              <TaskRow task={item} members={members} onToggle={toggle} />
+              <TaskRow task={item} members={members} tags={tags} onToggle={toggle} />
             </SwipeRow>
           )}
           ListEmptyComponent={
@@ -359,7 +366,7 @@ export default function Taken() {
       <TaskFilterSheet
         visible={filterOpen} onClose={() => setFilterOpen(false)}
         filters={filters} setFilters={setFilters}
-        members={members} subgroups={subgroups} tasks={tasks} filterArg={filterArg}
+        members={members} subgroups={subgroups} tags={tags} tasks={tasks} filterArg={filterArg}
       />
 
       <Celebrate show={celebrate} message={t('tasks.allDoneToday')} onDone={() => setCelebrate(false)} />
@@ -370,13 +377,16 @@ export default function Taken() {
 // Bottom-sheet met gegroepeerde filterkeuzes (categorie/persoon/groep/status).
 // Filters werken live; de sheet is enkel de editor. Categorie toont per-categorie
 // tellers (countBy) op de huidige selectie minus de categorie-as.
-function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tasks, filterArg }) {
+function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tags = [], tasks, filterArg }) {
   const catCounts = useMemo(
     () => countBy(applyTaskFilters(tasks, { ...filterArg, categories: [] }), (tk) => tk.category),
     [tasks, filterArg],
   );
   const toggleCategory = (k) => setFilters((f) => ({
     ...f, categories: f.categories.includes(k) ? f.categories.filter((x) => x !== k) : [...f.categories, k],
+  }));
+  const toggleTag = (id) => setFilters((f) => ({
+    ...f, tagIds: f.tagIds.includes(id) ? f.tagIds.filter((x) => x !== id) : [...f.tagIds, id],
   }));
 
   return (
@@ -392,6 +402,19 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
               active={filters.categories.includes(k)} onPress={() => toggleCategory(k)} />
           ))}
         </View>
+
+        {/* Labels (multi) — alleen tonen als er tags zijn */}
+        {tags.length > 0 ? (
+          <>
+            <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.tags')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
+              {tags.map((tag) => (
+                <Chip key={tag.id} label={tag.name} color={tag.color}
+                  active={filters.tagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {/* Toegewezen aan (single) */}
         <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.assignee')}</Text>
