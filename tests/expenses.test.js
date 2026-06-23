@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SPLIT, computeShares, exactSharesValid, computeBalances, settle,
+  SPLIT, computeShares, exactSharesValid, computeBalances, balancesFromTotals, settle,
   formatCents, parseAmountToCents,
 } from '../lib/expenses.js';
 
@@ -150,4 +150,40 @@ test('settle: deterministische koppeling bij gelijke bedragen (op id)', () => {
 test('parseAmountToCents: accepteert ook een getal als invoer', () => {
   assert.equal(parseAmountToCents(7.5), 750);
   assert.equal(parseAmountToCents(12), 1200);
+});
+
+// --- balancesFromTotals (PERF-1): saldo uit server-side aggregaat-totalen, gebruikt
+// als de uitgavenlijst het laad-venster raakt. Net = voorgeschoten − eigen aandeel;
+// som = 0 net als computeBalances; exacte nullen worden opgeruimd.
+
+test('balancesFromTotals: net = voorgeschoten − aandeel, som = 0', () => {
+  const bal = balancesFromTotals([
+    { profile_id: 'erik', paid_cents: 3000, share_cents: 1000 }, // legde voor → +2000
+    { profile_id: 'mira', paid_cents: 0, share_cents: 1000 },    // alleen aandeel → −1000
+    { profile_id: 'tim', paid_cents: 0, share_cents: 1000 },     // alleen aandeel → −1000
+  ]);
+  assert.equal(bal.erik, 2000);   // 3000 − 1000 (niet 3000 + 1000)
+  assert.equal(bal.mira, -1000);
+  assert.equal(bal.tim, -1000);
+  assert.equal(sum(bal), 0);
+});
+
+test('balancesFromTotals: exacte nul-saldi worden opgeruimd', () => {
+  const bal = balancesFromTotals([
+    { profile_id: 'a', paid_cents: 500, share_cents: 500 },  // net 0 → weg
+    { profile_id: 'b', paid_cents: 800, share_cents: 300 },  // net +500 → blijft
+  ]);
+  assert.deepEqual(bal, { b: 500 });
+  assert.ok(!('a' in bal), 'nul-saldo hoort niet in het overzicht');
+});
+
+test('balancesFromTotals: ontbrekende paid/share tellen als 0, leeg → leeg', () => {
+  const bal = balancesFromTotals([
+    { profile_id: 'a', share_cents: 400 },  // geen paid_cents → 0 − 400 = −400
+    { profile_id: 'b', paid_cents: 400 },   // geen share_cents → 400 − 0 = +400
+  ]);
+  assert.equal(bal.a, -400);
+  assert.equal(bal.b, 400);
+  assert.deepEqual(balancesFromTotals([]), {});
+  assert.deepEqual(balancesFromTotals(), {}); // zonder argument → leeg saldo
 });

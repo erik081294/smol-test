@@ -5,6 +5,7 @@ import { DETAIL_PARENT, backLabelFor } from '../lib/navMeta.js';
 
 test('backLabelFor: detail-route → label van de herkomst-tab', () => {
   assert.equal(backLabelFor('plant'), 'Planten');
+  assert.equal(backLabelFor('pet'), 'Huisdieren'); // PET-detail keert terug naar de Huisdieren-tab
   assert.equal(backLabelFor('purchase'), 'Boodschappen');
   assert.equal(backLabelFor('kosten-inzichten'), 'Kosten');
   assert.equal(backLabelFor('resource'), 'Samen'); // module 'delen' heet 'Samen'

@@ -3,7 +3,7 @@
 // moet stabiel zijn — anders "springt" het overzicht bij gelijke standen.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tally, sinceDate, PERIODS } from '../lib/fairness.js';
+import { tally, tallyFromCounts, sinceDate, PERIODS } from '../lib/fairness.js';
 
 const MEMBERS = [
   { id: 'a', display_name: 'Alice', avatar_emoji: '🦊' },
@@ -122,4 +122,78 @@ test('tally: id-tie-break onafhankelijk van de leden-volgorde', () => {
   const M = (ids) => ids.map((id) => ({ id, display_name: id }));
   assert.deepEqual(tally([], M(['c', 'a', 'b'])).map((r) => r.profileId), ['a', 'b', 'c']);
   assert.deepEqual(tally([], M(['a', 'b', 'c'])).map((r) => r.profileId), ['a', 'b', 'c']);
+});
+
+// --- tallyFromCounts (PERF-1): rijen uit server-side aggregaat-tellingen. Moet exact
+// dezelfde rij-vorm, percentages en sortering geven als tally(), maar dan gevoed uit
+// {profile_id, completions, cleaning_completions}-totalen i.p.v. een voltooiingen-log.
+
+test('tallyFromCounts: telt per lid uit het aggregaat (default-veld) en pct klopt', () => {
+  const rows = tallyFromCounts(
+    [{ profile_id: 'a', completions: 2 }, { profile_id: 'b', completions: 1 }],
+    MEMBERS,
+  );
+  const byId = Object.fromEntries(rows.map((r) => [r.profileId, r]));
+  assert.equal(byId.a.count, 2);
+  assert.equal(byId.b.count, 1);
+  assert.equal(byId.c.count, 0);          // lid zonder aggregaat-rij → 0
+  assert.equal(sum(rows), 3);
+  assert.ok(Math.abs(byId.a.pct - (2 / 3) * 100) < 1e-9);
+});
+
+test('tallyFromCounts: `field` kiest de kolom (schoonmaak los van algemeen)', () => {
+  const counts = [
+    { profile_id: 'a', completions: 5, cleaning_completions: 1 },
+    { profile_id: 'b', completions: 0, cleaning_completions: 4 },
+  ];
+  const algemeen = Object.fromEntries(tallyFromCounts(counts, MEMBERS).map((r) => [r.profileId, r.count]));
+  assert.deepEqual(algemeen, { a: 5, b: 0, c: 0 });
+  const schoon = Object.fromEntries(
+    tallyFromCounts(counts, MEMBERS, 'cleaning_completions').map((r) => [r.profileId, r.count]),
+  );
+  assert.deepEqual(schoon, { a: 1, b: 4, c: 0 });
+});
+
+test('tallyFromCounts: ontbrekend veld of niet-numerieke waarde → 0, strings worden getallen', () => {
+  const rows = tallyFromCounts(
+    [{ profile_id: 'a' }, { profile_id: 'b', completions: '3' }],   // a mist het veld; b is een string
+    MEMBERS,
+  );
+  const byId = Object.fromEntries(rows.map((r) => [r.profileId, r]));
+  assert.equal(byId.a.count, 0);
+  assert.equal(byId.b.count, 3);          // Number('3') === 3, geen string-concat
+  assert.equal(sum(rows), 3);
+});
+
+test('tallyFromCounts: naam/emoji-fallback en sortering (count desc, stabiel op id)', () => {
+  const rows = tallyFromCounts(
+    [{ profile_id: 'b', completions: 2 }, { profile_id: 'c', completions: 2 }],
+    [{ id: 'a', display_name: 'Alice', avatar_emoji: '🦊' }, { id: 'b' }, { id: 'c' }],
+  );
+  // b en c hebben beide 2, a heeft 0 → volgorde b, c (op id), dan a.
+  assert.deepEqual(rows.map((r) => r.profileId), ['b', 'c', 'a']);
+  const byId = Object.fromEntries(rows.map((r) => [r.profileId, r]));
+  assert.equal(byId.a.name, 'Alice');
+  assert.equal(byId.a.emoji, '🦊');
+  assert.equal(byId.b.name, 'Onbekend');  // fallback bij ontbrekende naam
+  assert.equal(byId.b.emoji, null);
+});
+
+test('tallyFromCounts: alles nul → pct 0 (geen deling door nul)', () => {
+  const rows = tallyFromCounts([], MEMBERS);
+  assert.equal(rows.length, 3);
+  for (const r of rows) {
+    assert.equal(r.count, 0);
+    assert.equal(r.pct, 0);
+  }
+});
+
+test('tallyFromCounts: zonder leden → geen rijen (members defaulten naar leeg, niet naar een spookrij)', () => {
+  assert.deepEqual(tallyFromCounts([{ profile_id: 'a', completions: 3 }]), []);
+});
+
+test('tally: zonder leden → geen rijen, ook met voltooiingen', () => {
+  // Geen huishoudleden → niets te verdelen; het overzicht blijft leeg (geen spookrij).
+  assert.deepEqual(tally([]), []);
+  assert.deepEqual(tally([{ completed_by: 'x', completed_at: '2026-06-15T10:00:00Z' }]), []);
 });
