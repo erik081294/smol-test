@@ -99,3 +99,42 @@ test('DELETE: zonder id in old/new → null (fallback naar reload)', () => {
 test('onbekend event → null', () => {
   assert.equal(applyRealtimePatch([], { eventType: 'TRUNCATE' }, byNAsc), null);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('comparatorFromOrder: zonder ascending → standaard oplopend', () => {
+  const cmp = comparatorFromOrder([{ column: 'n' }]);
+  assert.deepEqual([{ n: 3 }, { n: 1 }, { n: 2 }].sort(cmp).map((x) => x.n), [1, 2, 3]);
+});
+
+test('comparatorFromOrder: ontbrekende kolom telt als null; gelijke waarde valt door naar de 2e kolom', () => {
+  const cmp = comparatorFromOrder([{ column: 'k', ascending: true }, { column: 't', ascending: true }]);
+  assert.deepEqual([{ k: 'b' }, {}, { k: 'a' }].sort(cmp).map((x) => x.k ?? 'X'), ['a', 'b', 'X']); // undefined = null = laatst
+  assert.deepEqual([{ k: 'a', t: 2 }, { k: 'a', t: 1 }].sort(cmp).map((x) => x.t), [1, 2]); // gelijke k → t beslist
+});
+
+test('comparatorFromOrder: beide null in de 1e kolom → 2e kolom beslist; robuust tegen null-elementen', () => {
+  const cmp = comparatorFromOrder([{ column: 'k', ascending: true }, { column: 't', ascending: true }]);
+  assert.deepEqual([{ k: null, t: 2 }, { k: null, t: 1 }].sort(cmp).map((x) => x.t), [1, 2]);
+  assert.equal(typeof cmp(null, { k: 1 }), 'number'); // crasht niet op een null-element
+});
+
+test('applyRealtimePatch: null/zonder-row payloads → null (fallback naar reload)', () => {
+  assert.equal(applyRealtimePatch([], null, byNAsc), null);
+  assert.equal(applyRealtimePatch([], { eventType: 'INSERT' }, byNAsc), null); // geen new
+  assert.equal(applyRealtimePatch([], { eventType: 'UPDATE' }, byNAsc), null); // geen new
+});
+
+test('INSERT: idempotent ook in een lijst met meerdere items', () => {
+  const items = [{ id: 'a', n: 1 }, { id: 'b', n: 2 }];
+  const out = applyRealtimePatch(items, { eventType: 'INSERT', new: { id: 'a', n: 1 } }, byNAsc);
+  assert.equal(out, items); // geen duplicaat, ongewijzigde referentie
+});
+
+test('DELETE: valt terug op new.id als old.id ontbreekt; onbekend event patcht niet stiekem', () => {
+  assert.deepEqual(
+    applyRealtimePatch([{ id: 'a', n: 1 }], { eventType: 'DELETE', new: { id: 'a' } }, byNAsc).map((x) => x.id),
+    [],
+  );
+  assert.equal(applyRealtimePatch([{ id: 'a', n: 1 }], { eventType: 'TRUNCATE', old: { id: 'a' } }, byNAsc), null);
+});

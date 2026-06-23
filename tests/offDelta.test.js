@@ -56,3 +56,15 @@ test('selectNewDeltas: negeert namen zonder geldige timestamps', () => {
   const { total } = selectNewDeltas(['rommel.gz', f(100, 200)], 0);
   assert.equal(total, 1);
 });
+
+// --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).
+
+test('selectNewDeltas: gelijke `to` → stabiele tie-break op bestandsnaam', () => {
+  const { pending } = selectNewDeltas([f(200, 300), f(100, 300)], 0); // zelfde to, andere from/naam
+  assert.deepEqual(pending.map((d) => d.from), [ts(100), ts(200)]); // bestandsnaam met T+100 vóór T+200
+});
+
+test('selectNewDeltas: watermerk exact op de oudste `from` → geen gat (grens)', () => {
+  const { gap } = selectNewDeltas([f(100, 200), f(200, 300)], ts(100)); // oldestFrom == watermark
+  assert.equal(gap, false);
+});
