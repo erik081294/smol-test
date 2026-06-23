@@ -151,6 +151,52 @@ een agenda-laag die per subgroep filtert. Afspraken bestaan al als taakcategorie
 verrijking is een echte **kalenderweergave** met subgroep-filter en eventueel sync naar
 de telefoon-agenda. Dit is de natuurlijke plek waar subgroepen het meest zichtbaar worden.
 
+### 🚗 Voertuigen — auto-onderhoud & kosten plannen
+Een eigen module voor het onderhoud van de auto('s) van het huishouden. Leunt op dezelfde
+infrastructuur als Planten en Huisdieren (een eigen domeintabel + verzorgings-/onderhoudstemplates
+die terugkerende `tasks` aanmaken) en op de Kosten-laag (§3) voor het geld.
+- **Voertuig toevoegen**: merk/model, bouwjaar, kenteken en km-stand; later meerdere voertuigen.
+- **Kenteken → auto-type (RDW)**: voor een auto vul je alleen het **kenteken** in; de app haalt
+  merk, handelsbenaming/model en voertuigsoort op uit de **open data van de RDW** en vult het
+  auto-type voor je in (handmatig overschrijven blijft kunnen).
+- **Onderhoud plannen**: een onderhoudsschema uit een sjabloon (APK, grote/kleine beurt, olie
+  verversen, banden wisselen zomer/winter, distributieriem) dat — net als bij huisdieren —
+  als voor-aangevinkte checklist terugkerende taken aanmaakt. Plannen kan op **datum** én op
+  **km-stand** ("volgende beurt over 15.000 km").
+- **Kosten plannen & bijhouden**: per onderhoudsbeurt een verwachte en een werkelijke prijs,
+  zodat je een jaarbegroting voor de auto ziet. Gerealiseerde kosten koppelen aan
+  **WieBetaaltWat** (§3) zodat ze meelopen in de saldo's — een natuurlijke uitbreiding van
+  het autodeel-/kostenstuk.
+- **Onderhoudshistorie** per voertuig: een tijdlijn van uitgevoerd onderhoud met datum,
+  km-stand, kosten en een losse notitie (hergebruikt het log-patroon van `pet_log`).
+- **Inbrengen in de Samen/Delen-module**: een voertuig kan tegelijk een **gedeelde resource** worden
+  in de bestaande Delen-module (reserveringskalender + kosten-naar-gebruik, AUT-1/2). Voor **auto's is
+  dit de default** — een nieuwe auto staat meteen klaar om te reserveren en samen te bekostigen,
+  bovenop het onderhoud.
+
+> **Aanpak — bouwvolgorde.** Begin regelgebaseerd, net als de huisdier-routines: een handvol
+> onderhoudssjablonen in code (`lib/vehicleCare.js`), betrouwbaar en uitlegbaar. Bouw eerst het
+> voertuig + onderhoudsschema (VTG-1), daarna de kosten-/historielaag bovenop WieBetaaltWat (VTG-2),
+> de RDW-lookup (VTG-3) en het delen via de Samen-module (VTG-4). Hergebruik overal bestaande,
+> beproefde lagen — `tasks`-recurrence, `create_expense`, `shared_resources` — i.p.v. parallelle logica.
+>
+> **Robuustheid & stabiliteit.** De **RDW-lookup is een verrijking, geen vereiste**: hij draait
+> niet-blokkerend (debounced, met timeout) en valt bij een trage/onbereikbare RDW, geen internet of
+> een onbekend kenteken stil terug op handmatige invoer — een auto opslaan kan altijd zónder lookup.
+> Het kenteken wordt eerst lokaal genormaliseerd en gevalideerd (geen call bij evident ongeldige
+> invoer) en het resultaat wordt op het voertuig **gecachet** (één call per kenteken, fair-use richting
+> de RDW; kenteken alleen binnen het huishouden opgeslagen, niet gelogd). Het **delen** gebeurt
+> **idempotent en transactioneel**: voertuig + gekoppelde `shared_resources`-rij in één RPC, met een
+> unieke 1-op-1 `resource_id`, zodat opnieuw opslaan nooit dubbele resources maakt; de gedeelde
+> resource erft de zichtbaarheid (subgroep/RLS) van het voertuig. Verwijderen waarschuwt bij **actieve
+> reserveringen** en ruimt de koppeling netjes op (geen wees-resources).
+>
+> **Gebruiksgemak.** Voor een auto vul je in de praktijk alleen het kenteken in (de rest wordt
+> ingevuld en blijft overschrijfbaar) en staat delen meteen aan — met één duidelijke schakelaar om dat
+> uit te zetten. Onderhoud, reserveringen en kosten hangen aan hetzelfde voertuig en zijn over en weer
+> deeplinkbaar. Km-gebaseerd plannen vraagt periodiek een km-stand-update; houd dat licht (een prompt,
+> geen sensor) en degradeer naar datum-only zolang er (nog) geen km-stand bekend is.
+
 ---
 
 ## 3. 💶 Kosten & informeel autodelen (WieBetaaltWat)
@@ -209,7 +255,9 @@ design-systeem. Build-ready in [`docs/plans/07`](docs/plans/07-strakke-app.md).
 **Fase 2 — De ambitieuze data-features — ⏳ DAARNA**
 Boodschappen-bonnetjes (trap 1→2) met productcatalogus + prijstracker (BOO-2/3/5),
 Grote-aankopen-dossiers (AAN-1 t/m AAN-4),
-kosten-koppeling aan modules (KOS-3) en de autodeel-basis (AUT-1/2). Hier zit het meeste
+kosten-koppeling aan modules (KOS-3) en de autodeel-basis (AUT-1/2). Hier komt ook de
+**Voertuigen-module** (auto-onderhoud + kosten plannen, RDW-kenteken & delen via de Samen-module, VTG-1 t/m 4) en de eigen-diersoort-uitbreiding
+op Huisdieren (HUI-2). Hier zit het meeste
 bouwwerk; lever in trappen op. **Al af:** KLU-2 klus-bibliotheek, KLU-3 seizoenssuggesties,
 PLA-7 plantfoto-cover (no-migratie-voorlopers), de **Huisdieren-module** (HUI-1, migr. 0038),
 en — via plan 01 (migratie 0012) — beurtrotatie/eerlijkheid (KLU-4, SCH-3) op een nieuwe voltooiingen-log.
@@ -272,6 +320,11 @@ Inspanning is een T-shirt-maat (S/M/L).
 | PLA-6 | Planten | AI-soortherkenning | 3 | Could | L | ⏳ | PLA-1 | Plant-ID API of eigen model; handmatige keuze blijft terugval. |
 | PLA-9 | Planten | Bulk planten toevoegen ("plant-rondje" met rollende camera) | 3 | Could | L | ⏳ | PLA-1, UX-7 | **Idee (gebruikerswens):** in één doorlopende camera-flow plant ná plant vastleggen (foto + naam + evt. notitie), details achteraf afmaken; elke plant direct persisteren via `addPlant`. Leunt op UX-7 (in-app camera, `CaptureSession`-primitief). Vereist dev build; geen migratie. |
 | HUI-1 | Huisdieren | Huisdier-verzorging (module) | 2 | Should | L | 🔧 | — | **Gebouwd (migr. `0038`, live).** Nieuwe module die de plant-infra hergebruikt maar een eigen domein heeft: `pets`/`pet_log` + private bucket `pets`. Verzorgingsroutines per diersoort in `lib/petCare.js` (8 diertypen) → voor-aangevinkte checklist die `tasks` (category `huisdier` + `pet_id`) aanmaakt; tijdlijn met foto/notitie/**gewicht**; cross-pet tijdlijn. `lib/usePets.js`/`petPhoto.js`, `app/(tabs)/huisdieren.js` + `app/pet/*`. **Rest:** foto kiezen/uploaden, checklist-flow, tijdlijn + gewicht-log + realtime op toestel bevestigen. |
+| HUI-2 | Huisdieren | Eigen diersoort toevoegen | 2 | Should | S | ⏳ | HUI-1 | **Idee (gebruikerswens):** zelf een ander dier benoemen i.p.v. alleen de vaste 8 typen. Nu vangt `type: 'anders'` (`lib/petCare.js`) de rest met de generieke 🐾-routine; uitbreiden naar een vrij **soort-label** (+ eigen emoji) dat de gebruiker invoert. Soortlabel opslaan op `pets` (lichte migratie: kolom `species_label`, of hergebruik een vrij veld) en tonen i.p.v. "Anders"; verzorgingschecklist valt terug op de `anders`-templates (handmatig bij te schaven). Soortkiezer in `app/pet/[id].js` krijgt een "Anders, namelijk…"-optie. **Robuust:** additief (bestaande `anders`-dieren blijven werken), label getrimd + lengte-gevalideerd, emoji optioneel met 🐾-fallback. |
+| VTG-1 | Voertuigen | Voertuig + onderhoudsschema (module) | 2 | Should | M | ⏳ | — | **Idee (gebruikerswens): nieuwe module, auto-onderhoud.** Hergebruikt de plant-/huisdier-infra: nieuwe tabel `vehicles` (merk/model, bouwjaar, kenteken, km-stand) + onderhoudssjablonen in `lib/vehicleCare.js` (APK, grote/kleine beurt, olie, banden zomer/winter, distributieriem) → voor-aangevinkte checklist die terugkerende `tasks` (category `voertuig` + `vehicle_id`) aanmaakt. Plannen op **datum** én **km-stand**. `app/(tabs)/voertuigen.js` + `app/vehicle/*`. Migratie nodig. |
+| VTG-2 | Voertuigen | Onderhoud plannen: kosten & historie | 2 | Should | M | ⏳ | VTG-1, KOS-1 | **Idee (gebruikerswens):** per onderhoudsbeurt een **verwachte** en **werkelijke** prijs → jaarbegroting per auto. Gerealiseerde kosten koppelen aan **WieBetaaltWat** (KOS-1) zodat ze meelopen in de saldo's. Onderhoudshistorie als tijdlijn (datum, km-stand, kosten, notitie) via een `vehicle_log` naar `pet_log`-patroon. |
+| VTG-3 | Voertuigen | Kenteken → auto-type via RDW | 2 | Should | S | ⏳ | VTG-1 | **Idee (gebruikerswens):** bij een auto alleen het **kenteken** invoeren; de app haalt merk, handelsbenaming/model en voertuigsoort op via de **RDW open data** (dataset *Gekentekende voertuigen*, `opendata.rdw.nl`, geen auth) en vult het auto-type automatisch in. Lookup in `lib/rdw.js` (kenteken normaliseren + resultaat cachen op `vehicles`); handmatig overschrijven blijft mogelijk. **Niet-blokkerend** (debounced + timeout); offline/onbekend kenteken → stille fallback naar handmatige invoer. Web/native `fetch`; geen migratie naast VTG-1. |
+| VTG-4 | Voertuigen | Voertuig delen via de Samen/Delen-module (auto = default) | 2 | Should | M | ⏳ | VTG-1, AUT-1 | **Idee (gebruikerswens):** een aangemaakt voertuig tegelijk een **gedeelde resource** maken in de bestaande Delen-module (`shared_resources` kind `auto` + `reservations` + kosten-naar-gebruik, AUT-1/2). Voor **auto's default aan**: bij aanmaken meteen een gekoppelde `shared_resources`-rij. Koppeling via `resource_id` op `vehicles` zodat onderhoud én reserveren/bekostigen op hetzelfde voertuig hangen. **Robuust:** idempotente/transactionele koppeling (geen dubbele resources), erft zichtbaarheid/RLS van het voertuig, waarschuwt bij actieve reserveringen vóór verwijderen. Migratie nodig. |
 | AAN-1 | Grote aankopen | Aankoop-dossier | 2 | Should | M | ⏳ | FND-1 | Titel, budgetrange, deadline, wie beslist mee. Subgroep-gescoped. |
 | AAN-2 | Grote aankopen | Opties verzamelen | 2 | Should | M | ⏳ | AAN-1 | Kandidaten met prijs/link/foto + voor/tegen per lid. |
 | AAN-3 | Grote aankopen | Vergelijktabel | 2 | Should | M | ⏳ | AAN-2 | Opties naast elkaar op zelfgekozen criteria. |
@@ -299,6 +352,7 @@ Inspanning is een T-shirt-maat (S/M/L).
 | UX-9 | Platform/UX | Eigen lettertype verkennen (weg van het systeemfont/Inter) | 2 | Could | S | ⏳ | UX-1 | **Verkenning:** een eigen, leesbaar **variable font** (Inter bewust niet) — centraal via `expo-font` + `fontFamily` op de `type`-tokens in `lib/theme.js`. Eisen: Latin-Extended (NL-diacrieten), prettige cijfers, OFL. Kandidaten naast elkaar op toestel testen; keuze in `DESIGN.md`. |
 | UX-12 | Platform/UX | Back vanuit een via-"Meer"-geopende tab gaat naar Home i.p.v. Meer | 1.5 | Should | S | 🔧 | UX-2 | **Gebouwd.** `backBehavior="history"` op de Tabs: Android-back keert naar de vórige tab. **Rest:** op Android-toestel (hardware-back + gebaar) + web verifiëren; anders de stack-push-variant (UX-10). |
 | UX-13 | Platform/UX | Flexibele avatars: foto-upload + zelf-gebouwde avatar (personen én huishouden) | 2 | Should | M | ⏳ | UX-1, STR-4 | **Idee (gebruikerswens):** avatar van enkel emoji → keuze **emoji/foto/zelfgebouwde avatar**, voor leden én huishouden. Generieke descriptor (`kind: emoji\|photo\|builder`), nieuwe `avatars`-bucket + RLS, `Avatar`-component als switch. Builder via lokaal-gevendorde of zelf-getekende SVG (`react-native-svg`/`lib/illustrations.js`), geen runtime-dependency. Migratie nodig. |
+| UX-14 | Platform/UX | Dark-mode: donkere titels & pill-teksten leesbaar maken | 1.5 | Should | S | ⏳ | — | **Bug (gebruikerswens):** in donker thema blijven diverse **titels** en **teksten in pills/chips/badges** donker → te laag contrast. Oorzaak = hardcoded hex of fg-kleuren die niet op rendertijd uit de dark-tokens komen (`darkColors` in `lib/theme.js`); ook `*Soft`-tint-bg's (Badge) tegen een donkere fg nalopen. **Aanpak:** audit alle pill-achtige componenten (`Chip`/`Badge` in `lib/ui.js` + categorie-/status-labels) en sectie-titels op tokengebruik (`colors.ink`/`inkSoft`), verwijder vaste kleuren, check AA-contrast. Sluit aan op `DESIGN.md` en de toegankelijkheids-audit (PLT-5). Borg met een token-/contrast-check tegen regressie. |
 
 ---
 
