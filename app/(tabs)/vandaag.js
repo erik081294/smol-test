@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSharedValue } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { parseISO, isToday } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,7 +12,7 @@ import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
 import { dayProgress } from '../../lib/widgets/summaries';
-import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
   deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
@@ -59,6 +60,7 @@ export default function Home() {
   const dialog = useDialog();
   const toast = useToast();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const { overdue, today } = useMemo(() => {
     const open = tasks.filter((tk) => !tk.completed_at);
@@ -122,6 +124,41 @@ export default function Home() {
   }, []);
   const changeStyle = (s) => { setWidgetStyle(s); AsyncStorage.setItem(STYLE_KEY, s).catch(() => {}); };
 
+  // Auto-scroll tijdens het slepen van een widget (UX): houd je een tegel tegen de
+  // boven-/onderrand, dan scrollt de pagina mee zodat je 'm voorbij de huidige view kunt
+  // plaatsen. scrollY (JS, scroll-doel) + scrollSV (worklet, voor de tegel-compensatie in
+  // WidgetGrid). De edge-loop draait alleen zolang de vinger in de rand-zone is.
+  const scrollRef = useRef(null);
+  const scrollY = useRef(0);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const scrollSV = useSharedValue(0);
+  const edgeDir = useRef(0);
+  const edgeTimer = useRef(null);
+
+  const stopEdgeScroll = useCallback(() => {
+    edgeDir.current = 0;
+    if (edgeTimer.current) { clearInterval(edgeTimer.current); edgeTimer.current = null; }
+  }, []);
+  const onEdgeScroll = useCallback((absoluteY) => {
+    const vh = viewportH.current || 0;
+    const ZONE = 110;            // rand-zone (incl. ~tabbar/sticky-balk onderaan)
+    let dir = 0;
+    if (absoluteY < insets.top + ZONE) dir = -1;
+    else if (absoluteY > insets.top + vh - ZONE) dir = 1;
+    edgeDir.current = dir;
+    if (dir && !edgeTimer.current) {
+      edgeTimer.current = setInterval(() => {
+        if (!edgeDir.current) return;
+        const max = Math.max(0, contentH.current - (viewportH.current || 0));
+        const next = Math.min(max, Math.max(0, scrollY.current + edgeDir.current * 24));
+        if (next !== scrollY.current) { scrollY.current = next; scrollRef.current?.scrollTo({ y: next, animated: false }); }
+      }, 16);
+    }
+    if (!dir) stopEdgeScroll();
+  }, [insets.top, stopEdgeScroll]);
+  useEffect(() => stopEdgeScroll, [stopEdgeScroll]);
+
   // Layout-mutaties (puur + gesynct). animateNextLayout is no-op bij reduced motion.
   const applyLayout = (next) => { animateNextLayout(); save(next); };
   const onMove = (key, delta) => {
@@ -176,7 +213,12 @@ export default function Home() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: 100 }}
+        ref={scrollRef}
+        scrollEventThrottle={16}
+        onScroll={(e) => { const y = e.nativeEvent.contentOffset.y; scrollY.current = y; scrollSV.value = y; }}
+        onContentSizeChange={(_, h) => { contentH.current = h; }}
+        onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; }}
+        contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: editing ? 132 : 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
       >
         {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag).
@@ -259,46 +301,53 @@ export default function Home() {
             gap={GRID_GAP}
             tileH={TILE_H}
             controlH={CONTROL_H}
-            onReorder={(next) => save(next)}
+            scrollSV={scrollSV}
+            onEdgeScroll={onEdgeScroll}
+            onEdgeScrollEnd={stopEdgeScroll}
+            // Slepen schakelt automatisch bewerkmodus in (UX) — daarna sluit je af via de
+            // sticky "Klaar"-balk. Stop ook de auto-scroll-lus zodra je loslaat.
+            onReorder={(next) => { save(next); stopEdgeScroll(); setEditing(true); }}
             renderControls={renderControls}
           />
         ) : null}
 
-        {/* Grid-kop + bewerk-toggle — bewust ónder de tegels (UX-26): je stelt eerst
-            de grid samen en vindt de "Aanpassen"-knop waar je 'm verwacht, eronder. */}
-        <Row justify="space-between" align="center" style={{ marginTop: space.xs, marginBottom: space.sm }}>
-          <Text style={type.label}>{t('home.widgets.title')}</Text>
-          {/* In bewerkmodus is "Klaar" een gevulde groene pil i.p.v. een fluisterstil
-              tekstlinkje (UX, batch 2): de afsluit-actie moet er duidelijk uitspringen.
-              Buiten bewerkmodus blijft "Aanpassen" een rustige ingang. */}
-          {editing ? (
-            <Pressable onPress={() => setEditing(false)} hitSlop={8} accessibilityRole="button"
-              accessibilityLabel={t('widget.edit.done')}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: 4,
-                paddingHorizontal: space.md, height: 36, borderRadius: radius.pill,
-                backgroundColor: colors.forest,
-                opacity: pressed ? 0.85 : 1,
-              })}>
-              <Icon name="check" size={16} color={colors.onDark} weight="bold" />
-              <Text style={[type.button, { color: colors.onDark }]}>{t('widget.edit.done')}</Text>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => setEditing(true)} hitSlop={8} accessibilityRole="button"
-              accessibilityLabel={t('widget.edit')}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
-              <Icon name="appearance" size={16} color={colors.forest} />
-              <Text style={[type.label, { color: colors.forest }]}>{t('widget.edit')}</Text>
-            </Pressable>
-          )}
-        </Row>
-
-        {/* In bewerkmodus: stijl-keuze + drag-hint + "widget toevoegen", gegroepeerd
-            onder de toggle. Buiten bewerkmodus: één rustige ingang naar alle modules. */}
+        {/* In bewerkmodus tonen we ónder de tegels enkel "widget toevoegen" — stijl en
+            "Klaar" wonen in de sticky balk onderin. Buiten bewerkmodus: de rustige ingang
+            naar alle modules, met de "Aanpassen"-link gecentreerd onderaan de pagina. */}
         {editing ? (
+          <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginTop: space.sm }} />
+        ) : (
           <>
+            <ItemRow
+              leading={<Icon name="more" size={24} color={colors.forest} />}
+              title={t('home.allModules')}
+              chevron
+              onPress={() => router.push('/(tabs)/meer')}
+            />
+            <Pressable onPress={() => setEditing(true)} hitSlop={10} accessibilityRole="button"
+              accessibilityLabel={t('widget.edit')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+                alignSelf: 'center', marginTop: space.lg, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1,
+              })}>
+              <Icon name="appearance" size={16} color={colors.inkSoft} />
+              <Text style={[type.label, { color: colors.inkSoft }]}>{t('widget.edit')}</Text>
+            </Pressable>
+          </>
+        )}
+      </ScrollView>
+
+      {/* Sticky bewerk-balk: in bewerkmodus altijd in beeld — stijl-keuze + de
+          onmiskenbare "Klaar"-afsluitknop, ook na het scrollen langs de tegels. */}
+      {editing ? (
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          flexDirection: 'row', alignItems: 'center', gap: space.sm,
+          paddingHorizontal: SCREEN_PAD, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm,
+          backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line,
+        }}>
+          <View style={{ flex: 1 }}>
             <SegmentedControl
-              style={{ marginBottom: space.sm }}
               value={widgetStyle}
               onChange={changeStyle}
               options={[
@@ -306,26 +355,14 @@ export default function Home() {
                 { value: 'neutral', label: t('widget.style.neutral') },
               ]}
             />
-            <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
-            <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.sm }} />
-            {/* Onmiskenbare afsluit-actie onderaan, óók bereikbaar na het scrollen langs
-                de tegels (UX, batch 2): de gevulde primaire knop "Klaar". */}
-            <Button title={t('widget.edit.done')} icon="check" onPress={() => setEditing(false)} style={{ marginBottom: space.lg }} />
-          </>
-        ) : (
-          <ItemRow
-            leading={<Icon name="more" size={24} color={colors.forest} />}
-            title={t('home.allModules')}
-            chevron
-            onPress={() => router.push('/(tabs)/meer')}
-          />
-        )}
-      </ScrollView>
-
-      {/* Snel een taak toevoegen — verborgen in bewerkmodus. */}
-      {!editing ? (
+          </View>
+          <Button title={t('widget.edit.done')} icon="check" fullWidth={false}
+            onPress={() => setEditing(false)} />
+        </View>
+      ) : (
+        /* Snel een taak toevoegen — verborgen in bewerkmodus. */
         <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
-      ) : null}
+      )}
     </SafeAreaView>
   );
 }
