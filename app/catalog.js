@@ -1,100 +1,124 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, ScrollView, Pressable, Linking } from 'react-native';
-import { useDialog } from "../lib/dialog";
+import React, { useMemo, useState } from 'react';
+import { View, Text, SectionList, TextInput, Pressable, Platform, ScrollView } from 'react-native';
+import { useDialog } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useCatalogCategories, useCatalogSearch } from '../lib/useCatalog';
 import { useGroceries } from '../lib/useGroceries';
 import { useToast } from '../lib/toast';
 import { backLabelFor } from '../lib/navMeta';
-import { ModalHeader, ItemRow, Empty, ListSkeleton, Chip } from '../lib/ui';
+import { CATEGORIES, catalogByCategory, searchCatalog } from '../lib/groceryCatalog';
+import { normalize } from '../lib/productMatch';
+import { ProductImageView } from '../lib/ProductImageView';
+import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
 import { Icon } from '../lib/icons';
 import { colors, space, radius, type, touchTarget, screenPadding } from '../lib/theme';
 import { t } from '../lib/i18n';
 
-// Bladeren/zoeken in de globale Open Food Facts-catalogus (NL) om de
-// boodschappenlijst te vullen. Tik een product → het komt op de lijst, gekoppeld
-// aan het catalogusproduct (catalog_product_id).
+// Bladeren/zoeken in de gebundelde, merkloze catalogus (lib/groceryCatalog) — Picnic-stijl:
+// schappen (categorieën) + zoekbalk + beeld + aantallen. Tik een product → het komt op de
+// gedeelde boodschappenlijst. Staat het er niet bij? Voeg het eenmalig toe via de zoekterm.
 export default function Catalog() {
   const dialog = useDialog();
   const router = useRouter();
   const toast = useToast();
-  const { add } = useGroceries();
-  const { categories } = useCatalogCategories();
+  const { items, add } = useGroceries();
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState(null); // null = nog niets gekozen
-  const { items, loading, loadingMore, hasMore, loadMore, active } = useCatalogSearch({ query, category });
+  const [category, setCategory] = useState(null); // null = alle schappen
+  const [qtyByKey, setQtyByKey] = useState({});
 
-  const onAdd = (item) => {
-    add(item.name, null, item.id)
-      .then(() => toast.show({ message: t('catalog.added', { name: item.name }) }))
+  const q = query.trim();
+  const qtyOf = (key) => qtyByKey[key] ?? 1;
+
+  // Wat staat al (open) op de lijst — op genormaliseerde naam, zodat "✓ op je lijst" klopt.
+  const onListSet = useMemo(
+    () => new Set(items.filter((i) => !i.checked).map((i) => normalize(i.name))),
+    [items],
+  );
+
+  // Secties: zoeken → één resultatenlijst; één schap gekozen → dat schap; anders alle schappen.
+  const sections = useMemo(() => {
+    if (q) {
+      const results = searchCatalog(q);
+      return results.length ? [{ key: 'results', title: null, data: results }] : [];
+    }
+    const shelves = catalogByCategory();
+    const picked = category ? shelves.filter((g) => g.key === category) : shelves;
+    return picked.map((g) => ({ key: g.key, title: `${g.emoji}  ${g.label}`, data: g.items }));
+  }, [q, category]);
+
+  const addItem = (item) => {
+    const n = qtyOf(item.key);
+    const quantity = n > 1 ? `${n} ${item.unit}` : null;
+    add(item.name, null, null, quantity)
+      .then(() => {
+        toast.show({ message: t('catalog.added', { name: item.name }) });
+        setQtyByKey((m) => { const c = { ...m }; delete c[item.key]; return c; });
+      })
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
-  const renderItem = ({ item }) => (
-    <ItemRow
-      leading={
-        item.image_url ? (
-          <Image
-            source={{ uri: item.image_url }}
-            style={{ width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt }}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
+  const addCustom = () => {
+    const name = q;
+    if (!name) return;
+    add(name)
+      .then(() => { toast.show({ message: t('catalog.added', { name }) }); setQuery(''); })
+      .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
+  };
+
+  const renderItem = ({ item }) => {
+    const on = onListSet.has(normalize(item.name));
+    return (
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
+        borderBottomWidth: 1, borderBottomColor: colors.line,
+      }}>
+        <ProductImageView item={item} size={40} />
+        <View style={{ flex: 1 }}>
+          <Text style={type.body} numberOfLines={1}>{item.name}</Text>
+          {item.unit ? <Text style={type.caption}>{item.unit}</Text> : null}
+        </View>
+        {on ? (
+          <Row gap={4} align="center">
+            <Icon name="check" size={16} color={colors.forest} weight="bold" />
+            <Text style={[type.caption, { color: colors.forest }]}>{t('catalog.onlist')}</Text>
+          </Row>
         ) : (
-          <View style={{ width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="catalog" size={20} color={colors.inkFaint} />
-          </View>
-        )
-      }
-      title={item.name}
-      meta={
-        (item.brands || item.quantity) ? (
-          <Text style={type.caption} numberOfLines={1}>
-            {[item.brands, item.quantity].filter(Boolean).join(' · ')}
-          </Text>
-        ) : undefined
-      }
-      onPress={() => onAdd(item)}
-      accessibilityLabel={t('catalog.add', { name: item.name })}
-      trailing={
-        <Pressable
-          onPress={() => onAdd(item)}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('catalog.add', { name: item.name })}
-          style={({ pressed }) => ({
-            width: 32, height: 32, borderRadius: 16,
-            backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
-            alignItems: 'center', justifyContent: 'center',
-          })}
-        >
-          <Icon name="add" size={18} color={colors.forest} weight="bold" />
-        </Pressable>
-      }
-    />
-  );
+          <Row gap={space.sm} align="center">
+            <Stepper value={qtyOf(item.key)} onChange={(v) => setQtyByKey((m) => ({ ...m, [item.key]: v }))}
+              min={1} max={99} accessibilityLabel={t('catalog.qty')} />
+            <Pressable onPress={() => addItem(item)} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('catalog.add', { name: item.name })}
+              style={({ pressed }) => ({
+                width: 36, height: 36, borderRadius: 18,
+                backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
+                alignItems: 'center', justifyContent: 'center',
+              })}>
+              <Icon name="add" size={18} color={colors.forest} weight="bold" />
+            </Pressable>
+          </Row>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      {/* ModalHeader pad zichzelf (space.lg) — niet in de screenPadding-wrapper zetten. */}
       <ModalHeader title={t('catalog.title')} onClose={() => router.back()} backLabel={backLabelFor('catalog')} />
+
+      {/* Zoekbalk */}
       <View style={{ paddingHorizontal: screenPadding }}>
-        {/* Zoekbalk */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
+          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
+        }}>
           <Icon name="search" size={20} color={colors.inkFaint} />
           <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('catalog.search')}
-            placeholderTextColor={colors.inkFaint}
-            autoCorrect={false}
-            returnKeyType="search"
-            accessibilityLabel={t('catalog.search')}
+            value={query} onChangeText={setQuery}
+            placeholder={t('catalog.search')} placeholderTextColor={colors.inkFaint}
+            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('catalog.search')}
             style={{
               flex: 1, minHeight: touchTarget, marginLeft: space.sm,
-              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm,
-              fontSize: 16, color: colors.ink,
+              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
             }}
           />
           {query.length > 0 ? (
@@ -105,57 +129,54 @@ export default function Catalog() {
         </View>
       </View>
 
-      {/* Categorie-schappen (horizontaal). 'Alles' = filter uit. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.sm }}
-        style={{ flexGrow: 0 }}
-      >
-        <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
-        {categories.map((c) => (
-          <Chip
-            key={c.key}
-            label={`${c.emoji ? c.emoji + ' ' : ''}${c.label}`}
-            active={category === c.key}
-            onPress={() => setCategory((cur) => (cur === c.key ? null : c.key))}
-          />
-        ))}
-      </ScrollView>
+      {/* Schap-filter (alleen relevant als je niet zoekt) */}
+      {!q ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.sm }} style={{ flexGrow: 0 }}>
+          <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
+          {CATEGORIES.map((c) => (
+            <Chip key={c.key} label={`${c.emoji} ${c.label}`} active={category === c.key}
+              onPress={() => setCategory((cur) => (cur === c.key ? null : c.key))} />
+          ))}
+        </ScrollView>
+      ) : null}
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.xxl }}
-        renderItem={renderItem}
         keyboardShouldPersistTaps="handled"
-        onEndReached={() => { if (hasMore) loadMore(); }}
-        onEndReachedThreshold={0.5}
+        stickySectionHeadersEnabled={false}
+        renderItem={renderItem}
+        renderSectionHeader={({ section }) => (
+          section.title ? (
+            <Text style={[type.label, { marginTop: space.md, marginBottom: space.xs, color: colors.inkSoft }]}>
+              {section.title}
+            </Text>
+          ) : null
+        )}
         ListEmptyComponent={
-          loading ? (
-            <ListSkeleton count={6} />
-          ) : !active ? (
-            <Empty illustration="groceries" title={t('catalog.start.title')} subtitle={t('catalog.start.subtitle')} />
-          ) : (
+          !q ? null : (
             <Empty illustration="groceries" title={t('catalog.empty.title')} subtitle={t('catalog.empty.subtitle')} />
           )
         }
         ListFooterComponent={
-          <View style={{ paddingVertical: space.lg, alignItems: 'center', gap: space.sm }}>
-            {loadingMore ? <ActivityIndicator color={colors.forest} /> : null}
-            {items.length > 0 ? (
-              <Pressable
-                onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
-                accessibilityRole="link"
-                accessibilityLabel={t('catalog.attribution')}
-                hitSlop={8}
-              >
-                <Text style={[type.caption, { textAlign: 'center', textDecorationLine: 'underline', color: colors.forest }]}>
-                  {t('catalog.attribution')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+          // Staat het er niet (precies) bij? Voeg de zoekterm eenmalig toe.
+          q ? (
+            <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md,
+                paddingVertical: space.md, paddingHorizontal: space.md, borderRadius: radius.md,
+                borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
+                backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
+              })}>
+              <Icon name="add" size={18} color={colors.forest} weight="bold" />
+              <View style={{ flex: 1 }}>
+                <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+                <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
+              </View>
+            </Pressable>
+          ) : null
         }
       />
     </SafeAreaView>
