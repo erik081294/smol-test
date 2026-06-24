@@ -251,6 +251,65 @@ op kop/tussenruimte (let op: via adb vereist een Pan een tráge drag ≥1000ms �
   van een bestaande taak (geen skeleton); **Schoonmaak** rauwe `Modal` + geen swipe (eigen
   teardown). Deze stonden al als "open" genoteerd onder UXR-2.
 
+## Build-notitie — UXR-2 batch 2 (gebruikersfeedback 2026-06-24)
+
+Tweede ronde verfijningen op dezelfde branch/PR (#41). `npm test` **512 groen**, `expo lint`
+0 errors, mutatie-ratchet **groen** (agenda 91.3 %, recurrence 92.8 %, widgets 79.8 %, i18n/
+modules/constants ongemoeid — geen daling; `advanceRecurrence` + `forMe`/audience + details-
+toggle gedekt).
+
+Gebouwd (11 punten):
+1. **Vandaag — hele groene hero-kaart klikbaar** i.p.v. alleen de ring (één knop, samengestelde a11y).
+2. **Vandaag — focus-taken weg-swipen:** rechts = afvinken (groen, omkeerbaar, geen undo-toast),
+   links = uitstellen (oker, +1 dag, met undo). Verwijderen hoort hier bewust níet.
+3. **Vandaag — "Klaar" prominent in bewerkmodus:** gevulde groene pil in de kop + primaire knop
+   onderaan de bewerkgroep (was een fluisterstil tekstlinkje).
+4. **Widgets instelbaar:** breedte (1/2 kolommen) + **details-toggle** per tegel; een brede tegel
+   toont nu **side-by-side** (stat-blok links, preview rechts). Pure `toggleWidgetDetails`/
+   `widgetShowsDetails` in `grid.js`; placement-veld `details` (default aan = backward compat).
+5. **Afspraken — subtiel delen:** `VisibilityPicker` in collapsible-modus ("Voor wie? — Hele
+   huishouden", vouwt pas op tik open). **Taken — "Voor mij"-filter:** pure `forMe` (toegewezen/
+   gemaakt/gedeeld) + `audience`-as in `applyTaskFilters`; losse huishoud-taken vallen weg, met
+   jou gedeelde afspraken blijven zichtbaar.
+6. **Drawers — grijp-handvat + omlaag-swipen om te sluiten** op de gedeelde `BottomSheet` (raakt
+   álle sheets); `GestureHandlerRootView` in de `Modal`, Pan op een ruime (~44dp) handvat-zone
+   zodat scrollende inhoud los blijft scrollen. Overlay-tik + kruisje blijven als sluit-routes.
+7. **Taken — content schuift mee** tussen periodes (translateX volgt de vinger, nieuwe periode
+   schuift van de overkant in; respecteert "verminder beweging"). **Volledige datumbox klikbaar**
+   (alle scopes, óók Jaar) + **jaar-kiezer** toegevoegd aan `PeriodPicker`.
+8. **Herhaal-einde** (subtiel, zoals "Beschrijving toevoegen"): stopdatum óf na X keer. Pure
+   `advanceRecurrence` beslist doorrollen vs. stoppen; `completeTask` telt `recur_count` af.
+   Migratie **`0040_recur_end.sql`** (`tasks.recur_until` + `recur_count`, beide nullable) is
+   **op de live DB toegepast** via MCP (na expliciete toestemming Erik).
+9. **Kalender van maand naar maand swipen** (`PeriodPicker`): horizontaal vegen bladert dag/
+   week-grid maand-naar-maand, maand-grid jaar-naar-jaar, jaar-grid per pagina; content schuift
+   mee. De ‹ › knoppen blijven als betrouwbare bediening.
+10. **Hele drawer naar beneden swipen om te sluiten** (niet enkel het handvat), mét **scroll-
+    voorrang.** De dismiss-Pan loopt **simultaan** met de scroll (scroll wordt nooit geblokkeerd)
+    en sluit alleen wanneer de lijst bovenaan staat (`scrollY ≤ 0`). Nieuwe `SheetScrollView`
+    deelt de scrollpositie; de verticaal-scrollende sheets (Taken-filter, maaltijden, plant-/
+    huisdier-detail) zijn erop omgezet.
+11. **Breedte-knop met richtinggevoelig icoon**: een smalle tegel toont "verbreden", een brede
+    "versmallen" — duidelijker dan één ⟳-icoon.
+
+**Verificatie 2026-06-24.** Op het tóestel (moto g72) geverifieerd: hele hero-kaart als één knop
+(gecombineerde a11y), "Voor mij"-chip, volledige klikbare datumbox. Op de **emulator** (toestel
+was in gebruik): app boot + Vandaag/Taken renderen, **brede Agenda-widget toont side-by-side**,
+afspraken-editor met **subtiele "Voor wie?"-rij**, **herhaal-einde** ("Op datum"-pill + "Na aantal
+keer"-stepper, ook in de niet-bewaard-guard), Filter-sheet mét **grijp-handvat**.
+Daarna óók geverifieerd op de emulator: **widget-bewerkmodus** — gevulde "Klaar"-pil in de kop +
+prominente "Klaar"-knop onderaan (#2), en de control-balk met de **details-toggle alléén op brede
+tegels** + het richtinggevoelige breedte-icoon (#3/#11); de **side-by-side**-preview op de
+Activiteit-widget; de **koud-laad-skeleton + "Even laden…"** op Vandaag.
+
+**Niet via adb verifieerbaar:** álle RNGH-Pan-gebaren (periode-content-slide #7, drawer-swipe-omlaag
+#10, kalender-maand-swipe #9) — `adb input swipe` dríjft op deze emulator géén RNGH-Pan aan (ook de
+in batch 1 op het toestel bewezen periode-swipe reageert niet via adb-emulator; dat isoleert het als
+emulator/adb-beperking, geen code-bug). Alles degradeert veilig: drawers blijven sluitbaar via
+overlay-tik/kruisje, de kalender via de ‹ › knoppen, en de scroll-Pan loopt simultaan met scrollen
+(scroll kan niet geblokkeerd worden). **Op een echt toestel te bevestigen:** drawer-swipe-omlaag
+(incl. scroll-voorrang), kalender-maand-swipe en de periode-content-slide.
+
 ## Acceptatie
 
 - Elke aangepakte module heeft een nette **loading-, lege- en foutstaat**.

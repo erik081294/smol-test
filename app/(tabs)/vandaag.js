@@ -155,8 +155,12 @@ export default function Home() {
       }}>
         <EditBtn icon="back" label={t('widget.move.back')} tint={colors.forest} onPress={() => onMove(key, -1)} />
         <EditBtn icon="forward" label={t('widget.move.forward')} tint={colors.forest} onPress={() => onMove(key, 1)} />
+        {/* Breedte-knop met een richtinggevoelig icoon (UX, batch 2): een smalle tegel
+            toont "verbreden", een brede tegel "versmallen" — duidelijker dan één ⟳. */}
         {descriptor?.sizes.length > 1 ? (
-          <EditBtn icon="repeat" label={t('widget.width')} tint={colors.inkSoft} onPress={() => onResize(key)} />
+          <EditBtn icon={wide ? 'narrow' : 'widen'}
+            label={wide ? t('widget.width.narrow') : t('widget.width.widen')}
+            tint={colors.inkSoft} onPress={() => onResize(key)} />
         ) : null}
         {/* Details aan/uit — alleen zinvol op een brede tegel (UX, batch 2): de smalle
             1×1-tegel heeft geen ruimte voor een preview, dus dan tonen we 'm niet. */}

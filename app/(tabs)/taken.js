@@ -14,7 +14,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { PeriodPicker } from '../../lib/PeriodPicker';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner,
+  BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner, SheetScrollView,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
@@ -427,7 +427,7 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <ModalHeader title={t('tasks.filter.title')} onClose={onClose} />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+      <SheetScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
         {/* Categorie (multi) */}
         <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.category')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
@@ -489,7 +489,7 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
             <Button title={t('tasks.filter.apply')} onPress={onClose} />
           </View>
         </Row>
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   );
 }

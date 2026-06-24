@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,7 +12,7 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
-  Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow,
+  Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
 } from '../../lib/ui';
 import { colors, space, type } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
@@ -209,7 +209,7 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
         title={date ? format(parseISO(date), 'EEEE d MMM', { locale: nl }) : ''}
         onClose={onClose} onConfirm={save} busy={busy}
         confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+      <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
             <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
               {MEAL_TYPES.map((m) => (
                 <Chip key={m} label={t('mealtype.' + m)} active={mealType === m} onPress={() => setMealType(m)} />
@@ -235,7 +235,7 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
             <Stepper value={servings} onChange={setServings} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
             {chosen ? <Text style={[type.caption, { marginTop: space.sm }]}>{chosen.title}</Text> : null}
             <View style={{ height: space.xl }} />
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   );
 }
@@ -258,7 +258,7 @@ function ShoppingListModal({ items, onClose, onConfirm }) {
           <Empty illustration="groceries" title={t('meals.list.none')} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg }} style={{ maxHeight: 360 }}>
+        <SheetScrollView contentContainerStyle={{ paddingHorizontal: space.lg }} style={{ maxHeight: 360 }}>
           {rows.map((r) => (
             <ItemRow
               key={r.key}
@@ -269,7 +269,7 @@ function ShoppingListModal({ items, onClose, onConfirm }) {
               onPress={() => toggle(r.key)}
             />
           ))}
-        </ScrollView>
+        </SheetScrollView>
       )}
       <View style={{ padding: space.lg }}>
         <Button title={t('meals.list.add')} icon="shopping" variant="accent"
