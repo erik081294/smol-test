@@ -257,6 +257,13 @@ test('mealPlanSummary: vanavond + lege (komende) dagen deze week', () => {
   assert.equal(s.tonight.recipe.title, 'Pasta');
   assert.deepEqual(s.emptyDays, ['2026-06-23', '2026-06-25', '2026-06-26', '2026-06-27', '2026-06-28']);
   assert.equal(s.emptyCount, 5);
+  // 7-dagen-strip: ma 22 (vandaag, gepland) … di 23 leeg, wo 24 gepland, rest leeg
+  assert.equal(s.week.length, 7);
+  assert.equal(s.week[0].date, '2026-06-22');
+  assert.equal(s.week[0].today, true);
+  assert.equal(s.week[0].planned, true);
+  assert.equal(s.week[1].planned, false); // 23 leeg
+  assert.equal(s.week[2].planned, true);  // 24 gepland
 });
 
 test('mealPlanSummary: niets gepland → tonight null, hele week leeg vanaf vandaag', () => {

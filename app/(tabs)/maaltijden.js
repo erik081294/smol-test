@@ -1,40 +1,48 @@
+/* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Image, Pressable, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO, addDays, isToday } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useMealPlan } from '../../lib/useMealPlan';
-import { useRecipes } from '../../lib/useRecipes';
+import { useRecipes, useRecipePhotoUrl } from '../../lib/useRecipes';
 import { usePantry } from '../../lib/usePantry';
 import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
   Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
+  SegmentedControl,
 } from '../../lib/ui';
-import { colors, space, type } from '../../lib/theme';
-import { animateNextLayout } from '../../lib/motion';
+import { Icon } from '../../lib/icons';
+import { colors, space, type, radius } from '../../lib/theme';
+import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
 import { normalize } from '../../lib/productMatch';
-import { EtenNav } from '../../lib/EtenNav';
-import { t } from '../../lib/i18n';
+import { t, plural } from '../../lib/i18n';
 
-export default function Maaltijden() {
+// "Keuken" — de eigen omgeving voor het weekmenu (plannen) én het beheren van recepten.
+// Eén scherm met een Weekmenu/Recepten-toggle; Boodschappen staat los (de "uit recept →
+// lijst"-flow blijft hier). Door de weken bladeren kan met de ‹ › knoppen óf zijwaarts vegen.
+export default function Keuken() {
   const dialog = useDialog();
   const router = useRouter();
+  const [view, setView] = useState('weekmenu'); // 'weekmenu' | 'recepten'
   const [weekStart, setWeekStart] = useState(new Date());
   const { entries, loading, reload, weekDays, addEntry, removeEntry, buildShoppingList, commitShoppingList } = useMealPlan(weekStart);
-  const { recipes } = useRecipes();
+  const { recipes, loading: recipesLoading, removeRecipe } = useRecipes();
   const { items: pantryItems } = usePantry();
   const { removeMany: removeGroceries } = useGroceries();
   const toast = useToast();
 
-  const [addFor, setAddFor] = useState(null);    // 'yyyy-MM-dd' waarvoor we toevoegen
-  const [listItems, setListItems] = useState(null); // boodschappenlijst-preview of null
-  const [hiddenIds, setHiddenIds] = useState([]);   // optimistisch verborgen tijdens undo
+  const [addFor, setAddFor] = useState(null);
+  const [listItems, setListItems] = useState(null);
+  const [hiddenIds, setHiddenIds] = useState([]);
 
   const byDay = useMemo(() => {
     const m = {};
@@ -48,7 +56,35 @@ export default function Maaltijden() {
 
   const weekLabel = `${format(parseISO(weekDays[0]), 'd MMM', { locale: nl })} – ${format(parseISO(weekDays[6]), 'd MMM', { locale: nl })}`;
 
-  // Verwijderen mét undo-vangnet (was een directe delete zonder terugdraaien).
+  // Zijwaarts door de weken vegen (zoals Taken): content schuift mee, nieuwe week komt van
+  // de overkant binnen. ‹ › blijven als bediening. activeOffsetX/failOffsetY laten verticaal
+  // scrollen ongemoeid; bij "verminder beweging" springt 'ie direct.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const reduce = prefersReducedMotion();
+  const tx = useSharedValue(0);
+  const listAnim = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
+  const stepWeek = (delta) => setWeekStart((d) => addDays(d, delta * 7));
+  const slideWeek = (delta) => {
+    if (reduce) { stepWeek(delta); return; }
+    const out = delta > 0 ? -SCREEN_W : SCREEN_W;
+    tx.value = withTiming(out, { duration: 150 }, (finished) => {
+      if (!finished) return;
+      runOnJS(stepWeek)(delta);
+      tx.value = -out;
+      tx.value = withTiming(0, { duration: 200 });
+    });
+  };
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-16, 16])
+    .onUpdate((e) => { 'worklet'; if (!reduce) tx.value = e.translationX; })
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX <= -56) runOnJS(slideWeek)(1);
+      else if (e.translationX >= 56) runOnJS(slideWeek)(-1);
+      else tx.value = withSpring(0, { damping: 20, stiffness: 220 });
+    });
+
   const remove = (entry) => {
     animateNextLayout();
     setHiddenIds((h) => [...h, entry.id]);
@@ -67,6 +103,15 @@ export default function Maaltijden() {
   const openShoppingList = async () => {
     const gap = await buildShoppingList(pantryItems);
     setListItems(gap.map((g) => ({ ...g, selected: true })));
+  };
+
+  const onDeleteRecipe = async (recipe) => {
+    const ok = await dialog.confirm({
+      title: t('recipe.delete.title', { name: recipe.title }),
+      body: t('recipe.delete.body'), tone: 'danger', confirmLabel: t('common.delete'),
+    });
+    if (!ok) return;
+    removeRecipe(recipe.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   const renderDay = (date) => {
@@ -107,40 +152,59 @@ export default function Maaltijden() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('meals.title')} subtitle={t('meals.subtitle')}
-        right={<IconButton icon="library" accessibilityLabel={t('meals.recipes')} tint={colors.forest}
-          onPress={() => router.push('/recipe/new')} />} />
+      <ScreenHeader title={t('keuken.title')} subtitle={t('keuken.subtitle')} />
 
-      <EtenNav active="maaltijden" />
+      <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+        <SegmentedControl
+          value={view} onChange={setView}
+          options={[
+            { value: 'weekmenu', label: t('keuken.tab.weekmenu') },
+            { value: 'recepten', label: t('keuken.tab.recepten') },
+          ]} />
+      </View>
 
-      {/* Weeknavigatie */}
-      <Row justify="space-between" style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-        <IconButton icon="back" accessibilityLabel={t('meals.prevWeek')} tint={colors.forest}
-          onPress={() => setWeekStart((d) => addDays(d, -7))} />
-        <Text style={type.title}>{weekLabel}</Text>
-        <IconButton icon="forward" accessibilityLabel={t('meals.nextWeek')} tint={colors.forest}
-          onPress={() => setWeekStart((d) => addDays(d, 7))} />
-      </Row>
+      {view === 'weekmenu' ? (
+        <>
+          {/* Weeknavigatie — ‹ › óf zijwaarts vegen op de lijst eronder. */}
+          <Row justify="space-between" align="center" style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+            <IconButton icon="back" accessibilityLabel={t('meals.prevWeek')} tint={colors.forest} onPress={() => slideWeek(-1)} />
+            <Text style={type.title}>{weekLabel}</Text>
+            <IconButton icon="forward" accessibilityLabel={t('meals.nextWeek')} tint={colors.forest} onPress={() => slideWeek(1)} />
+          </Row>
 
-      <FlatList
-        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
-        data={weekDays}
-        keyExtractor={(d) => d}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        renderItem={({ item }) => renderDay(item)}
-        ListEmptyComponent={loading ? <ListSkeleton count={4} /> : null}
-        ListFooterComponent={
-          <View style={{ marginTop: space.sm }}>
-            {!hasAny && !loading ? (
-              <Empty illustration="meals" title={t('meals.empty.title')} subtitle={t('meals.empty.subtitle')}
-                actionTitle={t('meals.empty.action')} onAction={() => setAddFor(weekDays[0])} />
-            ) : null}
-            {hasAny ? (
-              <Button title={t('meals.fillList')} icon="shopping" variant="accent" onPress={openShoppingList} />
-            ) : null}
-          </View>
-        }
-      />
+          <GestureDetector gesture={swipe}>
+            <Animated.View style={[{ flex: 1 }, listAnim]}>
+              <FlatList
+                contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
+                data={weekDays}
+                keyExtractor={(d) => d}
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
+                renderItem={({ item }) => renderDay(item)}
+                ListEmptyComponent={loading ? <ListSkeleton count={4} /> : null}
+                ListFooterComponent={
+                  <View style={{ marginTop: space.sm }}>
+                    {!hasAny && !loading ? (
+                      <Empty illustration="meals" title={t('meals.empty.title')} subtitle={t('meals.empty.subtitle')}
+                        actionTitle={t('meals.empty.action')} onAction={() => setAddFor(weekDays[0])} />
+                    ) : null}
+                    {hasAny ? (
+                      <Button title={t('meals.fillList')} icon="shopping" variant="accent" onPress={openShoppingList} />
+                    ) : null}
+                  </View>
+                }
+              />
+            </Animated.View>
+          </GestureDetector>
+        </>
+      ) : (
+        <RecipesView
+          recipes={recipes}
+          loading={recipesLoading}
+          onNew={() => router.push('/recipe/new')}
+          onOpen={(r) => router.push(`/recipe/${r.id}`)}
+          onDelete={onDeleteRecipe}
+        />
+      )}
 
       <AddEntryModal
         date={addFor}
@@ -168,6 +232,51 @@ export default function Maaltijden() {
         }}
       />
     </SafeAreaView>
+  );
+}
+
+// Recepten-beheer: bladerbare lijst (met coverfoto), nieuw recept, tik → editor,
+// swipe = verwijderen (met bevestiging in de ouder).
+function RecipesView({ recipes, loading, onNew, onOpen, onDelete }) {
+  return (
+    <FlatList
+      contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
+      data={recipes}
+      keyExtractor={(r) => r.id}
+      ListHeaderComponent={
+        <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
+      }
+      renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
+      ListEmptyComponent={
+        loading ? <ListSkeleton count={4} /> : (
+          <Empty illustration="meals" title={t('recipes.empty.title')} subtitle={t('recipes.empty.subtitle')}
+            actionTitle={t('recipe.new')} onAction={onNew} />
+        )
+      }
+    />
+  );
+}
+
+function RecipeCard({ recipe, onOpen, onDelete }) {
+  const url = useRecipePhotoUrl(recipe.photo_path);
+  return (
+    <SwipeRow left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onDelete(recipe) }}>
+      <Pressable onPress={() => onOpen(recipe)} accessibilityRole="button" accessibilityLabel={recipe.title}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm,
+          opacity: pressed ? 0.7 : 1,
+        })}>
+        <View style={{ width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} accessibilityIgnoresInvertColors />
+            : <Icon name="meals" size={26} color={colors.inkFaint} />}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={type.title} numberOfLines={1}>{recipe.title}</Text>
+          <Text style={type.caption}>{plural(recipe.servings ?? 2, 'recipe.servings.one', 'recipe.servings.other')}</Text>
+        </View>
+        <Icon name="chevron" size={18} color={colors.inkFaint} />
+      </Pressable>
+    </SwipeRow>
   );
 }
 
