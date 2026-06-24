@@ -1,7 +1,7 @@
 // Units voor de pure widget-grid-kern (lib/widgets/*). Geen React/Supabase.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { packGrid, deriveDefaultLayout, moveWidget, addWidget, removeWidget, resizeWidget, spanFor } from '../lib/widgets/grid.js';
+import { packGrid, deriveDefaultLayout, moveWidget, addWidget, removeWidget, resizeWidget, spanFor, widgetShowsDetails, toggleWidgetDetails } from '../lib/widgets/grid.js';
 import { widgetScheme, accentFor } from '../lib/widgets/colorSchemes.js';
 import {
   taskFocusSummary, taskProgressSummary, dayProgress, groceriesSummary, expenseBalanceSummary,
@@ -59,6 +59,25 @@ test('addWidget/removeWidget/resizeWidget', () => {
   assert.equal(l.find((x) => x.key === 'b').size, '1x1');
   l = removeWidget(l, 'a');
   assert.deepEqual(l.map((x) => x.key), ['b']);
+});
+
+test('widgetShowsDetails: default aan; alleen expliciet false zet details uit', () => {
+  assert.equal(widgetShowsDetails({ key: 'a', size: '2x1' }), true);          // undefined → aan
+  assert.equal(widgetShowsDetails({ key: 'a', size: '2x1', details: true }), true);
+  assert.equal(widgetShowsDetails({ key: 'a', size: '2x1', details: false }), false);
+  assert.equal(widgetShowsDetails(undefined), true);                          // null-safe
+});
+
+test('toggleWidgetDetails: schakelt om en raakt alleen de juiste widget', () => {
+  const l = [{ key: 'a', size: '2x1' }, { key: 'b', size: '1x1', details: false }];
+  const t1 = toggleWidgetDetails(l, 'a');                                     // aan → uit
+  assert.equal(t1.find((x) => x.key === 'a').details, false);
+  assert.equal(t1.find((x) => x.key === 'b').details, false);                 // ongemoeid
+  const t2 = toggleWidgetDetails(t1, 'a');                                    // uit → aan
+  assert.equal(t2.find((x) => x.key === 'a').details, true);
+  const t3 = toggleWidgetDetails(l, 'b');                                     // false → true
+  assert.equal(t3.find((x) => x.key === 'b').details, true);
+  assert.deepEqual(toggleWidgetDetails([], 'x'), []);                         // leeg blijft leeg
 });
 
 // --- kleurschema's ---

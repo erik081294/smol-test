@@ -11,15 +11,17 @@ import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
 import { dayProgress } from '../../lib/widgets/summaries';
-import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row, Banner, ListSkeleton } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
   deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
+  toggleWidgetDetails, widgetShowsDetails,
 } from '../../lib/widgets/grid';
 import { WIDGET_BY_KEY, DEFAULTS_BY_MODULE, WIDGETS } from '../../lib/widgets/registry';
 import { WidgetGrid } from '../../lib/widgets/WidgetGrid';
 import { useHomeLayout } from '../../lib/useHomeLayout';
-import { isOverdue } from '../../lib/recurrence';
+import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
+import { useToast } from '../../lib/toast';
 import { animateNextLayout } from '../../lib/motion';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -51,10 +53,11 @@ function EditBtn({ icon, label, tint = colors.ink, onPress }) {
 // afvinkbaar; (2) een modulaire, kleurrijke widget-grid die je zelf samenstelt
 // (toevoegen/herschikken/grootte/stijl), gesynct per gebruiker/huishouden.
 export default function Home() {
-  const { tasks, loading, error, reload, completeTask, uncompleteTask } = useTasks();
+  const { tasks, loading, error, reload, completeTask, uncompleteTask, updateTask } = useTasks();
   const { active, members, modules } = useHousehold();
   const { profile } = useAuth();
   const dialog = useDialog();
+  const toast = useToast();
   const router = useRouter();
 
   const { overdue, today } = useMemo(() => {
@@ -70,7 +73,26 @@ export default function Home() {
   const extraFocus = focus.length - visibleFocus.length;
   const progress = useMemo(() => dayProgress(tasks), [tasks]);
 
-  const toggle = (tk) => (tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk));
+  const toggle = (tk) => {
+    animateNextLayout();
+    return tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
+  };
+
+  // Veeg-acties op de focuslijst (UX, batch 2). Naar rechts = afvinken (de positieve,
+  // omkeerbare actie — net als het vinkje, dus zonder undo-toast); naar links = uitstellen
+  // (een dag vooruit, mét undo-vangnet). Verwijderen hoort hier bewust niet: Vandaag is
+  // een focus-overzicht, niet de plek om taken te wissen (dat kan in Taken).
+  const snoozeFromHome = (task) => {
+    const prev = task.due_date ?? null;
+    const next = snoozeDate(task, 1);
+    animateNextLayout();
+    updateTask(task.id, { due_date: next });
+    toast.show({
+      message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); updateTask(task.id, { due_date: prev }); },
+    });
+  };
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -107,6 +129,7 @@ export default function Home() {
     if (i !== -1) applyLayout(moveWidget(layout, key, i + delta));
   };
   const onResize = (key) => applyLayout(resizeWidget(layout, key, WIDGET_BY_KEY[key]?.sizes ?? ['1x1']));
+  const onToggleDetails = (key) => applyLayout(toggleWidgetDetails(layout, key));
   const onRemove = (key) => applyLayout(removeWidget(layout, key));
   const onAdd = async () => {
     const placed = new Set(layout.map((p) => p.key));
@@ -121,6 +144,9 @@ export default function Home() {
   // grootte en verwijderen — ook bruikbaar met een screenreader.
   const renderControls = (key) => {
     const descriptor = WIDGET_BY_KEY[key];
+    const placement = layout.find((p) => p.key === key);
+    const wide = placement?.size && placement.size !== '1x1';
+    const shows = widgetShowsDetails(placement);
     return (
       <View style={{
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
@@ -130,7 +156,13 @@ export default function Home() {
         <EditBtn icon="back" label={t('widget.move.back')} tint={colors.forest} onPress={() => onMove(key, -1)} />
         <EditBtn icon="forward" label={t('widget.move.forward')} tint={colors.forest} onPress={() => onMove(key, 1)} />
         {descriptor?.sizes.length > 1 ? (
-          <EditBtn icon="repeat" label={t('widget.resize')} tint={colors.inkSoft} onPress={() => onResize(key)} />
+          <EditBtn icon="repeat" label={t('widget.width')} tint={colors.inkSoft} onPress={() => onResize(key)} />
+        ) : null}
+        {/* Details aan/uit — alleen zinvol op een brede tegel (UX, batch 2): de smalle
+            1×1-tegel heeft geen ruimte voor een preview, dus dan tonen we 'm niet. */}
+        {wide ? (
+          <EditBtn icon="catalog" label={shows ? t('widget.details.hide') : t('widget.details.show')}
+            tint={shows ? colors.forest : colors.inkFaint} onPress={() => onToggleDetails(key)} />
         ) : null}
         <EditBtn icon="delete" label={t('widget.remove')} tint={colors.danger} onPress={() => onRemove(key)} />
       </View>
@@ -183,7 +215,13 @@ export default function Home() {
               tint={overdue.length ? colors.danger : colors.forest}
             />
             {visibleFocus.map((tk) => (
-              <TaskRow key={tk.id} task={tk} members={members} onToggle={toggle} />
+              <SwipeRow
+                key={tk.id}
+                right={{ icon: 'check', label: t('tasks.complete'), color: colors.done, onTrigger: () => toggle(tk) }}
+                left={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.ocher, onTrigger: () => snoozeFromHome(tk) }}
+              >
+                <TaskRow task={tk} members={members} onToggle={toggle} />
+              </SwipeRow>
             ))}
             {extraFocus > 0 && (
               <Pressable
@@ -226,12 +264,29 @@ export default function Home() {
             de grid samen en vindt de "Aanpassen"-knop waar je 'm verwacht, eronder. */}
         <Row justify="space-between" align="center" style={{ marginTop: space.xs, marginBottom: space.sm }}>
           <Text style={type.label}>{t('home.widgets.title')}</Text>
-          <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={editing ? t('widget.edit.done') : t('widget.edit')}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
-            <Icon name={editing ? 'check' : 'appearance'} size={16} color={colors.forest} />
-            <Text style={[type.label, { color: colors.forest }]}>{editing ? t('widget.edit.done') : t('widget.edit')}</Text>
-          </Pressable>
+          {/* In bewerkmodus is "Klaar" een gevulde groene pil i.p.v. een fluisterstil
+              tekstlinkje (UX, batch 2): de afsluit-actie moet er duidelijk uitspringen.
+              Buiten bewerkmodus blijft "Aanpassen" een rustige ingang. */}
+          {editing ? (
+            <Pressable onPress={() => setEditing(false)} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('widget.edit.done')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                paddingHorizontal: space.md, height: 36, borderRadius: radius.pill,
+                backgroundColor: colors.forest,
+                opacity: pressed ? 0.85 : 1,
+              })}>
+              <Icon name="check" size={16} color={colors.onDark} weight="bold" />
+              <Text style={[type.button, { color: colors.onDark }]}>{t('widget.edit.done')}</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setEditing(true)} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('widget.edit')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="appearance" size={16} color={colors.forest} />
+              <Text style={[type.label, { color: colors.forest }]}>{t('widget.edit')}</Text>
+            </Pressable>
+          )}
         </Row>
 
         {/* In bewerkmodus: stijl-keuze + drag-hint + "widget toevoegen", gegroepeerd
@@ -248,7 +303,10 @@ export default function Home() {
               ]}
             />
             <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
-            <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.lg }} />
+            <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.sm }} />
+            {/* Onmiskenbare afsluit-actie onderaan, óók bereikbaar na het scrollen langs
+                de tegels (UX, batch 2): de gevulde primaire knop "Klaar". */}
+            <Button title={t('widget.edit.done')} icon="check" onPress={() => setEditing(false)} style={{ marginBottom: space.lg }} />
           </>
         ) : (
           <ItemRow

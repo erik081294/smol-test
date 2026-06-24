@@ -7,7 +7,7 @@ import {
   groupByDay, weekDays, groupByWeek,
   applyTaskFilters, countBy, activeFilterCount,
   isOpen, isDone, inCategory, forAssignee, parseKey,
-  monthKey, monthDays, yearMonths, groupByMonth, taskHref,
+  monthKey, monthDays, yearMonths, groupByMonth, taskHref, forMe,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -295,4 +295,49 @@ test('activeFilterCount: tag-as telt mee', () => {
   assert.equal(activeFilterCount({ tagIds: ['t-school'] }), 1);
   assert.equal(activeFilterCount({ tagIds: ['a', 'b'], status: 'done' }), 2);
   assert.equal(activeFilterCount({ tagIds: [] }), 0);
+});
+
+// === "Voor mij" / audience (UX, batch 2) =================================
+
+const audienceSet = [
+  { id: 'a', assigned_to: 'me', visibility: 'household', completed_at: null },   // aan mij toegewezen
+  { id: 'b', assigned_to: 'other', visibility: 'household', completed_at: null }, // aan een ander
+  { id: 'c', assigned_to: null, visibility: 'household', completed_at: null },    // huishoud, niemand
+  { id: 'd', assigned_to: 'other', created_by: 'me', visibility: 'household', completed_at: null }, // door mij gemaakt
+  { id: 'e', assigned_to: 'other', visibility: 'custom', share_with: ['me'], completed_at: null },  // met mij gedeeld
+  { id: 'f', assigned_to: 'other', visibility: 'custom', share_with: ['x'], completed_at: null },   // met iemand anders
+];
+
+test('forMe: toegewezen aan mij', () => {
+  assert.equal(forMe({ assigned_to: 'me' }, 'me'), true);
+  assert.equal(forMe({ assigned_to: 'other' }, 'me'), false);
+});
+
+test('forMe: door mij gemaakt of expliciet met mij gedeeld telt ook', () => {
+  assert.equal(forMe({ assigned_to: 'other', created_by: 'me' }, 'me'), true);
+  assert.equal(forMe({ visibility: 'custom', share_with: ['me'] }, 'me'), true);
+  assert.equal(forMe({ visibility: 'custom', share_with: ['x'] }, 'me'), false);
+});
+
+test('forMe: losse huishoud-taak valt buiten "voor mij"', () => {
+  assert.equal(forMe({ assigned_to: null, visibility: 'household' }, 'me'), false);
+});
+
+test('forMe: zonder viewer-id niet filteren (alles voor mij)', () => {
+  assert.equal(forMe({ assigned_to: 'other' }, null), true);
+});
+
+test('applyTaskFilters: audience "mine" houdt toegewezen/gemaakt/gedeeld over', () => {
+  const r = applyTaskFilters(audienceSet, { audience: 'mine', viewerId: 'me', status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['a', 'd', 'e']);
+});
+
+test('applyTaskFilters: audience "all" (default) laat alles staan', () => {
+  const r = applyTaskFilters(audienceSet, { viewerId: 'me', status: 'all' });
+  assert.equal(r.length, 6);
+});
+
+test('applyTaskFilters: audience "mine" zonder viewer-id filtert niet', () => {
+  const r = applyTaskFilters(audienceSet, { audience: 'mine', viewerId: null, status: 'all' });
+  assert.equal(r.length, 6);
 });

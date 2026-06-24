@@ -1,12 +1,14 @@
+/* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, SectionList, Pressable } from 'react-native';
+import { View, Text, ScrollView, SectionList, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { format, addDays, addMonths, addYears } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
 import { useTags } from '../../lib/useTags';
+import { useAuth } from '../../lib/auth';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
 import { PeriodPicker } from '../../lib/PeriodPicker';
@@ -16,7 +18,7 @@ import {
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
-import { animateNextLayout } from '../../lib/motion';
+import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
 import { choreToTask } from '../../lib/choreLibrary';
 import {
@@ -29,7 +31,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
 
-const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open' };
+const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open', audience: 'all' };
 
 // Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -50,6 +52,7 @@ export default function Taken() {
   const { tasks, loading, error, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const { tags } = useTags();
+  const { user } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
@@ -71,7 +74,9 @@ export default function Taken() {
     subgroupId: filters.subgroupId,
     tagIds: filters.tagIds,
     status: filters.status,
-  }), [filters]);
+    audience: filters.audience,
+    viewerId: user?.id ?? null,
+  }), [filters, user]);
 
   // Lokaal verborgen taken (optimistisch wissen met undo) wegfilteren vóór de filters.
   const visibleTasks = useMemo(
@@ -197,16 +202,37 @@ export default function Taken() {
       : scope === 'maand' ? cap(monthLabel(cursor.getFullYear(), cursor.getMonth()))
         : String(cursor.getFullYear());
 
-  // Horizontaal vegen → vorige/volgende periode (UX-29). activeOffsetX zorgt dat 'ie
-  // pas bij een duidelijk-horizontale beweging aanslaat en failOffsetY laat verticaal
-  // scrollen ongemoeid — zo wordt de lijst niet wiebelig.
+  // Horizontaal vegen → vorige/volgende periode (UX-29). De content schuift nu mét de
+  // vinger mee en de nieuwe periode komt van de overkant binnen, zodat het echt als
+  // bladeren voelt (UX, batch 2). activeOffsetX laat 'm pas bij een duidelijk-horizontale
+  // beweging aanslaan; failOffsetY laat verticaal scrollen/pull-to-refresh ongemoeid.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const reduce = prefersReducedMotion();
+  const tx = useSharedValue(0);
+  const listAnim = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
+
+  // Wissel de periode mét slide: huidige content schuift weg in de veegrichting, de
+  // nieuwe schuift van de andere kant in. Bij "verminder beweging" springt 'ie direct.
+  const slidePeriod = (delta) => {
+    if (reduce) { stepPeriod(delta); return; }
+    const out = delta > 0 ? -SCREEN_W : SCREEN_W;
+    tx.value = withTiming(out, { duration: 150 }, (finished) => {
+      if (!finished) return;
+      runOnJS(stepPeriod)(delta);
+      tx.value = -out;                              // nieuwe content klaarzetten aan de overkant
+      tx.value = withTiming(0, { duration: 200 });  // …en in laten schuiven
+    });
+  };
+
   const swipe = Gesture.Pan()
     .activeOffsetX([-24, 24])
     .failOffsetY([-16, 16])
+    .onUpdate((e) => { 'worklet'; if (!reduce) tx.value = e.translationX; })
     .onEnd((e) => {
       'worklet';
-      if (e.translationX <= -56) runOnJS(stepPeriod)(1);
-      else if (e.translationX >= 56) runOnJS(stepPeriod)(-1);
+      if (e.translationX <= -56) runOnJS(slidePeriod)(1);
+      else if (e.translationX >= 56) runOnJS(slidePeriod)(-1);
+      else tx.value = withSpring(0, { damping: 20, stiffness: 220 });
     });
 
   // Actieve-filter-chips boven de lijst (elk verwijderbaar).
@@ -254,6 +280,11 @@ export default function Taken() {
           Geldt nu voor élke scope — ook Jaar is een gewone, gefilterde lijst (UX-32). */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, alignItems: 'center' }}>
+        {/* "Voor mij" — snelle toggle vooraan: alleen wat aan jou is toegewezen of met
+            jou gedeeld. Afspraken van anderen die met je gedeeld zijn blijven zichtbaar;
+            losse huishoud-taken vallen weg (UX, batch 2). */}
+        <Chip icon="person" label={t('tasks.audience.mine')} active={filters.audience === 'mine'}
+          onPress={() => setFilters((f) => ({ ...f, audience: f.audience === 'mine' ? 'all' : 'mine' }))} />
         <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button"
           accessibilityLabel={t('tasks.filter.title')}
           style={({ pressed }) => ({
@@ -278,23 +309,24 @@ export default function Taken() {
         ) : null}
       </ScrollView>
 
-      {/* Periode-kop: ‹ label › — het label is tikbaar en opent pas dán de kalender
-          (UX-30); pijlen + horizontaal vegen springen een periode (UX-29). Jaar heeft
-          geen kalenderkiezer (niet nodig), dus daar is het label niet tikbaar. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      {/* Periode-kop: ‹ [ label 📅 ] › — de hele tekstbox is nu het tikdoel en opent
+          de kalenderkiezer (UX, batch 2 — niet alleen het icoontje). Geldt voor élke
+          scope, óók Jaar (een jaar-kiezer). Pijlen + horizontaal vegen bladeren mét
+          slide-animatie (UX-29). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm,
         paddingHorizontal: space.lg, marginBottom: space.sm }}>
-        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.period.prev')} onPress={() => stepPeriod(-1)} />
-        {scope === 'jaar' ? (
-          <Text style={[type.title, { fontWeight: '700' }]}>{periodLabel}</Text>
-        ) : (
-          <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button"
-            accessibilityLabel={periodLabel} accessibilityHint={t('tasks.picker.hint')}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: pressed ? 0.6 : 1 })}>
-            <Text style={[type.title, { fontWeight: '700' }]}>{periodLabel}</Text>
-            <Icon name="agenda" size={15} color={colors.forest} />
-          </Pressable>
-        )}
-        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.period.next')} onPress={() => stepPeriod(1)} />
+        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.period.prev')} onPress={() => slidePeriod(-1)} />
+        <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button"
+          accessibilityLabel={periodLabel} accessibilityHint={t('tasks.picker.hint')}
+          style={({ pressed }) => ({
+            flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+            minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1.5,
+            borderColor: colors.line, backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+          })}>
+          <Text style={[type.title, { fontWeight: '700' }]} numberOfLines={1}>{periodLabel}</Text>
+          <Icon name="agenda" size={16} color={colors.forest} />
+        </Pressable>
+        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.period.next')} onPress={() => slidePeriod(1)} />
       </View>
 
       {error && !loading ? (
@@ -306,8 +338,10 @@ export default function Taken() {
         </Banner>
       ) : null}
 
-      {/* Eén lijst voor élke scope; horizontaal vegen → vorige/volgende periode (UX-29). */}
+      {/* Eén lijst voor élke scope; horizontaal vegen → vorige/volgende periode (UX-29),
+          met de content die mee-/in-schuift (listAnim). */}
       <GestureDetector gesture={swipe}>
+        <Animated.View style={[{ flex: 1 }, listAnim]}>
         <SectionList
           contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: 40, flexGrow: 1 }}
           sections={sections}
@@ -351,6 +385,7 @@ export default function Taken() {
             )
           }
         />
+        </Animated.View>
       </GestureDetector>
 
       <FAB label={t('fab.task')} accessibilityLabel={t('task.add')}

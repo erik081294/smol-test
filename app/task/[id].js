@@ -60,6 +60,12 @@ export default function TaskEditor() {
   const [freq, setFreq] = useState(null);          // null|daily|weekly|monthly
   const [interval, setIntervalN] = useState(1);
   const [weekdays, setWeekdays] = useState([]);
+  // Herhaal-einde (UX, batch 2): standaard geen einde; subtiel te onthullen.
+  const [showRecurEnd, setShowRecurEnd] = useState(false);
+  const [recurEndMode, setRecurEndMode] = useState('never');  // never|until|count
+  const [recurUntil, setRecurUntil] = useState(null);         // Date bij 'until'
+  const [recurCount, setRecurCount] = useState(5);            // aantal beurten bij 'count'
+  const [recurUntilPickerOpen, setRecurUntilPickerOpen] = useState(false);
   const [rotation, setRotation] = useState([]);    // passthrough (UX-40)
   const [tagIds, setTagIds] = useState([]);        // zelfgemaakte labels (UX-41)
   // Voor wie / wie ziet 'm: household | subgroup | custom
@@ -86,6 +92,14 @@ export default function TaskEditor() {
       setFreq(data.recur_freq);
       setIntervalN(data.recur_interval ?? 1);
       setWeekdays(data.recur_weekdays ?? []);
+      // Herhaal-einde uit de opgeslagen kolommen afleiden.
+      const until = data.recur_until ? new Date(data.recur_until + 'T00:00:00') : null;
+      const count = data.recur_count ?? null;
+      const endMode = until ? 'until' : (count != null ? 'count' : 'never');
+      setRecurUntil(until);
+      setRecurCount(count ?? 5);
+      setRecurEndMode(endMode);
+      setShowRecurEnd(endMode !== 'never');
       setRotation(data.rotation ?? []);
       setTagIds(data.tag_ids ?? []);
       setVisibility(data.visibility ?? VISIBILITY.HOUSEHOLD);
@@ -100,6 +114,7 @@ export default function TaskEditor() {
     title: title.trim(), notes: notes.trim(), category, zoneId, assignedTo,
     dueDate: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
     freq, interval, weekdays, rotation, tagIds, visibility, shareSubgroupId, shareWith,
+    recurEndMode, recurUntil: recurUntil ? format(recurUntil, 'yyyy-MM-dd') : null, recurCount,
   });
   useEffect(() => {
     if (loaded && initialSnap === null) setInitialSnap(buildSnapshot());
@@ -110,10 +125,12 @@ export default function TaskEditor() {
   const toggleWeekday = (d) =>
     setWeekdays((w) => (w.includes(d) ? w.filter((x) => x !== d) : [...w, d]));
 
-  // Herhaal-toggle: aan → standaard wekelijks; uit → eenmalig (en weekdagen leeg).
+  // Herhaal-toggle: aan → standaard wekelijks; uit → eenmalig (weekdagen + einde leeg).
   const toggleRecurring = () => {
-    if (freq) { setFreq(null); setWeekdays([]); }
-    else { setFreq(RECUR.WEEKLY); clearErr('date'); }
+    if (freq) {
+      setFreq(null); setWeekdays([]);
+      setShowRecurEnd(false); setRecurEndMode('never'); setRecurUntil(null);
+    } else { setFreq(RECUR.WEEKLY); clearErr('date'); }
   };
 
   // Eenheid achter "Elke N …".
@@ -132,6 +149,7 @@ export default function TaskEditor() {
     const e = {};
     if (!title.trim()) e.title = t('task.error.title');
     if (freq && !dueDate) e.date = t('task.error.recurDate');
+    if (freq && recurEndMode === 'until' && !recurUntil) e.recurEnd = t('task.recur.end.untilNone');
     const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
     if (visError) e.visibility = visError;
     setErrors(e);
@@ -153,6 +171,9 @@ export default function TaskEditor() {
       recur_freq: freq,
       recur_interval: freq && !(freq === RECUR.WEEKLY && weekdays.length) ? interval : 1,
       recur_weekdays: freq === RECUR.WEEKLY && weekdays.length ? weekdays : null,
+      // Herhaal-einde (UX, batch 2): alleen relevant als 'ie herhaalt.
+      recur_until: freq && recurEndMode === 'until' && recurUntil ? format(recurUntil, 'yyyy-MM-dd') : null,
+      recur_count: freq && recurEndMode === 'count' ? recurCount : null,
       rotation: rotation.length ? rotation : null,
       tag_ids: tagIds,
       ...visibilityPayload({ visibility, shareSubgroupId, shareWith }),
@@ -285,13 +306,64 @@ export default function TaskEditor() {
                   {'  ·  '}{t('task.recur.autoNext')}
                 </Text>
               </Row>
+
+              {/* Herhaal-einde — subtiele extra optie (UX, batch 2): standaard verborgen
+                  achter een tekstlink (net als "Beschrijving toevoegen"), zodat een
+                  herhaling niet eindeloos hoeft door te gaan. */}
+              {showRecurEnd ? (
+                <View style={{ marginTop: 14 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <Chip label={t('task.recur.end.never')} active={recurEndMode === 'never'} onPress={() => { setRecurEndMode('never'); clearErr('recurEnd'); }} />
+                    <Chip label={t('task.recur.end.until')} active={recurEndMode === 'until'} onPress={() => setRecurEndMode('until')} />
+                    <Chip label={t('task.recur.end.count')} active={recurEndMode === 'count'} onPress={() => { setRecurEndMode('count'); clearErr('recurEnd'); }} />
+                  </View>
+
+                  {recurEndMode === 'until' ? (
+                    <Pressable onPress={() => setRecurUntilPickerOpen(true)} accessibilityRole="button"
+                      accessibilityLabel={recurUntil ? cap(format(recurUntil, 'EEEE d MMMM', { locale: dateLocale() })) : t('task.recur.end.untilNone')}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, marginTop: 10,
+                        paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1.5,
+                        borderColor: errors.recurEnd ? colors.danger : colors.line,
+                        backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+                      })}>
+                      <Icon name="agenda" size={18} color={colors.forest} />
+                      <Text style={[type.title, { fontSize: 15, flex: 1, color: recurUntil ? colors.ink : colors.inkFaint }]}>
+                        {recurUntil ? `${t('task.recur.end.untilPick')} ${cap(format(recurUntil, 'EEEE d MMMM', { locale: dateLocale() }))}` : t('task.recur.end.untilNone')}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {recurEndMode === 'count' ? (
+                    <Row gap={space.md} align="center" style={{ marginTop: 12 }}>
+                      <Text style={type.body}>{t('task.recur.count.label')}</Text>
+                      <Stepper value={recurCount} onChange={setRecurCount} min={2} max={365}
+                        accessibilityLabel={`${recurCount} ${plural(recurCount, 'task.recur.count.unit.one', 'task.recur.count.unit.other')}`} />
+                      <Text style={type.body}>{plural(recurCount, 'task.recur.count.unit.one', 'task.recur.count.unit.other')}</Text>
+                    </Row>
+                  ) : null}
+
+                  {errors.recurEnd ? (
+                    <Text style={[type.caption, { color: colors.danger, marginTop: 8 }]}>{errors.recurEnd}</Text>
+                  ) : null}
+                </View>
+              ) : (
+                <Pressable onPress={() => { setShowRecurEnd(true); setRecurEndMode('until'); }} accessibilityRole="button"
+                  style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, opacity: pressed ? 0.6 : 1 })}>
+                  <Icon name="add" size={16} color={colors.forest} />
+                  <Text style={[type.label, { color: colors.forest }]}>{t('task.recur.end.add')}</Text>
+                </Pressable>
+              )}
             </View>
           ) : null}
         </View>
       ) : null}
 
-      {/* Voor wie? — combineert toewijzing én zichtbaarheid in één keuze (UX-35/37). */}
+      {/* Voor wie? — combineert toewijzing én zichtbaarheid in één keuze (UX-35/37).
+          Subtiel (collapsible): standaard zien álle huisgenoten de afspraak; pas op
+          tikken vouwt de keuze "alleen bepaalde personen/groepen" open (UX, batch 2). */}
       <VisibilityPicker
+        collapsible
         label={t('task.audience.label')}
         hint={t('task.audience.hint')}
         visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
@@ -316,6 +388,13 @@ export default function TaskEditor() {
         visible={datePickerOpen} onClose={() => setDatePickerOpen(false)}
         scope="dag" value={dueDate ?? new Date()} tasks={[]}
         onPick={(d) => { setDueDate(d); clearErr('date'); }}
+      />
+
+      {/* Stopdatum-kiezer voor een herhaling (UX, batch 2). */}
+      <PeriodPicker
+        visible={recurUntilPickerOpen} onClose={() => setRecurUntilPickerOpen(false)}
+        scope="dag" value={recurUntil ?? dueDate ?? new Date()} tasks={[]}
+        onPick={(d) => { setRecurUntil(d); clearErr('recurEnd'); }}
       />
     </Editor>
   );
