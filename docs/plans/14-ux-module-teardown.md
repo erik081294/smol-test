@@ -237,12 +237,17 @@ Alle rijen **UX-22 t/m UX-41 zijn gebouwd** (branch `feat/ux-batch-22-41-vandaag
 - **Bonus.** `useCollection` wist de lijst niet meer leeg bij een transiënte laadfout en legt
   een `error` bloot (foutbanner op Vandaag én Taken). Jaar-scope dropt z'n filters niet meer.
 
-**Nog te verifiëren / open:**
-- **On-device rooktest staat nog open** — het toestel viel tijdens deze sessie van USB
-  (adb zag 'm niet meer). Specifiek device-aandacht waard: **UX-29** (horizontaal periode-vegen
-  vs. de bestaande rij-swipe voor verwijderen/uitstellen — RNGH-arbitrage; bedoeld: de rij-swipe
-  wint op een rij, periode-veeg op de tussenruimte).
-- Geparkeerd, bewust nog niet gedaan: editor toont nog een **blanco** scherm tijdens het laden
+**On-device rooktest — uitgevoerd & geslaagd (moto g72, 2026-06-24).** Geverifieerd:
+Vandaag (hero-ring → Taken, widget-preview netjes binnen de tegel, bewerk-modus-controlebalk),
+Taken (week-default, periode-kop, "Achterstallig" bovenaan, dag-groepering), **UX-30** kalender-
+op-klik ("Kies een dag" met dag-stippen), **UX-32** Jaar als maand-gegroepeerde lijst, **UX-28**
+plant-taak → plant-detail, **UX-41** end-to-end (tag "Sport" live aangemaakt + getoond op de rij),
+de **afspraken-editor** (datum=vandaag, "Voor wie?"-blok, Herhalen-vinkje, beschrijving-toggle,
+actieknop onderaan, géén categorie/zone/rotatie) en het opslaan van een afspraak. **UX-29**
+horizontaal periode-vegen werkt (22–28 jun → 29–5 jul); rij-swipe wint op een rij, periode-veeg
+op kop/tussenruimte (let op: via adb vereist een Pan een tráge drag ≥1000ms — geen ontwerpfout).
+
+**Geparkeerd, bewust nog niet gedaan:** editor toont nog een **blanco** scherm tijdens het laden
   van een bestaande taak (geen skeleton); **Schoonmaak** rauwe `Modal` + geen swipe (eigen
   teardown). Deze stonden al als "open" genoteerd onder UXR-2.
 
