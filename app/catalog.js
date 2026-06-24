@@ -55,7 +55,7 @@ const CatalogRow = React.memo(function CatalogRow({ entry, onList, onAdd, onPrun
               backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
               alignItems: 'center', justifyContent: 'center',
             })}>
-            <Icon name="add" size={18} color={colors.forest} weight="bold" />
+            <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
           </Pressable>
           <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
@@ -73,7 +73,7 @@ const CatalogRow = React.memo(function CatalogRow({ entry, onList, onAdd, onPrun
               backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
               alignItems: 'center', justifyContent: 'center',
             })}>
-            <Icon name="add" size={18} color={colors.forest} weight="bold" />
+            <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
           </Pressable>
         </Row>
       )}
@@ -289,7 +289,7 @@ export default function Catalog() {
                 borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
                 backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
               })}>
-              <Icon name="add" size={18} color={colors.forest} weight="bold" />
+              <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
               <View style={{ flex: 1 }}>
                 <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
                 <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
