@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseQuantity, formatQuantity } from '../lib/quantity.js';
+import { parseQuantity, formatQuantity, mergeQuantity } from '../lib/quantity.js';
 
 test('parseQuantity: getal + eenheid', () => {
   assert.deepEqual(parseQuantity('2 pak'), { count: 2, unit: 'pak' });
@@ -75,4 +75,20 @@ test('formatQuantity: kapt kommagetallen af op een heel aantal', () => {
 test('parse -> format is rondreis-stabiel voor meervoud', () => {
   const { count, unit } = parseQuantity('5 fles');
   assert.equal(formatQuantity(count, unit), '5 fles');
+});
+
+test('mergeQuantity: telt aantallen op, eenheid van bestaande wint', () => {
+  assert.equal(mergeQuantity('2 pak', '1 pak'), '3 pak');
+});
+
+test('mergeQuantity: twee enkele items -> aantal 2 (geen eenheid)', () => {
+  assert.equal(mergeQuantity(null, null), '2');
+});
+
+test('mergeQuantity: bestaand aantal + enkel item', () => {
+  assert.equal(mergeQuantity('3', null), '4');
+});
+
+test('mergeQuantity: eenheid van nieuwe regel als bestaande er geen heeft', () => {
+  assert.equal(mergeQuantity('2', '1 fles'), '3 fles');
 });

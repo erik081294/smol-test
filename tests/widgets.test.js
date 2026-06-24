@@ -5,7 +5,7 @@ import { packGrid, deriveDefaultLayout, moveWidget, addWidget, removeWidget, res
 import { widgetScheme, accentFor } from '../lib/widgets/colorSchemes.js';
 import {
   taskFocusSummary, taskProgressSummary, dayProgress, groceriesSummary, expenseBalanceSummary,
-  plantsSummary, agendaSummary, cleaningSummary,
+  plantsSummary, agendaSummary, cleaningSummary, pantrySummary, mealPlanSummary,
 } from '../lib/widgets/summaries.js';
 
 // --- grid-engine ---
@@ -180,6 +180,99 @@ test('agendaSummary: komende week', () => {
 test('cleaningSummary: open zone-taken', () => {
   const s = cleaningSummary([{ zone_id: 'z1', completed_at: null }, { zone_id: null, completed_at: null }]);
   assert.equal(s.count, 1);
+});
+
+test('plantsSummary: next = eerstvolgende toekomstige beurt (op datum)', () => {
+  const plants = [{ id: 'p1', name: 'Ficus' }, { id: 'p2', name: 'Cactus' }];
+  const tasks = [
+    { plant_id: 'p1', due_date: '2026-06-25', completed_at: null },
+    { plant_id: 'p2', due_date: '2026-06-24', completed_at: null },
+  ];
+  const s = plantsSummary(plants, tasks, NOW);
+  assert.equal(s.count, 0); // niets <= vandaag
+  assert.equal(s.next.name, 'Cactus'); // 24 < 25
+  assert.equal(s.next.due_date, '2026-06-24');
+});
+
+test('plantsSummary: geen toekomstige beurt → next null', () => {
+  const s = plantsSummary(
+    [{ id: 'p1', name: 'Ficus' }],
+    [{ plant_id: 'p1', due_date: '2026-06-20', completed_at: null }], // achterstallig
+    NOW,
+  );
+  assert.equal(s.count, 1);
+  assert.equal(s.next, null);
+});
+
+test('plantsSummary: next negeert afgeronde, vandaag-of-eerder en onbekende-plant-taken', () => {
+  const plants = [{ id: 'p1', name: 'Ficus' }, { id: 'p2', name: 'Cactus' }, { id: 'p3', name: 'Varen' }];
+  const tasks = [
+    { plant_id: 'p1', due_date: '2026-06-25', completed_at: '2026-06-24' }, // af → niet
+    { plant_id: 'p2', due_date: '2026-06-22', completed_at: null },         // vandaag → niet "toekomst"
+    { plant_id: 'p3', due_date: '2026-06-26', completed_at: null },         // geldige toekomst → next
+    { plant_id: 'pX', due_date: '2026-06-23', completed_at: null },         // onbekende plant → niet
+  ];
+  const s = plantsSummary(plants, tasks, NOW);
+  assert.equal(s.count, 1);                 // p2 (vandaag) wil water
+  assert.equal(s.next.name, 'Varen');       // alleen p3 telt als toekomst
+  assert.equal(s.next.due_date, '2026-06-26');
+});
+
+test('pantrySummary: stock gecapt op 8, urgent-names op 3', () => {
+  const items = Array.from({ length: 10 }, (_, i) => ({ name: `P${i}`, best_before: '2020-01-01' })); // alle verlopen
+  const s = pantrySummary(items);
+  assert.equal(s.total, 10);
+  assert.equal(s.count, 10);
+  assert.equal(s.names.length, 3);
+  assert.equal(s.stock.length, 8);
+});
+
+test('pantrySummary: stock = inhoud (urgent eerst, rest op naam); total telt alles', () => {
+  const items = [
+    { name: 'Rijst' },
+    { name: 'Appels' },
+    { name: 'Melk', best_before: '2020-01-01' }, // verlopen → urgent
+  ];
+  const s = pantrySummary(items);
+  assert.equal(s.total, 3);
+  assert.equal(s.count, 1);
+  assert.deepEqual(s.names, ['Melk']);
+  assert.deepEqual(s.stock, ['Melk', 'Appels', 'Rijst']); // urgent eerst, dan rest alfabetisch
+});
+
+test('pantrySummary: lege voorraad → stock leeg, total 0', () => {
+  const s = pantrySummary([]);
+  assert.deepEqual(s.stock, []);
+  assert.equal(s.total, 0);
+  assert.equal(s.count, 0);
+});
+
+test('mealPlanSummary: vanavond + lege (komende) dagen deze week', () => {
+  const entries = [
+    { plan_date: '2026-06-22', meal_type: 'diner', recipe: { title: 'Pasta' } },
+    { plan_date: '2026-06-24', meal_type: 'diner', title: 'Soep' },
+    { plan_date: '2026-06-20', meal_type: 'diner', title: 'Verleden' }, // vóór de week → telt niet
+  ];
+  const s = mealPlanSummary(entries, NOW); // week ma 22 jun .. zo 28 jun
+  assert.equal(s.tonight.recipe.title, 'Pasta');
+  assert.deepEqual(s.emptyDays, ['2026-06-23', '2026-06-25', '2026-06-26', '2026-06-27', '2026-06-28']);
+  assert.equal(s.emptyCount, 5);
+});
+
+test('mealPlanSummary: niets gepland → tonight null, hele week leeg vanaf vandaag', () => {
+  const s = mealPlanSummary([], NOW);
+  assert.equal(s.tonight, null);
+  assert.equal(s.emptyCount, 7); // NOW = maandag → 7 dagen
+});
+
+test('mealPlanSummary: tonight kiest de diner-entry, niet de eerste maaltijd', () => {
+  const entries = [
+    { plan_date: '2026-06-22', meal_type: 'lunch', title: 'Broodje' },
+    { plan_date: '2026-06-22', meal_type: 'diner', title: 'Stamppot' },
+  ];
+  const s = mealPlanSummary(entries, NOW);
+  assert.equal(s.tonight.meal_type, 'diner');
+  assert.equal(s.tonight.title, 'Stamppot');
 });
 
 // --- Aanvullende randgevallen voor de samenvattingen (mutatietest-analyse 2026-06-22):
