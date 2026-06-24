@@ -2,15 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, SectionList, TextInput, Pressable, Platform, ScrollView } from 'react-native';
 import { useDialog } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useGroceries } from '../lib/useGroceries';
 import { useProducts } from '../lib/useProducts';
 import { useToast } from '../lib/toast';
 import { backLabelFor } from '../lib/navMeta';
 import { CATEGORIES, catalogByCategory, searchCatalog, itemByName } from '../lib/groceryCatalog';
 import { recentProducts } from '../lib/favoriteGroceries';
+import { countOf } from '../lib/groceryCount';
 import { normalize } from '../lib/productMatch';
-import { formatQuantity } from '../lib/quantity';
 import { ProductImageView } from '../lib/ProductImageView';
 import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
 import { Icon } from '../lib/icons';
@@ -21,13 +21,11 @@ import { t } from '../lib/i18n';
 const RECENT_KEY = '__recent__';
 const RECENT_CAP = 24;
 
-// Eén rij voor zowel een schap-product als een "eerder gekozen"-product. Gememoiseerd +
-// het aantal staat LOKAAL in de rij: een +/−-tik hertekent dus alléén deze rij, niet de
-// (lange) lijst. Alle callbacks komen stabiel binnen, dus React slaat ongewijzigde rijen
-// over. Dit (samen met directe feedback bij toevoegen) maakt de catalogus snappy.
-const CatalogRow = React.memo(function CatalogRow({ entry, onList, onAdd, onPrune }) {
-  const [qty, setQty] = useState(1);
-  const addShelf = () => { onAdd(entry, qty); setQty(1); };
+// Eén catalogus-/eerder-gekozen-rij. De stepper IS het mechaniek: zijn waarde is het
+// aantal dat op de boodschappenlijst staat (0 = er niet op). 0→n zet het op de lijst,
+// →0 haalt het eraf. Gememoiseerd zodat één tik niet de hele lijst hertekent.
+const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, onPrune }) {
+  const onList = count >= 1;
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
@@ -35,83 +33,43 @@ const CatalogRow = React.memo(function CatalogRow({ entry, onList, onAdd, onPrun
     }}>
       <ProductImageView item={entry.image} size={40} />
       <View style={{ flex: 1 }}>
-        <Text style={type.body} numberOfLines={1}>{entry.name}</Text>
+        <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
         {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
       </View>
-
-      {onList ? (
-        <Row gap={4} align="center">
-          <Icon name="check" size={16} color={colors.forest} weight="bold" />
-          <Text style={[type.caption, { color: colors.forest }]}>{t('catalog.onlist')}</Text>
-        </Row>
-      ) : entry.isRecent ? (
-        // Eerder gekozen = snelkeuze: één tik plaatst er één op de lijst (aantal stel je
-        // daarna op de lijst zelf bij). × schoont 'm uit deze sectie op.
-        <Row gap={space.xs} align="center">
-          <Pressable onPress={() => onAdd(entry, 1)} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={t('catalog.add', { name: entry.name })}
-            style={({ pressed }) => ({
-              width: 36, height: 36, borderRadius: 18,
-              backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
-              alignItems: 'center', justifyContent: 'center',
-            })}>
-            <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
-          </Pressable>
+      <Row gap={space.xs} align="center">
+        <Stepper value={count} onChange={(v) => onSetCount(entry, v)} min={0} max={99}
+          accessibilityLabel={t('catalog.qty.for', { name: entry.name })} />
+        {entry.isRecent ? (
           <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
-            style={{ width: 32, height: 36, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="close" size={16} color={colors.inkFaint} />
+            style={{ width: 28, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="close" size={15} color={colors.inkFaint} />
           </Pressable>
-        </Row>
-      ) : (
-        <Row gap={space.sm} align="center">
-          <Stepper value={qty} onChange={setQty} min={1} max={99} accessibilityLabel={t('catalog.qty')} />
-          <Pressable onPress={addShelf} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={t('catalog.add', { name: entry.name })}
-            style={({ pressed }) => ({
-              width: 36, height: 36, borderRadius: 18,
-              backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
-              alignItems: 'center', justifyContent: 'center',
-            })}>
-            <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
-          </Pressable>
-        </Row>
-      )}
+        ) : null}
+      </Row>
     </View>
   );
 });
 
-// Bladeren/zoeken in de gebundelde catalogus (lib/groceryCatalog) — Picnic-stijl: schappen
-// + zoekbalk + beeld + aantallen, met "Eerder gekozen" bovenaan (recentheid, op te schonen).
-// Toevoegen koppelt aan een huishoud-product zodat die sectie zich vanzelf vult, en geeft
-// directe feedback (het netwerk volgt op de achtergrond) zodat tikken meteen voelt.
+// Bladeren/zoeken in de gebundelde catalogus (lib/groceryCatalog). Picnic-stijl: schappen
+// + zoekbalk + beeld + "Eerder gekozen" bovenaan. Elke rij toont een stepper die direct
+// gekoppeld is aan de boodschappenlijst (zelfde model als de lijst zelf). Optimistisch:
+// het aantal verandert meteen lokaal, het netwerk volgt op de achtergrond.
 export default function Catalog() {
   const dialog = useDialog();
   const router = useRouter();
   const toast = useToast();
-  const { items, add } = useGroceries();
+  const params = useLocalSearchParams();
+  const { items, setCount } = useGroceries();
   const { products, ensureProduct, setHidden } = useProducts();
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState(null); // null = alle schappen, RECENT_KEY = eerder gekozen, anders schap-key
-  const [justAdded, setJustAdded] = useState(() => new Set());   // optimistische "✓ op je lijst" (genormaliseerde naam)
-  const [prunedIds, setPrunedIds] = useState(() => new Set());   // optimistisch opgeschoond uit "eerder gekozen"
+  const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
+  const [category, setCategory] = useState(null); // null = alle, RECENT_KEY, of schap-key
+  const [counts, setCounts] = useState({});        // optimistische override: entry.key → aantal
+  const [prunedIds, setPrunedIds] = useState(() => new Set());
 
   const q = query.trim();
 
-  // Wat staat al (open) op de lijst — op genormaliseerde naam, plus wat we zojuist
-  // optimistisch toevoegden (zodat "✓ op je lijst" meteen verschijnt, zonder netwerk).
-  const onListSet = useMemo(
-    () => new Set(items.filter((i) => !i.checked).map((i) => normalize(i.name))),
-    [items],
-  );
-  const isOnList = useCallback((name) => {
-    const n = normalize(name);
-    return onListSet.has(n) || justAdded.has(n);
-  }, [onListSet, justAdded]);
-
-  // De gebundelde catalogus is statisch → schap-secties + een key→entry-map één keer
-  // bouwen. Stabiele entry-refs betekenen dat data-wijzigingen (nieuwe boodschap, recency)
-  // de schap-rijen niet onnodig hertekenen.
+  // De gebundelde catalogus is statisch → schap-secties + key→entry-map één keer bouwen.
   const shelf = useMemo(() => {
     const byKey = new Map();
     const sections = catalogByCategory().map((g) => {
@@ -125,24 +83,16 @@ export default function Catalog() {
     return { sections, byKey };
   }, []);
 
-  // "Eerder gekozen": huishoud-producten op recentheid (min wat optimistisch is opgeschoond).
-  // Elk product leent beeld/eenheid van het gelijknamige catalogus-item.
   const recentEntries = useMemo(() => recentProducts(products, { n: RECENT_CAP })
     .filter((p) => !prunedIds.has(p.id))
     .map((p) => {
       const cat = itemByName(p.name);
       return {
-        key: `r:${p.id}`,
-        name: p.name,
-        unit: cat?.unit || p.default_unit || '',
-        image: { emoji: cat?.emoji, category: p.category || cat?.category },
-        isRecent: true,
-        product: p,
+        key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
+        image: { emoji: cat?.emoji, category: p.category || cat?.category }, isRecent: true, product: p,
       };
     }), [products, prunedIds]);
 
-  // Secties: zoeken → één resultatenlijst; "eerder gekozen" → die sectie; één schap → dat
-  // schap; anders eerder-gekozen (indien gevuld) bovenaan gevolgd door alle schappen.
   const sections = useMemo(() => {
     if (q) {
       const results = searchCatalog(q).map((it) => shelf.byKey.get(it.key)).filter(Boolean);
@@ -156,21 +106,28 @@ export default function Catalog() {
     return out.concat(picked);
   }, [q, category, recentEntries, shelf]);
 
-  // ── Toevoegen voelt meteen: feedback + optimistische ✓ nú, netwerk op de achtergrond.
-  const addImpl = (entry, n) => {
-    const norm = normalize(entry.name);
-    toast.show({ message: t('catalog.added', { name: entry.name }) });
-    setJustAdded((s) => new Set(s).add(norm));
-    const quantity = entry.isRecent ? null : formatQuantity(n, entry.unit);
-    const ensure = entry.isRecent
-      ? Promise.resolve(entry.product)
-      : ensureProduct({ name: entry.item.name, category: entry.item.category, defaultUnit: entry.item.unit });
-    ensure
-      .then((product) => add(entry.name, product?.id ?? null, null, quantity))
-      .catch((e) => {
-        setJustAdded((s) => { const next = new Set(s); next.delete(norm); return next; });
-        dialog.alert({ title: t('catalog.error.add'), body: e.message });
-      });
+  // Huidig aantal van een rij: optimistische override > werkelijke lijst-stand.
+  const countFor = useCallback(
+    (entry) => counts[entry.key] ?? countOf(items, entry.name),
+    [counts, items],
+  );
+
+  // Aantal zetten: meteen lokaal (snappy) + netwerk op de achtergrond. Bij de eerste plaatsing
+  // (0→n) koppelen we aan een huishoud-product (recency vult "Eerder gekozen"); daarna volstaat
+  // het bijwerken op naam.
+  const setImpl = (entry, n) => {
+    const prev = countFor(entry);
+    setCounts((m) => ({ ...m, [entry.key]: n }));
+    const unit = entry.unit;
+    const fail = (e) => { setCounts((m) => ({ ...m, [entry.key]: prev })); dialog.alert({ title: t('catalog.error.add'), body: e.message }); };
+    if (entry.isRecent) {
+      setCount(entry.name, n, { productId: entry.product.id, unit }).catch(fail);
+    } else if (prev <= 0 && n >= 1) {
+      ensureProduct({ name: entry.item.name, category: entry.item.category, defaultUnit: entry.item.unit })
+        .then((p) => setCount(entry.name, n, { productId: p?.id ?? null, unit })).catch(fail);
+    } else {
+      setCount(entry.name, n, { unit }).catch(fail);
+    }
   };
   const pruneImpl = (entry) => {
     const id = entry.product.id;
@@ -180,18 +137,13 @@ export default function Catalog() {
     toast.show({
       message: t('catalog.recent.removed', { name: entry.name }),
       actionLabel: t('common.undo'),
-      onAction: () => {
-        animateNextLayout();
-        setPrunedIds((s) => { const next = new Set(s); next.delete(id); return next; });
-        setHidden(id, false).catch(() => {});
-      },
+      onAction: () => { animateNextLayout(); setPrunedIds((s) => { const next = new Set(s); next.delete(id); return next; }); setHidden(id, false).catch(() => {}); },
     });
   };
-  // Stabiele wrappers (useEvent-patroon) zodat de rij-memo niet door verse closures breekt.
-  const addRef = useRef(addImpl);
+  const setRef = useRef(setImpl);
   const pruneRef = useRef(pruneImpl);
-  useEffect(() => { addRef.current = addImpl; pruneRef.current = pruneImpl; });
-  const onAdd = useCallback((entry, n) => addRef.current(entry, n), []);
+  useEffect(() => { setRef.current = setImpl; pruneRef.current = pruneImpl; });
+  const onSetCount = useCallback((entry, n) => setRef.current(entry, n), []);
   const onPrune = useCallback((entry) => pruneRef.current(entry), []);
 
   const addCustom = () => {
@@ -200,13 +152,13 @@ export default function Catalog() {
     toast.show({ message: t('catalog.added', { name }) });
     setQuery('');
     ensureProduct({ name })
-      .then((product) => add(name, product?.id ?? null))
+      .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
   const renderItem = useCallback(({ item: entry }) => (
-    <CatalogRow entry={entry} onList={isOnList(entry.name)} onAdd={onAdd} onPrune={onPrune} />
-  ), [isOnList, onAdd, onPrune]);
+    <CatalogRow entry={entry} count={countFor(entry)} onSetCount={onSetCount} onPrune={onPrune} />
+  ), [countFor, onSetCount, onPrune]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -236,8 +188,8 @@ export default function Catalog() {
         </View>
       </View>
 
-      {/* Schap-filter (alleen relevant als je niet zoekt) — met "Eerder gekozen" als eerste chip.
-          paddingVertical geeft de chip-rand lucht zodat 'ie bovenaan niet wordt afgesneden. */}
+      {/* Schap-filter — met "Eerder gekozen" als eerste chip; paddingVertical geeft de
+          chip-rand lucht zodat 'ie bovenaan niet wordt afgesneden. */}
       {!q ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.sm }}
@@ -280,7 +232,6 @@ export default function Catalog() {
           ) : null
         }
         ListFooterComponent={
-          // Staat het er niet (precies) bij? Voeg de zoekterm eenmalig toe.
           q ? (
             <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
               style={({ pressed }) => ({
@@ -289,7 +240,7 @@ export default function Catalog() {
                 borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
                 backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
               })}>
-              <Icon name="shopping" size={18} color={colors.forest} weight="bold" />
+              <Icon name="add" size={18} color={colors.forest} weight="bold" />
               <View style={{ flex: 1 }}>
                 <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
                 <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
