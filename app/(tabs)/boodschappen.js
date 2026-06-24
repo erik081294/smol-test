@@ -9,7 +9,7 @@ import { frequencyLabel } from '../../lib/buyFrequency';
 import { useCatalogCategories } from '../../lib/useCatalog';
 import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader, SwipeRow } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader, SwipeRow, Button } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { EtenNav } from '../../lib/EtenNav';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
@@ -168,7 +168,10 @@ export default function Boodschappen() {
   };
 
   const renderRow = (item) => (
-    <SwipeRow left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}>
+    <SwipeRow
+      left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}
+      right={{ icon: 'check', label: t('groceries.check'), color: colors.done, onTrigger: () => toggle(item) }}
+    >
       <ItemRow
         leading={
           <Checkbox
@@ -187,27 +190,13 @@ export default function Boodschappen() {
         meta={item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
         onPress={() => toggle(item)}
         accessibilityHint={t('a11y.tapToToggle')}
-        trailing={
-          <IconButton icon="delete" size={20} tint={colors.inkFaint}
-            accessibilityLabel={t('groceries.deleteItem', { name: item.name })} onPress={() => removeWithUndo(item)} />
-        }
       />
     </SwipeRow>
   );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
-        right={
-          <Row gap={space.xs}>
-            <IconButton icon="search" accessibilityLabel={t('catalog.open')} tint={colors.forest}
-              onPress={() => router.push('/catalog')} />
-            <IconButton icon="repeat" accessibilityLabel={t('groceries.favorites')} tint={colors.forest}
-              onPress={() => setFavOpen(true)} />
-            <IconButton icon="receipt" accessibilityLabel={t('groceries.receipt')} tint={colors.forest}
-              onPress={() => router.push('/purchase/new')} />
-          </Row>
-        } />
+      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')} />
 
       <EtenNav active="boodschappen" />
 
@@ -227,6 +216,21 @@ export default function Boodschappen() {
         />
         <IconButton icon="add" accessibilityLabel={t('common.add')} tint={colors.forest}
           onPress={add} style={{ backgroundColor: colors.ocher }} />
+      </View>
+
+      {/* In-scherm navigatie i.p.v. de drie cryptische header-iconen (UXR-3): de catalogus
+          is de hoofd-ingang om toe te voegen; vaste boodschappen + bon zijn secundair én
+          gelabeld, zodat de navigatie klip en klaar in beeld staat. */}
+      <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.xs }}>
+        <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
+        <Row gap={space.sm}>
+          <View style={{ flex: 1 }}>
+            <Button title={t('groceries.favorites')} icon="repeat" variant="ghost" onPress={() => setFavOpen(true)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title={t('groceries.receipt')} icon="receipt" variant="ghost" onPress={() => router.push('/purchase/new')} />
+          </View>
+        </Row>
       </View>
 
       {productHints.length > 0 ? (
