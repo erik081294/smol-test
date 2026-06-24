@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, ScrollView, TextInput, RefreshControl, Platform, Pressable } from 'react-native';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { View, Text, SectionList, ScrollView, TextInput, RefreshControl, Platform, Pressable, Keyboard, StyleSheet } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { frequencyLabel } from '../../lib/buyFrequency';
 import { useToast } from '../../lib/toast';
 import { searchCatalog } from '../../lib/groceryCatalog';
 import { countOf } from '../../lib/groceryCount';
+import { groupGroceriesByCategory } from '../../lib/groceryList';
 import { normalize } from '../../lib/productMatch';
 import { parseQuantity, formatQuantity } from '../../lib/quantity';
 import { ProductImageView } from '../../lib/ProductImageView';
@@ -20,6 +21,38 @@ import { t } from '../../lib/i18n';
 
 const SEARCH_LIMIT = 5;
 
+// Eén boodschappen-lijstrij, gememoiseerd: een tik op de stepper/checkbox hertekent
+// alléén deze rij (niet de hele lijst) — samen met de optimistische Stepper voelt het
+// instant. Alle callbacks komen stabiel binnen (useEvent-patroon in de ouder).
+const GroceryRow = React.memo(function GroceryRow({ item, onToggle, onChangeCount, onRemove }) {
+  const { count } = parseQuantity(item.quantity);
+  return (
+    <SwipeRow
+      left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onRemove(item) }}
+      right={{ icon: 'check', label: t('groceries.check'), color: colors.done, onTrigger: () => onToggle(item) }}
+    >
+      <ItemRow
+        leading={
+          <Checkbox checked={item.checked} onPress={() => onToggle(item)} shape="round" size={24}
+            color={item.checked ? colors.done : colors.inkFaint}
+            accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`} />
+        }
+        title={item.name}
+        titleColor={item.checked ? colors.inkFaint : undefined}
+        strikethrough={item.checked}
+        dimmed={item.checked}
+        meta={item.checked && item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
+        onPress={() => onToggle(item)}
+        accessibilityHint={t('a11y.tapToToggle')}
+        trailing={item.checked ? undefined : (
+          <Stepper compact value={count} min={0} max={99}
+            onChange={(v) => onChangeCount(item, v)} accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
+        )}
+      />
+    </SwipeRow>
+  );
+});
+
 export default function Boodschappen() {
   const dialog = useDialog();
   const { items, loading, reload, toggle: toggleItem, setQuantity, setCount, remove: removeItem, removeMany } = useGroceries();
@@ -29,7 +62,8 @@ export default function Boodschappen() {
   const router = useRouter();
   const [text, setText] = useState('');
   const [hiddenIds, setHiddenIds] = useState([]);
-  const [counts, setCounts] = useState({}); // optimistische override voor de inline zoekrijen
+  const [counts, setCounts] = useState({});       // optimistische override voor de zoekrijen
+  const [searchTop, setSearchTop] = useState(0);   // y onder de toevoegbalk (voor de dropdown)
 
   const q = text.trim();
 
@@ -43,12 +77,25 @@ export default function Boodschappen() {
   );
   const openProductIds = useMemo(() => new Set(open.map((i) => i.product_id).filter(Boolean)), [open]);
 
-  // Inline catalogus-zoekresultaten terwijl je typt — een paar mini-rijen met dezelfde
-  // gekoppelde stepper als de lijst/catalogus.
+  // product_id → categorie (voedt de schap-indeling van de lijst).
+  const categoryById = useMemo(() => {
+    const m = {};
+    for (const p of products) if (p.category) m[p.id] = p.category;
+    return m;
+  }, [products]);
+
+  // Lijst-secties: open boodschappen per supermarkt-schap (lege schappen weg), daarna een
+  // "Afgevinkt"-sectie. `kind` stuurt de sectiekop-rendering.
+  const sections = useMemo(() => {
+    const cat = groupGroceriesByCategory(open, { categoryById })
+      .map((g) => ({ key: g.key, kind: 'cat', title: `${g.emoji}  ${g.label}`, data: g.data }));
+    if (done.length) cat.push({ key: '__done__', kind: 'done', title: t('groceries.section.done'), data: done });
+    return cat;
+  }, [open, done, categoryById]);
+
   const searchResults = useMemo(() => (q ? searchCatalog(q).slice(0, SEARCH_LIMIT) : []), [q]);
   const exactMatch = useMemo(() => searchResults.some((r) => normalize(r.name) === normalize(q)), [searchResults, q]);
 
-  // "Misschien weer nodig" (BOO-8): zachte frequentie-suggesties. Alleen als je niet typt.
   const dueSuggestions = useMemo(() => {
     if (q) return [];
     return products
@@ -59,10 +106,9 @@ export default function Boodschappen() {
       .slice(0, 6);
   }, [products, freqByProduct, openProductIds, q]);
 
-  const countForCatalog = (item) => counts[item.key] ?? countOf(items, item.name);
+  const dismissSearch = () => { setText(''); Keyboard.dismiss(); };
 
-  // Aantal van een catalogus-item op de lijst zetten (inline zoeken): optimistisch + koppel
-  // aan een product bij de eerste plaatsing (recency). Daarna volstaat bijwerken op naam.
+  const countForCatalog = (item) => counts[item.key] ?? countOf(items, item.name);
   const setCatalogCount = (item, n) => {
     const prev = countForCatalog(item);
     setCounts((m) => ({ ...m, [item.key]: n }));
@@ -78,11 +124,18 @@ export default function Boodschappen() {
   const addCustom = () => {
     if (!q) return;
     const name = q;
-    setText('');
+    dismissSearch();
     ensureProduct({ name })
       .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
       .then(() => toast.show({ message: t('catalog.added', { name }) }))
       .catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
+  };
+
+  const submitTyped = () => {
+    if (!q) return;
+    const exact = searchResults.find((r) => normalize(r.name) === normalize(q));
+    if (exact) { setCatalogCount(exact, (countForCatalog(exact) || 0) + 1); setText(''); }
+    else addCustom();
   };
 
   const addLinked = (product) => {
@@ -92,27 +145,7 @@ export default function Boodschappen() {
       .catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
   };
 
-  const submitTyped = () => {
-    if (!q) return;
-    // Exacte catalogus-match? Voeg die toe; anders het eigen product.
-    const exact = searchResults.find((r) => normalize(r.name) === normalize(q));
-    if (exact) { setCatalogCount(exact, (countForCatalog(exact) || 0) + 1); setText(''); }
-    else addCustom();
-  };
-
-  const toggle = async (item) => {
-    animateNextLayout();
-    try { await toggleItem(item); } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
-  };
-
-  // Aantal op een open rij. 0 = verwijderen (mét undo), ≥1 = aantal bijwerken. Afvinken
-  // gebeurt via swipe/tik, niet via de stepper.
-  const changeCount = (item, n) => {
-    if (n <= 0) { removeWithUndo(item); return; }
-    const { unit } = parseQuantity(item.quantity);
-    setQuantity(item, formatQuantity(n, unit)).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
-  };
-
+  // ── Stabiele rij-handlers (useEvent): zo blijft GroceryRow's memo intact.
   const removeWithUndo = (item) => {
     animateNextLayout();
     setHiddenIds((h) => [...h, item.id]);
@@ -127,6 +160,23 @@ export default function Boodschappen() {
       },
     });
   };
+  const toggleImpl = async (item) => {
+    animateNextLayout();
+    try { await toggleItem(item); } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+  };
+  // 0 = verwijderen (mét undo), ≥1 = aantal bijwerken. Afvinken gaat via swipe/tik.
+  const changeCountImpl = (item, n) => {
+    if (n <= 0) { removeWithUndo(item); return; }
+    const { unit } = parseQuantity(item.quantity);
+    setQuantity(item, formatQuantity(n, unit)).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
+  };
+  const toggleRef = useRef(toggleImpl);
+  const changeRef = useRef(changeCountImpl);
+  const removeRef = useRef(removeWithUndo);
+  useEffect(() => { toggleRef.current = toggleImpl; changeRef.current = changeCountImpl; removeRef.current = removeWithUndo; });
+  const onToggle = useCallback((item) => toggleRef.current(item), []);
+  const onChangeCount = useCallback((item, n) => changeRef.current(item, n), []);
+  const onRemove = useCallback((item) => removeRef.current(item), []);
 
   const onClearChecked = () => {
     const ids = done.map((i) => i.id);
@@ -145,41 +195,17 @@ export default function Boodschappen() {
     });
   };
 
-  const renderRow = (item) => {
-    const { count } = parseQuantity(item.quantity);
-    return (
-      <SwipeRow
-        left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}
-        right={{ icon: 'check', label: t('groceries.check'), color: colors.done, onTrigger: () => toggle(item) }}
-      >
-        <ItemRow
-          leading={
-            <Checkbox checked={item.checked} onPress={() => toggle(item)} shape="round" size={24}
-              color={item.checked ? colors.done : colors.inkFaint}
-              accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`} />
-          }
-          title={item.name}
-          titleColor={item.checked ? colors.inkFaint : undefined}
-          strikethrough={item.checked}
-          dimmed={item.checked}
-          meta={item.checked && item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
-          onPress={() => toggle(item)}
-          accessibilityHint={t('a11y.tapToToggle')}
-          trailing={item.checked ? undefined : (
-            <Stepper compact value={count} min={0} max={99}
-              onChange={(v) => changeCount(item, v)} accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
-          )}
-        />
-      </SwipeRow>
-    );
-  };
+  const renderItem = useCallback(({ item }) => (
+    <GroceryRow item={item} onToggle={onToggle} onChangeCount={onChangeCount} onRemove={onRemove} />
+  ), [onToggle, onChangeCount, onRemove]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')} />
 
-      {/* Toevoegbalk — typen zoekt direct in de catalogus (resultaten hieronder). */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
+      {/* Toevoegbalk — typen zoekt direct in de catalogus (dropdown hieronder). */}
+      <View onLayout={(e) => setSearchTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
+        style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
         <TextInput
           value={text} onChangeText={setText} onSubmitEditing={submitTyped}
           returnKeyType="done" blurOnSubmit={false}
@@ -196,40 +222,7 @@ export default function Boodschappen() {
           onPress={submitTyped} style={{ backgroundColor: colors.ocher }} />
       </View>
 
-      {q ? (
-        /* Inline zoekresultaten + UX-vriendelijke uitgangen (nieuw / hele catalogus). */
-        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          {searchResults.length ? (
-            <Text style={[type.label, { color: colors.inkSoft, marginBottom: space.xs }]}>{t('groceries.search.results')}</Text>
-          ) : null}
-          {searchResults.map((item) => {
-            const cnt = countForCatalog(item);
-            return (
-              <View key={item.key} style={{
-                flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs,
-              }}>
-                <ProductImageView item={item} size={34} />
-                <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontWeight: '700' } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
-                <Stepper compact value={cnt} min={0} max={99} onChange={(v) => setCatalogCount(item, v)}
-                  accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
-              </View>
-            );
-          })}
-          {!exactMatch ? (
-            <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1 })}>
-              <Icon name="add" size={18} color={colors.forest} weight="bold" />
-              <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={() => router.push(`/catalog?q=${encodeURIComponent(q)}`)} accessibilityRole="button"
-            accessibilityLabel={t('groceries.search.viewAll')}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1 })}>
-            <Icon name="catalog" size={18} color={colors.inkSoft} />
-            <Text style={[type.body, { color: colors.inkSoft }]}>{t('groceries.search.viewAll')}</Text>
-          </Pressable>
-        </View>
-      ) : (
+      {!q ? (
         /* Niet aan het typen: heldere ingang naar de catalogus + rustige bon-link. */
         <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
           <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
@@ -242,9 +235,9 @@ export default function Boodschappen() {
             </Row>
           </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {/* "Misschien weer nodig" — zachte frequentie-suggesties, één tik = toevoegen */}
+      {/* "Misschien weer nodig" — alleen als je niet typt */}
       {dueSuggestions.length > 0 ? (
         <View style={{ marginBottom: space.sm }}>
           <View style={{ paddingHorizontal: space.lg }}>
@@ -273,13 +266,21 @@ export default function Boodschappen() {
         </View>
       ) : null}
 
-      <FlatList
-        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
-        data={open}
+      <SectionList
+        sections={sections}
         keyExtractor={(i) => i.id}
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
+        stickySectionHeadersEnabled={false}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        ListHeaderComponent={open.length > 0 ? <SectionHeader title={t('groceries.section.open')} count={open.length} /> : null}
-        renderItem={({ item }) => renderRow(item)}
+        renderItem={renderItem}
+        renderSectionHeader={({ section }) => (
+          section.kind === 'done' ? (
+            <SectionHeader title={section.title} count={section.data.length}
+              action={<IconButton icon="delete" accessibilityLabel={t('groceries.clearChecked')} tint={colors.danger} onPress={onClearChecked} />} />
+          ) : (
+            <Text style={[type.label, { marginTop: space.md, marginBottom: space.xs, color: colors.inkSoft }]}>{section.title}</Text>
+          )
+        )}
         ListEmptyComponent={
           loading && items.length === 0 ? (
             <ListSkeleton count={5} />
@@ -289,19 +290,47 @@ export default function Boodschappen() {
               actionTitle={t('catalog.open')} onAction={() => router.push('/catalog')} />
           ) : null
         }
-        ListFooterComponent={
-          done.length > 0 ? (
-            <View style={{ marginTop: space.lg }}>
-              <SectionHeader title={t('groceries.section.done')} count={done.length}
-                action={
-                  <IconButton icon="delete" accessibilityLabel={t('groceries.clearChecked')}
-                    tint={colors.danger} onPress={onClearChecked} />
-                } />
-              {done.map((item) => <View key={item.id}>{renderRow(item)}</View>)}
-            </View>
-          ) : null
-        }
       />
+
+      {/* Zoek-dropdown als een overlay onder de balk; tik ernaast (de backdrop) sluit 'm. */}
+      {q ? (
+        <View style={[StyleSheet.absoluteFill, { top: searchTop, zIndex: 20 }]}>
+          <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={t('common.close')} onPress={dismissSearch} />
+          <View style={{
+            marginHorizontal: space.lg, backgroundColor: colors.surface, borderRadius: radius.md,
+            borderWidth: 1, borderColor: colors.line, paddingHorizontal: space.md, paddingVertical: space.xs,
+            shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+          }}>
+            {searchResults.length ? (
+              <Text style={[type.label, { color: colors.inkSoft, marginTop: space.xs, marginBottom: space.xs }]}>{t('groceries.search.results')}</Text>
+            ) : null}
+            {searchResults.map((item) => {
+              const cnt = countForCatalog(item);
+              return (
+                <View key={item.key} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs }}>
+                  <ProductImageView item={item} size={34} />
+                  <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontWeight: '700' } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                  <Stepper compact value={cnt} min={0} max={99} onChange={(v) => setCatalogCount(item, v)}
+                    accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
+                </View>
+              );
+            })}
+            {!exactMatch ? (
+              <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1 })}>
+                <Icon name="add" size={18} color={colors.forest} weight="bold" />
+                <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => { const term = q; dismissSearch(); router.push(`/catalog?q=${encodeURIComponent(term)}`); }}
+              accessibilityRole="button" accessibilityLabel={t('groceries.search.viewAll')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="catalog" size={18} color={colors.inkSoft} />
+              <Text style={[type.body, { color: colors.inkSoft }]}>{t('groceries.search.viewAll')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

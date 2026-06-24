@@ -10,7 +10,6 @@ import { backLabelFor } from '../lib/navMeta';
 import { CATEGORIES, catalogByCategory, searchCatalog, itemByName } from '../lib/groceryCatalog';
 import { recentProducts } from '../lib/favoriteGroceries';
 import { countOf } from '../lib/groceryCount';
-import { normalize } from '../lib/productMatch';
 import { ProductImageView } from '../lib/ProductImageView';
 import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
 import { Icon } from '../lib/icons';
@@ -192,8 +191,10 @@ export default function Catalog() {
           chip-rand lucht zodat 'ie bovenaan niet wordt afgesneden. */}
       {!q ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.sm }}
-          style={{ flexGrow: 0 }}>
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingVertical: space.sm, alignItems: 'center' }}
+          // flexShrink:0 → de lange productlijst eronder mag deze chip-rij niet indrukken
+          // (anders werd de bovenkant van de pills afgekapt).
+          style={{ flexGrow: 0, flexShrink: 0 }}>
           <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
           {recentEntries.length ? (
             <Chip label={`🕘 ${t('catalog.recent')}`} active={category === RECENT_KEY}
