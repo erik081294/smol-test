@@ -129,6 +129,36 @@ test('recentProducts: verborgen producten vallen weg', () => {
   assert.equal(recentProducts(prods).length, 0);
 });
 
+test('recentProducts: recentheid wint van gebruik én naam (tegengestelde signalen)', () => {
+  // A is recenter maar minder gekozen en alfabetisch later; B is ouder, vaker, eerder.
+  // Recentheid moet domineren → A vóór B.
+  const prods = [
+    { id: 'A', name: 'Zeep', search: 'zeep', times_added: 1, last_added_at: '2026-06-20T10:00:00Z' },
+    { id: 'B', name: 'Appel', search: 'appel', times_added: 9, last_added_at: '2026-06-19T10:00:00Z' },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['A', 'B']);
+});
+
+test('recentProducts: bij gelijke recentheid wint gebruik van naam (tegengestelde signalen)', () => {
+  // Gelijke datum: Y is vaker gekozen maar alfabetisch later, X minder maar eerder.
+  // Gebruik moet de naam-tie-break verslaan → Y vóór X.
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'X', name: 'Appel', search: 'appel', times_added: 1, last_added_at: same },
+    { id: 'Y', name: 'Zeep', search: 'zeep', times_added: 9, last_added_at: same },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['Y', 'X']);
+});
+
+test('recentProducts: bij gelijke recentheid én gebruik beslist de naam (NL)', () => {
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'q', name: 'Boter', search: 'boter', times_added: 3, last_added_at: same },
+    { id: 'p', name: 'Appel', search: 'appel', times_added: 3, last_added_at: same },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['p', 'q']); // Appel < Boter
+});
+
 test('recentProducts: tie-break op gebruik dan naam bij gelijke recentheid', () => {
   const same = '2026-06-20T10:00:00Z';
   const prods = [

@@ -21,11 +21,13 @@ import { t } from '../lib/i18n';
 const RECENT_KEY = '__recent__';
 const RECENT_CAP = 24;
 
-// Eén rij voor zowel een schap-product als een "eerder gekozen"-product. Gememoiseerd
-// zodat het bijstellen van het aantal op één rij niet de hele (lange) lijst hertekent —
-// dat was de oorzaak van de traagheid. Alle callbacks komen stabiel binnen (zie hieronder),
-// dus React kan rijen die niet veranderen overslaan.
-const CatalogRow = React.memo(function CatalogRow({ entry, qty, onList, onQty, onAdd, onPrune }) {
+// Eén rij voor zowel een schap-product als een "eerder gekozen"-product. Gememoiseerd +
+// het aantal staat LOKAAL in de rij: een +/−-tik hertekent dus alléén deze rij, niet de
+// (lange) lijst. Alle callbacks komen stabiel binnen, dus React slaat ongewijzigde rijen
+// over. Dit (samen met directe feedback bij toevoegen) maakt de catalogus snappy.
+const CatalogRow = React.memo(function CatalogRow({ entry, onList, onAdd, onPrune }) {
+  const [qty, setQty] = useState(1);
+  const addShelf = () => { onAdd(entry, qty); setQty(1); };
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
@@ -63,9 +65,8 @@ const CatalogRow = React.memo(function CatalogRow({ entry, qty, onList, onQty, o
         </Row>
       ) : (
         <Row gap={space.sm} align="center">
-          <Stepper value={qty} onChange={(v) => onQty(entry.key, v)}
-            min={1} max={99} accessibilityLabel={t('catalog.qty')} />
-          <Pressable onPress={() => onAdd(entry, qty)} hitSlop={8} accessibilityRole="button"
+          <Stepper value={qty} onChange={setQty} min={1} max={99} accessibilityLabel={t('catalog.qty')} />
+          <Pressable onPress={addShelf} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('catalog.add', { name: entry.name })}
             style={({ pressed }) => ({
               width: 36, height: 36, borderRadius: 18,
@@ -80,10 +81,10 @@ const CatalogRow = React.memo(function CatalogRow({ entry, qty, onList, onQty, o
   );
 });
 
-// Bladeren/zoeken in de gebundelde, merkloze catalogus (lib/groceryCatalog) — Picnic-stijl:
-// schappen (categorieën) + zoekbalk + beeld + aantallen, met "Eerder gekozen" bovenaan
-// (recentheid, zelf op te schonen). Toevoegen koppelt aan een huishoud-product, zodat die
-// sectie zich vanzelf vult. Staat een product er niet bij? Voeg de zoekterm zelf toe.
+// Bladeren/zoeken in de gebundelde catalogus (lib/groceryCatalog) — Picnic-stijl: schappen
+// + zoekbalk + beeld + aantallen, met "Eerder gekozen" bovenaan (recentheid, op te schonen).
+// Toevoegen koppelt aan een huishoud-product zodat die sectie zich vanzelf vult, en geeft
+// directe feedback (het netwerk volgt op de achtergrond) zodat tikken meteen voelt.
 export default function Catalog() {
   const dialog = useDialog();
   const router = useRouter();
@@ -92,109 +93,120 @@ export default function Catalog() {
   const { products, ensureProduct, setHidden } = useProducts();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(null); // null = alle schappen, RECENT_KEY = eerder gekozen, anders schap-key
-  const [qtyByKey, setQtyByKey] = useState({});
+  const [justAdded, setJustAdded] = useState(() => new Set());   // optimistische "✓ op je lijst" (genormaliseerde naam)
+  const [prunedIds, setPrunedIds] = useState(() => new Set());   // optimistisch opgeschoond uit "eerder gekozen"
 
   const q = query.trim();
 
-  // Wat staat al (open) op de lijst — op genormaliseerde naam, zodat "✓ op je lijst" klopt.
+  // Wat staat al (open) op de lijst — op genormaliseerde naam, plus wat we zojuist
+  // optimistisch toevoegden (zodat "✓ op je lijst" meteen verschijnt, zonder netwerk).
   const onListSet = useMemo(
     () => new Set(items.filter((i) => !i.checked).map((i) => normalize(i.name))),
     [items],
   );
+  const isOnList = useCallback((name) => {
+    const n = normalize(name);
+    return onListSet.has(n) || justAdded.has(n);
+  }, [onListSet, justAdded]);
 
-  // "Eerder gekozen": huishoud-producten op recentheid. Elk product leent beeld/eenheid van
-  // het generieke catalogus-item met dezelfde naam (anders valt het terug op de schap-emoji).
-  const recentEntries = useMemo(() => recentProducts(products, { n: RECENT_CAP }).map((p) => {
-    const cat = itemByName(p.name);
-    return {
-      key: `r:${p.id}`,
-      name: p.name,
-      unit: cat?.unit || p.default_unit || '',
-      image: { emoji: cat?.emoji, category: p.category || cat?.category },
-      isRecent: true,
-      product: p,
-    };
-  }), [products]);
+  // De gebundelde catalogus is statisch → schap-secties + een key→entry-map één keer
+  // bouwen. Stabiele entry-refs betekenen dat data-wijzigingen (nieuwe boodschap, recency)
+  // de schap-rijen niet onnodig hertekenen.
+  const shelf = useMemo(() => {
+    const byKey = new Map();
+    const sections = catalogByCategory().map((g) => {
+      const data = g.items.map((it) => {
+        const e = { key: `c:${it.key}`, name: it.name, unit: it.unit, image: it, isRecent: false, item: it };
+        byKey.set(it.key, e);
+        return e;
+      });
+      return { key: g.key, title: `${g.emoji}  ${g.label}`, data };
+    });
+    return { sections, byKey };
+  }, []);
 
-  // Een schap-item → een rij-entry (stabiele ref dankzij useMemo op de schappen).
-  const toShelfEntry = (it) => ({ key: `c:${it.key}`, name: it.name, unit: it.unit, image: it, isRecent: false, item: it });
+  // "Eerder gekozen": huishoud-producten op recentheid (min wat optimistisch is opgeschoond).
+  // Elk product leent beeld/eenheid van het gelijknamige catalogus-item.
+  const recentEntries = useMemo(() => recentProducts(products, { n: RECENT_CAP })
+    .filter((p) => !prunedIds.has(p.id))
+    .map((p) => {
+      const cat = itemByName(p.name);
+      return {
+        key: `r:${p.id}`,
+        name: p.name,
+        unit: cat?.unit || p.default_unit || '',
+        image: { emoji: cat?.emoji, category: p.category || cat?.category },
+        isRecent: true,
+        product: p,
+      };
+    }), [products, prunedIds]);
 
   // Secties: zoeken → één resultatenlijst; "eerder gekozen" → die sectie; één schap → dat
   // schap; anders eerder-gekozen (indien gevuld) bovenaan gevolgd door alle schappen.
   const sections = useMemo(() => {
     if (q) {
-      const results = searchCatalog(q).map(toShelfEntry);
+      const results = searchCatalog(q).map((it) => shelf.byKey.get(it.key)).filter(Boolean);
       return results.length ? [{ key: 'results', title: null, data: results }] : [];
     }
-    if (category === RECENT_KEY) {
-      return recentEntries.length
-        ? [{ key: RECENT_KEY, title: `🕘  ${t('catalog.recent')}`, data: recentEntries }]
-        : [];
-    }
-    const shelves = catalogByCategory();
+    const recentSection = { key: RECENT_KEY, title: `🕘  ${t('catalog.recent')}`, data: recentEntries };
+    if (category === RECENT_KEY) return recentEntries.length ? [recentSection] : [];
     const out = [];
-    if (category == null && recentEntries.length) {
-      out.push({ key: RECENT_KEY, title: `🕘  ${t('catalog.recent')}`, data: recentEntries });
-    }
-    const picked = category ? shelves.filter((g) => g.key === category) : shelves;
-    for (const g of picked) out.push({ key: g.key, title: `${g.emoji}  ${g.label}`, data: g.items.map(toShelfEntry) });
-    return out;
-  }, [q, category, recentEntries]);
+    if (category == null && recentEntries.length) out.push(recentSection);
+    const picked = category ? shelf.sections.filter((s) => s.key === category) : shelf.sections;
+    return out.concat(picked);
+  }, [q, category, recentEntries, shelf]);
 
-  // ── Stabiele callbacks: via een ref zodat de rij-memo niet door verse closures wordt
-  // verbroken (anders hertekent elke aantal-tik tóch de hele lijst).
+  // ── Toevoegen voelt meteen: feedback + optimistische ✓ nú, netwerk op de achtergrond.
   const addImpl = (entry, n) => {
+    const norm = normalize(entry.name);
+    toast.show({ message: t('catalog.added', { name: entry.name }) });
+    setJustAdded((s) => new Set(s).add(norm));
     const quantity = entry.isRecent ? null : formatQuantity(n, entry.unit);
     const ensure = entry.isRecent
       ? Promise.resolve(entry.product)
       : ensureProduct({ name: entry.item.name, category: entry.item.category, defaultUnit: entry.item.unit });
     ensure
       .then((product) => add(entry.name, product?.id ?? null, null, quantity))
-      .then(() => {
-        toast.show({ message: t('catalog.added', { name: entry.name }) });
-        if (!entry.isRecent) setQtyByKey((m) => { const c = { ...m }; delete c[entry.key]; return c; });
-      })
-      .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
+      .catch((e) => {
+        setJustAdded((s) => { const next = new Set(s); next.delete(norm); return next; });
+        dialog.alert({ title: t('catalog.error.add'), body: e.message });
+      });
   };
   const pruneImpl = (entry) => {
+    const id = entry.product.id;
     animateNextLayout();
-    setHidden(entry.product.id, true).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
+    setPrunedIds((s) => new Set(s).add(id));
+    setHidden(id, true).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
     toast.show({
       message: t('catalog.recent.removed', { name: entry.name }),
       actionLabel: t('common.undo'),
-      onAction: () => { animateNextLayout(); setHidden(entry.product.id, false).catch(() => {}); },
+      onAction: () => {
+        animateNextLayout();
+        setPrunedIds((s) => { const next = new Set(s); next.delete(id); return next; });
+        setHidden(id, false).catch(() => {});
+      },
     });
   };
-  // Houd de refs ná de render gelijk aan de laatste closures (useEvent-patroon): zo
-  // blijven onAdd/onPrune stabiel en hertekent een aantal-tik niet de hele lijst, terwijl
-  // de handlers tóch de verse state zien op het moment dat je tikt.
+  // Stabiele wrappers (useEvent-patroon) zodat de rij-memo niet door verse closures breekt.
   const addRef = useRef(addImpl);
   const pruneRef = useRef(pruneImpl);
   useEffect(() => { addRef.current = addImpl; pruneRef.current = pruneImpl; });
-
   const onAdd = useCallback((entry, n) => addRef.current(entry, n), []);
   const onPrune = useCallback((entry) => pruneRef.current(entry), []);
-  const onQty = useCallback((key, v) => setQtyByKey((m) => ({ ...m, [key]: v })), []);
 
   const addCustom = () => {
     const name = q;
     if (!name) return;
+    toast.show({ message: t('catalog.added', { name }) });
+    setQuery('');
     ensureProduct({ name })
       .then((product) => add(name, product?.id ?? null))
-      .then(() => { toast.show({ message: t('catalog.added', { name }) }); setQuery(''); })
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
   const renderItem = useCallback(({ item: entry }) => (
-    <CatalogRow
-      entry={entry}
-      qty={qtyByKey[entry.key] ?? 1}
-      onList={onListSet.has(normalize(entry.name))}
-      onQty={onQty}
-      onAdd={onAdd}
-      onPrune={onPrune}
-    />
-  ), [qtyByKey, onListSet, onQty, onAdd, onPrune]);
+    <CatalogRow entry={entry} onList={isOnList(entry.name)} onAdd={onAdd} onPrune={onPrune} />
+  ), [isOnList, onAdd, onPrune]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -224,10 +236,12 @@ export default function Catalog() {
         </View>
       </View>
 
-      {/* Schap-filter (alleen relevant als je niet zoekt) — met "Eerder gekozen" als eerste chip */}
+      {/* Schap-filter (alleen relevant als je niet zoekt) — met "Eerder gekozen" als eerste chip.
+          paddingVertical geeft de chip-rand lucht zodat 'ie bovenaan niet wordt afgesneden. */}
       {!q ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.sm }} style={{ flexGrow: 0 }}>
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.sm }}
+          style={{ flexGrow: 0 }}>
           <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
           {recentEntries.length ? (
             <Chip label={`🕘 ${t('catalog.recent')}`} active={category === RECENT_KEY}

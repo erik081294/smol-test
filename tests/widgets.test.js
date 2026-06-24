@@ -228,3 +228,16 @@ test('agendaSummary: gesorteerd op datum; next = eerstvolgende', () => {
   assert.equal(s.count, 2);
   assert.equal(s.next.id, 'soon');
 });
+
+test('agendaSummary: items = eerste 4 aankomende, op datum gesorteerd', () => {
+  // 5 aankomende binnen de horizon (NOW = 2026-06-22) → items gecapt op 4, op datum.
+  const s = agendaSummary([
+    { id: 'd5', due_date: '2026-06-27', completed_at: null },
+    { id: 'd1', due_date: '2026-06-23', completed_at: null },
+    { id: 'd4', due_date: '2026-06-26', completed_at: null },
+    { id: 'd2', due_date: '2026-06-24', completed_at: null },
+    { id: 'd3', due_date: '2026-06-25', completed_at: null },
+  ], NOW);
+  assert.equal(s.count, 5);
+  assert.deepEqual(s.items.map((t) => t.id), ['d1', 'd2', 'd3', 'd4']); // 5e (d5) valt buiten de cap
+});
