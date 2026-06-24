@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CATEGORIES, CATALOG, categoryMeta, itemByKey, catalogByCategory, searchCatalog,
+  CATEGORIES, CATALOG, categoryMeta, itemByKey, itemByName, catalogByCategory, searchCatalog,
 } from '../lib/groceryCatalog.js';
 
 test('CATEGORIES: overig staat laatst (hoogste sort) en is uniek', () => {
@@ -79,4 +79,21 @@ test('searchCatalog: normaliseert (hoofdletters/diacrieten), geen match → leeg
   const items = [{ key: 'c', name: 'Crème fraîche', category: 'zuivel' }];
   assert.equal(searchCatalog('CREME', items).length, 1);
   assert.equal(searchCatalog('xyz', items).length, 0);
+});
+
+test('itemByName: vindt een catalogus-item op genormaliseerde naam', () => {
+  const it = itemByName('  MELK ');
+  assert.equal(it && it.key, 'melk');
+});
+
+test('itemByName: matcht ondanks maat-/hoeveelheidsruis in de naam', () => {
+  // normalize dempt "1L" e.d. → 'halfvolle melk'
+  const it = itemByName('Halfvolle melk 1L');
+  assert.equal(it && it.key, 'halfvolle-melk');
+});
+
+test('itemByName: onbekende naam → null', () => {
+  assert.equal(itemByName('bestaat-niet-xyz'), null);
+  assert.equal(itemByName(''), null);
+  assert.equal(itemByName(null), null);
 });

@@ -87,6 +87,7 @@ export const GROUPS = [
   // mutaties daarop zijn ruis, zelfde redenering als i18n. De helper-LOGICA wordt wél gemuteerd.
   { test: 'groceryCatalog', srcs: ['lib/groceryCatalog.js'], exclude: ['StringLiteral'] },
   { test: 'productImage', srcs: ['lib/productImage.js'] },
+  { test: 'quantity', srcs: ['lib/quantity.js'] },
   { test: 'widgets', srcs: ['lib/widgets/grid.js', 'lib/widgets/summaries.js'] },
   // colorSchemes.js is een kleur/stijl-datatabel; StringLiteral = hex/kleurnamen (data).
   { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },

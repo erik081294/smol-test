@@ -1,33 +1,28 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, SectionList, ScrollView, TextInput, RefreshControl, Platform, Modal, Pressable } from 'react-native';
+import { View, Text, FlatList, ScrollView, TextInput, RefreshControl, Platform, Pressable } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useGroceries } from '../../lib/useGroceries';
 import { useProducts, useProductFrequencies } from '../../lib/useProducts';
 import { frequencyLabel } from '../../lib/buyFrequency';
-import { useCatalogCategories } from '../../lib/useCatalog';
-import { groupFavorites, topFavorites, hiddenProducts } from '../../lib/favoriteGroceries';
 import { useToast } from '../../lib/toast';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, ModalHeader, SwipeRow, Button } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, SwipeRow, Button, Stepper } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { EtenNav } from '../../lib/EtenNav';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
-import { t, plural } from '../../lib/i18n';
+import { parseQuantity, formatQuantity } from '../../lib/quantity';
+import { t } from '../../lib/i18n';
 
 export default function Boodschappen() {
   const dialog = useDialog();
-  const { items, loading, reload, add: addItem, toggle: toggleItem, remove: removeItem, removeMany } = useGroceries();
-  const { products, suggestFor, setHidden } = useProducts();
+  const { items, loading, reload, add: addItem, toggle: toggleItem, setQuantity, remove: removeItem, removeMany } = useGroceries();
+  const { products, suggestFor } = useProducts();
   const { byProduct: freqByProduct } = useProductFrequencies();
-  const { categories: productCategories } = useCatalogCategories();
   const toast = useToast();
   const router = useRouter();
   const [text, setText] = useState('');
-  const [favOpen, setFavOpen] = useState(false);   // "Vaste boodschappen"-sheet
-  const [favQuery, setFavQuery] = useState('');
-  const [showHidden, setShowHidden] = useState(false);
 
   // Catalogus-suggesties terwijl je typt (BOO-5): koppel een boodschap aan een
   // bestaand product zodat de prijsdata uit normaal gebruik groeit.
@@ -57,31 +52,6 @@ export default function Boodschappen() {
     [items, hiddenIds]
   );
 
-  // "Vaste boodschappen": een "Meest gekozen"-snelkoppeling bovenaan + je producten per
-  // schap (op gebruik gesorteerd). Verborgen producten vallen overal uit, behalve in een
-  // optionele "Verborgen"-sectie om ze weer te tonen. Producten die al op de open lijst
-  // staan tonen we als "✓ op je lijst" (geen dubbele toevoeging).
-  const favGroups = useMemo(
-    () => groupFavorites(products, productCategories, { query: favQuery }),
-    [products, productCategories, favQuery]
-  );
-  const favTop = useMemo(() => topFavorites(products, { n: 8 }), [products]);
-  const favHidden = useMemo(() => hiddenProducts(products, { query: favQuery }), [products, favQuery]);
-  const hiddenCount = useMemo(() => products.filter((p) => p.hidden).length, [products]);
-
-  // Secties voor de SectionList: top (alleen zonder filter) → schappen → verborgen (alleen
-  // als "toon verborgen" aan staat). `kind` stuurt de rij-rendering.
-  const favSections = useMemo(() => {
-    // Een product kan in "Meest gekozen" én in zijn schap staan; geef de rij een
-    // sectie-gebonden key zodat React geen dubbele keys ziet.
-    const tag = (sectionKey, arr) => arr.map((p) => ({ ...p, _favKey: `${sectionKey}:${p.id}` }));
-    const out = [];
-    if (!favQuery && favTop.length) out.push({ key: '__top__', label: t('groceries.favorites.top'), emoji: '⭐', kind: 'top', data: tag('top', favTop) });
-    for (const g of favGroups) out.push({ ...g, kind: 'group', data: tag(g.key, g.items) });
-    if (showHidden && favHidden.length) out.push({ key: '__hidden__', label: t('groceries.favorites.hidden'), emoji: '🙈', kind: 'hidden', data: tag('hidden', favHidden) });
-    return out;
-  }, [favQuery, favTop, favGroups, showHidden, favHidden]);
-
   const openProductIds = useMemo(
     () => new Set(open.map((i) => i.product_id).filter(Boolean)),
     [open]
@@ -100,25 +70,6 @@ export default function Boodschappen() {
       .sort((a, b) => b.est.dueScore - a.est.dueScore)
       .slice(0, 6);
   }, [products, freqByProduct, openProductIds, text]);
-  const addFavorite = (product) => {
-    if (openProductIds.has(product.id)) { toast.show({ message: t('groceries.favorites.onlist') }); return; }
-    addItem(product.name, product.id).catch((e) => dialog.alert({ title: t('groceries.error.add'), body: e.message }));
-    toast.show({ message: t('groceries.favorites.added', { name: product.name }) });
-  };
-  // Verbergen is subtiel (lang indrukken) en meteen terug te draaien via de toast.
-  const hideFavorite = (product) => {
-    animateNextLayout();
-    setHidden(product.id, true).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
-    toast.show({
-      message: t('groceries.favorites.hide.done', { name: product.name }),
-      actionLabel: t('common.undo'),
-      onAction: () => { animateNextLayout(); setHidden(product.id, false).catch(() => {}); },
-    });
-  };
-  const unhideFavorite = (product) => {
-    animateNextLayout();
-    setHidden(product.id, false).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
-  };
 
   const add = async () => {
     const name = text.trim();
@@ -131,6 +82,13 @@ export default function Boodschappen() {
   const toggle = async (item) => {
     animateNextLayout(); // het item glijdt zacht tussen "te halen" en "afgevinkt"
     try { await toggleItem(item); } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+  };
+
+  // Aantal op een open rij bijstellen via de compacte stepper. Eén stuks → quantity leeg
+  // (rustige rij); vanaf twee "<n> <eenheid>" (eenheid komt mee uit de bestaande waarde).
+  const changeQuantity = (item, n) => {
+    const { unit } = parseQuantity(item.quantity);
+    setQuantity(item, formatQuantity(n, unit)).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   // Eén item wissen is óók terug te draaien: verberg het lokaal, verwijder pas
@@ -167,32 +125,40 @@ export default function Boodschappen() {
     });
   };
 
-  const renderRow = (item) => (
-    <SwipeRow
-      left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}
-      right={{ icon: 'check', label: t('groceries.check'), color: colors.done, onTrigger: () => toggle(item) }}
-    >
-      <ItemRow
-        leading={
-          <Checkbox
-            checked={item.checked}
-            onPress={() => toggle(item)}
-            shape="round"
-            size={24}
-            color={item.checked ? colors.done : colors.inkFaint}
-            accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`}
-          />
-        }
-        title={item.name}
-        titleColor={item.checked ? colors.inkFaint : undefined}
-        strikethrough={item.checked}
-        dimmed={item.checked}
-        meta={item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
-        onPress={() => toggle(item)}
-        accessibilityHint={t('a11y.tapToToggle')}
-      />
-    </SwipeRow>
-  );
+  const renderRow = (item) => {
+    const { count } = parseQuantity(item.quantity);
+    return (
+      <SwipeRow
+        left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}
+        right={{ icon: 'check', label: t('groceries.check'), color: colors.done, onTrigger: () => toggle(item) }}
+      >
+        <ItemRow
+          leading={
+            <Checkbox
+              checked={item.checked}
+              onPress={() => toggle(item)}
+              shape="round"
+              size={24}
+              color={item.checked ? colors.done : colors.inkFaint}
+              accessibilityLabel={`${item.name}, ${item.checked ? t('a11y.checked') : t('a11y.unchecked')}`}
+            />
+          }
+          title={item.name}
+          titleColor={item.checked ? colors.inkFaint : undefined}
+          strikethrough={item.checked}
+          dimmed={item.checked}
+          // Afgevinkt: aantal als rustige caption. Open: bewerkbaar via de stepper hiernaast.
+          meta={item.checked && item.quantity ? <Text style={type.caption}>{item.quantity}</Text> : undefined}
+          onPress={() => toggle(item)}
+          accessibilityHint={t('a11y.tapToToggle')}
+          trailing={item.checked ? undefined : (
+            <Stepper compact value={count} min={1} max={99}
+              onChange={(v) => changeQuantity(item, v)} accessibilityLabel={t('catalog.qty')} />
+          )}
+        />
+      </SwipeRow>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -218,19 +184,18 @@ export default function Boodschappen() {
           onPress={add} style={{ backgroundColor: colors.ocher }} />
       </View>
 
-      {/* In-scherm navigatie i.p.v. de drie cryptische header-iconen (UXR-3): de catalogus
-          is de hoofd-ingang om toe te voegen; vaste boodschappen + bon zijn secundair én
-          gelabeld, zodat de navigatie klip en klaar in beeld staat. */}
-      <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.xs }}>
+      {/* Eén heldere ingang naar de catalogus (bladeren, eerder gekozen, zelf toevoegen);
+          bon invoeren is een rustige tweede-orde-link eronder. */}
+      <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
         <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
-        <Row gap={space.sm}>
-          <View style={{ flex: 1 }}>
-            <Button title={t('groceries.favorites')} icon="repeat" variant="ghost" onPress={() => setFavOpen(true)} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button title={t('groceries.receipt')} icon="receipt" variant="ghost" onPress={() => router.push('/purchase/new')} />
-          </View>
-        </Row>
+        <Pressable onPress={() => router.push('/purchase/new')} hitSlop={8}
+          accessibilityRole="button" accessibilityLabel={t('groceries.receipt')}
+          style={{ alignSelf: 'center', paddingVertical: space.xs, marginTop: space.xs }}>
+          <Row gap={4} align="center">
+            <Icon name="receipt" size={14} color={colors.inkFaint} />
+            <Text style={[type.caption, { color: colors.inkSoft }]}>{t('groceries.receipt')}</Text>
+          </Row>
+        </Pressable>
       </View>
 
       {productHints.length > 0 ? (
@@ -283,7 +248,7 @@ export default function Boodschappen() {
           ) : !loading && items.length === 0 ? (
             <Empty illustration="groceries" title={t('groceries.empty.title')}
               subtitle={t('groceries.empty.subtitle')}
-              actionTitle={t('groceries.favorites')} onAction={() => setFavOpen(true)} />
+              actionTitle={t('catalog.open')} onAction={() => router.push('/catalog')} />
           ) : null
         }
         ListFooterComponent={
@@ -299,99 +264,6 @@ export default function Boodschappen() {
           ) : null
         }
       />
-
-      {/* "Vaste boodschappen": je eigen producten, per schap, op gebruik gesorteerd.
-          Eén tik = op de lijst (blijft open voor meerdere). De prijstracker zit op de
-          chevron ernaast. Producten die al op de lijst staan tonen we als "✓ op je lijst". */}
-      <Modal visible={favOpen} animationType="slide" onRequestClose={() => setFavOpen(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-          <ModalHeader title={t('groceries.favorites.title')} onClose={() => setFavOpen(false)} />
-          <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-            <TextInput
-              value={favQuery} onChangeText={setFavQuery}
-              placeholder={t('groceries.favorites.filter')} placeholderTextColor={colors.inkFaint}
-              accessibilityLabel={t('groceries.favorites.filter')}
-              style={{
-                minHeight: touchTarget, backgroundColor: colors.surface, borderRadius: radius.md,
-                borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md,
-                paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
-              }}
-            />
-            {hiddenCount > 0 ? (
-              <Pressable
-                onPress={() => setShowHidden((s) => !s)} hitSlop={8}
-                accessibilityRole="button"
-                style={{ alignSelf: 'flex-end', paddingVertical: space.xs }}
-              >
-                <Text style={[type.caption, { color: colors.forest }]}>
-                  {showHidden ? t('groceries.favorites.hideHidden')
-                    : plural(hiddenCount, 'groceries.favorites.showHidden.one', 'groceries.favorites.showHidden.other')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <SectionList
-            sections={favSections}
-            keyExtractor={(p) => p._favKey}
-            contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
-            stickySectionHeadersEnabled={false}
-            keyboardShouldPersistTaps="handled"
-            renderSectionHeader={({ section }) => (
-              <SectionHeader title={`${section.emoji ? `${section.emoji} ` : ''}${section.label}`} count={section.data.length} />
-            )}
-            renderItem={({ item, section }) => {
-              // Verborgen-sectie: tik = weer tonen.
-              if (section.kind === 'hidden') {
-                return (
-                  <ItemRow
-                    leading={<Icon name="catalog" size={20} color={colors.inkFaint} />}
-                    title={item.name}
-                    titleColor={colors.inkFaint}
-                    onPress={() => unhideFavorite(item)}
-                    accessibilityLabel={`${item.name} — ${t('groceries.favorites.unhide')}`}
-                    trailing={<Text style={[type.caption, { color: colors.forest }]}>{t('groceries.favorites.unhide')}</Text>}
-                  />
-                );
-              }
-              const onList = openProductIds.has(item.id);
-              return (
-                <ItemRow
-                  leading={
-                    <View style={{
-                      width: 32, height: 32, borderRadius: 16,
-                      backgroundColor: onList ? colors.forestTint : colors.ocherSoft,
-                      alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Icon name={onList ? 'check' : 'add'} size={18} color={colors.forest} weight="bold" />
-                    </View>
-                  }
-                  title={item.name}
-                  titleColor={onList ? colors.inkFaint : undefined}
-                  meta={
-                    onList ? <Text style={type.caption}>{t('groceries.favorites.onlist')}</Text>
-                      : item.times_added > 0
-                        ? <Text style={type.caption}>{plural(item.times_added, 'groceries.favorites.times.one', 'groceries.favorites.times.other')}</Text>
-                        : undefined
-                  }
-                  onPress={() => addFavorite(item)}
-                  onLongPress={() => hideFavorite(item)}
-                  accessibilityLabel={onList ? t('groceries.favorites.onlist') : t('catalog.add', { name: item.name })}
-                  accessibilityHint={t('groceries.favorites.longpress')}
-                  trailing={
-                    <IconButton icon="price" size={20} tint={colors.inkFaint}
-                      accessibilityLabel={t('groceries.favorites.detail')}
-                      onPress={() => { setFavOpen(false); router.push(`/product/${item.id}`); }} />
-                  }
-                />
-              );
-            }}
-            ListEmptyComponent={
-              <Empty illustration="groceries" title={t('groceries.favorites.empty.title')}
-                subtitle={t('groceries.favorites.empty.subtitle')} />
-            }
-          />
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
