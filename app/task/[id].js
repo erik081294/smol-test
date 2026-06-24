@@ -43,7 +43,7 @@ export default function TaskEditor() {
   const router = useRouter();
   const toast = useToast();
   const { addTask, updateTask, deleteTask } = useTasks();
-  const { tags, addTag } = useTags();
+  const { tags, addTag, deleteTag } = useTags();
   const { members, subgroups } = useHousehold();
 
   const [loaded, setLoaded] = useState(isNew);
@@ -233,9 +233,21 @@ export default function TaskEditor() {
         </Pressable>
       )}
 
-      {/* Labels — zelfgemaakte, gekleurde tags voor maximale flexibiliteit (UX-41). */}
+      {/* Labels — zelfgemaakte, gekleurde tags voor maximale flexibiliteit (UX-41).
+          Lang indrukken verwijdert een label; het is huishouden-breed, dus eerst bevestigen. */}
       <TagPicker tags={tags} selectedIds={tagIds} onCreate={addTag}
-        onToggle={(id) => setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))} />
+        onToggle={(id) => setTagIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+        onDelete={async (tag) => {
+          const ok = await dialog.confirm({
+            title: t('task.tags.delete.title', { name: tag.name }),
+            body: t('task.tags.delete.body'),
+            tone: 'danger',
+            confirmLabel: t('common.delete'),
+          });
+          if (!ok) return;
+          setTagIds((ids) => ids.filter((x) => x !== tag.id));
+          deleteTag(tag.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
+        }} />
 
       {/* Wanneer — standaard vandaag; tik op de datum (of het icoon) om te kiezen (UX-36). */}
       <Text style={[type.label, { marginBottom: 8 }]}>{t('task.field.when')}</Text>
