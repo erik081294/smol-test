@@ -264,6 +264,10 @@ test('mealPlanSummary: vanavond + lege (komende) dagen deze week', () => {
   assert.equal(s.week[0].planned, true);
   assert.equal(s.week[1].planned, false); // 23 leeg
   assert.equal(s.week[2].planned, true);  // 24 gepland
+  // upcoming: geplande dagen vanaf vandaag, met hun (diner-)entry
+  assert.deepEqual(s.upcoming.map((u) => u.date), ['2026-06-22', '2026-06-24']);
+  assert.equal(s.upcoming[0].entry.recipe.title, 'Pasta');
+  assert.equal(s.upcoming[1].entry.title, 'Soep');
 });
 
 test('mealPlanSummary: niets gepland → tonight null, hele week leeg vanaf vandaag', () => {
