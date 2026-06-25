@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Modal, ScrollView } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, SectionList, RefreshControl, Modal, ScrollView, Platform } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, addDays, parseISO } from 'date-fns';
@@ -10,7 +10,7 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import { status, daysUntil, sortByUrgency, PANTRY_STATUS } from '../../lib/pantry';
 import {
-  Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Stack,
+  Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row,
   Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
@@ -42,6 +42,40 @@ function bestBeforeLabel(item) {
   return t('pantry.bestBefore.days', { n: d });
 }
 
+// Gememoïseerde voorraadrij op moduleniveau (PERF-5, `GroceryRow`-patroon): alleen de
+// rij waarvan het item wijzigt hertekent. De handlers komen als stabiele callbacks binnen.
+const PantryRow = React.memo(function PantryRow({ item, onRemove, onEdit, onAdjust, onToList }) {
+  const st = status(item);
+  const bb = bestBeforeLabel(item);
+  return (
+    <SwipeRow
+      left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onRemove(item) }}>
+      <ItemRow
+        leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
+        title={item.name}
+        meta={
+          <Row gap={space.sm}>
+            <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
+            {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
+          </Row>
+        }
+        onPress={() => onEdit(item)}
+        accessibilityHint={t('pantry.editHint')}
+        trailing={
+          <Row gap={2}>
+            <IconButton icon="back" size={18} tint={colors.inkSoft}
+              accessibilityLabel={t('pantry.less')} onPress={() => onAdjust(item, -1)} />
+            <IconButton icon="forward" size={18} tint={colors.forest}
+              accessibilityLabel={t('pantry.more')} onPress={() => onAdjust(item, +1)} />
+            <IconButton icon="shopping" size={18} tint={colors.ocher}
+              accessibilityLabel={t('pantry.toList')} onPress={() => onToList(item)} />
+          </Row>
+        }
+      />
+    </SwipeRow>
+  );
+});
+
 export default function Voorraad() {
   const dialog = useDialog();
   const { items, loading, reload, add, update, adjustQuantity, remove, removeMany } = usePantry();
@@ -60,12 +94,16 @@ export default function Voorraad() {
   );
   const expired = useMemo(() => visible.filter((i) => status(i) === PANTRY_STATUS.EXPIRED), [visible]);
 
-  // Per bewaarplaats groeperen voor de "plaats"-weergave.
+  // Eén SectionList voor beide views (PERF-5): "plaats" groepeert per bewaarplaats,
+  // "urgentie" is één naamloze sectie. Zo blijft alles gevirtualiseerd i.p.v. de hele
+  // voorraad in een ListHeaderComponent te monteren.
   const sections = useMemo(() => {
-    if (view !== 'plaats') return null;
-    return PANTRY_LOCATIONS
-      .map((loc) => ({ loc, rows: sorted.filter((i) => i.location === loc) }))
-      .filter((s) => s.rows.length > 0);
+    if (view === 'plaats') {
+      return PANTRY_LOCATIONS
+        .map((loc) => ({ key: loc, title: t(`location.${loc}`), data: sorted.filter((i) => i.location === loc) }))
+        .filter((s) => s.data.length > 0);
+    }
+    return sorted.length ? [{ key: 'all', title: null, data: sorted }] : [];
   }, [view, sorted]);
 
   // Op de boodschappenlijst zetten — koppel meteen aan het (catalogus)product
@@ -111,39 +149,16 @@ export default function Voorraad() {
     });
   };
 
-  const renderRow = (item) => {
-    const st = status(item);
-    const bb = bestBeforeLabel(item);
-    return (
-      <SwipeRow key={item.id}
-        left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeWithUndo(item) }}>
-        <ItemRow
-          leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
-          title={item.name}
-          meta={
-            <Row gap={space.sm}>
-              <Text style={type.caption}>{(+item.quantity).toLocaleString('nl-NL')} {item.unit}</Text>
-              {bb ? <Badge label={bb} tone={STATUS_TONE[st]} /> : null}
-            </Row>
-          }
-          onPress={() => setEditor(item)}
-          accessibilityHint={t('pantry.editHint')}
-          trailing={
-            <Row gap={2}>
-              <IconButton icon="back" size={18} tint={colors.inkSoft}
-                accessibilityLabel={t('pantry.less')} onPress={() => adjustQuantity(item, -1)} />
-              <IconButton icon="forward" size={18} tint={colors.forest}
-                accessibilityLabel={t('pantry.more')} onPress={() => adjustQuantity(item, +1)} />
-              <IconButton icon="shopping" size={18} tint={colors.ocher}
-                accessibilityLabel={t('pantry.toList')} onPress={() => toList(item)} />
-            </Row>
-          }
-        />
-      </SwipeRow>
-    );
-  };
-
-  const listData = view === 'plaats' ? [] : sorted;
+  // Stabiele handlers naar de laatste closures (PERF-5, `GroceryRow`-patroon) zodat de
+  // gememoïseerde PantryRow niet hertekent door wisselende callback-identiteiten.
+  const removeRef = useRef(); const adjustRef = useRef(); const toListRef = useRef();
+  useEffect(() => { removeRef.current = removeWithUndo; adjustRef.current = adjustQuantity; toListRef.current = toList; });
+  const onRemove = useCallback((item) => removeRef.current(item), []);
+  const onAdjust = useCallback((item, d) => adjustRef.current(item, d), []);
+  const onToList = useCallback((item) => toListRef.current(item), []);
+  const renderItem = useCallback(({ item }) => (
+    <PantryRow item={item} onRemove={onRemove} onEdit={setEditor} onAdjust={onAdjust} onToList={onToList} />
+  ), [onRemove, onAdjust, onToList]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -166,24 +181,21 @@ export default function Voorraad() {
         </View>
       ) : null}
 
-      <FlatList
+      <SectionList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: 96 }}
-        data={listData}
+        sections={sections}
         keyExtractor={(i) => i.id}
+        stickySectionHeadersEnabled={false}
+        // Virtualisatie-afstelling, gelijk aan app/catalog.js (PERF-9).
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
-        renderItem={({ item }) => renderRow(item)}
-        ListHeaderComponent={
-          view === 'plaats' && sections
-            ? <Stack gap={space.md}>
-                {sections.map((s) => (
-                  <View key={s.loc}>
-                    <SectionHeader title={t(`location.${s.loc}`)} count={s.rows.length} />
-                    {s.rows.map((item) => renderRow(item))}
-                  </View>
-                ))}
-              </Stack>
-            : null
-        }
+        renderItem={renderItem}
+        renderSectionHeader={({ section }) => (
+          section.title ? <SectionHeader title={section.title} count={section.data.length} /> : null
+        )}
         ListEmptyComponent={
           loading && items.length === 0 ? (
             <ListSkeleton count={5} />
