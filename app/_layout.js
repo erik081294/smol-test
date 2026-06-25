@@ -44,6 +44,10 @@ function Gate({ themeMode }) {
     if (route === 'loading') return;
     const group = segments[0];
 
+    // Het uitnodigings-/join-scherm (PLT-7) regelt zijn eigen auth-staat (preview vóór
+    // inloggen, accepteren erna). De Gate stuurt het niet weg, ongeacht in-/uitgelogd.
+    if (group === 'join') return;
+
     if (route === 'auth') {
       if (group !== '(auth)') router.replace('/(auth)/welcome');
       return;
@@ -72,6 +76,7 @@ function Gate({ themeMode }) {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="join" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="task" options={{ presentation: 'modal' }} />
         <Stack.Screen name="expense" options={{ presentation: 'modal' }} />

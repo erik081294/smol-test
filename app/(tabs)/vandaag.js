@@ -11,6 +11,7 @@ import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
+import { PendingInviteBanner } from '../../lib/PendingInviteBanner';
 import { dayProgress } from '../../lib/widgets/summaries';
 import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
@@ -235,6 +236,10 @@ export default function Home() {
           loading={loading}
           onPress={() => router.push('/(tabs)/taken')}
         />
+
+        {/* Melding van een openstaande uitnodiging (PLT-7) — voor wie al een huishouden
+            heeft en naar een tweede wordt uitgenodigd; landt hier i.p.v. op onboarding. */}
+        <PendingInviteBanner />
 
         {/* Foutstaat (UX-23): een mislukte (her)laadbeurt — bv. offline — toont een
             nette banner met opnieuw-proberen i.p.v. een stil leeg scherm. */}

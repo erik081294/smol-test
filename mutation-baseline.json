@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-22T22:13:43.237Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 3040,
-    "total": 3556,
-    "score": 85.5
+    "killed": 3106,
+    "total": 3627,
+    "score": 85.6
   },
   "files": {
     "lib/activity.js": {
@@ -76,6 +76,11 @@
       "killed": 70,
       "total": 79,
       "score": 88.6
+    },
+    "lib/invites.js": {
+      "killed": 66,
+      "total": 71,
+      "score": 93
     },
     "lib/mealPlan.js": {
       "killed": 69,

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHousehold } from '../lib/household';
 import { useAuth } from '../lib/auth';
 import { Button, Field, Card, EmojiPicker } from '../lib/ui';
+import { PendingInviteBanner } from '../lib/PendingInviteBanner';
 import { colors, type, space } from '../lib/theme';
 import { t } from '../lib/i18n';
 
@@ -44,6 +45,9 @@ export default function Onboarding() {
         <Text style={[type.body, { color: colors.inkSoft, marginTop: 6, marginBottom: 24 }]}>
           {t('onboarding.subtitle')}
         </Text>
+
+        {/* Melding van een openstaande uitnodiging (PLT-7) — de invitee landt hier. */}
+        <PendingInviteBanner />
 
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
           <Button title={t('onboarding.tab.create')} variant={tab === 'create' ? 'primary' : 'soft'}
