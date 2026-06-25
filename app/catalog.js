@@ -41,7 +41,8 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
         {entry.isRecent ? (
           <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
-            style={{ width: 28, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+            // Volwaardig 44pt-aanraakdoel (A11Y-2/A5) i.p.v. de eerdere krappe 28×36.
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="close" size={15} color={colors.inkFaint} />
           </Pressable>
         ) : null}
