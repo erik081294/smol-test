@@ -19,7 +19,7 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 > notificaties, de Vandaag-widgetgrid en het taken-redesign). **Nieuw (2026-06-24/25):** drie
 > multi-agent-doorlichtingen — performance ([plan 16](docs/plans/16-performance-audit.md)),
 > security ([plan 17](docs/plans/17-security-remediatie.md)) en UX/a11y/correctheid ([plan 18](docs/plans/18-ux-verbeterplan.md))
-> — zijn geconsolideerd in §6 (PERF-3…9, SEC-1…7, A11Y-1/2, UX-43/44, INF-11, BOO-12); **SEC-1**
+> — zijn geconsolideerd in §6 (PERF-3…9, SEC-1…7, A11Y-1/2, UX-43/44, INF-11); **SEC-1**
 > (owner-escalatie) is kritiek en hoort vóór nieuw feature-werk. De keuken-/boodschappen-redesign-ronde
 > ([plan 15](docs/plans/15-keuken-boodschappen-widgets.md), branch `feat/boodschappen-redesign`) is op
 > toestel geverifieerd (2026-06-25, moto via USB): `npm test` + mutatie-ratchet + lint groen en de
@@ -357,7 +357,6 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | BOO-11 | Boodschappen | Vaste boodschappen (snel toevoegen uit je repertoire) | Next | Should | M | 🔧 | BOO-5 | **Gebouwd** (`lib/favoriteGroceries.js`, migr. `0029`/`0030`): eigen `products` per schap, één-tik toevoegen, "Meest gekozen". **Rest:** rendering/realtime op toestel. |
 | BOO-9 | Boodschappen | Barcode scannen → catalogus | Next | Should | M | ◐ | BOO-5, VOO-1 | **Datalaag af; scanner-UI device-gated** (`lib/barcode.js`/`openFoodFacts.js`, RPC `insert_catalog_product`, migr. `0027`/`0031`). **Rest (dev build):** `expo-camera`-scanner + scan-knop. |
 | BOO-10 | Boodschappen | Bonnen bewerkbaar maken | Next | Could | M | 🔧 | BOO-2 | **Gebouwd** (`update_purchase`-RPC, migr. `0033`): "Bewerken" opent de bon in de editor. **Rest:** op toestel. |
-| BOO-12 | Boodschappen | Decimale hoeveelheid-invoer | Next | Could | S | ⏳ | BOO-5 | Bevinding C2 ([plan 18](docs/plans/18-ux-verbeterplan.md)): `parseQuantity('2.5 kg')` kapt af ([`lib/quantity.js:13`](lib/quantity.js#L13)). Beslis decimaal-support → regex+round-trip-test, óf test die het afgekapte gedrag vastlegt. Pure → ratchet groen. |
 | PLA-6 | Planten | AI-soortherkenning | Later | Could | L | ⏳ | PLA-1 | Plant-ID API of eigen model; handmatige keuze blijft terugval. |
 | PLA-9 | Planten | Bulk planten toevoegen ("plant-rondje" met rollende camera) | Later | Could | L | ⏳ | PLA-1, UX-7 | **Idee:** doorlopende camera-flow plant ná plant (foto+naam+notitie), elk direct `addPlant`. Leunt op UX-7 (`CaptureSession`). Dev build; geen migratie. |
 | HUI-1 | Huisdieren | Huisdier-verzorging (module) | Next | Should | L | 🔧 | — | **Gebouwd (migr. `0038`, live):** `pets`/`pet_log` + bucket; `lib/petCare.js` (8 typen) → checklist die `tasks` (cat. `huisdier`) aanmaakt; tijdlijn+gewicht. **Rest:** foto/checklist/tijdlijn/realtime op toestel. |
