@@ -62,7 +62,19 @@ async function readIndex() {
   return res.text();
 }
 
+// SSRF/pad-traversal-gordel (SEC-7/L3): de bestandsnamen komen uit OFF's externe
+// index.txt. Sta alleen platte, simpele namen toe — geen schuine strepen, geen
+// '..', geen schema/host — zodat een vervuilde index nooit een willekeurige URL of
+// lokaal pad kan bereiken.
+function assertSafeDeltaName(filename) {
+  if (typeof filename !== 'string' || !/^[A-Za-z0-9._-]+$/.test(filename) || filename.includes('..')) {
+    throw new Error(`onveilige deltabestandsnaam geweigerd: ${JSON.stringify(filename)}`);
+  }
+  return filename;
+}
+
 async function openDelta(filename) {
+  assertSafeDeltaName(filename);
   if (LOCAL) return createReadStream(join(LOCAL, filename));
   const res = await fetch(`${DELTA_BASE}/${filename}`, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`${filename} ${res.status}`);
