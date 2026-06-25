@@ -78,6 +78,7 @@ export const GROUPS = [
   { test: 'recurringExpense', srcs: ['lib/recurringExpense.js'] },
   { test: 'reservations', srcs: ['lib/reservations.js'] },
   { test: 'rotation', srcs: ['lib/rotation.js'] },
+  { test: 'timeline', srcs: ['lib/timeline.js'] },
   { test: 'visibility', srcs: ['lib/visibility.js'] },
   // offCategoryMap.js is een token-regeltabel (data); StringLiteral-mutaties op die
   // tokens zijn ruis — de test dekt de match-LOGICA + representatieve mappings, niet
