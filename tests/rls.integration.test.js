@@ -28,17 +28,60 @@ const admin = ENABLED ? createClient(URL, SERVICE, { auth: { persistSession: fal
 const created = []; // user-ids om op te ruimen
 const tag = `rlstest+${Date.now()}`;
 
+// INF-12 — auth-rate-limit dempen. De gehoste Supabase-auth limiteert het
+// sign-in-/token-endpoint; een volledige run doet ~50 logins en zonder demping
+// vallen de laatste om op "Request rate limit reached". We (a) serialiseren alle
+// auth-calls met een minimale tussentijd zodat de burst de limiet niet raakt en
+// (b) herproberen rate-limit-fouten met exponentiële backoff zodat een al getript
+// venster netjes uitloopt i.p.v. de test te laten falen. Geen gedragsverandering
+// voor de RLS-checks zelf — alleen tempo.
+const AUTH_MIN_GAP_MS = 350;   // minimale tijd tussen twee auth-requests
+const AUTH_MAX_RETRIES = 8;    // pogingen vóór we de fout doorgeven aan de assert
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function isRateLimit(err) {
+  if (!err) return false;
+  const msg = String(err.message || '').toLowerCase();
+  return err.status === 429 || err.code === 'over_request_rate_limit' || msg.includes('rate limit');
+}
+
+let authChain = Promise.resolve(); // serialiseert auth-calls; pauzeert ook de wachtenden tijdens backoff
+let lastAuthAt = 0;
+
+// Voert één auth-call (`fn` → `{ data?, error? }`) uit met tussentijd + backoff.
+// Serialiseren via een keten houdt ook bij ingeschakelde test-concurrency de
+// auth-requests op één rij — en laat een backoff de hele wachtrij meedraaien,
+// wat de burst drainset.
+function throttledAuth(fn) {
+  const run = async () => {
+    let res;
+    for (let attempt = 0; attempt <= AUTH_MAX_RETRIES; attempt++) {
+      const gap = AUTH_MIN_GAP_MS - (Date.now() - lastAuthAt);
+      if (gap > 0) await sleep(gap);
+      res = await fn();
+      lastAuthAt = Date.now();
+      if (!isRateLimit(res?.error)) return res;
+      // Backoff: 1s, 2s, 4s, … gecapt op 30s, met jitter tegen synchroon herproberen.
+      await sleep(Math.min(30000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 400));
+    }
+    return res; // laatste (nog steeds rate-limited) resultaat → caller-assert faalt netjes
+  };
+  const result = authChain.then(run, run);
+  authChain = result.then(() => {}, () => {});
+  return result;
+}
+
 // Maakt een bevestigde gebruiker + ingelogde anon-client voor die persoon.
 async function makeUser(name) {
   const email = `${tag}.${name}@example.com`;
   const password = 'Test1234!passphrase';
-  const { data, error } = await admin.auth.admin.createUser({
+  const { data, error } = await throttledAuth(() => admin.auth.admin.createUser({
     email, password, email_confirm: true, user_metadata: { display_name: name },
-  });
+  }));
   assert.ok(!error, `gebruiker aanmaken (${name}): ${error?.message}`);
   created.push(data.user.id);
   const client = createClient(URL, ANON, { auth: { persistSession: false } });
-  const { error: signErr } = await client.auth.signInWithPassword({ email, password });
+  const { error: signErr } = await throttledAuth(() => client.auth.signInWithPassword({ email, password }));
   assert.ok(!signErr, `inloggen (${name}): ${signErr?.message}`);
   return { id: data.user.id, client };
 }
