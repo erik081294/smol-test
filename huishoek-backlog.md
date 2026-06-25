@@ -208,6 +208,39 @@ die terugkerende `tasks` aanmaken) en op de Kosten-laag (§3) voor het geld.
 > deeplinkbaar. Km-gebaseerd plannen vraagt periodiek een km-stand-update; houd dat licht (een prompt,
 > geen sensor) en degradeer naar datum-only zolang er (nog) geen km-stand bekend is.
 
+### 📰 Tijdlijn / Prikbord — het sociale hart (upgrade van Activiteit)
+De huidige **Activiteit**-module (PLT-6) is een lees-only feed: een tijdlijn van afgevinkte taken,
+afgeleid uit de voltooiingen-log. We bouwen 'm uit tot een echt **prikbord met tijdlijn** — het
+sociale hart van het huishouden, in plaats van een passief logboek. De volledige, build-ready
+uitwerking staat in [`docs/plans/19-tijdlijn-prikbord.md`](docs/plans/19-tijdlijn-prikbord.md);
+hieronder het *waarom* en de vier samenstellende delen:
+
+- **Handgeschreven berichten met grote foto's** — een lid plaatst een bericht (tekst en/of meerdere
+  foto's groot in beeld), zichtbaar voor het huishouden of een subgroep (het bestaande
+  zichtbaarheidscontract). Dit is de **hoofdmoot** van de tijdlijn.
+- **Pinnen** — belangrijke berichten ("de wifi-code", "vakantie-checklist") blijven bovenaan staan.
+- **Reageren, twee niveaus** — een **emoji-reactie kan op álles**, ook op systeem-events (👏 onder
+  "Tim vinkte de afwas af" — motiverend); een **geschreven reactie (comment) kan alléén op
+  handgeschreven berichten**.
+- **Activiteit als laag eronder** — de automatische events (taak afgevinkt, uitgave toegevoegd,
+  plant water gehad, …) blijven bestaan, maar als een **samenvouwbare laag** onder de berichten,
+  niet kris-kras ertussen. De bestaande, bewust source-agnostische event-engine (`lib/activity.js`,
+  een `FORMATTERS`-registry per event-type) wordt hiervoor verbreed — precies waar die al op
+  voorgesorteerd was.
+
+> **Instelbaar — wat komt er wél/niet op?** De tijdlijn is filterbaar op vier assen: per **module**
+> (wel taken, geen boodschappen), per **gebeurtenis-type** (wel "taak voltooid", niet "lijst-item
+> toegevoegd"), per **persoon/lid**, en per **zichtbaarheid/subgroep** (die laatste leunt op FND-1).
+> Net als bij module-toggling zijn er **twee lagen**: het huishouden (owner) zet de basis, elk lid
+> verfijnt voor zichzelf — een huishouden-uitzetting wint van de gebruiker.
+>
+> **Aanpak — bouwvolgorde.** Begin met het fundament (berichten + foto's, TML-1; dit hernoemt de
+> `activiteit`-module naar `tijdlijn`), bouw daarna pinnen, reacties en comments erop (TML-2/3/4),
+> haal de events terug als samengevouwen laag (TML-5, de eigenlijke PLT-6-upgrade) en sluit af met de
+> filterinstellingen (TML-6/7, en TML-8 zodra subgroepen bestaan). Hergebruik overal beproefde lagen
+> — `enable_module_rls`, het kind-tabel-patroon van `plant_photos`, `photoPicker` (downscalet al), de
+> twee-lagen-toggle van `household_modules`/`user_module_prefs` — i.p.v. parallelle logica.
+
 ---
 
 ## 3. 💶 Kosten & informeel autodelen (WieBetaaltWat)
@@ -374,14 +407,23 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | AUT-3 | Autodelen | Tussen bevriende huishoudens | Later | Could | L | ⏳ | AUT-2 | Gedeelde subgroep over huishoudens; vertrouwens-/uitnodigingsmodel. |
 | MLT-3 | Maaltijden | Recept-foto | Next | Could | S | 🔧 | MLT-2 | **Gebouwd** (bucket `recipes`+RLS, migr. `0034`; gedeelde `lib/photoPicker.js`). **Rest:** kiezen/uploaden/tonen op toestel. |
 | VOO-2 | Voorraad | Voorraad vullen via barcode | Later | Could | S | ⏳ | BOO-9, VOO-1 | Scan-resultaat van BOO-9 ook als voorraad-item. Deelt de scan-flow; extra bestemming. |
+| TML-1 | Tijdlijn | Fundament: berichten posten (tekst + grote foto's) | Later | Should | L | ⏳ | PLT-6 | **Nieuwe module, vervangt Activiteit.** `timeline_posts`+`timeline_photos`+bucket `timeline` (zichtbaarheidscontract); compose tekst+multi-foto via `photoPicker`; hernoemt module `activiteit`→`tijdlijn`. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
+| TML-2 | Tijdlijn | Berichten pinnen | Later | Could | S | ⏳ | TML-1 | `pinned_at`/`pinned_by` (al in TML-1-schema) → gepind bovenaan via `orderTimeline`. Geen migratie. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
+| TML-3 | Tijdlijn | Emoji-reacties (op berichten én systeem-events) | Later | Should | M | ⏳ | TML-1 | `timeline_reactions` polymorf (`target_type`/`target_id`), togglebaar; events mét reactie vouwen niet samen. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
+| TML-4 | Tijdlijn | Tekstreacties/comments (alléén op berichten) | Later | Should | M | ⏳ | TML-1 | `timeline_comments` (kind-tabel, erft post-zichtbaarheid); thread onder de post. Systeem-events: geen comment. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
+| TML-5 | Tijdlijn | Systeem-events als samenvouwbare laag (PLT-6-upgrade) | Later | Should | M | ⏳ | TML-1, PLT-6 | `lib/activity.js`-`FORMATTERS` verbreden (uitgave/boodschap/plant/…) + multi-bron-fan-out; renderen als toggle-bare "Activiteit"-sectie onder de berichten. Geen migratie (afgeleid). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
+| TML-6 | Tijdlijn | Filterinstellingen (per module + event-type, twee lagen) | Later | Should | M | ⏳ | TML-5 | `lib/timelineFilter.js` (default-on, huishouden-uitzetting wint, vgl. `effectiveModules`) + `household_timeline_prefs`/`user_timeline_prefs` (spiegelen migr. `0004`). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
+| TML-7 | Tijdlijn | Filter per persoon/lid | Later | Could | S | ⏳ | TML-6 | `axis='member'` erbij in `timelineFilter` + ledenlijst-toggles. Geen extra migratie. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
+| TML-8 | Tijdlijn | Filter per zichtbaarheid/subgroep | Later | Could | M | ⏳ | TML-6, FND-1 | `axis='subgroup'` — **weergave**-filter bovenop de RLS. **Bewust uitgesteld tot FND-1** (subgroepen) bestaat. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
 | PLT-1 | Platform | Notificaties & herinneringen | Next | Should | M | 🔧 | — | **Plan [`05`](docs/plans/05-notificaties.md).** Trap 1 lokaal werkt; trap 2 remote `notify` productie-klaar (migr. `0018`/`0023` live). **Rest = flip-on** (secret, deploy, webhook, 2-account) — [`docs/notify-setup.md`](docs/notify-setup.md). **Gate: SEC-5.** |
-| PLT-6 | Platform | Activiteiten-/wijzigingenfeed | Next | Could | M | 🔧 | — | **Gebouwd** (`lib/activity.js`+`activiteit.js`, geen migratie). **Rest:** realtime bevestigen. **Bekend:** hernoeming ververst feed-titel niet realtime. |
+| PLT-6 | Platform | Activiteiten-/wijzigingenfeed | Next | Could | M | 🔧 | — | **Gebouwd** (`lib/activity.js`+`activiteit.js`, geen migratie). **Rest:** realtime bevestigen. **Bekend:** hernoeming ververst feed-titel niet realtime. **Wordt uitgebouwd tot de Tijdlijn/Prikbord-module (TML-1…8, [plan 19](docs/plans/19-tijdlijn-prikbord.md));** de event-engine `lib/activity.js` blijft de events-laag (TML-5). |
+| PLT-7 | Platform | Beter uitnodigingssysteem (persoonlijke 24u-link) | Next | Should | M | 🔧 | — | **Gebouwd:** migr. [`0053`](supabase/migrations/0053_household_invites.sql) (`household_invites` + DEFINER-RPC's `create_invite`/`peek_invite`(anon)/`accept_invite`/`revoke_invite`); `lib/invites.js` (units, ratchet **93%**); web-first join-scherm [`app/join/[token].js`](app/join/[token].js) (preview→auth→accept→download-placeholders) + pending-melding [`PendingInviteBanner`](lib/PendingInviteBanner.js) op onboarding/vandaag; invite-UI in [`huishouden.js`](app/(tabs)/huishouden.js) (rol vooraf lid/beheerder, delen via sharesheet, intrekken). Web-first & account-gebonden (geen deferred deep linking). **Rest:** migr. `0053` live zetten (via MCP `apply_migration`); **web-build hosten (EAS Hosting)** zodat `/join` op web werkt; **echte store-links** i.p.v. placeholders; RLS-test `accept/peek/revoke` + device/web-rooktest. Kind-rol → FND-3; wachtwoordloos → PLT-8. |
 | UX-7 | Platform/UX | In-app camera in eigen stijl (kader, overlay, feedback) | Later | Could | L | ⏳ | BOO-9, STR-4, MLT-3 | **Doel:** eigen camerascherm (`expo-camera`) + generiek `CaptureSession`-primitief (deelt met BOO-9, batch PLA-9). Dev build. |
 | INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | Now | Must | S | 🔧 | — | Migraties `0001`–`0036` live; kern-RLS 13/13 (`docs/rls-connector-check.sql`); suite 599 (578 pass/21 skip). **JS-RLS mét secrets live nu 21/21 groen** — de auth-rate-limit die ~3 flows liet omvallen is opgelost via **INF-12** (2026-06-25, 2× back-to-back bevestigd). SEC-ronde breidt de suite uit (SEC-1/SEC-4) + refactort naar `create_household`. **Rest:** 2-account-rooktest (`VERIFICATIE.md`). |
 | INF-3 | Platform | E2E-tests (Maestro) | Next | Should | M | 🔧 | — | **Scaffolds** (plan [`08`](docs/plans/08-professioneel-hardening.md)): 3 flows in `.maestro/`. **Rest:** kalibreren tegen een build. |
 | INF-4 | Platform | Foutrapportage/monitoring (Sentry) | Next | Should | S | 🔧 | — | **Gewired** (plan [`08`](docs/plans/08-professioneel-hardening.md)): `lib/monitoring.js` env-gated + `ErrorBoundary`. **Rest:** DSN + build. |
 | INF-5 | Platform | Release-pijplijn (EAS) | Next | Should | M | 🔧 | — | **Config gestaged** (plan [`08`](docs/plans/08-professioneel-hardening.md)): `eas.json` + `docs/eas-setup.md`. **Rest:** `eas init`, secrets, eerste build (wacht op Play-account). |
-| STR-10 | Platform/UX | Empty states + illustraties | Next | Should | M | 🔧 | — | **Eigen `lib/illustrations.js`** (8 scènes) op alle hoofdtabs. **Rest:** laatste 6 scènes nalopen. |
+| STR-10 | Platform/UX | Empty states + illustraties | Next | Should | M | 🔧 | — | **Eigen [`lib/illustrations.js`](lib/illustrations.js)** (11 scènes: Today/Tasks/Groceries/Plants/Expenses/Agenda/Cleaning/Groups/Meals/Pantry/Pets) op alle hoofdtabs. Code-geverifieerd 2026-06-25. **Rest:** visuele review op toestel/web. |
 | INF-8 | Platform | Realtime-primitief & scoping | Next | Should | M | 🔧 | — | **Af (C1–C4):** `useRealtimeReload`+household-filter (migr. `0025`)+`realtimePatch`+`realtimeHub`. **Rest:** patch+gebundelde subscriptie op toestel. |
 | INF-9 | Platform | Edge-hardening `scan-receipt` | Next | Should | S | 🔧 | — | **Gebouwd+gedeployed:** per-gebruiker rate-limit (migr. `0026`)+MIME-whitelist. **Open (L1, [plan 17](docs/plans/17-security-remediatie.md)):** rate-limit fail-open → fail-closed + Orq-kostencap. **Rest:** happy-path op toestel. |
 | INF-10 | Platform | DB-advisor-hardening | Next | Could | S | 🔧 | — | B4 af (migr. `0024`); **M1 GEBOUWD+LIVE** (migr. `0042`–`0044`: anon/PUBLIC-EXECUTE ingetrokken op user-facing DEFINER-RPC's, `authenticated` + RLS-helpers behouden). **Open:** B5 pg_trgm uit `public`, B6 leaked-password (dashboard). [plan 17](docs/plans/17-security-remediatie.md). |
@@ -395,24 +437,24 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | SEC-7 | Security | Supply-chain & CI-hygiëne | Next | Could | S | ◐ | — | **L3 GEBOUWD:** SSRF-allowlist in `refresh-off-delta.mjs`. **L2 uitgesteld:** 14 moderate (build-time Expo, 0 high) → meenemen bij de volgende SDK-bump. [plan 17](docs/plans/17-security-remediatie.md). |
 | PERF-1 | Platform | Query-vensters & bulk-RPC | Next | Could | M | 🔧 | INF-8 | **Aggregaat-RPC af (migr. `0037`, live):** `household_*_totals` (SECURITY INVOKER → RLS scopet). **Rest:** P-H4 bulk-RPC bon→voorraad. |
 | PERF-2 | Platform/UX | Waargenomen snelheid: instant tab-wissel (geen laad-flits) | Next | Should | M | 🔧 | INF-8 | **Gebouwd** (in-memory SWR-cache `lib/dataCache.js` + `freezeOnBlur`). **Toestel bevestigd (2026-06-25, moto).** **Rest:** soepelheid op web. |
-| PERF-3 | Platform/perf | Bundle: phosphor per-icoon importeren (i.p.v. barrel) | Next | Should | S | ⏳ | — | Grootste bundle-/startup-win ([plan 16](docs/plans/16-performance-audit.md)): [`lib/icons.js:34`](lib/icons.js#L34) bundelt alle ~756 iconen voor ~57 gebruikte (geen tree-shaking). **Fix:** per-icoon subpath-import; `MAP` identiek. Meet bundle vóór/na. |
-| PERF-4 | Platform/perf | Render hot-path: TaskRow + Home-widgets memoïseren | Next | Should | M | ⏳ | — | [plan 16](docs/plans/16-performance-audit.md) + UX-D1/D4: `TaskRow`/Home-widgets niet gememoiseerd → elke afvink hertekent alle rijen. **Fix:** kopieer het `GroceryRow`-patroon; stabiliseer `useMealPlan`-datum. D5 bewust niet. |
-| PERF-5 | Platform/perf | Voorraad "plaats"-modus terug onder virtualisatie | Next | Should | S | ⏳ | — | [plan 16](docs/plans/16-performance-audit.md) (2 agents): [`voorraad.js:146`](app/(tabs)/voorraad.js#L146) rendert de hele voorraad in `ListHeaderComponent` → niets gevirtualiseerd. **Fix:** `SectionList` + `React.memo`-rij. |
-| PERF-7 | Platform/perf | Foto's resizen bij upload + expo-image-cache | Next | Should | M | ⏳ | — | [plan 16](docs/plans/16-performance-audit.md): [`photoPicker.js:10`](lib/photoPicker.js#L10) schaalt pixels niet → decode-hitches/OOM in fotorijke lijsten. **Fix:** `expo-image-manipulator` →1280px + `expo-image`-cache. |
+| PERF-3 | Platform/perf | Bundle: phosphor per-icoon importeren (i.p.v. barrel) | Next | Should | S | 🔧 | — | **Gebouwd** ([`lib/icons.js`](lib/icons.js#L14-L81): per-icoon subpath-imports i.p.v. de barrel, `MAP` identiek). Code-geverifieerd 2026-06-25. **Rest:** bundle vóór/na meten + startup op toestel. [plan 16](docs/plans/16-performance-audit.md). |
+| PERF-4 | Platform/perf | Render hot-path: TaskRow + Home-widgets memoïseren | Next | Should | M | 🔧 | — | **Gebouwd** ([`lib/TaskRow.js`](lib/TaskRow.js) + [`lib/widgets/registry.js`](lib/widgets/registry.js) gememoiseerd, `useMemo` per widget-samenvatting). Code-geverifieerd 2026-06-25. **Rest:** soepelheid bij afvinken op toestel. [plan 16](docs/plans/16-performance-audit.md). |
+| PERF-5 | Platform/perf | Voorraad "plaats"-modus terug onder virtualisatie | Next | Should | S | 🔧 | — | **Gebouwd** ([`voorraad.js`](app/(tabs)/voorraad.js#L100): één `SectionList` + `React.memo`-rij voor beide views i.p.v. alles in `ListHeaderComponent`). Code-geverifieerd 2026-06-25. **Rest:** scroll op toestel. [plan 16](docs/plans/16-performance-audit.md). |
+| PERF-7 | Platform/perf | Foto's resizen bij upload + expo-image-cache | Next | Should | M | 🔧 | — | **Gebouwd** ([`photoPicker.js`](lib/photoPicker.js#L27): lazy `expo-image-manipulator` → resize+compress, stille fallback zonder de native module). Code-geverifieerd 2026-06-25. **Rest:** activeert in een dev-build; foto-upload op toestel meten. [plan 16](docs/plans/16-performance-audit.md). |
 | PERF-8 | Platform/perf | Datalaag: query-vensters + koopfrequentie-RPC + reminder-hookstorm | Next | Should | M | ⏳ | INF-8, PERF-1 | [plan 16](docs/plans/16-performance-audit.md): `useProductFrequencies` ongelimiteerd/ongeïndexeerd → RPC+index; `usePurchases`-venster; reminder-hookstorm → `useTasksForReminders`+debounce. Bouw 2→3→1. Deels migratie. |
-| PERF-9 | Platform/perf | Virtualisatie-tuning op de SwipeRow-lijsten | Next | Could | S | ⏳ | — | [plan 18](docs/plans/18-ux-verbeterplan.md) D3: alleen `catalog.js` zet `initialNumToRender`/`windowSize`/… → kopieer die afstelling naar boodschappen/taken/kosten. |
+| PERF-9 | Platform/perf | Virtualisatie-tuning op de SwipeRow-lijsten | Next | Could | S | 🔧 | — | **Gebouwd** (`initialNumToRender`/`maxToRenderPerBatch`/`windowSize` staan nu op boodschappen/taken/kosten/voorraad). Code-geverifieerd 2026-06-25. **Rest:** scroll-jank op toestel. [plan 18](docs/plans/18-ux-verbeterplan.md) D3. |
 | TKN-2 | Taken/UX | Jaarweergave — activiteit-heatmap | Next | Could | M | 🔧 | TKN-1 | **Gebouwd** (heatmap uit `task_completions`, geen migratie). **Rest:** rendering/scroll/realtime op web/toestel. **Perf ([plan 16](docs/plans/16-performance-audit.md)):** jankt het → render als één `<Svg>` met `<Rect>`-cellen. |
 | UX-9 | Platform/UX | Eigen lettertype verkennen (weg van het systeemfont/Inter) | Later | Could | S | ⏳ | UX-1 | Verkenning: variable font (geen Inter) via `expo-font` op de `type`-tokens. Latin-Extended, OFL. Keuze in `DESIGN.md`. |
 | UX-12 | Platform/UX | Back vanuit een via-"Meer"-geopende tab gaat naar Home i.p.v. Meer | Next | Should | S | 🔧 | UX-2 | **Gebouwd** (`backBehavior="history"`). **Rest:** Android-back (hardware+gebaar)+web; anders stack-push (UX-10). |
 | UX-13 | Platform/UX | Flexibele avatars: foto-upload + zelf-gebouwde avatar (personen én huishouden) | Later | Should | M | ⏳ | UX-1, STR-4 | **Idee:** avatar emoji→foto/zelfgebouwd, leden+huishouden. `kind: emoji\|photo\|builder`, `avatars`-bucket+RLS, `Avatar`-switch; builder via `react-native-svg`. Migratie nodig. |
-| UX-23 | Platform/UX | Veeg-acties op de Vandaag-focus-taken | Next | Could | S | ⏳ | UX-17 | Bevinding UXR-1: focus-taken (`vandaag.js`) missen de `SwipeRow`-veegacties van de Taken-tab → wrap in `SwipeRow`. Kruisref UX-43. |
-| UX-24 | Platform/UX | Laad-skeleton op het Thuis-dashboard | Next | Could | S | ⏳ | UX-15 | Bevinding UXR-1: koud laden van `vandaag.js` toont alleen hero+spinner → lichte skeleton/placeholder-tegels. |
+| UX-23 | Platform/UX | Veeg-acties op de Vandaag-focus-taken | Next | Could | S | 🔧 | UX-17 | **Gebouwd** ([`vandaag.js`](app/(tabs)/vandaag.js#L270) wrapt de focus-taken in `SwipeRow`). Code-geverifieerd 2026-06-25. **Rest:** veeg op toestel. Kruisref UX-43. |
+| UX-24 | Platform/UX | Laad-skeleton op het Thuis-dashboard | Next | Could | S | 🔧 | UX-15 | **Gebouwd** ([`vandaag.js`](app/(tabs)/vandaag.js#L260): koud laden toont `ListSkeleton` i.p.v. blanco). Code-geverifieerd 2026-06-25. **Rest:** op toestel. |
 | UX-22 | Platform/UX | Drawers/sheets: nooit onder het toetsenbord + drie sluit-routes | Next | Should | M | ⏳ | UX-5 | **Contract voor élke sheet:** (a) inhoud schuift omhoog bij invoer; (b) sluitbaar via veeg-omlaag, backdrop-tik én kruisje. **Werk:** losse `Modal`s (o.a. `delen.js`) → gedeelde [`BottomSheet`](lib/ui.js#L758) met `avoidKeyboard`. In `DESIGN.md`. |
 | UX-42 | Platform/UX | Header-icoonrechts opschonen: alleen uitleg/activeerbaar, geen verstopte navigatie | Next | Should | M | ⏳ | — | De `ScreenHeader`-`right`-slot wordt als verstopte navigatie gebruikt (Planten/Boodschappen/Kosten/Maaltijden/Taken) → cryptisch. **Wens:** rechtsboven alleen uitleg/activeerbaar; overige acties wég. **Verken:** inventariseer `right=`-gebruik, herplaats per icoon, kop-contract in `DESIGN.md`. |
-| A11Y-1 | Platform/UX | Toegankelijkheid in de primitieven | Next | Should | M | ⏳ | STR-4 | Bevinding A1-A4 ([plan 18](docs/plans/18-ux-verbeterplan.md)): `SwipeRow` `accessibilityActions`, toast live-region, header-rol, `Stepper` `adjustable` (device-dump bevestigt: ±-knoppen niet bedienbaar via screenreader). **Eén fix per primitief werkt overal door.** |
-| A11Y-2 | Platform/UX | Toegankelijkheid op schermniveau | Next | Should | M | ⏳ | A11Y-1 | Bevinding A5-A9 ([plan 18](docs/plans/18-ux-verbeterplan.md)): 44pt-targets, losse `TextInput`→`Field`, voorraad-status niet kleur-only, `VisibilityPicker`→`AvatarSelect`, tag-actie via menu. |
-| UX-43 | Platform/UX | Swipe-conventie uniformeren + verwijderen ontdekbaar | Next | Should | M | ⏳ | UX-23 | Bevinding B1/B2 ([plan 18](docs/plans/18-ux-verbeterplan.md)): links-vegen = verwijderen (Boodschappen) vs uitstellen (Vandaag) → één conventie in `DESIGN.md`; verwijderen ontdekbaar (prullenbak op waarde 1). |
-| UX-44 | Platform/UX | Usability quick wins (catalogus/feedback/stepper) | Next | Could | M | ⏳ | — | Bevinding B3-B8 ([plan 18](docs/plans/18-ux-verbeterplan.md)): "Aanpassen" prominenter, prune-microcopy, `Celebrate` bij klaar, feedback-timing, eenheid in `Stepper`, suggesties wegklikbaar. |
+| A11Y-1 | Platform/UX | Toegankelijkheid in de primitieven | Next | Should | M | 🔧 | STR-4 | **Gebouwd** ([`ui.js`](lib/ui.js): `Stepper` `adjustable`+`accessibilityValue`+increment/decrement, toast `accessibilityLiveRegion`, header-rol, `SwipeRow` `accessibilityActions`). Code-geverifieerd 2026-06-25. **Rest:** screenreader-rooktest (VoiceOver/TalkBack). [plan 18](docs/plans/18-ux-verbeterplan.md) A1-A4. |
+| A11Y-2 | Platform/UX | Toegankelijkheid op schermniveau | Next | Should | M | ◐ | A11Y-1 | **Grotendeels gebouwd** ([`voorraad.js`](app/(tabs)/voorraad.js#L54): status niet kleur-only via `accessibilityLabel`; form-velden via `Field`; resterende rauwe `TextInput`s zijn bewuste compacte inline-velden). Code-geverifieerd 2026-06-25. **Rest:** 44pt-targets nalopen + screenreader-rooktest. [plan 18](docs/plans/18-ux-verbeterplan.md) A5-A9. |
+| UX-43 | Platform/UX | Swipe-conventie uniformeren + verwijderen ontdekbaar | Next | Should | M | 🔧 | UX-23 | **Gebouwd** ([`ui.js`](lib/ui.js#L391): één `SwipeRow`-conventie — `left`=verwijderen (fysiek rechts), `right`=uitstellen (fysiek links) — gedocumenteerd in de kop). Code-geverifieerd 2026-06-25. **Rest:** conventie in `DESIGN.md` borgen + op toestel. [plan 18](docs/plans/18-ux-verbeterplan.md) B1/B2. |
+| UX-44 | Platform/UX | Usability quick wins (catalogus/feedback/stepper) | Next | Could | M | ◐ | — | **Deels gebouwd** (`Celebrate` in [`ui.js`](lib/ui.js), gebruikt in `taken.js`). Code-geverifieerd 2026-06-25. **Rest:** overige B3-B8 (microcopy, feedback-timing, eenheid in `Stepper`, suggesties wegklikbaar) nalopen + op toestel. [plan 18](docs/plans/18-ux-verbeterplan.md) B3-B8. |
 | UXR-2 | UX-review | Ontleding: Taken & de tasks-weergaven | Later | Should | M | ⏳ | STR-1 | Verkennend: `taken.js`+`agenda.js`/`schoonmaak.js`+`task/[id].js`. Klopt de STR-1-rolverdeling in gebruik? [plan 14](docs/plans/14-ux-module-teardown.md). |
 | UXR-4 | UX-review | Ontleding: Kosten & delen | Later | Should | M | ⏳ | — | Verkennend: `kosten.js`/`expense`/`kosten-inzichten.js`/`delen.js`. Split-type, settle-uitleg, saldo-transparantie. [plan 14](docs/plans/14-ux-module-teardown.md). |
 | UXR-5 | UX-review | Ontleding: Keuken-loop (Maaltijden + Voorraad) | Later | Should | M | ⏳ | — | Verkennend: `maaltijden.js`/`recipe`/`voorraad.js` — menu→boodschappen→koken→voorraad. [plan 14](docs/plans/14-ux-module-teardown.md). |
@@ -443,6 +485,17 @@ Voorgestelde ID's reserveren ruimte; zodra een idee "echt" wordt, krijgt het een
 - **Toegankelijkheids-audit** (PLT-5) — **→ gepromoot naar §6 als A11Y-1/A11Y-2** (UX-doorlichting,
   [`docs/plans/18`](docs/plans/18-ux-verbeterplan.md)): primitieven (SwipeRow/toast/header/Stepper) +
   schermniveau (targets/labels/kleur-only). De device-smoke-test met VoiceOver/TalkBack hoort bij die rijen.
+- **Beter uitnodigingssysteem** (PLT-7) — **gebouwd → verplaatst naar de §6-statustabel.** De ontwerp-/
+  brainstormbesluiten (web-first & account-gebonden, persoonlijke 24u eenmalige link, één link elk kanaal,
+  rol vooraf lid/beheerder, kind-rol uitgesteld → FND-3, gepersonaliseerde join-pagina + download-placeholders,
+  latere rondleiding) staan in de migratie-header [`0053`](supabase/migrations/0053_household_invites.sql) en de §6-notitie.
+- **Wachtwoordloze login: magic-link / OTP** (PLT-8) — registreren/inloggen zonder wachtwoord te
+  verzinnen (Supabase `signInWithOtp` → e-mailcode of magic-link). Vooral wrijvingsloos voor **nieuwe
+  genodigden** via PLT-7. **Voor nu bewust e-mail+wachtwoord;** dit is de latere upgrade. Cross-cutting
+  (raakt álle sign-up, niet alleen invites) → eigen rij wanneer het echt wordt.
+- **Losse items via web delen (netwerkeffect)** (PLT-9) — bv. een boodschappenlijst deelbaar via een
+  web-link, laagdrempelig zónder app, als groeimotor bovenop de web-build van PLT-7. Leunt op dezelfde
+  Expo Web-host + token-/zichtbaarheidsaanpak. Later uitwerken.
 
 ### 7.3 Nieuwe module-ideeën
 - **Documenten- & garantiekluis** (DOC-1) — bonnetjes/handleidingen/garanties/contracten per item;
