@@ -29,6 +29,9 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 11 | [Interactie- & navigatie-polish](./11-interactie-navigatie-polish.md) | UX-6, UX-10 | Design-systeem + cross-cutting | Nee |
 | 12 | [Vandaag widget-grid](./12-vandaag-widgetgrid.md) | VDG-1 t/m VDG-8 | Home-epic (gefaseerd) | Optioneel (VDG-4) |
 | 13 | [Kleine features op bestaande data](./13-kleine-features.md) | PLA-8, BOO-8 | Twee kleine features | Nee |
+| 16 | [Performance-audit & echte wins](./16-performance-audit.md) | PERF-3 t/m PERF-8 | Kwaliteit/perf (5-agent-audit) | Deels (PERF-8) |
+| 17 | [Security-remediatie](./17-security-remediatie.md) | SEC-1 t/m SEC-7 (+ INF-9/INF-10) | Security/hardening (3-agent-audit) | Ja (meerdere) |
+| 18 | [Verbeterplan UX/a11y/correctheid/perf](./18-ux-verbeterplan.md) | A11Y-1/2, UX-43/44, PERF-9, INF-11, BOO-12 | Kwaliteit/UX (4-agent-audit) | Nee |
 
 > **Volgende ronde (gekozen 2026-06-20): drie elkaar versterkende features** met maximale
 > gebruikerswaarde — **09 Slimme keuken-loop** (Maaltijden + Voorraad, bovenop de catalogus),
@@ -55,6 +58,13 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 > + `freezeOnBlur`), **INF-8 C3** (incrementeel realtime-patchen `lib/realtimePatch.js`) en de veilige
 > helft van **PERF-1** (query-limits). Géén migratie; units + lint groen. Status uitsluitend in
 > backlog §6 (PERF-2/INF-8/PERF-1 → 🔧, toestel-/web-bevestiging resteert).
+
+> **Drie doorlichtingen geconsolideerd (2026-06-24/25): plannen 16–18.** Drie parallelle multi-agent
+> audits zijn omgezet in build-ready plannen én geconsolideerd in de backlog §6: **16 Performance**
+> (PERF-3…8), **17 Security** (SEC-1…7, kritiek **SEC-1** = owner-escalatie; do-now met SEC-2) en **18
+> UX/a11y/correctheid/perf** (A11Y-1/2, UX-43/44, PERF-9, INF-11, BOO-12). Overlap is gede-dupliceerd:
+> 18-Pijler-D = PERF-4/PERF-5, D5 bewust níét, en security-M1/L4/L5 vallen onder INF-10, L1 onder INF-9.
+> **Aanbevolen do-now:** SEC-1 + SEC-2 vóór nieuw feature-werk (tenant-isolatie). Status uitsluitend in backlog §6.
 
 ## Stap-voor-stap: plannen 10–13 oppakken
 
