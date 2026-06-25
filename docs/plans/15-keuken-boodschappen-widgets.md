@@ -64,3 +64,31 @@ Tegelhoogte blijft uniform; de strip is horizontaal en past binnen `TILE_H`.
 `npm test` groen · `node scripts/mutation-check.mjs --since=origin/main` groen (nieuwe pure
 modules ≥ baseline) · `npx expo lint` 0 errors · rooktest op de moto voor de gebaren
 (swipe-week, swipe-afvinken) — RNGH-pan is niet betrouwbaar in de emulator te injecteren.
+
+### Verificatie-resultaat (2026-06-25, moto g72 via USB + dev-server)
+Alle niet-veeg-checks gedraaid; veeg-gebaren (swipe-week / swipe-afvinken) door Erik zelf
+op het toestel bevestigd.
+- **`npm test`** → 587 tests, 569 pass, 0 fail, 18 skip (RLS zonder secrets). ✓
+- **Mutatie-ratchet** (`--since=origin/main`, 14 groepen) → "geen daling, groen". ✓ De 5 nieuwe
+  pure modules scoren hoog (groceryCatalog 98.7 %, productImage 100 %, quantity 94.3 %,
+  groceryCount 92.3 %, groceryList 96.6 %) maar hadden **nog geen baseline-regel** → ze konden
+  de ratchet niet laten falen. **INF-11 opgelost (2026-06-25):** de 5 entries zijn chirurgisch aan
+  `mutation-baseline.json` toegevoegd (geen `--update`, want dat herschrijft álle baselines over de
+  werkboom incl. parallel SEC-werk heen); `total` herberekend naar 3040/3556 (85.5 %).
+- **`npx expo lint`** → 0 errors, 27 warnings (pre-existing react-hooks `set-state-in-effect`/
+  `exhaustive-deps`, niet branch-specifiek). ✓ ("0 errors" gehaald.)
+- **Toestel-rooktest (niet-veeg):**
+  - *Boodschappen* — categorie-schappen (🥬 Groente & fruit, 🥚 Zuivel & eieren) renderen;
+    instant 0-based stepper werkt (Appels 1→2→1, geen lag, optimistisch); inline zoek-dropdown
+    opent bij typen ("koffie" → "Uit de catalogus"-overlay met beeld + 0-based stepper +
+    "Hele catalogus bekijken"), de losse Catalogus-knop verbergt tijdens typen, en de dropdown
+    **sluit** via een backdrop-tik (`dismissSearch`). ✓
+  - *Keuken-omgeving* — Weekmenu ⇄ Recepten sub-nav, week-navigatie (‹ 22–28 jun. ›), dagkaarten
+    met geplande maaltijd ("Pasta pest · Diner · 2 pers."), Recepten-beheerlijst ("+ Nieuw recept").
+    **De 7-dagen-strip crasht niet meer** (de ontbrekende `Icon`-import uit 008c3f1 is op het
+    toestel bevestigd). Geen ANR/crash. ✓
+  - *Home/widget-grid* — rendert volledig (hero + Taken/Boodschappen/Schoonmaak/Kosten/Planten/
+    Activiteit + de Maaltijden-7-dagen-strip); tab-wissels instant zonder laad-flits (PERF-2). ✓
+- **Testmethode-noot:** `adb shell input text "<heel woord>"` triggert `onChangeText` van de
+  RN-`TextInput` niet betrouwbaar (de dropdown bleef leeg); **letter-voor-letter** typen wél.
+  Geen app-bug — een adb-injectie-artefact, net als de RNGH-pan-onbetrouwbaarheid.
