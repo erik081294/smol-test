@@ -27,7 +27,7 @@ export default function VehicleEditor() {
   const isNew = id === 'new';
   const router = useRouter();
   const dialog = useDialog();
-  const { vehicles, addVehicle, updateVehicle, removeVehicle } = useVehicles();
+  const { vehicles, addVehicle, updateVehicle, removeVehicle, setVehicleShared } = useVehicles();
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
   const { entries: logEntries, reload: reloadLog } = useVehicleLog(isNew ? null : id);
@@ -46,6 +46,10 @@ export default function VehicleEditor() {
   const [visibility, setVisibility] = useState(existing?.visibility ?? VISIBILITY.HOUSEHOLD);
   const [shareSubgroupId, setShareSubgroupId] = useState(existing?.share_subgroup_id ?? null);
   const [shareWith, setShareWith] = useState(existing?.share_with ?? []);
+
+  // Delen via de Samen-module (VTG-4). Voor een auto staat dit standaard aan; bij een
+  // bestaand voertuig weerspiegelt het of er al een gekoppelde resource is.
+  const [shared, setShared] = useState(isNew ? true : existing?.resource_id != null);
 
   // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Bij een geldig kenteken
   // vult 'ie merk/model/type — maar alléén lege velden, zodat handmatige invoer nooit
@@ -92,7 +96,8 @@ export default function VehicleEditor() {
     };
     try {
       if (isNew) {
-        await addVehicle({ ...payload, maintenanceKeys: [...maintenance] });
+        const created = await addVehicle({ ...payload, maintenanceKeys: [...maintenance] });
+        if (created && shared) await setVehicleShared(created.id, true);
       } else {
         await updateVehicle(id, {
           name: name.trim(), make: make.trim() || null, model: model.trim() || null,
@@ -103,6 +108,9 @@ export default function VehicleEditor() {
           share_subgroup_id: visibility === VISIBILITY.SUBGROUP ? shareSubgroupId : null,
           share_with: visibility === VISIBILITY.CUSTOM ? shareWith : null,
         });
+        // Delen aan/uit als het wijzigde (of sync naam/zichtbaarheid als het aan blijft).
+        if (shared !== (existing?.resource_id != null)) await setVehicleShared(id, shared);
+        else if (shared) await setVehicleShared(id, true);
       }
       router.back();
     } catch (e) {
@@ -212,6 +220,15 @@ export default function VehicleEditor() {
           shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
           shareWith={shareWith} onToggleMember={(mid) => setShareWith((w) => w.includes(mid) ? w.filter((x) => x !== mid) : [...w, mid])}
           subgroups={subgroups} members={members} />
+
+        {/* Delen via de Samen-module (VTG-4) — voor een auto standaard aan. */}
+        <Row gap={space.sm} align="center" style={{ marginBottom: space.lg }}>
+          <Checkbox checked={shared} onPress={() => setShared((v) => !v)} accessibilityLabel={t('vehicle.share.label')} />
+          <View style={{ flex: 1 }}>
+            <Text style={type.body}>{t('vehicle.share.label')}</Text>
+            <Text style={type.caption}>{t('vehicle.share.hint')}</Text>
+          </View>
+        </Row>
 
         <Field label={t('vehicle.field.notes')} value={notes} onChangeText={setNotes} multiline />
 
