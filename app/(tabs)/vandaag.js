@@ -80,10 +80,11 @@ export default function Home() {
     return tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
   };
 
-  // Veeg-acties op de focuslijst (UX, batch 2). Naar rechts = afvinken (de positieve,
-  // omkeerbare actie — net als het vinkje, dus zonder undo-toast); naar links = uitstellen
-  // (een dag vooruit, mét undo-vangnet). Verwijderen hoort hier bewust niet: Vandaag is
-  // een focus-overzicht, niet de plek om taken te wissen (dat kan in Taken).
+  // Veeg-actie op de focuslijst — app-brede conventie (UX-43): LINKS = verwijderen
+  // (destructief), RECHTS = de neutrale/positieve actie. Vandaag is bewust een focus-
+  // overzicht zónder verwijderen, dus links blijft hier leeg; rechts = uitstellen (een
+  // dag vooruit, mét undo-vangnet). Afvinken gaat via het vinkje in de rij — net als op
+  // Taken — zodat dezelfde veegrichting nergens het ene scherm wist en het andere niet.
   const snoozeFromHome = (task) => {
     const prev = task.due_date ?? null;
     const next = snoozeDate(task, 1);
@@ -263,8 +264,7 @@ export default function Home() {
             {visibleFocus.map((tk) => (
               <SwipeRow
                 key={tk.id}
-                right={{ icon: 'check', label: t('tasks.complete'), color: colors.done, onTrigger: () => toggle(tk) }}
-                left={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.ocher, onTrigger: () => snoozeFromHome(tk) }}
+                right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.ocher, onTrigger: () => snoozeFromHome(tk) }}
               >
                 <TaskRow task={tk} members={members} onToggle={toggle} />
               </SwipeRow>

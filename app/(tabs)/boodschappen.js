@@ -13,7 +13,7 @@ import { groupGroceriesByCategory } from '../../lib/groceryList';
 import { normalize } from '../../lib/productMatch';
 import { parseQuantity, formatQuantity } from '../../lib/quantity';
 import { ProductImageView } from '../../lib/ProductImageView';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Row, SwipeRow, Button, Stepper } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Row, SwipeRow, Button, Stepper, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
@@ -25,7 +25,7 @@ const SEARCH_LIMIT = 5;
 // alléén deze rij (niet de hele lijst) — samen met de optimistische Stepper voelt het
 // instant. Alle callbacks komen stabiel binnen (useEvent-patroon in de ouder).
 const GroceryRow = React.memo(function GroceryRow({ item, onToggle, onChangeCount, onRemove }) {
-  const { count } = parseQuantity(item.quantity);
+  const { count, unit } = parseQuantity(item.quantity);
   return (
     <SwipeRow
       left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onRemove(item) }}
@@ -46,7 +46,10 @@ const GroceryRow = React.memo(function GroceryRow({ item, onToggle, onChangeCoun
         accessibilityHint={t('a11y.tapToToggle')}
         trailing={item.checked ? undefined : (
           <Stepper compact value={count} min={0} max={99}
-            onChange={(v) => onChangeCount(item, v)} accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
+            onChange={(v) => onChangeCount(item, v)}
+            // Eenheid in de stepper (UX-44/B7): toon "2 pak" i.p.v. een kaal getal.
+            formatValue={unit ? (n) => `${n} ${unit}` : undefined}
+            accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
         )}
       />
     </SwipeRow>
@@ -282,6 +285,13 @@ export default function Boodschappen() {
         windowSize={9}
         removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
+        // Klaar-moment (UX-44/B5): alles afgevinkt (open leeg, afgevinkt gevuld) → een
+        // positieve bevestiging boven de "Afgevinkt"-sectie i.p.v. een stille lijst.
+        ListHeaderComponent={
+          !q && open.length === 0 && done.length > 0
+            ? <Banner tone="success" style={{ marginBottom: space.sm }}>{t('groceries.allDone')}</Banner>
+            : null
+        }
         renderItem={renderItem}
         renderSectionHeader={({ section }) => (
           section.kind === 'done' ? (

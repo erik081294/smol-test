@@ -41,7 +41,8 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
         {entry.isRecent ? (
           <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
-            style={{ width: 28, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+            // Volwaardig 44pt-aanraakdoel (A11Y-2/A5) i.p.v. de eerdere krappe 28×36.
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="close" size={15} color={colors.inkFaint} />
           </Pressable>
         ) : null}
@@ -148,10 +149,12 @@ export default function Catalog() {
   const addCustom = () => {
     const name = q;
     if (!name) return;
-    toast.show({ message: t('catalog.added', { name }) });
+    // Toast pas ná succes (UX-44/B6) — gelijk aan boodschappen.js. Eerder verscheen de
+    // "toegevoegd"-toast vóór de netwerkcall, gevolgd door een fout-dialog bij falen.
     setQuery('');
     ensureProduct({ name })
       .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
+      .then(() => toast.show({ message: t('catalog.added', { name }) }))
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 

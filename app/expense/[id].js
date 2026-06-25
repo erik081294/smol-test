@@ -231,8 +231,9 @@ export default function ExpenseEditor() {
                 {on && splitType === SPLIT.EXACT && (
                   <TextInput value={exactText[m.id] ?? ''} onChangeText={(v) => setExactText((e) => ({ ...e, [m.id]: v }))}
                     placeholder="0,00" keyboardType="decimal-pad" placeholderTextColor={colors.inkFaint}
-                    style={{ width: 80, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.sm,
-                      paddingHorizontal: space.sm, paddingVertical: space.xs, textAlign: 'right', color: colors.ink }} />
+                    accessibilityLabel={t('expense.a11y.exact', { name: m.display_name })}
+                    style={{ width: 80, minHeight: 44, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.sm,
+                      paddingHorizontal: space.sm, paddingVertical: space.sm, textAlign: 'right', color: colors.ink }} />
                 )}
               </View>
             );

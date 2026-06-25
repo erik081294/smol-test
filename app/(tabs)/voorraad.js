@@ -51,7 +51,10 @@ const PantryRow = React.memo(function PantryRow({ item, onRemove, onEdit, onAdju
     <SwipeRow
       left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onRemove(item) }}>
       <ItemRow
-        leading={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
+        // Status niet kleur-only (A11Y-2/A7): de gekleurde stip krijgt de statusnaam als
+        // gesproken label, zodat een screenreader 'vers/bijna op/over datum' kan melden.
+        leading={<View accessible accessibilityLabel={t('pantry.status.' + st)}
+          style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: STATUS_DOT[st] }} />}
         title={item.name}
         meta={
           <Row gap={space.sm}>
