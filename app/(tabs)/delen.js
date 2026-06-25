@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useResources } from '../../lib/useResources';
 import { useHousehold } from '../../lib/household';
-import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModalHeader } from '../../lib/ui';
+import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModalHeader, BottomSheet, SheetScrollView } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { colors, space, type } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
@@ -79,28 +79,24 @@ function AddResourceModal({ visible, onClose, onAdd, members, subgroups }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: '90%' }}>
-          <ModalHeader title={t('share.add')} onClose={onClose} onConfirm={save} busy={busy}
-            confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
-          <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
-            <Field label={t('share.field.name')} value={name} onChangeText={setName}
-              placeholder={t('share.field.name.placeholder')} autoFocus />
-            <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.field.kind')}</Text>
-            <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
-              {KINDS.map((k) => <Chip key={k} label={t('share.kind.' + k)} active={kind === k} onPress={() => setKind(k)} />)}
-            </Row>
-            <VisibilityPicker
-              visibility={visibility} onChangeVisibility={setVisibility}
-              shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
-              shareWith={shareWith} onToggleMember={toggleMember}
-              subgroups={subgroups} members={members}
-            />
-            <View style={{ height: space.xl }} />
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard>
+      <ModalHeader title={t('share.add')} onClose={onClose} onConfirm={save} busy={busy}
+        confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
+      <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+        <Field label={t('share.field.name')} value={name} onChangeText={setName}
+          placeholder={t('share.field.name.placeholder')} autoFocus />
+        <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.field.kind')}</Text>
+        <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
+          {KINDS.map((k) => <Chip key={k} label={t('share.kind.' + k)} active={kind === k} onPress={() => setKind(k)} />)}
+        </Row>
+        <VisibilityPicker
+          visibility={visibility} onChangeVisibility={setVisibility}
+          shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
+          shareWith={shareWith} onToggleMember={toggleMember}
+          subgroups={subgroups} members={members}
+        />
+        <View style={{ height: space.xl }} />
+      </SheetScrollView>
+    </BottomSheet>
   );
 }

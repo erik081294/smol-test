@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, SectionList, RefreshControl, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, SectionList, RefreshControl, ScrollView, Platform } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, addDays, parseISO } from 'date-fns';
@@ -11,9 +11,9 @@ import { useToast } from '../../lib/toast';
 import { status, daysUntil, sortByUrgency, PANTRY_STATUS } from '../../lib/pantry';
 import {
   Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row,
-  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow,
+  Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow, BottomSheet, SheetScrollView,
 } from '../../lib/ui';
-import { colors, space, type, radius } from '../../lib/theme';
+import { colors, space, type } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { PANTRY_LOCATIONS, UNITS } from '../../lib/constants';
@@ -288,63 +288,59 @@ function PantryEditor({ editor, onClose, onAdd, onUpdate, onDelete, suggestFor, 
   };
 
   return (
-    <Modal visible={!!editor} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '90%' }}>
-          <ModalHeader title={isNew ? t('pantry.add') : name} onClose={onClose} onConfirm={save} busy={busy}
-            confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
-          <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
-            <Field label={t('pantry.field.name')} value={name} onChangeText={setName}
-              placeholder={t('pantry.field.name.placeholder')} autoFocus={isNew} />
-            {hints.length > 0 ? (
-              <Row gap={space.xs} wrap style={{ marginTop: -space.sm, marginBottom: space.md }}>
-                {hints.map((p) => (
-                  <Chip key={p.id} label={p.name} icon="catalog" onPress={() => setName(p.name)} />
-                ))}
-              </Row>
-            ) : null}
+    <BottomSheet visible={!!editor} onClose={onClose} avoidKeyboard>
+      <ModalHeader title={isNew ? t('pantry.add') : name} onClose={onClose} onConfirm={save} busy={busy}
+        confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
+      <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+        <Field label={t('pantry.field.name')} value={name} onChangeText={setName}
+          placeholder={t('pantry.field.name.placeholder')} autoFocus={isNew} />
+        {hints.length > 0 ? (
+          <Row gap={space.xs} wrap style={{ marginTop: -space.sm, marginBottom: space.md }}>
+            {hints.map((p) => (
+              <Chip key={p.id} label={p.name} icon="catalog" onPress={() => setName(p.name)} />
+            ))}
+          </Row>
+        ) : null}
 
-            <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.quantity')}</Text>
-            <Row gap={space.md} style={{ marginBottom: space.lg }}>
-              <Stepper value={quantity} onChange={setQuantity} min={0} max={999} accessibilityLabel={t('pantry.field.quantity')} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {UNITS.map((u) => <Chip key={u} label={u} active={unit === u} onPress={() => setUnit(u)} />)}
-              </ScrollView>
-            </Row>
-
-            <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.location')}</Text>
-            <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
-              {PANTRY_LOCATIONS.map((loc) => (
-                <Chip key={loc} label={t(`location.${loc}`)} active={location === loc} onPress={() => setLocation(loc)} />
-              ))}
-            </Row>
-
-            <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.bestBefore')}</Text>
-            <Row gap={space.xs} wrap style={{ marginBottom: space.xs }}>
-              {BB_CHOICES.map((c) => (
-                <Chip key={c.l} label={c.l}
-                  active={bbOffset === c.v && !(c.v === null && bbExisting)}
-                  onPress={() => { setBbOffset(c.v); if (c.v !== null) setBbExisting(null); }} />
-              ))}
-            </Row>
-            {(bbOffset != null || bbExisting) ? (
-              <Text style={[type.caption, { marginBottom: space.lg }]}>
-                {format(parseISO(resolvedBestBefore()), 'EEEE d MMMM', { locale: nl })}
-              </Text>
-            ) : <View style={{ marginBottom: space.lg }} />}
-
-            <Field label={t('pantry.field.threshold')} value={threshold} onChangeText={setThreshold}
-              placeholder="1" keyboardType="numeric" />
-
-            {!isNew ? (
-              <Button title={t('common.delete')} variant="ghost"
-                onPress={() => { onClose(); onDelete(editor); }}
-                style={{ borderColor: 'transparent', marginTop: space.sm }} />
-            ) : null}
-            <View style={{ height: space.xl }} />
+        <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.quantity')}</Text>
+        <Row gap={space.md} style={{ marginBottom: space.lg }}>
+          <Stepper value={quantity} onChange={setQuantity} min={0} max={999} accessibilityLabel={t('pantry.field.quantity')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {UNITS.map((u) => <Chip key={u} label={u} active={unit === u} onPress={() => setUnit(u)} />)}
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+        </Row>
+
+        <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.location')}</Text>
+        <Row gap={space.xs} wrap style={{ marginBottom: space.lg }}>
+          {PANTRY_LOCATIONS.map((loc) => (
+            <Chip key={loc} label={t(`location.${loc}`)} active={location === loc} onPress={() => setLocation(loc)} />
+          ))}
+        </Row>
+
+        <Text style={[type.label, { marginBottom: space.xs }]}>{t('pantry.field.bestBefore')}</Text>
+        <Row gap={space.xs} wrap style={{ marginBottom: space.xs }}>
+          {BB_CHOICES.map((c) => (
+            <Chip key={c.l} label={c.l}
+              active={bbOffset === c.v && !(c.v === null && bbExisting)}
+              onPress={() => { setBbOffset(c.v); if (c.v !== null) setBbExisting(null); }} />
+          ))}
+        </Row>
+        {(bbOffset != null || bbExisting) ? (
+          <Text style={[type.caption, { marginBottom: space.lg }]}>
+            {format(parseISO(resolvedBestBefore()), 'EEEE d MMMM', { locale: nl })}
+          </Text>
+        ) : <View style={{ marginBottom: space.lg }} />}
+
+        <Field label={t('pantry.field.threshold')} value={threshold} onChangeText={setThreshold}
+          placeholder="1" keyboardType="numeric" />
+
+        {!isNew ? (
+          <Button title={t('common.delete')} variant="ghost"
+            onPress={() => { onClose(); onDelete(editor); }}
+            style={{ borderColor: 'transparent', marginTop: space.sm }} />
+        ) : null}
+        <View style={{ height: space.xl }} />
+      </SheetScrollView>
+    </BottomSheet>
   );
 }

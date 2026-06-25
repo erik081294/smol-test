@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, Modal, RefreshControl } from 'react-native';
+import { View, Text, FlatList, ScrollView, RefreshControl } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,8 +12,8 @@ import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
 import { TaskRow } from '../../lib/TaskRow';
 import { FairnessBars } from '../../lib/FairnessBars';
-import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ListSkeleton } from '../../lib/ui';
-import { colors, radius, type, space } from '../../lib/theme';
+import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { colors, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
 import { CLEANING_TEMPLATES, planTemplate } from '../../lib/cleaningTemplates';
@@ -180,50 +180,45 @@ export default function Schoonmaak() {
         }
       />
 
-      {/* Sjabloon-preview */}
-      <Modal visible={!!picker} animationType="slide" transparent onRequestClose={() => setPicker(null)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-          <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
-            padding: space.lg, maxHeight: '85%' }}>
-            <Text style={[type.h2, { marginBottom: space.sm }]}>{t('cleaning.setup')}</Text>
+      {/* Sjabloon-preview (UX-22: gedeelde BottomSheet). */}
+      <BottomSheet visible={!!picker} onClose={() => setPicker(null)} maxHeight="85%">
+        <SheetScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.lg }}>
+          <Text style={[type.h2, { marginBottom: space.sm }]}>{t('cleaning.setup')}</Text>
 
-            {/* Sjabloonkeuze */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
-              {CLEANING_TEMPLATES.map((tpl) => (
-                <Chip key={tpl.key} label={tpl.label} active={picker?.key === tpl.key} onPress={() => setPicker(tpl)} />
-              ))}
-            </ScrollView>
+          {/* Sjabloonkeuze */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
+            {CLEANING_TEMPLATES.map((tpl) => (
+              <Chip key={tpl.key} label={tpl.label} active={picker?.key === tpl.key} onPress={() => setPicker(tpl)} />
+            ))}
+          </ScrollView>
 
-            {picker && (
-              <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>{picker.description}</Text>
-            )}
+          {picker && (
+            <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>{picker.description}</Text>
+          )}
 
-            <ScrollView style={{ maxHeight: 320 }}>
-              {preview?.tasks.map((pt, i) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
-                  paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                  <Text style={type.body}>{pt.zone_name} · {pt.title}</Text>
-                  <Text style={type.caption}>{recurrenceLabel(pt)}</Text>
-                </View>
-              ))}
-            </ScrollView>
+          {preview?.tasks.map((pt, i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
+              paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+              <Text style={type.body}>{pt.zone_name} · {pt.title}</Text>
+              <Text style={type.caption}>{recurrenceLabel(pt)}</Text>
+            </View>
+          ))}
 
-            {preview && (
-              <Text style={[type.caption, { marginTop: space.sm }]}>
-                {plural(preview.tasks.length, 'cleaning.preview.tasks.one', 'cleaning.preview.tasks.other')}
-                {preview.zonesToCreate.length
-                  ? t('cleaning.preview.newZones', { n: preview.zonesToCreate.length })
-                  : t('cleaning.preview.existingZones')}
-              </Text>
-            )}
+          {preview && (
+            <Text style={[type.caption, { marginTop: space.sm }]}>
+              {plural(preview.tasks.length, 'cleaning.preview.tasks.one', 'cleaning.preview.tasks.other')}
+              {preview.zonesToCreate.length
+                ? t('cleaning.preview.newZones', { n: preview.zonesToCreate.length })
+                : t('cleaning.preview.existingZones')}
+            </Text>
+          )}
 
-            <Row gap={space.sm} style={{ marginTop: space.md }}>
-              <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setPicker(null)} /></View>
-              <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} onPress={applyTemplate} /></View>
-            </Row>
-          </View>
-        </View>
-      </Modal>
+          <Row gap={space.sm} style={{ marginTop: space.md }}>
+            <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setPicker(null)} /></View>
+            <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} onPress={applyTemplate} /></View>
+          </Row>
+        </SheetScrollView>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

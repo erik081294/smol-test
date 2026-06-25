@@ -59,6 +59,21 @@ test('buildMaintenanceTasks: alleen de gekozen keys, titel = sjabloon — voertu
   assert.equal(tasks[0].recur_interval, 12); // APK = jaarlijks = 12 maanden
 });
 
+test('buildMaintenanceTasks: APK valt op de RDW-vervaldatum, overige op startdatum', () => {
+  const start = new Date('2026-06-25T10:00:00');
+  const tasks = buildMaintenanceTasks(
+    V({ apk_expires_on: '2027-03-14' }), ['apk', 'olie'], { startDate: start });
+  const apk = tasks.find((t) => t.title.startsWith('APK'));
+  const olie = tasks.find((t) => t.title.startsWith('Olie'));
+  assert.equal(apk.due_date, '2027-03-14', 'APK op de echte RDW-datum');
+  assert.equal(olie.due_date, '2026-06-25', 'overige op de startdatum');
+  // Zonder (geldige) RDW-datum valt APK terug op de startdatum.
+  const [apk2] = buildMaintenanceTasks(V({ apk_expires_on: null }), ['apk'], { startDate: start });
+  assert.equal(apk2.due_date, '2026-06-25');
+  const [apk3] = buildMaintenanceTasks(V({ apk_expires_on: 'onzin' }), ['apk'], { startDate: start });
+  assert.equal(apk3.due_date, '2026-06-25', 'ongeldige datum → startdatum');
+});
+
 test('buildMaintenanceTasks: zichtbaarheid — household (default), subgroup, custom', () => {
   const [household] = buildMaintenanceTasks(V(), ['apk']);
   assert.equal(household.visibility, VISIBILITY.HOUSEHOLD);

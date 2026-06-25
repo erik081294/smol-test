@@ -21,7 +21,7 @@ const FREQS = [RECUR.DAILY, RECUR.WEEKLY, RECUR.MONTHLY];
 
 export default function RecurringExpenseEditor() {
   const dialog = useDialog();
-  const { id } = useLocalSearchParams();
+  const { id, vehicle } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
   const { addTemplate, updateTemplate, removeTemplate } = useRecurringExpenses();
@@ -37,6 +37,9 @@ export default function RecurringExpenseEditor() {
   const [interval, setIntervalN] = useState(1);
   const [startDate, setStartDate] = useState(new Date());
   const [active, setActive] = useState(true);
+  // Optionele koppeling aan een voertuig (V3): meegegeven bij 'nieuw' vanaf de auto, of
+  // geladen bij een bestaande vaste last. Zo telt het voertuig-kostenoverzicht 'm mee.
+  const [vehicleId, setVehicleId] = useState(vehicle ?? null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(isNew);
@@ -53,6 +56,7 @@ export default function RecurringExpenseEditor() {
       setIntervalN(data.recur_interval ?? 1);
       setStartDate(parseISO(data.next_date));
       setActive(data.active);
+      setVehicleId(data.vehicle_id ?? null);
       setLoaded(true);
     });
   }, [id]);
@@ -86,6 +90,7 @@ export default function RecurringExpenseEditor() {
       recur_interval: interval,
       next_date: format(startDate, 'yyyy-MM-dd'),
       active,
+      vehicle_id: vehicleId ?? null,
     };
     try {
       if (isNew) await addTemplate(payload);

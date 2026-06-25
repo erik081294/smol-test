@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,9 +16,11 @@ import { monthMatrix, monthLabel, dateKey, parseKey } from '../../lib/agenda';
 import { backLabelFor } from '../../lib/navMeta';
 import {
   ModalHeader, Field, Stepper, Button, ItemRow, IconButton, Row, Banner, Empty, SectionHeader, Chip, AvatarSelect, DateStepper,
+  BottomSheet, SheetScrollView,
 } from '../../lib/ui';
 import { colors, space, type, radius } from '../../lib/theme';
-import { parseAmountToCents } from '../../lib/expenses';
+import { parseAmountToCents, formatCents } from '../../lib/expenses';
+import { tripCostCents } from '../../lib/vehicleSharing';
 import { success, error as hapticError } from '../../lib/haptics';
 import { t } from '../../lib/i18n';
 
@@ -27,7 +29,30 @@ export default function ResourceDetail() {
   const router = useRouter();
   const { reservations, loading, addReservation, removeReservation } = useReservations(id);
   const { members } = useHousehold();
+  const { addExpense } = useExpenses();
+  const { user } = useAuth();
+  const toast = useToast();
   const [resource, setResource] = useState(null);
+
+  // Reservering toevoegen + (V4) automatische km-verrekening: heeft de resource een tarief
+  // en bevat de rit km, dan maken we meteen een uitgave (rijder betaalt de eigenaar). De
+  // eigenaar rekent zichzelf niets; "gratis" (geen tarief) → geen uitgave.
+  const handleAddReservation = async (r) => {
+    await addReservation(r);
+    const cost = tripCostCents(r.usageValue, resource?.price_per_km_cents);
+    if (cost > 0 && user?.id && resource && user.id !== resource.created_by) {
+      try {
+        await addExpense({
+          description: t('share.kmBill.description', { name: resource.name }),
+          amountCents: cost, paidBy: resource.created_by,
+          splitType: 'shares', participants: [{ profileId: user.id, weight: 1 }],
+          visibility: resource.visibility, shareSubgroupId: resource.share_subgroup_id, shareWith: resource.share_with,
+          sourceType: 'reservation', sourceId: resource.id,
+        });
+        toast.show({ message: t('share.kmBill.done', { amount: formatCents(cost) }) });
+      } catch { /* reservering staat al; verrekening faalde → stil (niet blokkeren) */ }
+    }
+  };
   const [reserving, setReserving] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [view, setView] = useState('kalender');     // 'kalender' | 'lijst'
@@ -56,6 +81,11 @@ export default function ResourceDetail() {
           <Button title={t('share.reserve')} icon="add" variant="accent" onPress={() => openReserve(selectedDay)} style={{ flex: 1 }} />
           <Button title={t('share.splitCost')} icon="expenses" variant="soft" onPress={() => setSplitting(true)} style={{ flex: 1 }} />
         </Row>
+        {resource.price_per_km_cents > 0 ? (
+          <Text style={[type.caption, { marginBottom: space.md }]}>
+            {t('share.kmBill.rate', { amount: formatCents(resource.price_per_km_cents) })}
+          </Text>
+        ) : null}
 
         <Row gap={space.sm} style={{ marginBottom: space.md }}>
           <Chip label={t('share.view.calendar')} active={view === 'kalender'} onPress={() => setView('kalender')} />
@@ -92,7 +122,7 @@ export default function ResourceDetail() {
         <View style={{ height: space.xxl }} />
       </ScrollView>
 
-      <ReserveModal visible={reserving} initialDay={reserveDay} onClose={() => setReserving(false)} reservations={reservations} onAdd={addReservation} />
+      <ReserveModal visible={reserving} initialDay={reserveDay} onClose={() => setReserving(false)} reservations={reservations} onAdd={handleAddReservation} />
       <SplitModal visible={splitting} onClose={() => setSplitting(false)} resource={resource}
         reservations={reservations} members={members} />
     </SafeAreaView>
@@ -190,39 +220,35 @@ function ReserveModal({ visible, initialDay, onClose, reservations, onAdd }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '90%' }}>
-          <ModalHeader title={t('share.reserve')} onClose={onClose} onConfirm={save} busy={busy}
-            confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
-          <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
-            <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.day')}</Text>
-            <DateStepper date={day} onChange={setDay} style={{ marginBottom: space.lg }} />
+    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard>
+      <ModalHeader title={t('share.reserve')} onClose={onClose} onConfirm={save} busy={busy}
+        confirmLabel={t('common.add')} cancelLabel={t('common.cancelLong')} />
+      <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+        <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.day')}</Text>
+        <DateStepper date={day} onChange={setDay} style={{ marginBottom: space.lg }} />
 
-            <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
-              <Chip label={t('share.reservation.allDay')} active={fromH === 0 && toH === 23}
-                onPress={() => { setFromH(0); setToH(23); }} />
-            </Row>
-            <Row gap={space.xl} style={{ marginBottom: space.md }}>
-              <View>
-                <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.from')}</Text>
-                <Stepper value={fromH} onChange={setFromH} min={0} max={23} formatValue={(h) => `${h}:00`} accessibilityLabel={t('share.reservation.from')} />
-              </View>
-              <View>
-                <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.to')}</Text>
-                <Stepper value={toH} onChange={setToH} min={0} max={23} formatValue={(h) => `${h}:00`} accessibilityLabel={t('share.reservation.to')} />
-              </View>
-            </Row>
-            {timeError ? <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{t('share.reservation.timeError')}</Text> : null}
-            {conflict ? <Banner tone="warning" style={{ marginBottom: space.md }}>{t('share.reservation.conflict')}</Banner> : null}
+        <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
+          <Chip label={t('share.reservation.allDay')} active={fromH === 0 && toH === 23}
+            onPress={() => { setFromH(0); setToH(23); }} />
+        </Row>
+        <Row gap={space.xl} style={{ marginBottom: space.md }}>
+          <View>
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.from')}</Text>
+            <Stepper value={fromH} onChange={setFromH} min={0} max={23} formatValue={(h) => `${h}:00`} accessibilityLabel={t('share.reservation.from')} />
+          </View>
+          <View>
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.reservation.to')}</Text>
+            <Stepper value={toH} onChange={setToH} min={0} max={23} formatValue={(h) => `${h}:00`} accessibilityLabel={t('share.reservation.to')} />
+          </View>
+        </Row>
+        {timeError ? <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{t('share.reservation.timeError')}</Text> : null}
+        {conflict ? <Banner tone="warning" style={{ marginBottom: space.md }}>{t('share.reservation.conflict')}</Banner> : null}
 
-            <Field label={t('share.reservation.km')} value={km} onChangeText={setKm} placeholder="0" keyboardType="numeric" />
-            <Field label={t('share.reservation.note')} value={note} onChangeText={setNote} placeholder={t('share.reservation.note')} />
-            <View style={{ height: space.xl }} />
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+        <Field label={t('share.reservation.km')} value={km} onChangeText={setKm} placeholder="0" keyboardType="numeric" />
+        <Field label={t('share.reservation.note')} value={note} onChangeText={setNote} placeholder={t('share.reservation.note')} />
+        <View style={{ height: space.xl }} />
+      </SheetScrollView>
+    </BottomSheet>
   );
 }
 
@@ -273,34 +299,30 @@ function SplitModal({ visible, onClose, resource, reservations, members }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View style={{ backgroundColor: colors.bg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, maxHeight: '90%' }}>
-          <ModalHeader title={t('share.splitCost')} onClose={onClose} onConfirm={save} busy={busy}
-            confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
-          <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
-            {reservers.length === 0 ? (
-              <Banner tone="info">{t('share.split.noReservers')}</Banner>
-            ) : (
-              <>
-                <Field label={t('share.split.amount')} value={amountText} onChangeText={setAmountText}
-                  placeholder="0,00" keyboardType="decimal-pad" autoFocus />
-                <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.split.how')}</Text>
-                <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
-                  <Chip label={t('share.split.usage')} active={effectiveMode === 'usage'} onPress={() => setMode('usage')} />
-                  <Chip label={t('share.split.equal')} active={effectiveMode === 'equal'} onPress={() => setMode('equal')} />
-                </Row>
-                {mode === 'usage' && usage.length === 0 ? (
-                  <Text style={[type.caption, { marginBottom: space.md }]}>{t('share.split.noUsage')}</Text>
-                ) : null}
-                <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
-                <AvatarSelect members={members} selectedId={paidBy} onSelect={setPaidBy} style={{ marginBottom: space.lg }} />
-              </>
-            )}
-            <View style={{ height: space.xl }} />
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    <BottomSheet visible={visible} onClose={onClose} avoidKeyboard>
+      <ModalHeader title={t('share.splitCost')} onClose={onClose} onConfirm={save} busy={busy}
+        confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
+      <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
+        {reservers.length === 0 ? (
+          <Banner tone="info">{t('share.split.noReservers')}</Banner>
+        ) : (
+          <>
+            <Field label={t('share.split.amount')} value={amountText} onChangeText={setAmountText}
+              placeholder="0,00" keyboardType="decimal-pad" autoFocus />
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('share.split.how')}</Text>
+            <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
+              <Chip label={t('share.split.usage')} active={effectiveMode === 'usage'} onPress={() => setMode('usage')} />
+              <Chip label={t('share.split.equal')} active={effectiveMode === 'equal'} onPress={() => setMode('equal')} />
+            </Row>
+            {mode === 'usage' && usage.length === 0 ? (
+              <Text style={[type.caption, { marginBottom: space.md }]}>{t('share.split.noUsage')}</Text>
+            ) : null}
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
+            <AvatarSelect members={members} selectedId={paidBy} onSelect={setPaidBy} style={{ marginBottom: space.lg }} />
+          </>
+        )}
+        <View style={{ height: space.xl }} />
+      </SheetScrollView>
+    </BottomSheet>
   );
 }
