@@ -6,6 +6,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useVehicles } from '../../lib/useVehicles';
 import { Empty, FAB, ScreenHeader, ItemRow, ListSkeleton, Badge, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
+import { CarGlyph } from '../../lib/CarGlyph';
 import { colors, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
 import { t } from '../../lib/i18n';
@@ -43,9 +44,12 @@ export default function Voertuigen() {
         renderItem={({ item }) => {
           const next = nextByVehicle[item.id];
           const sub = subtitleFor(item);
+          const hasAppearance = item.color != null || item.body_type != null;
           return (
             <ItemRow
-              leading={<Icon name="voertuig" size={24} color={colors.catVoertuig ?? colors.forest} weight="fill" />}
+              leading={hasAppearance
+                ? <CarGlyph color={item.color} bodyType={item.body_type} size={44} />
+                : <Icon name="voertuig" size={24} color={colors.catVoertuig ?? colors.forest} weight="fill" />}
               title={item.name}
               meta={
                 <Row gap={space.sm} wrap>

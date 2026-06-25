@@ -1,16 +1,20 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
-import { useVehicles, useVehicleLog, addVehicleLog } from '../../lib/useVehicles';
+import { useVehicles, useVehicleLog, useVehicleRecurring, addVehicleLog } from '../../lib/useVehicles';
+import { vehicleCostSummary } from '../../lib/vehicleCosts';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { maintenanceTemplates, defaultMaintenanceKeys, intervalLabel } from '../../lib/vehicleCare';
 import { isValidPlate, lookupPlate } from '../../lib/rdw';
+import { CarGlyph } from '../../lib/CarGlyph';
+import { offerImagePicker } from '../../lib/photoPicker';
+import { parseRatePerKm, formatRatePerKm } from '../../lib/vehicleSharing';
 import { formatCents, parseAmountToCents } from '../../lib/expenses';
-import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader } from '../../lib/ui';
+import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader, ItemRow } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { VISIBILITY } from '../../lib/constants';
 import { colors, type, space, radius } from '../../lib/theme';
@@ -22,6 +26,16 @@ function toInt(text) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+// Eén regel in het kostenoverzicht: label links, bedrag/maand rechts.
+function CostRow({ label, valueCents }) {
+  return (
+    <Row justify="space-between" style={{ marginTop: space.xs }}>
+      <Text style={type.caption}>{label}</Text>
+      <Text style={type.caption}>{t('vehicle.costs.perMonth', { amount: formatCents(valueCents) })}</Text>
+    </Row>
+  );
+}
+
 export default function VehicleEditor() {
   const { id } = useLocalSearchParams();
   const isNew = id === 'new';
@@ -31,8 +45,17 @@ export default function VehicleEditor() {
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
   const { entries: logEntries, reload: reloadLog } = useVehicleLog(isNew ? null : id);
+  const { items: recurring, reload: reloadRecurring } = useVehicleRecurring(isNew ? null : id);
 
   const existing = useMemo(() => vehicles.find((v) => v.id === id), [vehicles, id]);
+
+  // Kostenoverzicht (V3): vaste lasten + gerealiseerd onderhoud + afschrijving-schatting.
+  const costs = useMemo(
+    () => vehicleCostSummary({ recurring, logs: logEntries, vehicle: existing ?? {} }),
+    [recurring, logEntries, existing]
+  );
+  // Vaste lasten/onderhoud herladen zodra de editor terugkrijgt (na een sub-editor).
+  useFocusEffect(useCallback(() => { reloadRecurring(); reloadLog(); }, [reloadRecurring, reloadLog]));
 
   const [name, setName] = useState(existing?.name ?? '');
   const [plate, setPlate] = useState(existing?.license_plate ?? '');
@@ -50,11 +73,17 @@ export default function VehicleEditor() {
   // Delen via de Samen-module (VTG-4). Voor een auto staat dit standaard aan; bij een
   // bestaand voertuig weerspiegelt het of er al een gekoppelde resource is.
   const [shared, setShared] = useState(isNew ? true : existing?.resource_id != null);
+  // Prijs per km (V4): tarief dat de eigenaar rekent bij delen. Leeg = gratis.
+  const [priceKm, setPriceKm] = useState(existing?.price_per_km_cents != null ? formatRatePerKm(existing.price_per_km_cents) : '');
 
   // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Bij een geldig kenteken
   // vult 'ie merk/model/type — maar alléén lege velden, zodat handmatige invoer nooit
   // wordt overschreven. Faalt de RDW (offline/onbekend/timeout), dan gebeurt er stil niets.
   const [lookupState, setLookupState] = useState(null); // null | 'busy' | 'found' | 'none'
+  // Verrijking uit de laatste geslaagde RDW-lookup (kleur/carrosserie/APK/eerste-toelating/
+  // prijs/massa). Bij bewerken pas opgeslagen als er een verse lookup was; anders blijft
+  // de bestaande verrijking staan.
+  const [rdw, setRdw] = useState(null);
   const lookupSeq = useRef(0);
   useEffect(() => {
     if (!isValidPlate(plate)) { setLookupState(null); return undefined; }
@@ -67,6 +96,7 @@ export default function VehicleEditor() {
         setMake((m) => m || r.make || '');
         setModel((m) => m || r.model || '');
         setVehicleType((tp) => tp || r.vehicleType || '');
+        setRdw(r);
         setLookupState('found');
       } else {
         setLookupState('none');
@@ -74,6 +104,16 @@ export default function VehicleEditor() {
     }, 600);
     return () => clearTimeout(timer);
   }, [plate]);
+
+  // Verschijning voor de glyph (verse lookup wint van de opgeslagen waarde).
+  const glyphColor = rdw?.color ?? existing?.color ?? null;
+  const glyphBody = rdw?.bodyType ?? existing?.body_type ?? null;
+  const apkOn = rdw?.apkExpiry ?? existing?.apk_expires_on ?? null;
+  const hasAppearance = glyphColor != null || glyphBody != null;
+  const appearanceLine = [
+    glyphColor, glyphBody,
+    apkOn ? t('vehicle.rdw.apkUntil', { date: String(apkOn).split('-').reverse().join('-') }) : null,
+  ].filter(Boolean).join(' · ');
 
   // Onderhouds-checklist: alleen bij een nieuw voertuig (de taken worden bij aanmaken
   // gegenereerd). Default voor-aangevinkt = de gangbare basis (APK/beurten/olie/banden).
@@ -95,9 +135,17 @@ export default function VehicleEditor() {
       visibility, shareSubgroupId, shareWith,
     };
     try {
+      let vehicleId = id;
       if (isNew) {
-        const created = await addVehicle({ ...payload, maintenanceKeys: [...maintenance] });
-        if (created && shared) await setVehicleShared(created.id, true);
+        const created = await addVehicle({
+          ...payload, maintenanceKeys: [...maintenance],
+          color: rdw?.color, bodyType: rdw?.bodyType, apkExpiresOn: rdw?.apkExpiry,
+          firstRegistration: rdw?.firstRegistration, catalogPriceCents: rdw?.catalogPriceCents,
+          curbWeightKg: rdw?.curbWeightKg,
+          pricePerKmCents: shared ? parseRatePerKm(priceKm) : null,
+        });
+        if (!created) return; // addVehicle gaf geen rij terug (fout al getoond) → niet navigeren
+        vehicleId = created.id;
       } else {
         await updateVehicle(id, {
           name: name.trim(), make: make.trim() || null, model: model.trim() || null,
@@ -107,10 +155,22 @@ export default function VehicleEditor() {
           visibility,
           share_subgroup_id: visibility === VISIBILITY.SUBGROUP ? shareSubgroupId : null,
           share_with: visibility === VISIBILITY.CUSTOM ? shareWith : null,
+          price_per_km_cents: shared ? parseRatePerKm(priceKm) : null,
+          // Alleen overschrijven bij een verse RDW-lookup; anders bestaande verrijking laten staan.
+          ...(rdw ? {
+            color: rdw.color, body_type: rdw.bodyType, apk_expires_on: rdw.apkExpiry,
+            first_registration: rdw.firstRegistration, catalog_price_cents: rdw.catalogPriceCents,
+            curb_weight_kg: rdw.curbWeightKg,
+          } : {}),
         });
-        // Delen aan/uit als het wijzigde (of sync naam/zichtbaarheid als het aan blijft).
-        if (shared !== (existing?.resource_id != null)) await setVehicleShared(id, shared);
-        else if (shared) await setVehicleShared(id, true);
+      }
+      // Delen is secundair en mág de (geslaagde) opslag niet omverwerpen: een fout hierin
+      // (bv. een elders verwijderde rij, of nog-actieve reserveringen bij ontkoppelen)
+      // waarschuwt alleen. Sync zolang gedeeld (naam/zichtbaarheid) óf als het toggelde.
+      const wasShared = !isNew && existing?.resource_id != null;
+      if (shared || shared !== wasShared) {
+        try { await setVehicleShared(vehicleId, shared); }
+        catch (e) { await dialog.alert({ title: t('vehicle.share.syncFailed'), body: e.message }); }
       }
       router.back();
     } catch (e) {
@@ -133,6 +193,7 @@ export default function VehicleEditor() {
   const [logCost, setLogCost] = useState('');
   const [logNote, setLogNote] = useState('');
   const [logAsExpense, setLogAsExpense] = useState(false);
+  const [logPhoto, setLogPhoto] = useState(null); // gekozen boekje-foto (asset), nog niet geüpload
   const [logBusy, setLogBusy] = useState(false);
 
   const totalCostCents = logEntries.reduce((sum, e) => sum + (e.cost_cents ?? 0), 0);
@@ -144,9 +205,9 @@ export default function VehicleEditor() {
         vehicle: existing, householdId: existing.household_id, userId: user.id,
         title: logTitle, performedOn: logDate || null,
         mileage: toInt(logKm), costCents: parseAmountToCents(logCost),
-        note: logNote, asExpense: logAsExpense, members, paidBy: user.id,
+        note: logNote, asExpense: logAsExpense, members, paidBy: user.id, photoAsset: logPhoto,
       });
-      setLogTitle(''); setLogKm(''); setLogCost(''); setLogNote(''); setLogAsExpense(false); setLogOpen(false);
+      setLogTitle(''); setLogKm(''); setLogCost(''); setLogNote(''); setLogAsExpense(false); setLogPhoto(null); setLogOpen(false);
       await reloadLog();
     } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setLogBusy(false); }
@@ -186,6 +247,16 @@ export default function VehicleEditor() {
           </View>
         </Row>
 
+        {/* Fun factor (V1): jouw autootje in de RDW-kleur + carrosserie. */}
+        {hasAppearance ? (
+          <View style={{ alignItems: 'center', marginBottom: space.lg }}>
+            <CarGlyph color={glyphColor} bodyType={glyphBody} size={132} />
+            {appearanceLine ? (
+              <Text style={[type.caption, { marginTop: space.xs }]}>{appearanceLine}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Onderhouds-checklist alleen bij aanmaken (genereert de terugkerende taken). */}
         {isNew ? (
           <View style={{ marginBottom: space.lg }}>
@@ -222,15 +293,58 @@ export default function VehicleEditor() {
           subgroups={subgroups} members={members} />
 
         {/* Delen via de Samen-module (VTG-4) — voor een auto standaard aan. */}
-        <Row gap={space.sm} align="center" style={{ marginBottom: space.lg }}>
+        <Row gap={space.sm} align="center" style={{ marginBottom: shared ? space.md : space.lg }}>
           <Checkbox checked={shared} onPress={() => setShared((v) => !v)} accessibilityLabel={t('vehicle.share.label')} />
           <View style={{ flex: 1 }}>
             <Text style={type.body}>{t('vehicle.share.label')}</Text>
             <Text style={type.caption}>{t('vehicle.share.hint')}</Text>
           </View>
         </Row>
+        {/* Prijs per km (V4): leeg = gratis (reserveren mag, geen kosten). */}
+        {shared ? (
+          <Field label={t('vehicle.share.pricePerKm')} value={priceKm} onChangeText={setPriceKm}
+            placeholder="0,00" keyboardType="decimal-pad" helper={t('vehicle.share.pricePerKm.hint')}
+            style={{ marginBottom: space.lg }} />
+        ) : null}
 
         <Field label={t('vehicle.field.notes')} value={notes} onChangeText={setNotes} multiline />
+
+        {/* Kostenoverzicht (V3) — vaste lasten + onderhoud + afschrijving-schatting. */}
+        {!isNew ? (
+          <View style={{ marginTop: space.sm, marginBottom: space.lg }}>
+            <SectionHeader title={t('vehicle.costs.title')} />
+            <View style={{ padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, marginBottom: space.sm }}>
+              <Text style={[type.title, { fontSize: 22 }]}>{t('vehicle.costs.perMonth', { amount: formatCents(costs.monthlyCents) })}</Text>
+              <Text style={type.caption}>{t('vehicle.costs.perYear', { amount: formatCents(costs.annualCents) })}</Text>
+              <CostRow label={t('vehicle.costs.fixed')} valueCents={costs.fixedMonthlyCents} />
+              <CostRow label={t('vehicle.costs.maintenance')} valueCents={costs.maintenanceMonthlyCents} />
+              {costs.depreciation ? (
+                <>
+                  <CostRow label={t('vehicle.costs.depreciation')} valueCents={costs.depreciationMonthlyCents} />
+                  <Text style={[type.caption, { color: colors.inkSoft, marginTop: space.xs }]}>
+                    {t('vehicle.costs.value')}: {formatCents(costs.depreciation.currentValueCents)}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+            {costs.depreciation ? (
+              <Text style={[type.caption, { color: colors.inkSoft, marginBottom: space.sm }]}>{t('vehicle.costs.estimateNote')}</Text>
+            ) : null}
+            {recurring.length === 0 ? (
+              <Text style={[type.caption, { marginBottom: space.sm }]}>{t('vehicle.costs.empty')}</Text>
+            ) : (
+              <Stack gap={space.xs} style={{ marginBottom: space.sm }}>
+                {recurring.map((r) => (
+                  <ItemRow key={r.id} title={r.description}
+                    meta={<Text style={type.caption}>{formatCents(r.amount_cents)} · {r.recur_interval > 1 ? t('recur.' + r.recur_freq + '.other', { n: r.recur_interval }) : t('recur.' + r.recur_freq + '.one')}</Text>}
+                    chevron onPress={() => router.push(`/recurring-expense/${r.id}`)} />
+                ))}
+              </Stack>
+            )}
+            <Button title={t('vehicle.costs.addFixed')} variant="soft" icon="add"
+              onPress={() => router.push(`/recurring-expense/new?vehicle=${id}`)} />
+          </View>
+        ) : null}
 
         {/* Onderhoudshistorie (VTG-2) — alleen bij een bestaand voertuig. */}
         {!isNew ? (
@@ -238,6 +352,8 @@ export default function VehicleEditor() {
             <SectionHeader title={t('vehicle.history.title')} count={logEntries.length}
               action={<Button title={t('vehicle.history.log')} variant="ghost" icon="add"
                 fullWidth={false} onPress={() => setLogOpen((o) => !o)} />} />
+            <Button title={t('vehicle.timeline.open')} variant="soft" icon="timeline"
+              onPress={() => router.push(`/vehicle/timeline?v=${id}`)} style={{ marginBottom: space.sm }} />
             {totalCostCents > 0 ? (
               <Text style={[type.caption, { marginBottom: space.sm }]}>
                 {t('vehicle.history.total', { amount: formatCents(totalCostCents) })}
@@ -259,6 +375,9 @@ export default function VehicleEditor() {
                 <Field label={t('vehicle.log.cost')} value={logCost} onChangeText={setLogCost}
                   placeholder="0,00" keyboardType="decimal-pad" />
                 <Field label={t('vehicle.log.note')} value={logNote} onChangeText={setLogNote} multiline />
+                <Button title={logPhoto ? t('vehicle.log.photoAdded') : t('vehicle.log.photo')}
+                  variant="soft" icon="photo" fullWidth={false} style={{ marginBottom: space.md }}
+                  onPress={() => offerImagePicker((asset) => setLogPhoto(asset))} />
                 <Row gap={space.sm} align="center" style={{ marginBottom: space.md }}>
                   <Checkbox checked={logAsExpense} onPress={() => setLogAsExpense((v) => !v)}
                     accessibilityLabel={t('vehicle.log.asExpense')} />

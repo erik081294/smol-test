@@ -2,7 +2,10 @@
 // lookup met een geïnjecteerde mock-fetch (geen echt netwerk).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizePlate, isValidPlate, rdwUrl, parseRdwRecord, lookupPlate } from '../lib/rdw.js';
+import { normalizePlate, isValidPlate, rdwUrl, parseRdwDate, parseRdwRecord, lookupPlate } from '../lib/rdw.js';
+
+// Verrijkingsvelden zijn null als ze in het record ontbreken — handig basisobject voor de asserts.
+const NO_ENRICH = { color: null, bodyType: null, apkExpiry: null, firstRegistration: null, catalogPriceCents: null, curbWeightKg: null };
 
 test('normalizePlate: hoofdletters, alleen alfanumeriek, null-veilig', () => {
   assert.equal(normalizePlate('12-ab-3'), '12AB3');
@@ -27,18 +30,43 @@ test('rdwUrl: query op het genormaliseerde kenteken', () => {
   assert.equal(rdwUrl('12-ab-3'), 'https://opendata.rdw.nl/resource/m9d7-ebf2.json?kenteken=12AB3');
 });
 
+test('parseRdwDate: YYYYMMDD → ISO, onzin → null', () => {
+  assert.equal(parseRdwDate('20251231'), '2025-12-31');
+  assert.equal(parseRdwDate(20180704), '2018-07-04');     // ook een getal mag
+  assert.equal(parseRdwDate('20251331'), null);           // maand 13
+  assert.equal(parseRdwDate('20250100'), null);           // dag 00
+  assert.equal(parseRdwDate('2025-12-31'), null);         // niet het RDW-formaat
+  assert.equal(parseRdwDate(''), null);
+  assert.equal(parseRdwDate(null), null);
+});
+
 test('parseRdwRecord: mapt + title-cased, null bij geen bruikbaar record', () => {
   assert.deepEqual(
     parseRdwRecord({ merk: 'VOLKSWAGEN', handelsbenaming: 'GOLF PLUS', voertuigsoort: 'PERSONENAUTO' }),
-    { make: 'Volkswagen', model: 'Golf Plus', vehicleType: 'Personenauto' },
+    { make: 'Volkswagen', model: 'Golf Plus', vehicleType: 'Personenauto', ...NO_ENRICH },
   );
   assert.deepEqual(
     parseRdwRecord({ merk: 'TESLA' }),
-    { make: 'Tesla', model: null, vehicleType: null },
+    { make: 'Tesla', model: null, vehicleType: null, ...NO_ENRICH },
   );
   assert.equal(parseRdwRecord(null), null);
   assert.equal(parseRdwRecord({}), null);                 // geen merk én geen model
   assert.equal(parseRdwRecord({ voertuigsoort: 'BROMFIETS' }), null);
+});
+
+test('parseRdwRecord: verrijking — kleur/carrosserie/APK/eerste-toelating/prijs/massa', () => {
+  assert.deepEqual(
+    parseRdwRecord({
+      merk: 'VOLKSWAGEN', handelsbenaming: 'GOLF', voertuigsoort: 'PERSONENAUTO',
+      eerste_kleur: 'BLAUW', inrichting: 'HATCHBACK', vervaldatum_apk: '20251231',
+      datum_eerste_toelating: '20180704', catalogusprijs: '25750', massa_ledig_voertuig: '1180',
+    }),
+    {
+      make: 'Volkswagen', model: 'Golf', vehicleType: 'Personenauto',
+      color: 'Blauw', bodyType: 'Hatchback', apkExpiry: '2025-12-31',
+      firstRegistration: '2018-07-04', catalogPriceCents: 2575000, curbWeightKg: 1180,
+    },
+  );
 });
 
 test('lookupPlate: ongeldig kenteken → null, géén fetch-call', async () => {
@@ -55,7 +83,7 @@ test('lookupPlate: geldig kenteken + record → gemapt object, juiste URL', asyn
     return { ok: true, json: async () => [{ merk: 'VOLKSWAGEN', handelsbenaming: 'GOLF', voertuigsoort: 'PERSONENAUTO' }] };
   };
   const out = await lookupPlate('12-ABC-3', { fetchImpl });
-  assert.deepEqual(out, { make: 'Volkswagen', model: 'Golf', vehicleType: 'Personenauto' });
+  assert.deepEqual(out, { make: 'Volkswagen', model: 'Golf', vehicleType: 'Personenauto', ...NO_ENRICH });
   assert.equal(calledUrl, 'https://opendata.rdw.nl/resource/m9d7-ebf2.json?kenteken=12ABC3');
 });
 
