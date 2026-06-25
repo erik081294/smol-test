@@ -11,14 +11,16 @@ import {
 } from '../../lib/ui';
 import { Illustration } from '../../lib/illustrations';
 import { Icon } from '../../lib/icons';
-import { colors, radius, type, space } from '../../lib/theme';
+import { colors, type, space } from '../../lib/theme';
 import { TOGGLEABLE_MODULES } from '../../lib/modules';
+import { inviteUrl, inviteStatus, hoursUntilExpiry, WEB_BASE_URL } from '../../lib/invites';
 import { t, plural } from '../../lib/i18n';
 
 export default function HuishoudenTab() {
   const dialog = useDialog();
   const { active, households, members, subgroups, selectHousehold, leaveHousehold,
           createSubgroup, updateSubgroupMembers, deleteSubgroup,
+          invites, createInvite, revokeInvite,
           householdDisabled, userDisabled, setHouseholdModule, setUserModule } = useHousehold();
   const { profile, signOut } = useAuth();
   const router = useRouter();
@@ -76,13 +78,43 @@ export default function HuishoudenTab() {
 
   const sgEmojis = ['👥', '👩‍❤️‍👨', '⚽', '🎓', '🏠', '🧒', '🎸', '🐾'];
 
-  const shareCode = async () => {
-    if (!active) return;
+  // --- Uitnodigen (PLT-7) ----------------------------------------------------
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteRole, setInviteRole] = useState('member');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [createdInvite, setCreatedInvite] = useState(null);
+
+  // Op web wijst de link naar de huidige origin; op native naar de gehoste web-app.
+  const inviteBase = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : WEB_BASE_URL;
+
+  const openInvite = () => { setInviteRole('member'); setCreatedInvite(null); setInviteOpen(true); };
+
+  const generateInvite = async () => {
+    setInviteBusy(true);
+    try { setCreatedInvite(await createInvite(inviteRole)); }
+    catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+    finally { setInviteBusy(false); }
+  };
+
+  const shareInvite = async () => {
+    if (!createdInvite) return;
+    const url = inviteUrl(createdInvite.token, inviteBase);
     try {
       await Share.share({
-        message: t('household.share.message', { name: active.name, code: active.invite_code }),
+        message: t('invite.share.message', {
+          inviter: profile?.display_name ?? t('common.someone'),
+          household: active?.name, url,
+        }),
       });
     } catch {}
+  };
+
+  const confirmRevoke = async (inv) => {
+    if (await dialog.confirm({
+      title: t('invite.revoke.confirm.title'),
+      body: t('invite.revoke.confirm.body'),
+      confirmLabel: t('invite.revoke'), cancelLabel: t('common.cancel'), tone: 'danger',
+    })) revokeInvite(inv.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   const confirmLeave = async () => {
@@ -108,24 +140,16 @@ export default function HuishoudenTab() {
             </View>
           </View>
 
-          {/* Invite code — branded hero, tikbaar om te delen */}
-          <Pressable onPress={shareCode} accessibilityRole="button" accessibilityLabel={t('household.shareCode')}
-            style={({ pressed }) => ({
-              marginTop: space.lg, backgroundColor: pressed ? colors.forestSoft : colors.forest,
-              borderRadius: radius.md, padding: space.md,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            })}>
-            <View>
-              <Text style={{ color: colors.ocherSoft, fontSize: 12, fontWeight: '600' }}>{t('household.inviteCode.label')}</Text>
-              <Text style={{ color: colors.onDark, fontSize: 26, fontWeight: '800', letterSpacing: 4, marginTop: 2 }}>
-                {active?.invite_code}
+          {/* Uitnodigen (PLT-7): een persoonlijke, 24u geldige link i.p.v. een statische
+              code. Alleen de beheerder kan uitnodigen (RPC dwingt het ook af). */}
+          {isOwner ? (
+            <>
+              <Button title={t('invite.new')} icon="add" onPress={openInvite} style={{ marginTop: space.lg }} />
+              <Text style={[type.caption, { marginTop: space.sm, textAlign: 'center' }]}>
+                {t('invite.hint')}
               </Text>
-            </View>
-            <Icon name="share" size={22} color={colors.onDark} />
-          </Pressable>
-          <Text style={[type.caption, { marginTop: space.sm, textAlign: 'center' }]}>
-            {t('household.inviteCode.hint')}
-          </Text>
+            </>
+          ) : null}
         </Card>
 
         {/* Leden */}
@@ -138,6 +162,29 @@ export default function HuishoudenTab() {
             trailing={m.role === 'owner' ? <Badge label={t('household.role.owner')} tone="brand" /> : null}
           />
         ))}
+
+        {/* Openstaande uitnodigingen (PLT-7) — beheerder ziet + trekt ze per stuk in. */}
+        {isOwner && invites.length > 0 && (
+          <>
+            <SectionHeader title={t('invite.pending.title')} count={invites.length} />
+            {invites.map((inv) => {
+              const expired = inviteStatus(inv) === 'expired';
+              const hoursLeft = hoursUntilExpiry(inv);
+              return (
+                <ItemRow
+                  key={inv.id}
+                  leading={<Avatar emoji="📨" />}
+                  title={inv.role === 'owner' ? t('invite.role.owner') : t('invite.role.member')}
+                  meta={<Text style={[type.caption, expired && { color: colors.danger }]}>
+                    {expired ? t('invite.expired') : t('invite.expiresInHours', { h: hoursLeft })}
+                  </Text>}
+                  trailing={<IconButton icon="delete" accessibilityLabel={t('invite.revoke')}
+                    tint={colors.danger} onPress={() => confirmRevoke(inv)} />}
+                />
+              );
+            })}
+          </>
+        )}
 
         {/* Groepen (subgroepen) */}
         <SectionHeader title={t('household.section.groups')} count={subgroups.length}
@@ -299,6 +346,45 @@ export default function HuishoudenTab() {
                 onPress={saveSubgroup} loading={sgBusy} style={{ marginTop: space.md }} />
             </ScrollView>
           </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Uitnodigen (PLT-7): rol vooraf → persoonlijke 24u-link → delen via OS-sharesheet. */}
+      <Modal visible={inviteOpen} animationType="slide" presentationStyle="pageSheet"
+        onRequestClose={() => setInviteOpen(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+          <ModalHeader title={t('invite.title')} onClose={() => setInviteOpen(false)} />
+          <ScrollView contentContainerStyle={{ padding: space.lg }}>
+            {!createdInvite ? (
+              <>
+                <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.lg }]}>{t('invite.intro')}</Text>
+                <Text style={[type.label, { marginBottom: space.sm }]}>{t('invite.role.label')}</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: space.lg }}>
+                  <Button title={t('invite.role.member')} variant={inviteRole === 'member' ? 'primary' : 'soft'}
+                    onPress={() => setInviteRole('member')} style={{ flex: 1 }} />
+                  <Button title={t('invite.role.owner')} variant={inviteRole === 'owner' ? 'primary' : 'soft'}
+                    onPress={() => setInviteRole('owner')} style={{ flex: 1 }} />
+                </View>
+                <Text style={[type.caption, { marginBottom: space.lg }]}>
+                  {inviteRole === 'owner' ? t('invite.role.owner.hint') : t('invite.role.member.hint')}
+                </Text>
+                <Button title={t('invite.create')} onPress={generateInvite} loading={inviteBusy} />
+              </>
+            ) : (
+              <>
+                <Card>
+                  <Text style={[type.label, { color: colors.inkFaint }]}>{t('invite.link.label')}</Text>
+                  <Text selectable style={[type.body, { color: colors.forest, marginTop: space.xs }]}>
+                    {inviteUrl(createdInvite.token, inviteBase)}
+                  </Text>
+                  <Text style={[type.caption, { marginTop: space.sm }]}>{t('invite.link.hint')}</Text>
+                </Card>
+                <Button title={t('invite.share')} icon="share" onPress={shareInvite} style={{ marginTop: space.lg }} />
+                <Button title={t('invite.another')} variant="soft" onPress={() => setCreatedInvite(null)}
+                  style={{ marginTop: space.sm }} />
+              </>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>

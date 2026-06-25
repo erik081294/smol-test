@@ -59,6 +59,7 @@ export const GROUPS = [
   // i18n.js is grotendeels vertaaldata; StringLiteral-mutaties daarop zijn ruis.
   { test: 'i18n', srcs: ['lib/i18n.js'], exclude: ['StringLiteral'] },
   { test: 'insights', srcs: ['lib/insights.js'] },
+  { test: 'invites', srcs: ['lib/invites.js'] },
   { test: 'mealPlan', srcs: ['lib/mealPlan.js'] },
   { test: 'modules', srcs: ['lib/modules.js'] },
   { test: 'navMeta', srcs: ['lib/navMeta.js'] },
