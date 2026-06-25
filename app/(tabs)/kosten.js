@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Modal } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -90,6 +90,11 @@ export default function Kosten() {
         contentContainerStyle={{ padding: space.lg, paddingTop: space.md, paddingBottom: 120 }}
         data={filtered}
         keyExtractor={(e) => e.id}
+        // Virtualisatie-afstelling, gelijk aan app/catalog.js (PERF-9).
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
         renderItem={({ item }) => {
           const n = item.participantIds.length;

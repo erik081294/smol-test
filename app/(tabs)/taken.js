@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, SectionList, Pressable, useWindowDimensions } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, ScrollView, SectionList, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
@@ -35,6 +35,21 @@ const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagI
 
 // Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+// Gememoïseerde lijst-rij (PERF-4, GroceryRow-patroon): SwipeRow + TaskRow samen, zodat
+// een afvink alleen de geraakte rij hertekent i.p.v. de hele lijst. De inline left/right-
+// objecten zaten vroeger in renderItem en braken de memo van TaskRow; hier zitten ze in
+// een gememoïseerde wrapper met stabiele callbacks.
+const TaskListRow = React.memo(function TaskListRow({ item, members, tags, onToggle, onRemove, onSnooze }) {
+  return (
+    <SwipeRow
+      left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onRemove(item) }}
+      right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => onSnooze(item) }}
+    >
+      <TaskRow task={item} members={members} tags={tags} onToggle={onToggle} />
+    </SwipeRow>
+  );
+});
 
 // Sorteer een maand-/jaarbucket op datum, dan tijd, dan titel (de buckets spannen
 // meerdere dagen, dus eerst op datum — sortDayTasks gaat van één dag uit).
@@ -141,6 +156,18 @@ export default function Taken() {
       onAction: () => { animateNextLayout(); updateTask(task.id, { due_date: prev }); },
     });
   };
+
+  // Stabiele handlers naar de laatste closures (PERF-4, GroceryRow-patroon) zodat de
+  // gememoïseerde TaskListRow niet hertekent door wisselende callback-identiteiten.
+  const toggleRef = useRef(); const removeRef = useRef(); const snoozeRef = useRef();
+  useEffect(() => { toggleRef.current = toggle; removeRef.current = removeTaskWithUndo; snoozeRef.current = snoozeTaskWithUndo; });
+  const onToggle = useCallback((tk) => toggleRef.current(tk), []);
+  const onRemoveRow = useCallback((tk) => removeRef.current(tk), []);
+  const onSnoozeRow = useCallback((tk) => snoozeRef.current(tk), []);
+  const renderTaskItem = useCallback(({ item }) => (
+    <TaskListRow item={item} members={members} tags={tags}
+      onToggle={onToggle} onRemove={onRemoveRow} onSnooze={onSnoozeRow} />
+  ), [members, tags, onToggle, onRemoveRow, onSnoozeRow]);
 
   // Secties per scope. Dag/Week/Maand/Jaar leveren nu állemaal een lijst (UX-32):
   // de kalender is verhuisd naar de kiezer-on-klik (UX-30). Achterstallig staat
@@ -347,6 +374,11 @@ export default function Taken() {
           sections={sections}
           keyExtractor={(item) => item.id}
           stickySectionHeadersEnabled={false}
+          // Virtualisatie-afstelling, gelijk aan app/catalog.js (PERF-9).
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS === 'android'}
           onRefresh={reload}
           refreshing={loading}
           ListHeaderComponent={(() => {
@@ -361,14 +393,7 @@ export default function Taken() {
             <SectionHeader title={section.title} count={section.data.length}
               tint={section.key === 'overdue' ? colors.danger : colors.inkSoft} />
           )}
-          renderItem={({ item }) => (
-            <SwipeRow
-              left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(item) }}
-              right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(item) }}
-            >
-              <TaskRow task={item} members={members} tags={tags} onToggle={toggle} />
-            </SwipeRow>
-          )}
+          renderItem={renderTaskItem}
           ListEmptyComponent={
             loading ? (
               <ListSkeleton count={5} />
