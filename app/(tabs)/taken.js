@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, SectionList, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, SectionList, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
@@ -347,6 +347,11 @@ export default function Taken() {
           sections={sections}
           keyExtractor={(item) => item.id}
           stickySectionHeadersEnabled={false}
+          // Virtualisatie-afstelling, gelijk aan app/catalog.js (PERF-9).
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={9}
+          removeClippedSubviews={Platform.OS === 'android'}
           onRefresh={reload}
           refreshing={loading}
           ListHeaderComponent={(() => {

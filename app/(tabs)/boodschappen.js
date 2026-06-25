@@ -275,6 +275,12 @@ export default function Boodschappen() {
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
         stickySectionHeadersEnabled={false}
+        // Virtualisatie-afstelling, gelijk aan app/catalog.js (PERF-9): begrens de
+        // eerste render + batchgrootte en knip off-screen rijen op Android weg.
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
         renderItem={renderItem}
         renderSectionHeader={({ section }) => (
