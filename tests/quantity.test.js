@@ -68,8 +68,8 @@ test('formatQuantity: eenheid null valt terug op leeg → enkel het getal', () =
   assert.equal(formatQuantity(2, null), '2');
 });
 
-test('formatQuantity: kapt kommagetallen af op een heel aantal', () => {
-  assert.equal(formatQuantity(2.9, 'pak'), '2 pak');
+test('formatQuantity: behoudt decimalen i.p.v. afkappen (BOO-12)', () => {
+  assert.equal(formatQuantity(2.9, 'pak'), '2.9 pak');
 });
 
 test('parse -> format is rondreis-stabiel voor meervoud', () => {
@@ -91,4 +91,69 @@ test('mergeQuantity: bestaand aantal + enkel item', () => {
 
 test('mergeQuantity: eenheid van nieuwe regel als bestaande er geen heeft', () => {
   assert.equal(mergeQuantity('2', '1 fles'), '3 fles');
+});
+
+// --- BOO-12: decimale hoeveelheden (kg/l) blijven behouden -------------------
+
+test('parseQuantity: decimaal met punt blijft behouden', () => {
+  assert.deepEqual(parseQuantity('2.5 kg'), { count: 2.5, unit: 'kg' });
+});
+
+test('parseQuantity: komma telt óók als decimaalteken (NL-invoer)', () => {
+  assert.deepEqual(parseQuantity('1,5 kg'), { count: 1.5, unit: 'kg' });
+});
+
+test('parseQuantity: decimaal zonder eenheid', () => {
+  assert.deepEqual(parseQuantity('2.5'), { count: 2.5, unit: '' });
+});
+
+test('parseQuantity: positieve breuk < 1 blijft staan (niet naar 1 opgehoogd)', () => {
+  assert.deepEqual(parseQuantity('0.5 kg'), { count: 0.5, unit: 'kg' });
+});
+
+test('parseQuantity: rondt af op 3 decimalen', () => {
+  assert.deepEqual(parseQuantity('1.2345 kg'), { count: 1.235, unit: 'kg' });
+});
+
+test('parseQuantity: losse beginpunt zonder cijfer telt als naam (anker vereist een cijfer)', () => {
+  // '.5 kg' heeft geen cijfer vóór de punt → de regex matcht niet → hele tekst is "eenheid".
+  assert.deepEqual(parseQuantity('.5 kg'), { count: 1, unit: '.5 kg' });
+});
+
+test('formatQuantity: decimaal toont volledig met eenheid', () => {
+  assert.equal(formatQuantity(2.5, 'kg'), '2.5 kg');
+});
+
+test('formatQuantity: breuk onder de grens (1.5) toont tóch — alleen héél 1 verbergt', () => {
+  assert.equal(formatQuantity(1.5, 'kg'), '1.5 kg');
+  assert.equal(formatQuantity(1, 'kg'), null);
+});
+
+test('formatQuantity: breuk < 1 toont volledig', () => {
+  assert.equal(formatQuantity(0.5, 'l'), '0.5 l');
+});
+
+test('formatQuantity: negatieve breuk -> null (niet "-0.5")', () => {
+  assert.equal(formatQuantity(-0.5, 'kg'), null);
+});
+
+test('formatQuantity: rondt float-ruis weg (0.1 + 0.2 -> 0.3)', () => {
+  assert.equal(formatQuantity(0.1 + 0.2, 'kg'), '0.3 kg');
+});
+
+test('parse -> format is rondreis-stabiel voor een decimaal', () => {
+  const { count, unit } = parseQuantity('2.5 kg');
+  assert.equal(formatQuantity(count, unit), '2.5 kg');
+});
+
+test('mergeQuantity: telt decimalen correct op (regressie: was "3 .5 kg")', () => {
+  assert.equal(mergeQuantity('2.5 kg', '1 kg'), '3.5 kg');
+});
+
+test('mergeQuantity: decimale som die op een heel getal uitkomt laat de fractie vallen', () => {
+  assert.equal(mergeQuantity('2.5 kg', '0.5 kg'), '3 kg');
+});
+
+test('mergeQuantity: float-ruis bij optellen wordt weggerond', () => {
+  assert.equal(mergeQuantity('0.1 kg', '0.2 kg'), '0.3 kg');
 });
