@@ -7,6 +7,7 @@ import {
   groupByDay, weekDays, groupByWeek,
   applyTaskFilters, countBy, activeFilterCount,
   isOpen, isDone, inCategory, forAssignee, parseKey,
+  monthKey, monthDays, yearMonths, groupByMonth, taskHref, forMe,
 } from '../lib/agenda.js';
 
 test('monthMatrix: altijd 6×7, ma-start, juni 2026 begint op 1 jun (ma)', () => {
@@ -200,4 +201,143 @@ test('sortDayTasks: gelijke tijd → op titel', () => {
 
 test('parseKey: yyyy-MM-dd → Date op lokale middernacht', () => {
   assert.equal(dateKey(parseKey('2026-06-10')), '2026-06-10');
+});
+
+// === Maand-/Jaar-lijst-helpers (UX-32) ===================================
+
+test('monthKey: yyyy-MM uit string én Date', () => {
+  assert.equal(monthKey('2026-06-10'), '2026-06');
+  assert.equal(monthKey(new Date(2026, 5, 10)), '2026-06');
+  assert.equal(monthKey(new Date(2026, 0, 1)), '2026-01'); // januari = maand 0
+});
+
+test('monthDays: alle echte dagen van de maand, geen uitlopers (0-gebaseerd)', () => {
+  const jun = monthDays(2026, 5); // juni = 30 dagen
+  assert.equal(jun.length, 30);
+  assert.equal(jun[0].key, '2026-06-01');
+  assert.equal(jun.at(-1).key, '2026-06-30');
+});
+
+test('monthDays: februari schrikkel (29) vs niet-schrikkel (28)', () => {
+  assert.equal(monthDays(2024, 1).length, 29); // 2024 is schrikkeljaar
+  assert.equal(monthDays(2026, 1).length, 28);
+  assert.equal(monthDays(2024, 1).at(-1).key, '2024-02-29');
+});
+
+test('yearMonths: 12 maanden met juiste index, sleutel en datum', () => {
+  const ms = yearMonths(2026);
+  assert.equal(ms.length, 12);
+  assert.equal(ms[0].month, 0);
+  assert.equal(ms[0].key, '2026-01');
+  assert.equal(ms[11].key, '2026-12');
+  assert.equal(dateKey(ms[5].date), '2026-06-01');
+  assert.ok(typeof ms[0].label === 'string' && ms[0].label.length > 0);
+});
+
+test('groupByMonth: groepeert per maand, negeert datumloze taken', () => {
+  const g = groupByMonth([
+    { id: 1, due_date: '2026-06-10' },
+    { id: 2, due_date: '2026-06-28' },
+    { id: 3, due_date: '2026-07-01' },
+    { id: 4, due_date: null },
+    { id: 5 },
+  ]);
+  assert.deepEqual(g['2026-06'].map((t) => t.id), [1, 2]);
+  assert.deepEqual(g['2026-07'].map((t) => t.id), [3]);
+  assert.equal(Object.keys(g).length, 2);
+});
+
+// === Navigatie (UX-28) ===================================================
+
+test('taskHref: module-taak → bron-element, prioriteit plant > pet > zone', () => {
+  assert.equal(taskHref({ id: 't1', plant_id: 'p9' }), '/plant/p9');
+  assert.equal(taskHref({ id: 't2', pet_id: 'd4' }), '/pet/d4');
+  assert.equal(taskHref({ id: 't3', zone_id: 'z2' }), '/(tabs)/schoonmaak');
+  // prioriteit: plant wint van pet wint van zone
+  assert.equal(taskHref({ id: 't4', plant_id: 'p1', pet_id: 'd1', zone_id: 'z1' }), '/plant/p1');
+  assert.equal(taskHref({ id: 't5', pet_id: 'd1', zone_id: 'z1' }), '/pet/d1');
+});
+
+test('taskHref: handmatige afspraak → editor; null veilig', () => {
+  assert.equal(taskHref({ id: 't6', category: 'afspraak' }), '/task/t6');
+  assert.equal(taskHref({ id: 't7' }), '/task/t7');
+  assert.equal(taskHref(null), null);
+});
+
+// === Tag-filter (UX-41) ==================================================
+
+const tagged = [
+  { id: '1', category: 'afspraak', tag_ids: ['t-school'], completed_at: null },
+  { id: '2', category: 'afspraak', tag_ids: ['t-sport', 't-school'], completed_at: null },
+  { id: '3', category: 'klus', tag_ids: [], completed_at: null },
+  { id: '4', category: 'afspraak', tag_ids: ['t-sport'], completed_at: null },
+];
+
+test('applyTaskFilters: tagIds — OR binnen de as (minstens één tag)', () => {
+  const r = applyTaskFilters(tagged, { tagIds: ['t-school'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['1', '2']);
+  const r2 = applyTaskFilters(tagged, { tagIds: ['t-school', 't-sport'], status: 'all' });
+  assert.deepEqual(r2.map((t) => t.id), ['1', '2', '4']);
+});
+
+test('applyTaskFilters: lege tagIds filtert niet; taak zonder tags valt weg bij een tagfilter', () => {
+  assert.equal(applyTaskFilters(tagged, { tagIds: [], status: 'all' }).length, 4);
+  const r = applyTaskFilters(tagged, { tagIds: ['t-sport'], status: 'all' });
+  assert.ok(!r.some((t) => t.id === '3')); // id 3 heeft geen tags
+});
+
+test('applyTaskFilters: tag + categorie combineren (AND tussen assen)', () => {
+  const r = applyTaskFilters(tagged, { tagIds: ['t-school'], categories: ['klus'], status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), []); // geen klus-taak met t-school
+});
+
+test('activeFilterCount: tag-as telt mee', () => {
+  assert.equal(activeFilterCount({ tagIds: ['t-school'] }), 1);
+  assert.equal(activeFilterCount({ tagIds: ['a', 'b'], status: 'done' }), 2);
+  assert.equal(activeFilterCount({ tagIds: [] }), 0);
+});
+
+// === "Voor mij" / audience (UX, batch 2) =================================
+
+const audienceSet = [
+  { id: 'a', assigned_to: 'me', visibility: 'household', completed_at: null },   // aan mij toegewezen
+  { id: 'b', assigned_to: 'other', visibility: 'household', completed_at: null }, // aan een ander
+  { id: 'c', assigned_to: null, visibility: 'household', completed_at: null },    // huishoud, niemand
+  { id: 'd', assigned_to: 'other', created_by: 'me', visibility: 'household', completed_at: null }, // door mij gemaakt
+  { id: 'e', assigned_to: 'other', visibility: 'custom', share_with: ['me'], completed_at: null },  // met mij gedeeld
+  { id: 'f', assigned_to: 'other', visibility: 'custom', share_with: ['x'], completed_at: null },   // met iemand anders
+];
+
+test('forMe: toegewezen aan mij', () => {
+  assert.equal(forMe({ assigned_to: 'me' }, 'me'), true);
+  assert.equal(forMe({ assigned_to: 'other' }, 'me'), false);
+});
+
+test('forMe: door mij gemaakt of expliciet met mij gedeeld telt ook', () => {
+  assert.equal(forMe({ assigned_to: 'other', created_by: 'me' }, 'me'), true);
+  assert.equal(forMe({ visibility: 'custom', share_with: ['me'] }, 'me'), true);
+  assert.equal(forMe({ visibility: 'custom', share_with: ['x'] }, 'me'), false);
+});
+
+test('forMe: losse huishoud-taak valt buiten "voor mij"', () => {
+  assert.equal(forMe({ assigned_to: null, visibility: 'household' }, 'me'), false);
+});
+
+test('forMe: zonder viewer-id niet filteren (alles voor mij)', () => {
+  assert.equal(forMe({ assigned_to: 'other' }, null), true);
+});
+
+test('applyTaskFilters: audience "mine" houdt toegewezen/gemaakt/gedeeld over', () => {
+  const r = applyTaskFilters(audienceSet, { audience: 'mine', viewerId: 'me', status: 'all' });
+  assert.deepEqual(r.map((t) => t.id), ['a', 'd', 'e']);
+});
+
+test('applyTaskFilters: audience "all" (default) laat alles staan', () => {
+  const r = applyTaskFilters(audienceSet, { viewerId: 'me', status: 'all' });
+  assert.equal(r.length, 6);
+});
+
+test('applyTaskFilters: audience "mine" zonder viewer-id filtert niet', () => {
+  const r = applyTaskFilters(audienceSet, { audience: 'mine', viewerId: null, status: 'all' });
+  assert.equal(r.length, 6);
 });

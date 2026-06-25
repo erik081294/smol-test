@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { format, addDays } from 'date-fns';
-import { nextDueDate, recurrenceLabel, dueLabel, isOverdue, snoozeDate } from '../lib/recurrence.js';
+import { nextDueDate, recurrenceLabel, dueLabel, isOverdue, snoozeDate, advanceRecurrence } from '../lib/recurrence.js';
 import { t } from '../lib/i18n.js';
 
 const ymd = (d) => (d ? format(d, 'yyyy-MM-dd') : null);
@@ -102,4 +102,45 @@ test('snoozeDate: zonder due_date → vanaf vandaag; default-arg = +1 dag', () =
   // Aanroep met alleen een taak gebruikt de byDays-default (1).
   const expected = format(addDays(new Date(new Date().setHours(0, 0, 0, 0)), 1), 'yyyy-MM-dd');
   assert.equal(snoozeDate({}), expected);
+});
+
+// === advanceRecurrence (UX, batch 2: einddatum / na X keer) ==============
+
+test('advanceRecurrence: niet-herhalend → stopt (next null)', () => {
+  assert.deepEqual(advanceRecurrence({ due_date: '2026-06-16' }), { next: null, count: null });
+  assert.deepEqual(advanceRecurrence({ recur_freq: 'daily' }), { next: null, count: null });
+  assert.deepEqual(advanceRecurrence({}), { next: null, count: null }); // default-arg
+  // Grens van de OR-guard: recur_freq zónder due_date stopt direct — de count blijft
+  // null (níét doorrekenen), ook met een recur_count gezet.
+  assert.deepEqual(advanceRecurrence({ recur_freq: 'daily', recur_count: 3 }), { next: null, count: null });
+});
+
+test('advanceRecurrence: geldige reeks maar geen volgende datum → count blijft ongemoeid', () => {
+  // recur_freq + due_date aanwezig (guard gepasseerd), maar nextDueDate geeft null
+  // (onbekende frequentie) → stopt, en de resterende count rolt 1-op-1 mee (niet -1).
+  assert.deepEqual(advanceRecurrence({ recur_freq: 'yearly', due_date: '2026-06-16', recur_count: 3 }), { next: null, count: 3 });
+});
+
+test('advanceRecurrence: zonder einde rolt eindeloos door (count null)', () => {
+  const r = advanceRecurrence({ recur_freq: 'daily', due_date: '2026-06-16', recur_interval: 1 });
+  assert.equal(ymd(r.next), '2026-06-17');
+  assert.equal(r.count, null);
+});
+
+test('advanceRecurrence: "na X keer" telt af, en stopt op de laatste beurt', () => {
+  // 3 beurten resterend → rolt door, nog 2 te gaan
+  const r = advanceRecurrence({ recur_freq: 'daily', due_date: '2026-06-16', recur_count: 3 });
+  assert.equal(ymd(r.next), '2026-06-17');
+  assert.equal(r.count, 2);
+  // laatste beurt (1 resterend) → stopt, geen volgende datum
+  const last = advanceRecurrence({ recur_freq: 'daily', due_date: '2026-06-16', recur_count: 1 });
+  assert.deepEqual(last, { next: null, count: 0 });
+});
+
+test('advanceRecurrence: einddatum — grens telt mee, daarna stoppen', () => {
+  const base = { recur_freq: 'daily', due_date: '2026-06-16', recur_interval: 1 };
+  // volgende beurt (17e) valt vóór/op de einddatum → doorrollen
+  assert.equal(ymd(advanceRecurrence({ ...base, recur_until: '2026-06-17' }).next), '2026-06-17');
+  // volgende beurt (17e) valt ná de einddatum (16e) → stoppen
+  assert.equal(advanceRecurrence({ ...base, recur_until: '2026-06-16' }).next, null);
 });

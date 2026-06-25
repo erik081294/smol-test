@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildIntents, parseWebhookEvent, chunk, expoMessages, EXPO_MAX_BATCH,
+  clampBody, MAX_BODY,
 } from '../supabase/functions/notify/core.js';
 
 const taskInsert = (record) => ({ type: 'INSERT', table: 'tasks', record });
@@ -53,4 +54,32 @@ test('expoMessages bouwt één message per token met de intent-copy en behoudt d
   assert.equal(msgs[0].title, 'T');
   assert.equal(msgs[0].body, 'B');
   assert.deepEqual(msgs[1].data, { kind: 'task_assigned', taskId: 't1' });
+});
+
+// --- SEC-5: payload-hardening -------------------------------------------------
+
+test('taak met een niet-string assigned_to → geen intent (recipientId-guard)', () => {
+  assert.deepEqual(buildIntents(taskInsert({ id: 't1', title: 'x', assigned_to: 42, created_by: 'ann' })), []);
+  assert.deepEqual(buildIntents(taskInsert({ id: 't1', title: 'x', assigned_to: '', created_by: 'ann' })), []);
+  assert.deepEqual(buildIntents(taskInsert({ id: 't1', title: 'x', assigned_to: { id: 'bob' }, created_by: 'ann' })), []);
+});
+
+test('lange taaktitel wordt in de push-body afgekapt op MAX_BODY', () => {
+  const longTitle = 'A'.repeat(500);
+  const [intent] = buildIntents(taskInsert({ id: 't1', title: longTitle, assigned_to: 'bob', created_by: 'ann' }));
+  assert.ok(intent.body.length <= MAX_BODY, 'body niet langer dan MAX_BODY');
+  assert.ok(intent.body.endsWith('…'), 'afgekapte body eindigt op een ellipsis');
+});
+
+test('clampBody weert controletekens, vouwt witruimte samen en behoudt koppeltekens', () => {
+  assert.equal(clampBody('Stof\tzuigen\n nu'), 'Stof zuigen nu');
+  assert.equal(clampBody('multi-tool   set'), 'multi-tool set');
+  assert.equal(clampBody('  trim  '), 'trim');
+  assert.equal(clampBody(null), '');
+  assert.equal(clampBody(undefined), '');
+});
+
+test('clampBody knipt af met een ellipsis en respecteert de max-parameter', () => {
+  assert.equal(clampBody('abcdef', 4), 'abc…');
+  assert.equal(clampBody('abcd', 4), 'abcd'); // precies op de grens → onveranderd
 });

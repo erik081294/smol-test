@@ -151,7 +151,10 @@ export default function Schoonmaak() {
                 <Text style={[type.caption]}>{t('cleaning.zone.empty')}</Text>
               ) : zt.map((task) => (
                 <View key={task.id} style={{ marginBottom: 4 }}>
-                  <TaskRow task={task} members={members} onToggle={toggle} />
+                  {/* Binnen de Schoonmaak-module opent een zone-taak de editor (hier
+                      hoort 'ie thuis); vanaf Taken/Vandaag linkt 'ie hierheen (UX-28). */}
+                  <TaskRow task={task} members={members} onToggle={toggle}
+                    onPress={() => router.push(`/task/${task.id}`)} />
                 </View>
               ))}
               {/* Zelfde editor als overal — alleen met deze zone voorgevuld. */}

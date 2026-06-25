@@ -13,7 +13,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -301,7 +301,7 @@ export default function PlantScreen() {
         <BottomSheet visible={!!selectedPhoto} onClose={() => setSelectedPhoto(null)} avoidKeyboard>
           <ModalHeader title={selectedPhoto?.photo_path ? t('plant.timeline.photo') : t('plant.timeline.note')} onClose={() => setSelectedPhoto(null)} />
           {/* De body krijgt een eigen padded wrapper (de ModalHeader pad zichzelf al). */}
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
             {selectedPhoto?.photo_path ? (
               <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
                 backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
@@ -324,25 +324,25 @@ export default function PlantScreen() {
               <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
               <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
             </Row>
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
 
         {/* Losse notitie toevoegen aan de tijdlijn (zonder foto). */}
         <BottomSheet visible={composing} onClose={() => setComposing(false)} avoidKeyboard>
           <ModalHeader title={t('plant.timeline.addNote')} onClose={() => setComposing(false)} />
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
             <Field label={t('plant.field.note')} value={composeText} onChangeText={setComposeText} multiline
               placeholder={t('plant.field.note.placeholder')} autoFocus style={{ marginBottom: 0 }} />
             <Button title={t('plant.note.save')} onPress={saveComposedNote} loading={composeBusy}
               disabled={!composeText.trim()} style={{ marginTop: space.md }} />
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
 
         {/* Plant bewerken (UX-21): naam, soort en locatie. */}
         <BottomSheet visible={editing} onClose={() => setEditing(false)} avoidKeyboard>
           <ModalHeader title={t('plant.edit')} onClose={() => setEditing(false)}
             onConfirm={saveEdit} busy={editBusy} />
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: space.lg }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: space.lg }} keyboardShouldPersistTaps="handled">
             <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
               placeholder={t('plant.field.name.placeholder')} error={errors.name} />
 
@@ -379,7 +379,7 @@ export default function PlantScreen() {
                 <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(location === loc ? null : loc)} />
               ))}
             </View>
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
       </SafeAreaView>
     );

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS, EXPENSE_CATEGORIES } from '../lib/constants.js';
+import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS, EXPENSE_CATEGORIES, TAG_COLORS } from '../lib/constants.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(resolve(here, '../supabase/migrations/0001_init.sql'), 'utf8');
@@ -50,4 +50,14 @@ test('PANTRY_LOCATIONS matcht pantry_items.location CHECK (0016)', () => {
 
 test('EXPENSE_CATEGORIES matcht expenses.category CHECK (0019)', () => {
   assert.deepEqual([...EXPENSE_CATEGORIES].sort(), checkValuesIn(sql0019, 'category text not null default'));
+});
+
+// TAG_COLORS (UX-41): het kleurenpalet voor zelfgemaakte tags. Géén DB-CHECK, maar
+// wel een vaste vorm — pin de exacte set zodat de mutatietest de literals dekt en een
+// per ongeluk leeggemaakt/aangepast palet meteen opvalt.
+test('TAG_COLORS: vaste set distinct geldige hex-kleuren', () => {
+  assert.deepEqual(TAG_COLORS, ['#E4572E', '#F3A712', '#2E933C', '#3A7CA5', '#7B4BC4', '#C2417B', '#5A6470']);
+  assert.equal(TAG_COLORS.length, 7);
+  assert.equal(new Set(TAG_COLORS).size, TAG_COLORS.length); // allemaal uniek
+  for (const c of TAG_COLORS) assert.match(c, /^#[0-9A-Fa-f]{6}$/); // #RRGGBB
 });

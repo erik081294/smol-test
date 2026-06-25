@@ -1,7 +1,7 @@
 // Units voor de pure "Vaste boodschappen"-groepering/sortering (lib/favoriteGroceries.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupFavorites, topFavorites, hiddenProducts } from '../lib/favoriteGroceries.js';
+import { groupFavorites, topFavorites, hiddenProducts, recentProducts } from '../lib/favoriteGroceries.js';
 
 const categories = [
   { key: 'zuivel', label: 'Zuivel & eieren', emoji: '🥛', sort: 20 },
@@ -110,4 +110,80 @@ test('groupFavorites: categorie buiten de taxonomie → fallback-label = key, em
   assert.equal(g[0].key, 'onbekend-schap');
   assert.equal(g[0].label, 'onbekend-schap');
   assert.equal(g[0].emoji, null);
+});
+
+test('recentProducts: sorteert op recentheid (laatst toegevoegd eerst)', () => {
+  // id1 is recenter dan id2, ook al is id2 vaker gekozen → recentheid wint.
+  assert.deepEqual(recentProducts(products).map((p) => p.id), ['1', '2']);
+});
+
+test('recentProducts: producten zonder last_added_at vallen weg', () => {
+  // id3 (times_added 5) en id4 hebben last_added_at null → eruit, ondanks gebruik.
+  const ids = recentProducts(products).map((p) => p.id);
+  assert.ok(!ids.includes('3'));
+  assert.ok(!ids.includes('4'));
+});
+
+test('recentProducts: verborgen producten vallen weg', () => {
+  const prods = [{ id: '9', name: 'Boter', search: 'boter', times_added: 1, last_added_at: '2026-06-21T10:00:00Z', hidden: true }];
+  assert.equal(recentProducts(prods).length, 0);
+});
+
+test('recentProducts: recentheid wint van gebruik én naam (tegengestelde signalen)', () => {
+  // A is recenter maar minder gekozen en alfabetisch later; B is ouder, vaker, eerder.
+  // Recentheid moet domineren → A vóór B.
+  const prods = [
+    { id: 'A', name: 'Zeep', search: 'zeep', times_added: 1, last_added_at: '2026-06-20T10:00:00Z' },
+    { id: 'B', name: 'Appel', search: 'appel', times_added: 9, last_added_at: '2026-06-19T10:00:00Z' },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['A', 'B']);
+});
+
+test('recentProducts: bij gelijke recentheid wint gebruik van naam (tegengestelde signalen)', () => {
+  // Gelijke datum: Y is vaker gekozen maar alfabetisch later, X minder maar eerder.
+  // Gebruik moet de naam-tie-break verslaan → Y vóór X.
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'X', name: 'Appel', search: 'appel', times_added: 1, last_added_at: same },
+    { id: 'Y', name: 'Zeep', search: 'zeep', times_added: 9, last_added_at: same },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['Y', 'X']);
+});
+
+test('recentProducts: bij gelijke recentheid én gebruik beslist de naam (NL)', () => {
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'q', name: 'Boter', search: 'boter', times_added: 3, last_added_at: same },
+    { id: 'p', name: 'Appel', search: 'appel', times_added: 3, last_added_at: same },
+  ];
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['p', 'q']); // Appel < Boter
+});
+
+test('recentProducts: tie-break op gebruik dan naam bij gelijke recentheid', () => {
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'b', name: 'Boter', search: 'boter', times_added: 1, last_added_at: same },
+    { id: 'a', name: 'Appel', search: 'appel', times_added: 9, last_added_at: same },
+    { id: 'c', name: 'Citroen', search: 'citroen', times_added: 1, last_added_at: same },
+  ];
+  // gelijke datum → meest gekozen eerst (a), daarna alfabetisch (b vóór c).
+  assert.deepEqual(recentProducts(prods).map((p) => p.id), ['a', 'b', 'c']);
+});
+
+test('recentProducts: respecteert de cap n (default 24 zonder argument)', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({
+    id: String(i), name: `P${i}`, search: `p${i}`, times_added: 1,
+    last_added_at: `2026-06-${String(10 + (i % 20)).padStart(2, '0')}T10:00:00Z`,
+  }));
+  assert.equal(recentProducts(many, { n: 5 }).length, 5);
+  assert.equal(recentProducts(many).length, 24); // default-cap
+});
+
+test('recentProducts: filtert op zoekterm (search-veld)', () => {
+  const ids = recentProducts(products, { query: 'melk' }).map((p) => p.id);
+  assert.deepEqual(ids, ['1']); // 'Halfvolle melk'
+});
+
+test('recentProducts() zonder argumenten → lege lijst (default-param)', () => {
+  assert.deepEqual(recentProducts(), []);
 });

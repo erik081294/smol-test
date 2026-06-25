@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-22T22:13:43.237Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 2870,
-    "total": 3381,
-    "score": 84.9
+    "killed": 3040,
+    "total": 3556,
+    "score": 85.5
   },
   "files": {
     "lib/activity.js": {
@@ -206,6 +206,31 @@
       "killed": 121,
       "total": 137,
       "score": 88.3
+    },
+    "lib/groceryCatalog.js": {
+      "killed": 76,
+      "total": 77,
+      "score": 98.7
+    },
+    "lib/groceryCount.js": {
+      "killed": 12,
+      "total": 13,
+      "score": 92.3
+    },
+    "lib/groceryList.js": {
+      "killed": 28,
+      "total": 29,
+      "score": 96.6
+    },
+    "lib/productImage.js": {
+      "killed": 21,
+      "total": 21,
+      "score": 100
+    },
+    "lib/quantity.js": {
+      "killed": 33,
+      "total": 35,
+      "score": 94.3
     }
   }
 }

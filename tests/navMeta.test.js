@@ -20,7 +20,7 @@ test('backLabelFor: onbekende route → null (val terug op de ✕)', () => {
 test('backLabelFor: fromKey overschrijft de statische parent', () => {
   // catalog hoort standaard bij boodschappen, maar kan vanaf elders geopend zijn.
   assert.equal(backLabelFor('catalog'), 'Boodschappen');
-  assert.equal(backLabelFor('catalog', 'maaltijden'), 'Maaltijden');
+  assert.equal(backLabelFor('catalog', 'maaltijden'), 'Keuken'); // module 'maaltijden' heet nu "Keuken"
 });
 
 test('backLabelFor: onbekende fromKey valt terug op null (niet op de parent)', () => {
