@@ -33,64 +33,12 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 17 | [Security-remediatie](./17-security-remediatie.md) | SEC-1 t/m SEC-7 (+ INF-9/INF-10) | Security/hardening (3-agent-audit) | Ja (meerdere) |
 | 18 | [Verbeterplan UX/a11y/correctheid/perf](./18-ux-verbeterplan.md) | A11Y-1/2, UX-43/44, PERF-9, INF-11, BOO-12 | Kwaliteit/UX (4-agent-audit) | Nee |
 
-> **Volgende ronde (gekozen 2026-06-20): drie elkaar versterkende features** met maximale
-> gebruikerswaarde — **09 Slimme keuken-loop** (Maaltijden + Voorraad, bovenop de catalogus),
-> **05 Notificaties** (geactualiseerd: lokaal + remote, incl. maaltijd-/voorraad-herinneringen)
-> en **04 Kosten & autodelen** (geactualiseerd: bon→uitgave nu echt mogelijk via `purchases`).
-> Samenhang: menu → lijst → voorraad → herinneringen → kosten. Aanbevolen volgorde **09 → 05 → 04**.
-> **→ GEBOUWD (2026-06-20)** (migraties `0016`–`0018`), plus een vervolgronde met
-> **kosten-inzichten & budget** (`0019`), **reserveringen-kalender** + **server-side recurring**
-> (`0020`, `pg_cron`) en **FK-indexen** (`0021`). Getest (units groen, lint 0 errors, RLS-cases
-> erbij). **Alle migraties `0016`–`0021` staan live (2026-06-20)**; resteert nog de toestel-rooktest
-> — zie backlog §6 en `VERIFICATIE.md`. ✅
->
-> *(Plannen 01, 02, 06/INF-6, 07 en 08 zijn (groten)deels gereed; zie backlog §6.)*
-
-> **Volgende ronde gespecificeerd (2026-06-22): plannen 10–13.** De Grote-aankopen-module
-> (03) is bewust **uitgesteld**. In plaats daarvan zijn vier andere ontwikkelingen uitgewerkt
-> die grotendeels **vanuit een dev-omgeving te bouwen én te testen** zijn (pure logica + units
-> + lint; meestal geen migratie): **10 Taken-redesign**, **11 Interactie-/navigatie-polish**,
-> **13 Kleine features** en de grote **12 Vandaag-widget-grid-epic**. Stap-voor-stap-volgorde
-> hieronder.
-
-> **Vervolg (2026-06-22): performance-pakket GEBOUWD.** Na 10–13 een "waargenomen snelheid"-ronde
-> i.p.v. een nieuwe feature: **PERF-2** (instant tab-wissel — in-memory SWR-cache `lib/dataCache.js`
-> + `freezeOnBlur`), **INF-8 C3** (incrementeel realtime-patchen `lib/realtimePatch.js`) en de veilige
-> helft van **PERF-1** (query-limits). Géén migratie; units + lint groen. Status uitsluitend in
-> backlog §6 (PERF-2/INF-8/PERF-1 → 🔧, toestel-/web-bevestiging resteert).
-
-> **Drie doorlichtingen geconsolideerd (2026-06-24/25): plannen 16–18.** Drie parallelle multi-agent
-> audits zijn omgezet in build-ready plannen én geconsolideerd in de backlog §6: **16 Performance**
-> (PERF-3…8), **17 Security** (SEC-1…7, kritiek **SEC-1** = owner-escalatie; do-now met SEC-2) en **18
-> UX/a11y/correctheid/perf** (A11Y-1/2, UX-43/44, PERF-9, INF-11, BOO-12). Overlap is gede-dupliceerd:
-> 18-Pijler-D = PERF-4/PERF-5, D5 bewust níét, en security-M1/L4/L5 vallen onder INF-10, L1 onder INF-9.
-> **Aanbevolen do-now:** SEC-1 + SEC-2 vóór nieuw feature-werk (tenant-isolatie). Status uitsluitend in backlog §6.
-
-## Stap-voor-stap: plannen 10–13 oppakken
-
-Geordend op **waarde-per-inspanning** en **bouwbaarheid vanuit hier** (geen device nodig tot
-expliciet vermeld). Elke stap is een afgeronde, commit-/PR-bare eenheid.
-
-```
-Stap 1 — Plan 13 PLA-8 (cross-plant tijdlijn)      S · geen migratie · puur + UI
-Stap 2 — Plan 11 UX-6 (dialoog/actiesheet-systeem)  M · geen migratie · raakt ~21 call-sites
-Stap 3 — Plan 11 UX-10 ("vorige"-lintje)            M · geen migratie · ~12-18 schermen, units
-Stap 4 — Plan 10 TKN-1 (tijdscope-switcher)         L · geen migratie · agenda-helpers + MonthView
-Stap 5 — Plan 10 TKN-3 (filter-bediening)           M · geen migratie · filter-helpers + sheet
-Stap 6 — Plan 13 BOO-8 (aankoopfrequentie)          M · geen migratie · pure heuristiek + units
-Stap 7 — Plan 12 Fase A+B (widget-registry+grid+stijlen) L · geen migratie · puur, units
-Stap 8 — Plan 12 Fase C (layout-persistentie)       M · migratie optioneel (0036 home_layouts)
-Stap 9 — Plan 12 Fase D (drag-and-drop, a11y/perf)  L · DEVICE-validatie vereist
-```
-
-**Waarom deze volgorde.** Begin klein en zelfstandig (**13/PLA-8**) om het patroon warm te
-draaien. Doe daarna **11 (UX-6 → UX-10)**: het dialoogsysteem en het "vorige"-lintje verhogen de
-afwerking overal en sluiten aan op de net geleverde UX-12. Pak dan de **Taken-redesign (10)** —
-de meest gebruikte tab, met herbruikbare pure logica. **13/BOO-8** is een fijne losse
-toevoeging. Bewaar de **widget-grid-epic (12)** voor het laatst en bouw 'm **gefaseerd**: A+B
-leveren al een modulaire, kleurrijke Home zónder migratie of device; C voegt sync toe; D
-(drag-and-drop) als laatste, want dat vraagt toestel-validatie. Plannen 10, 11 en 13 zijn
-**parallelliseerbaar** (raken verschillende bestanden); 12 leunt op de cohesie die 10/11 brengen.
+> **Build-historie staat hier niet.** Welke ronde wanneer is gebouwd/gemerged — de keuken-loop
+> (09/05/04), de no-device-ronde (10–13), het performance-pakket en de consolidatie van de drie
+> audits (16–18) in de backlog — staat chronologisch in
+> [`huishoek-voortgang.md`](../../huishoek-voortgang.md); de actuele status per item uitsluitend in
+> [backlog §6](../../huishoek-backlog.md). Dit document blijft de **platte plan-index +
+> ontwerp-onderbouwing**, geen logboek.
 
 ## Aanbevolen volgorde & afhankelijkheden
 
