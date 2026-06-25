@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { FlatList, View, Text, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
@@ -63,6 +63,11 @@ export default function Tijdlijn() {
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
     [members],
   );
+
+  // Herlaad bij focus (SWR): de tab is `freezeOnBlur`, dus terugkeren uit het detail
+  // (bv. na verwijderen) remount niet — en een realtime DELETE draagt geen household_id,
+  // dus de gefilterde subscriptie vangt 'm niet. Focus-reload houdt de feed vers.
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
