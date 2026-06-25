@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,6 +6,7 @@ import { useVehicles } from '../../lib/useVehicles';
 import { useHousehold } from '../../lib/household';
 import { useDialog } from '../../lib/dialog';
 import { maintenanceTemplates, defaultMaintenanceKeys, intervalLabel } from '../../lib/vehicleCare';
+import { isValidPlate, lookupPlate } from '../../lib/rdw';
 import { ModalHeader, Field, Checkbox, Button, Row, Stack } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { VISIBILITY } from '../../lib/constants';
@@ -32,6 +33,7 @@ export default function VehicleEditor() {
   const [plate, setPlate] = useState(existing?.license_plate ?? '');
   const [make, setMake] = useState(existing?.make ?? '');
   const [model, setModel] = useState(existing?.model ?? '');
+  const [vehicleType, setVehicleType] = useState(existing?.vehicle_type ?? '');
   const [year, setYear] = useState(existing?.year != null ? String(existing.year) : '');
   const [mileage, setMileage] = useState(existing?.mileage != null ? String(existing.mileage) : '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
@@ -39,6 +41,30 @@ export default function VehicleEditor() {
   const [visibility, setVisibility] = useState(existing?.visibility ?? VISIBILITY.HOUSEHOLD);
   const [shareSubgroupId, setShareSubgroupId] = useState(existing?.share_subgroup_id ?? null);
   const [shareWith, setShareWith] = useState(existing?.share_with ?? []);
+
+  // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Bij een geldig kenteken
+  // vult 'ie merk/model/type — maar alléén lege velden, zodat handmatige invoer nooit
+  // wordt overschreven. Faalt de RDW (offline/onbekend/timeout), dan gebeurt er stil niets.
+  const [lookupState, setLookupState] = useState(null); // null | 'busy' | 'found' | 'none'
+  const lookupSeq = useRef(0);
+  useEffect(() => {
+    if (!isValidPlate(plate)) { setLookupState(null); return undefined; }
+    const seq = ++lookupSeq.current;
+    const timer = setTimeout(async () => {
+      setLookupState('busy');
+      const r = await lookupPlate(plate);
+      if (seq !== lookupSeq.current) return; // kenteken intussen veranderd → verouderd
+      if (r) {
+        setMake((m) => m || r.make || '');
+        setModel((m) => m || r.model || '');
+        setVehicleType((tp) => tp || r.vehicleType || '');
+        setLookupState('found');
+      } else {
+        setLookupState('none');
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [plate]);
 
   // Onderhouds-checklist: alleen bij een nieuw voertuig (de taken worden bij aanmaken
   // gegenereerd). Default voor-aangevinkt = de gangbare basis (APK/beurten/olie/banden).
@@ -56,7 +82,7 @@ export default function VehicleEditor() {
     if (!name.trim()) { setError(t('vehicle.error.name')); return; }
     setBusy(true);
     const payload = {
-      name, make, model, year: toInt(year), licensePlate: plate, mileage: toInt(mileage), notes,
+      name, make, model, vehicleType, year: toInt(year), licensePlate: plate, mileage: toInt(mileage), notes,
       visibility, shareSubgroupId, shareWith,
     };
     try {
@@ -65,6 +91,7 @@ export default function VehicleEditor() {
       } else {
         await updateVehicle(id, {
           name: name.trim(), make: make.trim() || null, model: model.trim() || null,
+          vehicle_type: vehicleType.trim() || null,
           year: toInt(year), license_plate: plate.trim() || null, mileage: toInt(mileage),
           notes: notes.trim() || null,
           visibility,
@@ -95,7 +122,10 @@ export default function VehicleEditor() {
         <Field label={t('vehicle.field.name')} value={name} onChangeText={(v) => { setName(v); setError(null); }}
           placeholder={t('vehicle.field.name.placeholder')} autoFocus={isNew} error={error} />
         <Field label={t('vehicle.field.plate')} value={plate} onChangeText={setPlate}
-          placeholder={t('vehicle.field.plate.placeholder')} autoCapitalize="characters" />
+          placeholder={t('vehicle.field.plate.placeholder')} autoCapitalize="characters"
+          helper={lookupState === 'busy' ? t('vehicle.rdw.busy')
+            : lookupState === 'found' ? t('vehicle.rdw.found')
+              : lookupState === 'none' ? t('vehicle.rdw.none') : undefined} />
 
         <Row gap={space.md}>
           <View style={{ flex: 1 }}>
