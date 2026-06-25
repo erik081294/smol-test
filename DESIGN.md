@@ -186,7 +186,8 @@ Velden staan in een vaste, voorspelbare volgorde — de denkstap van de gebruike
 4. **Details** — notities e.d.
 5. **Delen met** — geavanceerd; via `VisibilityPicker collapsible` ingeklapt
    onderaan (opent vanzelf als de keuze afwijkt van "Hele huishouden"), zodat het
-   de hoofd-flow niet onderbreekt.
+   de hoofd-flow niet onderbreekt. Het model erachter (de drie modi, de RLS-afdwinging
+   en de client-spiegel) staat in [docs/zichtbaarheid.md](docs/zichtbaarheid.md).
 6. **Verwijderen** — helemaal onderaan, alleen in bewerk-modus (undo-toast, geen
    blokkerende `Alert`).
 
@@ -196,9 +197,11 @@ zelden-gewijzigde blokken horen in een `Collapsible`.
 
 **Niet-bewaarde wijzigingen.** Geef de `Editor` een `dirty`-prop mee wanneer het
 formulier gewijzigd is; bij sluiten/terug-drukken vraagt 'ie dan eerst om bevestiging
-(`confirmDiscard`, cross-platform: `Alert` native / `window.confirm` web, Android-back
-onderschept) i.p.v. een ingevuld formulier stil weg te gooien. Een schoon formulier
-sluit direct — geen frictie. (De native `Alert` wordt later het eigen dialoog-systeem.)
+(`confirmDiscard`, via het eigen `dialog`-systeem — één codepad voor alle platforms,
+Android hardware-back onderschept) i.p.v. een ingevuld formulier stil weg te gooien.
+Een schoon formulier sluit direct — geen frictie. Bij ongeldige invoer geef je
+daarnaast `confirmDisabled` mee: de bevestig-knop dimt én wordt niet-tikbaar, zodat het
+scherm zelf laat zien dat er nog iets ontbreekt i.p.v. een tik die stil niets doet.
 
 ### Drawers & sheets — toetsenbord-ontwijking en sluiten
 

@@ -8,6 +8,8 @@ import { relativeTime } from '../../lib/activity';
 import { ModalHeader, Avatar, Button, Empty, ListSkeleton } from '../../lib/ui';
 import { colors, type, space, radius } from '../../lib/theme';
 import { dialog } from '../../lib/dialog';
+import { useToast } from '../../lib/toast';
+import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t } from '../../lib/i18n';
 
 // Bericht-detail (TML-1): de post groot met de volledige foto-galerij + verwijderen.
@@ -24,16 +26,29 @@ function BigPhoto({ path }) {
 
 export default function PostDetail() {
   const router = useRouter();
+  const toast = useToast();
   const { id } = useLocalSearchParams();
   const { posts, loading, deletePost, members } = useTimeline();
   const post = posts.find((p) => p.id === id);
   const author = post ? (members ?? []).find((m) => m.id === post.author_id) : null;
 
-  const onDelete = async () => {
-    const ok = await dialog.confirm({ title: t('timeline.deleteConfirm'), confirmLabel: t('common.delete'), tone: 'danger' });
-    if (!ok) return;
-    await deletePost(id);
+  // Verwijderen met ongedaan-maken (zelfde patroon als de uitgaven-editor): het bericht
+  // verdwijnt meteen uit de feed (markPending), we keren terug, en de echte delete —
+  // inclusief het opruimen van de foto's in de bucket — volgt pas als de toast verloopt.
+  // Geen blokkerende Alert: undo is het vangnet en werkt óók op web (DESIGN.md principe 7).
+  const onDelete = () => {
+    markPending(id);
     router.back();
+    toast.show({
+      message: t('timeline.deleted'),
+      actionLabel: t('common.undo'),
+      onAction: () => unmarkPending(id),
+      onExpire: async () => {
+        try { await deletePost(id); }
+        catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+        finally { unmarkPending(id); }
+      },
+    });
   };
 
   return (

@@ -50,7 +50,7 @@ function PostCard({ post, author, onPress }) {
           <Text style={type.caption}>{relativeTime(post.created_at)}</Text>
         </View>
       </View>
-      {body ? <Text style={[type.body, { marginTop: space.sm }]}>{body}</Text> : null}
+      {body ? <Text style={[type.body, { marginTop: space.sm }]} numberOfLines={6}>{body}</Text> : null}
       <PhotoStrip photos={post.photos} />
     </Card>
   );
