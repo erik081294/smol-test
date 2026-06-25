@@ -81,6 +81,14 @@ test('searchCatalog: normaliseert (hoofdletters/diacrieten), geen match → leeg
   assert.equal(searchCatalog('xyz', items).length, 0);
 });
 
+test('searchCatalog: zoekt in de standaard-catalogus via de voor-genormaliseerde namen (PERF-6)', () => {
+  // Geen tweede argument → de vaste CATALOG (de voor-genormaliseerde snelle weg).
+  const keys = searchCatalog('melk').map((i) => i.key);
+  assert.ok(keys.includes('melk'), 'Melk moet matchen');
+  // Prefix-match ('Melk') staat vóór een midden-in-de-naam-match ('Halfvolle melk').
+  assert.ok(keys.indexOf('melk') < keys.indexOf('halfvolle-melk'), 'prefix vóór midden-match');
+});
+
 test('itemByName: vindt een catalogus-item op genormaliseerde naam', () => {
   const it = itemByName('  MELK ');
   assert.equal(it && it.key, 'melk');

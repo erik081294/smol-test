@@ -86,3 +86,20 @@ test('bestMatch: score precies op de drempel telt nog mee (>=)', () => {
   assert.equal(bestMatch('abc', products, 0.5).product.id, 'p'); // 0,5 >= 0,5
   assert.equal(bestMatch('abc', products, 0.5000001), null);     // net te hoog
 });
+
+// --- PERF-6: hot-path normaliseert minder, zonder gedragsverandering ----------
+
+test('normalize: is idempotent — normalize(normalize(x)) === normalize(x)', () => {
+  // Hierop steunt PERF-6: een al-genormaliseerd `search`-veld mag zónder her-normalisatie
+  // de vergelijking in. Breekt deze aanname, dan moet de optimalisatie terug.
+  for (const x of ['Halfvolle Melk 1L', 'Café Crème 250ml', 'AH 2x Broodjes', 'H2O bruisend', '']) {
+    assert.equal(normalize(normalize(x)), normalize(x), `niet idempotent voor "${x}"`);
+  }
+});
+
+test('suggestions/bestMatch: gebruiken het voor-genormaliseerde search-veld, niet de ruwe naam', () => {
+  // `search` is de waarheid; `name` is hier expres rommel. Matcht het op search → score 1.
+  const products = [{ id: 'p1', name: 'ZZZ ONZIN', search: 'melk' }];
+  assert.equal(suggestions('Melk', products, 1)[0].score, 1);
+  assert.equal(bestMatch('melk 1L', products, 0.6).product.id, 'p1');
+});

@@ -94,7 +94,10 @@ export default function Boodschappen() {
   }, [open, done, categoryById]);
 
   const searchResults = useMemo(() => (q ? searchCatalog(q).slice(0, SEARCH_LIMIT) : []), [q]);
-  const exactMatch = useMemo(() => searchResults.some((r) => normalize(r.name) === normalize(q)), [searchResults, q]);
+  const exactMatch = useMemo(() => {
+    const nq = normalize(q); // PERF-6: query één keer normaliseren i.p.v. per resultaat
+    return searchResults.some((r) => normalize(r.name) === nq);
+  }, [searchResults, q]);
 
   const dueSuggestions = useMemo(() => {
     if (q) return [];
@@ -133,7 +136,8 @@ export default function Boodschappen() {
 
   const submitTyped = () => {
     if (!q) return;
-    const exact = searchResults.find((r) => normalize(r.name) === normalize(q));
+    const nq = normalize(q); // PERF-6: query één keer normaliseren i.p.v. per resultaat
+    const exact = searchResults.find((r) => normalize(r.name) === nq);
     if (exact) { setCatalogCount(exact, (countForCatalog(exact) || 0) + 1); setText(''); }
     else addCustom();
   };
