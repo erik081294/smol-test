@@ -2,12 +2,15 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useVehicles } from '../../lib/useVehicles';
+import { format } from 'date-fns';
+import { useVehicles, useVehicleLog, addVehicleLog } from '../../lib/useVehicles';
 import { useHousehold } from '../../lib/household';
+import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { maintenanceTemplates, defaultMaintenanceKeys, intervalLabel } from '../../lib/vehicleCare';
 import { isValidPlate, lookupPlate } from '../../lib/rdw';
-import { ModalHeader, Field, Checkbox, Button, Row, Stack } from '../../lib/ui';
+import { formatCents, parseAmountToCents } from '../../lib/expenses';
+import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { VISIBILITY } from '../../lib/constants';
 import { colors, type, space, radius } from '../../lib/theme';
@@ -26,6 +29,8 @@ export default function VehicleEditor() {
   const dialog = useDialog();
   const { vehicles, addVehicle, updateVehicle, removeVehicle } = useVehicles();
   const { members, subgroups } = useHousehold();
+  const { user } = useAuth();
+  const { entries: logEntries, reload: reloadLog } = useVehicleLog(isNew ? null : id);
 
   const existing = useMemo(() => vehicles.find((v) => v.id === id), [vehicles, id]);
 
@@ -112,6 +117,33 @@ export default function VehicleEditor() {
     catch (e) { dialog.alert({ title: t('vehicle.error.save'), body: e.message }); }
   };
 
+  // Onderhoud loggen (VTG-2): datum/km/kosten/notitie + optioneel als gedeelde uitgave.
+  const [logOpen, setLogOpen] = useState(false);
+  const [logTitle, setLogTitle] = useState('');
+  const [logDate, setLogDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [logKm, setLogKm] = useState('');
+  const [logCost, setLogCost] = useState('');
+  const [logNote, setLogNote] = useState('');
+  const [logAsExpense, setLogAsExpense] = useState(false);
+  const [logBusy, setLogBusy] = useState(false);
+
+  const totalCostCents = logEntries.reduce((sum, e) => sum + (e.cost_cents ?? 0), 0);
+
+  const submitLog = async () => {
+    setLogBusy(true);
+    try {
+      await addVehicleLog({
+        vehicle: existing, householdId: existing.household_id, userId: user.id,
+        title: logTitle, performedOn: logDate || null,
+        mileage: toInt(logKm), costCents: parseAmountToCents(logCost),
+        note: logNote, asExpense: logAsExpense, members, paidBy: user.id,
+      });
+      setLogTitle(''); setLogKm(''); setLogCost(''); setLogNote(''); setLogAsExpense(false); setLogOpen(false);
+      await reloadLog();
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+    finally { setLogBusy(false); }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ModalHeader title={isNew ? t('vehicle.new') : (existing?.name ?? t('vehicle.add'))}
@@ -182,6 +214,61 @@ export default function VehicleEditor() {
           subgroups={subgroups} members={members} />
 
         <Field label={t('vehicle.field.notes')} value={notes} onChangeText={setNotes} multiline />
+
+        {/* Onderhoudshistorie (VTG-2) — alleen bij een bestaand voertuig. */}
+        {!isNew ? (
+          <View style={{ marginTop: space.sm, marginBottom: space.lg }}>
+            <SectionHeader title={t('vehicle.history.title')} count={logEntries.length}
+              action={<Button title={t('vehicle.history.log')} variant="ghost" icon="add"
+                fullWidth={false} onPress={() => setLogOpen((o) => !o)} />} />
+            {totalCostCents > 0 ? (
+              <Text style={[type.caption, { marginBottom: space.sm }]}>
+                {t('vehicle.history.total', { amount: formatCents(totalCostCents) })}
+              </Text>
+            ) : null}
+
+            {logOpen ? (
+              <View style={{ padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, marginBottom: space.md }}>
+                <Field label={t('vehicle.log.title')} value={logTitle} onChangeText={setLogTitle}
+                  placeholder={t('vehicle.log.title.placeholder')} />
+                <Row gap={space.md}>
+                  <View style={{ flex: 1 }}>
+                    <Field label={t('vehicle.log.date')} value={logDate} onChangeText={setLogDate} placeholder="2026-06-25" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Field label={t('vehicle.log.km')} value={logKm} onChangeText={setLogKm} keyboardType="number-pad" />
+                  </View>
+                </Row>
+                <Field label={t('vehicle.log.cost')} value={logCost} onChangeText={setLogCost}
+                  placeholder="0,00" keyboardType="decimal-pad" />
+                <Field label={t('vehicle.log.note')} value={logNote} onChangeText={setLogNote} multiline />
+                <Row gap={space.sm} align="center" style={{ marginBottom: space.md }}>
+                  <Checkbox checked={logAsExpense} onPress={() => setLogAsExpense((v) => !v)}
+                    accessibilityLabel={t('vehicle.log.asExpense')} />
+                  <Text style={[type.body, { flex: 1 }]}>{t('vehicle.log.asExpense')}</Text>
+                </Row>
+                <Button title={t('vehicle.log.save')} onPress={submitLog} loading={logBusy} />
+              </View>
+            ) : null}
+
+            {logEntries.length === 0 ? (
+              <Text style={type.caption}>{t('vehicle.history.empty')}</Text>
+            ) : (
+              <Stack gap={space.xs}>
+                {logEntries.map((e) => (
+                  <View key={e.id} style={{ padding: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line }}>
+                    <Text style={type.body}>{e.title || t('vehicle.field.maintenance')}</Text>
+                    <Text style={type.caption}>
+                      {[e.performed_on, e.mileage != null ? `${e.mileage} km` : null,
+                        e.cost_cents != null ? formatCents(e.cost_cents) : null].filter(Boolean).join(' · ')}
+                    </Text>
+                    {e.note ? <Text style={[type.caption, { color: colors.inkSoft }]}>{e.note}</Text> : null}
+                  </View>
+                ))}
+              </Stack>
+            )}
+          </View>
+        ) : null}
 
         {!isNew ? (
           <Button title={t('vehicle.deleteButton')} variant="ghost" onPress={onDelete}
