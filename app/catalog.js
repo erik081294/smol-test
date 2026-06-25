@@ -149,10 +149,12 @@ export default function Catalog() {
   const addCustom = () => {
     const name = q;
     if (!name) return;
-    toast.show({ message: t('catalog.added', { name }) });
+    // Toast pas ná succes (UX-44/B6) — gelijk aan boodschappen.js. Eerder verscheen de
+    // "toegevoegd"-toast vóór de netwerkcall, gevolgd door een fout-dialog bij falen.
     setQuery('');
     ensureProduct({ name })
       .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
+      .then(() => toast.show({ message: t('catalog.added', { name }) }))
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
