@@ -155,7 +155,12 @@ Zodat elke actie op een voorspelbare plek staat:
   uitbreidbaar naar nieuwe acties zonder het component te wijzigen. De **zichtbare
   knop in de rij blijft** als toegankelijke + web-fallback (op web rendert `SwipeRow`
   de kale rij); de veeg is alleen een snellere ingang. Altijd met **undo-toast** — de
-  actie zelf leeft in `onTrigger`, niet in een tweede delete-pad.
+  actie zelf leeft in `onTrigger`, niet in een tweede delete-pad. **Deze richting is
+  app-breed bindend (UX-43):** dezelfde veeg betekent overal hetzelfde. Een scherm
+  zónder verwijderen laat `left` **leeg** (bv. Vandaag — een focus-overzicht, geen
+  wis-plek) i.p.v. er een niet-destructieve actie op te hangen; zo wist links-vegen
+  nergens het ene scherm en doet het op het andere iets anders. Voor screenreaders zijn
+  de veegacties ook als `accessibilityActions` beschikbaar (A11Y-1).
 - **Secundair/navigatie → header-rechts `IconButton`(s)** (zoeken, bibliotheek,
   terugkerend). Houd het bij maximaal een handvol.
 - **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →
