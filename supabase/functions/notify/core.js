@@ -9,6 +9,21 @@
 
 export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 export const EXPO_MAX_BATCH = 100; // Expo Push API: max 100 messages per request.
+export const MAX_BODY = 178;       // praktische lengte voor APNs/Expo-notificaties.
+
+// Push-body normaliseren (SEC-5): controletekens weren en de lengte begrenzen.
+// De webhook is al secret-geverifieerd (fail-closed in index.ts); dit is de extra
+// laag zodat een record.title die abnormaal lang is of stuurtekens bevat nooit
+// ongefilterd in een push belandt.
+export function clampBody(text, max = MAX_BODY) {
+  let s = '';
+  for (const ch of String(text ?? '')) {
+    const code = ch.codePointAt(0);
+    s += code < 0x20 || code === 0x7f ? ' ' : ch; // controletekens → spatie
+  }
+  s = s.replace(/\s+/g, ' ').trim();
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
+}
 
 // Database-Webhook-payload → genormaliseerd event.
 //   { type: 'INSERT'|'UPDATE'|'DELETE', table, record, old_record }
@@ -31,7 +46,10 @@ function taskHandler({ type, record, old_record }) {
   if (!record) return [];
   const assignee = record.assigned_to;
   const creator = record.created_by;
-  if (!assignee || assignee === creator) return [];
+  // recipientId moet een niet-lege string zijn — de schil doet er een DB-query mee
+  // (push_tokens.profile_id). Weiger junk/niet-string-waarden (SEC-5).
+  if (typeof assignee !== 'string' || !assignee) return [];
+  if (assignee === creator) return [];
   // Bij UPDATE alleen sturen als de toewijzing daadwerkelijk wijzigde (geen
   // dubbele push bij ongerelateerde taak-edits).
   if (type === 'UPDATE' && old_record && old_record.assigned_to === assignee) return [];
@@ -42,7 +60,7 @@ function taskHandler({ type, record, old_record }) {
     dedupKey: `task:${record.id}:assigned:${assignee}`,
     kind: 'task_assigned',
     title: 'Nieuwe taak voor jou',
-    body: record.title || 'Je hebt een taak toegewezen gekregen',
+    body: clampBody(record.title) || 'Je hebt een taak toegewezen gekregen',
     data: { kind: 'task_assigned', taskId: record.id },
   }];
 }

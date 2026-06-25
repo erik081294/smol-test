@@ -1,100 +1,182 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, Image, ActivityIndicator, Platform, ScrollView, Pressable, Linking } from 'react-native';
-import { useDialog } from "../lib/dialog";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, SectionList, TextInput, Pressable, Platform, ScrollView } from 'react-native';
+import { useDialog } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useCatalogCategories, useCatalogSearch } from '../lib/useCatalog';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useGroceries } from '../lib/useGroceries';
+import { useProducts } from '../lib/useProducts';
 import { useToast } from '../lib/toast';
 import { backLabelFor } from '../lib/navMeta';
-import { ModalHeader, ItemRow, Empty, ListSkeleton, Chip } from '../lib/ui';
+import { CATEGORIES, catalogByCategory, searchCatalog, itemByName } from '../lib/groceryCatalog';
+import { recentProducts } from '../lib/favoriteGroceries';
+import { countOf } from '../lib/groceryCount';
+import { ProductImageView } from '../lib/ProductImageView';
+import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
 import { Icon } from '../lib/icons';
+import { animateNextLayout } from '../lib/motion';
 import { colors, space, radius, type, touchTarget, screenPadding } from '../lib/theme';
 import { t } from '../lib/i18n';
 
-// Bladeren/zoeken in de globale Open Food Facts-catalogus (NL) om de
-// boodschappenlijst te vullen. Tik een product → het komt op de lijst, gekoppeld
-// aan het catalogusproduct (catalog_product_id).
+const RECENT_KEY = '__recent__';
+const RECENT_CAP = 24;
+
+// Eén catalogus-/eerder-gekozen-rij. De stepper IS het mechaniek: zijn waarde is het
+// aantal dat op de boodschappenlijst staat (0 = er niet op). 0→n zet het op de lijst,
+// →0 haalt het eraf. Gememoiseerd zodat één tik niet de hele lijst hertekent.
+const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, onPrune }) {
+  const onList = count >= 1;
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
+      borderBottomWidth: 1, borderBottomColor: colors.line,
+    }}>
+      <ProductImageView item={entry.image} size={40} />
+      <View style={{ flex: 1 }}>
+        <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
+        {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
+      </View>
+      <Row gap={space.xs} align="center">
+        <Stepper value={count} onChange={(v) => onSetCount(entry, v)} min={0} max={99}
+          accessibilityLabel={t('catalog.qty.for', { name: entry.name })} />
+        {entry.isRecent ? (
+          <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
+            accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
+            style={{ width: 28, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="close" size={15} color={colors.inkFaint} />
+          </Pressable>
+        ) : null}
+      </Row>
+    </View>
+  );
+});
+
+// Bladeren/zoeken in de gebundelde catalogus (lib/groceryCatalog). Picnic-stijl: schappen
+// + zoekbalk + beeld + "Eerder gekozen" bovenaan. Elke rij toont een stepper die direct
+// gekoppeld is aan de boodschappenlijst (zelfde model als de lijst zelf). Optimistisch:
+// het aantal verandert meteen lokaal, het netwerk volgt op de achtergrond.
 export default function Catalog() {
   const dialog = useDialog();
   const router = useRouter();
   const toast = useToast();
-  const { add } = useGroceries();
-  const { categories } = useCatalogCategories();
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState(null); // null = nog niets gekozen
-  const { items, loading, loadingMore, hasMore, loadMore, active } = useCatalogSearch({ query, category });
+  const params = useLocalSearchParams();
+  const { items, setCount } = useGroceries();
+  const { products, ensureProduct, setHidden } = useProducts();
+  const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
+  const [category, setCategory] = useState(null); // null = alle, RECENT_KEY, of schap-key
+  const [counts, setCounts] = useState({});        // optimistische override: entry.key → aantal
+  const [prunedIds, setPrunedIds] = useState(() => new Set());
 
-  const onAdd = (item) => {
-    add(item.name, null, item.id)
-      .then(() => toast.show({ message: t('catalog.added', { name: item.name }) }))
+  const q = query.trim();
+
+  // De gebundelde catalogus is statisch → schap-secties + key→entry-map één keer bouwen.
+  const shelf = useMemo(() => {
+    const byKey = new Map();
+    const sections = catalogByCategory().map((g) => {
+      const data = g.items.map((it) => {
+        const e = { key: `c:${it.key}`, name: it.name, unit: it.unit, image: it, isRecent: false, item: it };
+        byKey.set(it.key, e);
+        return e;
+      });
+      return { key: g.key, title: `${g.emoji}  ${g.label}`, data };
+    });
+    return { sections, byKey };
+  }, []);
+
+  const recentEntries = useMemo(() => recentProducts(products, { n: RECENT_CAP })
+    .filter((p) => !prunedIds.has(p.id))
+    .map((p) => {
+      const cat = itemByName(p.name);
+      return {
+        key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
+        image: { emoji: cat?.emoji, category: p.category || cat?.category }, isRecent: true, product: p,
+      };
+    }), [products, prunedIds]);
+
+  const sections = useMemo(() => {
+    if (q) {
+      const results = searchCatalog(q).map((it) => shelf.byKey.get(it.key)).filter(Boolean);
+      return results.length ? [{ key: 'results', title: null, data: results }] : [];
+    }
+    const recentSection = { key: RECENT_KEY, title: `🕘  ${t('catalog.recent')}`, data: recentEntries };
+    if (category === RECENT_KEY) return recentEntries.length ? [recentSection] : [];
+    const out = [];
+    if (category == null && recentEntries.length) out.push(recentSection);
+    const picked = category ? shelf.sections.filter((s) => s.key === category) : shelf.sections;
+    return out.concat(picked);
+  }, [q, category, recentEntries, shelf]);
+
+  // Huidig aantal van een rij: optimistische override > werkelijke lijst-stand.
+  const countFor = useCallback(
+    (entry) => counts[entry.key] ?? countOf(items, entry.name),
+    [counts, items],
+  );
+
+  // Aantal zetten: meteen lokaal (snappy) + netwerk op de achtergrond. Bij de eerste plaatsing
+  // (0→n) koppelen we aan een huishoud-product (recency vult "Eerder gekozen"); daarna volstaat
+  // het bijwerken op naam.
+  const setImpl = (entry, n) => {
+    const prev = countFor(entry);
+    setCounts((m) => ({ ...m, [entry.key]: n }));
+    const unit = entry.unit;
+    const fail = (e) => { setCounts((m) => ({ ...m, [entry.key]: prev })); dialog.alert({ title: t('catalog.error.add'), body: e.message }); };
+    if (entry.isRecent) {
+      setCount(entry.name, n, { productId: entry.product.id, unit }).catch(fail);
+    } else if (prev <= 0 && n >= 1) {
+      ensureProduct({ name: entry.item.name, category: entry.item.category, defaultUnit: entry.item.unit })
+        .then((p) => setCount(entry.name, n, { productId: p?.id ?? null, unit })).catch(fail);
+    } else {
+      setCount(entry.name, n, { unit }).catch(fail);
+    }
+  };
+  const pruneImpl = (entry) => {
+    const id = entry.product.id;
+    animateNextLayout();
+    setPrunedIds((s) => new Set(s).add(id));
+    setHidden(id, true).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
+    toast.show({
+      message: t('catalog.recent.removed', { name: entry.name }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); setPrunedIds((s) => { const next = new Set(s); next.delete(id); return next; }); setHidden(id, false).catch(() => {}); },
+    });
+  };
+  const setRef = useRef(setImpl);
+  const pruneRef = useRef(pruneImpl);
+  useEffect(() => { setRef.current = setImpl; pruneRef.current = pruneImpl; });
+  const onSetCount = useCallback((entry, n) => setRef.current(entry, n), []);
+  const onPrune = useCallback((entry) => pruneRef.current(entry), []);
+
+  const addCustom = () => {
+    const name = q;
+    if (!name) return;
+    toast.show({ message: t('catalog.added', { name }) });
+    setQuery('');
+    ensureProduct({ name })
+      .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
-  const renderItem = ({ item }) => (
-    <ItemRow
-      leading={
-        item.image_url ? (
-          <Image
-            source={{ uri: item.image_url }}
-            style={{ width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt }}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-        ) : (
-          <View style={{ width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="catalog" size={20} color={colors.inkFaint} />
-          </View>
-        )
-      }
-      title={item.name}
-      meta={
-        (item.brands || item.quantity) ? (
-          <Text style={type.caption} numberOfLines={1}>
-            {[item.brands, item.quantity].filter(Boolean).join(' · ')}
-          </Text>
-        ) : undefined
-      }
-      onPress={() => onAdd(item)}
-      accessibilityLabel={t('catalog.add', { name: item.name })}
-      trailing={
-        <Pressable
-          onPress={() => onAdd(item)}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('catalog.add', { name: item.name })}
-          style={({ pressed }) => ({
-            width: 32, height: 32, borderRadius: 16,
-            backgroundColor: pressed ? colors.ocher : colors.ocherSoft,
-            alignItems: 'center', justifyContent: 'center',
-          })}
-        >
-          <Icon name="add" size={18} color={colors.forest} weight="bold" />
-        </Pressable>
-      }
-    />
-  );
+  const renderItem = useCallback(({ item: entry }) => (
+    <CatalogRow entry={entry} count={countFor(entry)} onSetCount={onSetCount} onPrune={onPrune} />
+  ), [countFor, onSetCount, onPrune]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      {/* ModalHeader pad zichzelf (space.lg) — niet in de screenPadding-wrapper zetten. */}
       <ModalHeader title={t('catalog.title')} onClose={() => router.back()} backLabel={backLabelFor('catalog')} />
+
+      {/* Zoekbalk */}
       <View style={{ paddingHorizontal: screenPadding }}>
-        {/* Zoekbalk */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
+          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
+        }}>
           <Icon name="search" size={20} color={colors.inkFaint} />
           <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('catalog.search')}
-            placeholderTextColor={colors.inkFaint}
-            autoCorrect={false}
-            returnKeyType="search"
-            accessibilityLabel={t('catalog.search')}
+            value={query} onChangeText={setQuery}
+            placeholder={t('catalog.search')} placeholderTextColor={colors.inkFaint}
+            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('catalog.search')}
             style={{
               flex: 1, minHeight: touchTarget, marginLeft: space.sm,
-              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm,
-              fontSize: 16, color: colors.ink,
+              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
             }}
           />
           {query.length > 0 ? (
@@ -105,57 +187,67 @@ export default function Catalog() {
         </View>
       </View>
 
-      {/* Categorie-schappen (horizontaal). 'Alles' = filter uit. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.sm }}
-        style={{ flexGrow: 0 }}
-      >
-        <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
-        {categories.map((c) => (
-          <Chip
-            key={c.key}
-            label={`${c.emoji ? c.emoji + ' ' : ''}${c.label}`}
-            active={category === c.key}
-            onPress={() => setCategory((cur) => (cur === c.key ? null : c.key))}
-          />
-        ))}
-      </ScrollView>
+      {/* Schap-filter — met "Eerder gekozen" als eerste chip; paddingVertical geeft de
+          chip-rand lucht zodat 'ie bovenaan niet wordt afgesneden. */}
+      {!q ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingVertical: space.sm, alignItems: 'center' }}
+          // flexShrink:0 → de lange productlijst eronder mag deze chip-rij niet indrukken
+          // (anders werd de bovenkant van de pills afgekapt).
+          style={{ flexGrow: 0, flexShrink: 0 }}>
+          <Chip label={t('catalog.all')} active={category == null} onPress={() => setCategory(null)} />
+          {recentEntries.length ? (
+            <Chip label={`🕘 ${t('catalog.recent')}`} active={category === RECENT_KEY}
+              onPress={() => setCategory((cur) => (cur === RECENT_KEY ? null : RECENT_KEY))} />
+          ) : null}
+          {CATEGORIES.map((c) => (
+            <Chip key={c.key} label={`${c.emoji} ${c.label}`} active={category === c.key}
+              onPress={() => setCategory((cur) => (cur === c.key ? null : c.key))} />
+          ))}
+        </ScrollView>
+      ) : null}
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
+      <SectionList
+        sections={sections}
+        keyExtractor={(entry) => entry.key}
         contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.xxl }}
-        renderItem={renderItem}
         keyboardShouldPersistTaps="handled"
-        onEndReached={() => { if (hasMore) loadMore(); }}
-        onEndReachedThreshold={0.5}
+        stickySectionHeadersEnabled={false}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
+        renderItem={renderItem}
+        renderSectionHeader={({ section }) => (
+          section.title ? (
+            <Text style={[type.label, { marginTop: space.md, marginBottom: space.xs, color: colors.inkSoft }]}>
+              {section.title}
+            </Text>
+          ) : null
+        )}
         ListEmptyComponent={
-          loading ? (
-            <ListSkeleton count={6} />
-          ) : !active ? (
-            <Empty illustration="groceries" title={t('catalog.start.title')} subtitle={t('catalog.start.subtitle')} />
-          ) : (
+          q ? (
             <Empty illustration="groceries" title={t('catalog.empty.title')} subtitle={t('catalog.empty.subtitle')} />
-          )
+          ) : category === RECENT_KEY ? (
+            <Empty illustration="groceries" title={t('catalog.recent.empty.title')} subtitle={t('catalog.recent.empty.subtitle')} />
+          ) : null
         }
         ListFooterComponent={
-          <View style={{ paddingVertical: space.lg, alignItems: 'center', gap: space.sm }}>
-            {loadingMore ? <ActivityIndicator color={colors.forest} /> : null}
-            {items.length > 0 ? (
-              <Pressable
-                onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
-                accessibilityRole="link"
-                accessibilityLabel={t('catalog.attribution')}
-                hitSlop={8}
-              >
-                <Text style={[type.caption, { textAlign: 'center', textDecorationLine: 'underline', color: colors.forest }]}>
-                  {t('catalog.attribution')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+          q ? (
+            <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md,
+                paddingVertical: space.md, paddingHorizontal: space.md, borderRadius: radius.md,
+                borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
+                backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
+              })}>
+              <Icon name="add" size={18} color={colors.forest} weight="bold" />
+              <View style={{ flex: 1 }}>
+                <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+                <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
+              </View>
+            </Pressable>
+          ) : null
         }
       />
     </SafeAreaView>

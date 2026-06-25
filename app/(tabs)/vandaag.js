@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSharedValue } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { parseISO, isToday } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,22 +12,25 @@ import { useDialog } from '../../lib/dialog';
 import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
 import { dayProgress } from '../../lib/widgets/summaries';
-import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Row } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
   deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
+  toggleWidgetDetails, widgetShowsDetails,
 } from '../../lib/widgets/grid';
 import { WIDGET_BY_KEY, DEFAULTS_BY_MODULE, WIDGETS } from '../../lib/widgets/registry';
 import { WidgetGrid } from '../../lib/widgets/WidgetGrid';
 import { useHomeLayout } from '../../lib/useHomeLayout';
-import { isOverdue } from '../../lib/recurrence';
+import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
+import { useToast } from '../../lib/toast';
 import { animateNextLayout } from '../../lib/motion';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
 
 const SCREEN_PAD = 18;
 const GRID_GAP = space.md;
-const TILE_H = 132;       // uniforme tegelhoogte (1×1 en 2×1 even hoog → strakke grid)
+const TILE_H = 148;       // uniforme tegelhoogte (1×1 en 2×1 even hoog → strakke grid);
+                          // ruim genoeg dat een 2×1-preview (balk + 2 regels) past (UX-24)
 const CONTROL_H = 48;     // bewerk-controlebalk onder de tegel
 const FOCUS_CAP = 6;
 const STYLE_KEY = 'huishoek.widgetStyle';
@@ -50,11 +54,13 @@ function EditBtn({ icon, label, tint = colors.ink, onPress }) {
 // afvinkbaar; (2) een modulaire, kleurrijke widget-grid die je zelf samenstelt
 // (toevoegen/herschikken/grootte/stijl), gesynct per gebruiker/huishouden.
 export default function Home() {
-  const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
+  const { tasks, loading, error, reload, completeTask, uncompleteTask, updateTask } = useTasks();
   const { active, members, modules } = useHousehold();
   const { profile } = useAuth();
   const dialog = useDialog();
+  const toast = useToast();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const { overdue, today } = useMemo(() => {
     const open = tasks.filter((tk) => !tk.completed_at);
@@ -69,7 +75,26 @@ export default function Home() {
   const extraFocus = focus.length - visibleFocus.length;
   const progress = useMemo(() => dayProgress(tasks), [tasks]);
 
-  const toggle = (tk) => (tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk));
+  const toggle = (tk) => {
+    animateNextLayout();
+    return tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
+  };
+
+  // Veeg-acties op de focuslijst (UX, batch 2). Naar rechts = afvinken (de positieve,
+  // omkeerbare actie — net als het vinkje, dus zonder undo-toast); naar links = uitstellen
+  // (een dag vooruit, mét undo-vangnet). Verwijderen hoort hier bewust niet: Vandaag is
+  // een focus-overzicht, niet de plek om taken te wissen (dat kan in Taken).
+  const snoozeFromHome = (task) => {
+    const prev = task.due_date ?? null;
+    const next = snoozeDate(task, 1);
+    animateNextLayout();
+    updateTask(task.id, { due_date: next });
+    toast.show({
+      message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
+      actionLabel: t('common.undo'),
+      onAction: () => { animateNextLayout(); updateTask(task.id, { due_date: prev }); },
+    });
+  };
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -99,6 +124,41 @@ export default function Home() {
   }, []);
   const changeStyle = (s) => { setWidgetStyle(s); AsyncStorage.setItem(STYLE_KEY, s).catch(() => {}); };
 
+  // Auto-scroll tijdens het slepen van een widget (UX): houd je een tegel tegen de
+  // boven-/onderrand, dan scrollt de pagina mee zodat je 'm voorbij de huidige view kunt
+  // plaatsen. scrollY (JS, scroll-doel) + scrollSV (worklet, voor de tegel-compensatie in
+  // WidgetGrid). De edge-loop draait alleen zolang de vinger in de rand-zone is.
+  const scrollRef = useRef(null);
+  const scrollY = useRef(0);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const scrollSV = useSharedValue(0);
+  const edgeDir = useRef(0);
+  const edgeTimer = useRef(null);
+
+  const stopEdgeScroll = useCallback(() => {
+    edgeDir.current = 0;
+    if (edgeTimer.current) { clearInterval(edgeTimer.current); edgeTimer.current = null; }
+  }, []);
+  const onEdgeScroll = useCallback((absoluteY) => {
+    const vh = viewportH.current || 0;
+    const ZONE = 110;            // rand-zone (incl. ~tabbar/sticky-balk onderaan)
+    let dir = 0;
+    if (absoluteY < insets.top + ZONE) dir = -1;
+    else if (absoluteY > insets.top + vh - ZONE) dir = 1;
+    edgeDir.current = dir;
+    if (dir && !edgeTimer.current) {
+      edgeTimer.current = setInterval(() => {
+        if (!edgeDir.current) return;
+        const max = Math.max(0, contentH.current - (viewportH.current || 0));
+        const next = Math.min(max, Math.max(0, scrollY.current + edgeDir.current * 24));
+        if (next !== scrollY.current) { scrollY.current = next; scrollRef.current?.scrollTo({ y: next, animated: false }); }
+      }, 16);
+    }
+    if (!dir) stopEdgeScroll();
+  }, [insets.top, stopEdgeScroll]);
+  useEffect(() => stopEdgeScroll, [stopEdgeScroll]);
+
   // Layout-mutaties (puur + gesynct). animateNextLayout is no-op bij reduced motion.
   const applyLayout = (next) => { animateNextLayout(); save(next); };
   const onMove = (key, delta) => {
@@ -106,6 +166,7 @@ export default function Home() {
     if (i !== -1) applyLayout(moveWidget(layout, key, i + delta));
   };
   const onResize = (key) => applyLayout(resizeWidget(layout, key, WIDGET_BY_KEY[key]?.sizes ?? ['1x1']));
+  const onToggleDetails = (key) => applyLayout(toggleWidgetDetails(layout, key));
   const onRemove = (key) => applyLayout(removeWidget(layout, key));
   const onAdd = async () => {
     const placed = new Set(layout.map((p) => p.key));
@@ -120,6 +181,9 @@ export default function Home() {
   // grootte en verwijderen — ook bruikbaar met een screenreader.
   const renderControls = (key) => {
     const descriptor = WIDGET_BY_KEY[key];
+    const placement = layout.find((p) => p.key === key);
+    const wide = placement?.size && placement.size !== '1x1';
+    const shows = widgetShowsDetails(placement);
     return (
       <View style={{
         flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
@@ -128,8 +192,18 @@ export default function Home() {
       }}>
         <EditBtn icon="back" label={t('widget.move.back')} tint={colors.forest} onPress={() => onMove(key, -1)} />
         <EditBtn icon="forward" label={t('widget.move.forward')} tint={colors.forest} onPress={() => onMove(key, 1)} />
+        {/* Breedte-knop met een richtinggevoelig icoon (UX, batch 2): een smalle tegel
+            toont "verbreden", een brede tegel "versmallen" — duidelijker dan één ⟳. */}
         {descriptor?.sizes.length > 1 ? (
-          <EditBtn icon="repeat" label={t('widget.resize')} tint={colors.inkSoft} onPress={() => onResize(key)} />
+          <EditBtn icon={wide ? 'narrow' : 'widen'}
+            label={wide ? t('widget.width.narrow') : t('widget.width.widen')}
+            tint={colors.inkSoft} onPress={() => onResize(key)} />
+        ) : null}
+        {/* Details aan/uit — alleen zinvol op een brede tegel (UX, batch 2): de smalle
+            1×1-tegel heeft geen ruimte voor een preview, dus dan tonen we 'm niet. */}
+        {wide ? (
+          <EditBtn icon="catalog" label={shows ? t('widget.details.hide') : t('widget.details.show')}
+            tint={shows ? colors.forest : colors.inkFaint} onPress={() => onToggleDetails(key)} />
         ) : null}
         <EditBtn icon="delete" label={t('widget.remove')} tint={colors.danger} onPress={() => onRemove(key)} />
       </View>
@@ -139,10 +213,17 @@ export default function Home() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: 100 }}
+        ref={scrollRef}
+        scrollEventThrottle={16}
+        onScroll={(e) => { const y = e.nativeEvent.contentOffset.y; scrollY.current = y; scrollSV.value = y; }}
+        onContentSizeChange={(_, h) => { contentH.current = h; }}
+        onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; }}
+        contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: editing ? 132 : 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
       >
-        {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag). */}
+        {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag).
+            Ring is tikbaar → Taken (UX-22); `loading` voorkomt de misleidende
+            "rustige dag" tijdens het koud laden (UX-23). */}
         <HomeHero
           householdName={active?.name}
           householdEmoji={active?.emoji}
@@ -150,11 +231,29 @@ export default function Home() {
           firstName={profile?.display_name?.split(' ')[0] ?? ''}
           progress={progress}
           remaining={focus.length}
+          loading={loading}
+          onPress={() => router.push('/(tabs)/taken')}
         />
 
+        {/* Foutstaat (UX-23): een mislukte (her)laadbeurt — bv. offline — toont een
+            nette banner met opnieuw-proberen i.p.v. een stil leeg scherm. */}
+        {error && !loading ? (
+          <Banner tone="warning" icon="warning" title={t('home.error.title')} style={{ marginBottom: space.lg }}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        ) : null}
+
         {/* Focus: achterstallig + vandaag, afvinkbaar. Leeg → overslaan. In bewerkmodus
-            bewust verborgen zodat de aandacht op het samenstellen van de grid ligt. */}
-        {!editing && focus.length > 0 && (
+            bewust verborgen zodat de aandacht op het samenstellen van de grid ligt.
+            Koud laden zonder data → skeleton i.p.v. blanco (UX-23). */}
+        {!editing && loading && tasks.length === 0 ? (
+          <View style={{ marginBottom: space.lg }}>
+            <ListSkeleton count={3} />
+          </View>
+        ) : !editing && focus.length > 0 ? (
           <View style={{ marginBottom: space.lg }}>
             <SectionHeader
               title={t('home.focus.title')}
@@ -162,7 +261,13 @@ export default function Home() {
               tint={overdue.length ? colors.danger : colors.forest}
             />
             {visibleFocus.map((tk) => (
-              <TaskRow key={tk.id} task={tk} members={members} onToggle={toggle} />
+              <SwipeRow
+                key={tk.id}
+                right={{ icon: 'check', label: t('tasks.complete'), color: colors.done, onTrigger: () => toggle(tk) }}
+                left={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.ocher, onTrigger: () => snoozeFromHome(tk) }}
+              >
+                <TaskRow task={tk} members={members} onToggle={toggle} />
+              </SwipeRow>
             ))}
             {extraFocus > 0 && (
               <Pressable
@@ -180,37 +285,10 @@ export default function Home() {
               </Pressable>
             )}
           </View>
-        )}
-
-        {/* Grid-kop: titel + bewerk-toggle. */}
-        <Row justify="space-between" align="center" style={{ marginBottom: space.sm }}>
-          <Text style={type.label}>{t('home.widgets.title')}</Text>
-          <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={editing ? t('widget.edit.done') : t('widget.edit')}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
-            <Icon name={editing ? 'check' : 'appearance'} size={16} color={colors.forest} />
-            <Text style={[type.label, { color: colors.forest }]}>{editing ? t('widget.edit.done') : t('widget.edit')}</Text>
-          </Pressable>
-        </Row>
-
-        {/* Stijl-keuze + drag-hint (alleen in bewerkmodus). */}
-        {editing ? (
-          <>
-            <SegmentedControl
-              style={{ marginBottom: space.sm }}
-              value={widgetStyle}
-              onChange={changeStyle}
-              options={[
-                { value: 'playful', label: t('widget.style.playful') },
-                { value: 'neutral', label: t('widget.style.neutral') },
-              ]}
-            />
-            <Text style={[type.caption, { marginBottom: space.md }]}>{t('widget.dragHint')}</Text>
-          </>
         ) : null}
 
-        {/* Widget-grid: absoluut gepositioneerd, met vinger-drag-herschikking in
-            bewerkmodus (long-press → optillen → realtime door de widgets schuiven). */}
+        {/* Widget-grid: absoluut gepositioneerd, met long-press-drag-herschikking in
+            béíde modi (UX-25); de tegels tonen hun preview binnen hun ruimte (UX-24). */}
         {layout.length > 0 ? (
           <WidgetGrid
             layout={layout}
@@ -223,31 +301,68 @@ export default function Home() {
             gap={GRID_GAP}
             tileH={TILE_H}
             controlH={CONTROL_H}
-            onReorder={(next) => save(next)}
+            scrollSV={scrollSV}
+            onEdgeScroll={onEdgeScroll}
+            onEdgeScrollEnd={stopEdgeScroll}
+            // Slepen schakelt automatisch bewerkmodus in (UX) — daarna sluit je af via de
+            // sticky "Klaar"-balk. Stop ook de auto-scroll-lus zodra je loslaat.
+            onReorder={(next) => { save(next); stopEdgeScroll(); setEditing(true); }}
             renderControls={renderControls}
           />
         ) : null}
 
-        {/* Widget toevoegen (alleen in bewerkmodus). */}
+        {/* In bewerkmodus tonen we ónder de tegels enkel "widget toevoegen" — stijl en
+            "Klaar" wonen in de sticky balk onderin. Buiten bewerkmodus: de rustige ingang
+            naar alle modules, met de "Aanpassen"-link gecentreerd onderaan de pagina. */}
         {editing ? (
-          <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginBottom: space.lg }} />
-        ) : null}
-
-        {/* Eén rustige ingang naar alle onderdelen i.p.v. een tweede launchpad. */}
-        {!editing ? (
-          <ItemRow
-            leading={<Icon name="more" size={24} color={colors.forest} />}
-            title={t('home.allModules')}
-            chevron
-            onPress={() => router.push('/(tabs)/meer')}
-          />
-        ) : null}
+          <Button title={t('widget.add')} icon="add" variant="ghost" onPress={onAdd} style={{ marginTop: space.sm }} />
+        ) : (
+          <>
+            <ItemRow
+              leading={<Icon name="more" size={24} color={colors.forest} />}
+              title={t('home.allModules')}
+              chevron
+              onPress={() => router.push('/(tabs)/meer')}
+            />
+            <Pressable onPress={() => setEditing(true)} hitSlop={10} accessibilityRole="button"
+              accessibilityLabel={t('widget.edit')}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+                alignSelf: 'center', marginTop: space.lg, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1,
+              })}>
+              <Icon name="appearance" size={16} color={colors.inkSoft} />
+              <Text style={[type.label, { color: colors.inkSoft }]}>{t('widget.edit')}</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
 
-      {/* Snel een taak toevoegen — verborgen in bewerkmodus. */}
-      {!editing ? (
+      {/* Sticky bewerk-balk: in bewerkmodus altijd in beeld — stijl-keuze + de
+          onmiskenbare "Klaar"-afsluitknop, ook na het scrollen langs de tegels. */}
+      {editing ? (
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          flexDirection: 'row', alignItems: 'center', gap: space.sm,
+          paddingHorizontal: SCREEN_PAD, paddingTop: space.sm, paddingBottom: insets.bottom + space.sm,
+          backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line,
+        }}>
+          <View style={{ flex: 1 }}>
+            <SegmentedControl
+              value={widgetStyle}
+              onChange={changeStyle}
+              options={[
+                { value: 'playful', label: t('widget.style.playful') },
+                { value: 'neutral', label: t('widget.style.neutral') },
+              ]}
+            />
+          </View>
+          <Button title={t('widget.edit.done')} icon="check" fullWidth={false}
+            onPress={() => setEditing(false)} />
+        </View>
+      ) : (
+        /* Snel een taak toevoegen — verborgen in bewerkmodus. */
         <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
-      ) : null}
+      )}
     </SafeAreaView>
   );
 }

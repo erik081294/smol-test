@@ -16,7 +16,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible } from '../../lib/ui';
+import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -362,7 +362,7 @@ export default function PetScreen() {
         {/* Tijdlijn-post-detail */}
         <BottomSheet visible={!!selected} onClose={() => setSelected(null)} avoidKeyboard>
           <ModalHeader title={selected?.photo_path ? t('pet.timeline.photo') : (selected?.weight_grams != null ? t('pet.weight.title') : t('pet.timeline.note'))} onClose={() => setSelected(null)} />
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
             {selected?.photo_path ? (
               <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
                 backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
@@ -385,13 +385,13 @@ export default function PetScreen() {
               <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={removeSelected} /></View>
               <View style={{ flex: 1 }}><Button title={t('common.save')} onPress={saveNote} /></View>
             </Row>
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
 
         {/* Notitie / gewicht toevoegen */}
         <BottomSheet visible={!!composing} onClose={() => setComposing(null)} avoidKeyboard>
           <ModalHeader title={composing === 'weight' ? t('pet.weight.add') : t('pet.timeline.addNote')} onClose={() => setComposing(null)} />
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
             {composing === 'weight' ? (
               <Field label={t('pet.weight.field')} value={composeWeight} onChangeText={setComposeWeight}
                 keyboardType="decimal-pad" placeholder="4,2" autoFocus />
@@ -401,13 +401,13 @@ export default function PetScreen() {
             <Button title={t('common.save')} onPress={saveComposed} loading={composeBusy}
               disabled={composing === 'weight' ? !(parseFloat(composeWeight.replace(',', '.')) > 0) : !composeText.trim()}
               style={{ marginTop: space.md }} />
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
 
         {/* Verzorging aanpassen */}
         <BottomSheet visible={!!careSheet} onClose={() => setCareSheet(null)} avoidKeyboard>
           <ModalHeader title={t('pet.care.adjust')} onClose={() => setCareSheet(null)} />
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
             <Text style={[type.caption, { marginBottom: space.sm }]}>{t('pet.care.adjust.hint')}</Text>
             {careSheet ? careTemplates(pet.type).map((tpl) => (
               <CareRowToggle key={tpl.key} tpl={tpl} state={careSheet[tpl.key]}
@@ -415,7 +415,7 @@ export default function PetScreen() {
                 onInterval={(v) => setCareSheet((c) => ({ ...c, [tpl.key]: { ...c[tpl.key], interval: v } }))} />
             )) : null}
             <Button title={t('common.save')} onPress={applyCare} loading={careBusy} style={{ marginTop: space.md }} />
-          </ScrollView>
+          </SheetScrollView>
         </BottomSheet>
       </SafeAreaView>
     );

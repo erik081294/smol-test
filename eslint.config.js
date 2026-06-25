@@ -15,14 +15,19 @@ module.exports = defineConfig([
       // De nieuwe React-19/compiler-regels uit eslint-config-expo 56 markeren
       // idiomatische, wérkende RN-patronen in de kern-UI: `useRef(...).current`
       // tijdens render (react-hooks/refs), een lokale render-helper-component
-      // (react-hooks/static-components) en `setState` in een sync-effect
-      // (react-hooks/set-state-in-effect). Ze opschonen is waardevol maar een
-      // eigen, runtime te valideren slag — voorlopig zichtbaar als "warn" i.p.v.
-      // CI-blokkerende "error". De correctheids-vangnetten (no-undef,
-      // no-unused-vars, react/jsx-no-undef) blijven onverminderd actief.
+      // (react-hooks/static-components), `setState` in een sync-effect
+      // (react-hooks/set-state-in-effect) en het muteren van een Reanimated
+      // `sharedValue.value` binnen een worklet/scroll-handler (react-hooks/
+      // immutability — de compiler-analyse modelleert Reanimated shared values
+      // niet, zie BottomSheet/SheetScrollView in lib/ui.js). Ze opschonen is
+      // waardevol maar een eigen, runtime te valideren slag — voorlopig
+      // zichtbaar als "warn" i.p.v. CI-blokkerende "error". De correctheids-
+      // vangnetten (no-undef, no-unused-vars, react/jsx-no-undef) blijven
+      // onverminderd actief.
       "react-hooks/refs": "warn",
       "react-hooks/static-components": "warn",
       "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
     },
   }
 ]);

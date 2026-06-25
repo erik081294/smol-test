@@ -1,24 +1,29 @@
+/* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, SectionList, Pressable } from 'react-native';
+import { View, Text, ScrollView, SectionList, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { format } from 'date-fns';
+import { format, addDays, addMonths, addYears } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
+import { useTags } from '../../lib/useTags';
+import { useAuth } from '../../lib/auth';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
-import { MonthView } from '../../lib/MonthView';
+import { PeriodPicker } from '../../lib/PeriodPicker';
 import {
   Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
-  DateStepper, BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow,
+  BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner, SheetScrollView,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
-import { animateNextLayout } from '../../lib/motion';
+import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
-import { YearActivity } from '../../lib/YearActivity';
 import { choreToTask } from '../../lib/choreLibrary';
 import {
-  groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey,
+  groupByDay, weekDays, groupByWeek, sortDayTasks, dateKey, groupByDate,
+  monthDays, yearMonths, groupByMonth, monthLabel,
   applyTaskFilters, countBy, activeFilterCount,
 } from '../../lib/agenda';
 import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
@@ -26,19 +31,36 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
 
-const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, status: 'open' };
+const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open', audience: 'all' };
+
+// Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+// Sorteer een maand-/jaarbucket op datum, dan tijd, dan titel (de buckets spannen
+// meerdere dagen, dus eerst op datum — sortDayTasks gaat van één dag uit).
+const sortByDate = (items) => [...(items ?? [])].sort((a, b) => {
+  const da = a.due_date ?? '';
+  const db = b.due_date ?? '';
+  if (da !== db) return da < db ? -1 : 1;
+  const ta = a.due_time ?? '99:99';
+  const tb = b.due_time ?? '99:99';
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  return (a.title ?? '').localeCompare(b.title ?? '');
+});
 
 export default function Taken() {
-  const { tasks, loading, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
+  const { tasks, loading, error, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
+  const { tags } = useTags();
+  const { user } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const dialog = useDialog();
   const [hiddenIds, setHiddenIds] = useState([]);
 
-  const [scope, setScope] = useState('dag');         // 'dag' | 'week' | 'maand' | 'jaar'
-  const [cursor, setCursor] = useState(new Date());  // anker voor Dag/Week
-  const [selected, setSelected] = useState(dateKey(new Date())); // gekozen dag in Maand
+  const [scope, setScope] = useState('week');        // 'dag' | 'week' | 'maand' | 'jaar' — week is de standaard (UX-31)
+  const [cursor, setCursor] = useState(new Date());  // anker voor de actieve periode
+  const [pickerOpen, setPickerOpen] = useState(false); // kalenderkiezer pas op klik (UX-30)
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -50,8 +72,11 @@ export default function Taken() {
     categories: filters.categories,
     assignees: filters.assigneeId ? [filters.assigneeId] : [],
     subgroupId: filters.subgroupId,
+    tagIds: filters.tagIds,
     status: filters.status,
-  }), [filters]);
+    audience: filters.audience,
+    viewerId: user?.id ?? null,
+  }), [filters, user]);
 
   // Lokaal verborgen taken (optimistisch wissen met undo) wegfilteren vóór de filters.
   const visibleTasks = useMemo(
@@ -117,10 +142,14 @@ export default function Taken() {
     });
   };
 
-  // Secties per scope (Dag/Week). Maand rendert los via MonthView.
+  // Secties per scope. Dag/Week/Maand/Jaar leveren nu állemaal een lijst (UX-32):
+  // de kalender is verhuisd naar de kiezer-on-klik (UX-30). Achterstallig staat
+  // bovenaan voor dag/week/maand (niet in de brede Jaar-weergave).
   const sections = useMemo(() => {
     const out = [];
-    if (overdue.length) out.push({ key: 'overdue', title: t('tasks.overdue'), data: sortDayTasks(overdue) });
+    if (scope !== 'jaar' && overdue.length) {
+      out.push({ key: 'overdue', title: t('tasks.overdue'), data: sortDayTasks(overdue) });
+    }
     if (scope === 'dag') {
       const { dated, undated } = groupByDay(filtered, cursor);
       const onDay = sortDayTasks(dated).filter((tk) => !overdue.includes(tk));
@@ -130,9 +159,18 @@ export default function Taken() {
       const byDay = groupByWeek(filtered, cursor);
       for (const d of weekDays(cursor)) {
         const items = sortDayTasks(byDay[d.key]).filter((tk) => !overdue.includes(tk));
-        if (items.length) {
-          out.push({ key: d.key, title: format(d.date, 'EEEE d MMM', { locale: dateLocale() }), data: items });
-        }
+        if (items.length) out.push({ key: d.key, title: cap(format(d.date, 'EEEE d MMM', { locale: dateLocale() })), data: items });
+      }
+    } else if (scope === 'maand') {
+      const byDate = groupByDate(filtered);
+      for (const day of monthDays(cursor.getFullYear(), cursor.getMonth())) {
+        const items = sortDayTasks(byDate[day.key]).filter((tk) => !overdue.includes(tk));
+        if (items.length) out.push({ key: day.key, title: cap(format(day.date, 'EEEE d MMM', { locale: dateLocale() })), data: items });
+      }
+    } else if (scope === 'jaar') {
+      const byMonth = groupByMonth(filtered);
+      for (const mo of yearMonths(cursor.getFullYear())) {
+        if (byMonth[mo.key]?.length) out.push({ key: mo.key, title: cap(mo.label), data: sortByDate(byMonth[mo.key]) });
       }
     }
     return out;
@@ -149,14 +187,53 @@ export default function Taken() {
     prevOpenToday.current = openTodayCount;
   }, [openTodayCount]);
 
-  const stepCursor = (delta) => {
-    const d = new Date(cursor);
-    d.setDate(d.getDate() + (scope === 'week' ? delta * 7 : delta));
-    setCursor(d);
+  // Eén periode vooruit/terug, afhankelijk van de scope (dag/week/maand/jaar).
+  const stepPeriod = (delta) => setCursor((c) => {
+    if (scope === 'week') return addDays(c, delta * 7);
+    if (scope === 'maand') return addMonths(c, delta);
+    if (scope === 'jaar') return addYears(c, delta);
+    return addDays(c, delta);
+  });
+
+  // Periode-label voor de kop.
+  const week = weekDays(cursor);
+  const periodLabel = scope === 'dag' ? cap(format(cursor, 'EEEE d MMMM', { locale: dateLocale() }))
+    : scope === 'week' ? `${format(week[0].date, 'd')} – ${format(week[6].date, 'd MMM', { locale: dateLocale() })}`
+      : scope === 'maand' ? cap(monthLabel(cursor.getFullYear(), cursor.getMonth()))
+        : String(cursor.getFullYear());
+
+  // Horizontaal vegen → vorige/volgende periode (UX-29). De content schuift nu mét de
+  // vinger mee en de nieuwe periode komt van de overkant binnen, zodat het echt als
+  // bladeren voelt (UX, batch 2). activeOffsetX laat 'm pas bij een duidelijk-horizontale
+  // beweging aanslaan; failOffsetY laat verticaal scrollen/pull-to-refresh ongemoeid.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const reduce = prefersReducedMotion();
+  const tx = useSharedValue(0);
+  const listAnim = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
+
+  // Wissel de periode mét slide: huidige content schuift weg in de veegrichting, de
+  // nieuwe schuift van de andere kant in. Bij "verminder beweging" springt 'ie direct.
+  const slidePeriod = (delta) => {
+    if (reduce) { stepPeriod(delta); return; }
+    const out = delta > 0 ? -SCREEN_W : SCREEN_W;
+    tx.value = withTiming(out, { duration: 150 }, (finished) => {
+      if (!finished) return;
+      runOnJS(stepPeriod)(delta);
+      tx.value = -out;                              // nieuwe content klaarzetten aan de overkant
+      tx.value = withTiming(0, { duration: 200 });  // …en in laten schuiven
+    });
   };
 
-  const week = weekDays(cursor);
-  const weekLabel = `${format(week[0].date, 'd')} – ${format(week[6].date, 'd MMM', { locale: dateLocale() })}`;
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-16, 16])
+    .onUpdate((e) => { 'worklet'; if (!reduce) tx.value = e.translationX; })
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX <= -56) runOnJS(slidePeriod)(1);
+      else if (e.translationX >= 56) runOnJS(slidePeriod)(-1);
+      else tx.value = withSpring(0, { damping: 20, stiffness: 220 });
+    });
 
   // Actieve-filter-chips boven de lijst (elk verwijderbaar).
   const activeChips = [];
@@ -170,6 +247,10 @@ export default function Taken() {
   if (filters.subgroupId) {
     const g = subgroups.find((s) => s.id === filters.subgroupId);
     activeChips.push({ key: 'subgroup', label: g ? `${g.emoji} ${g.name}` : t('tasks.filter.group'), onRemove: () => setFilters((f) => ({ ...f, subgroupId: null })) });
+  }
+  for (const tagId of filters.tagIds) {
+    const tag = tags.find((tg) => tg.id === tagId);
+    activeChips.push({ key: `tag-${tagId}`, label: tag?.name ?? t('tasks.filter.tags'), onRemove: () => setFilters((f) => ({ ...f, tagIds: f.tagIds.filter((x) => x !== tagId) })) });
   }
   if (filters.status !== 'open') {
     activeChips.push({ key: 'status', label: filters.status === 'done' ? t('tasks.filter.done') : t('tasks.filter.status.all'), onRemove: () => setFilters((f) => ({ ...f, status: 'open' })) });
@@ -196,11 +277,14 @@ export default function Taken() {
       </View>
 
       {/* Filterbalk (TKN-3): knop met teller + actieve-filter-chips + wis-alles.
-          Niet in Jaar-scope: die kijkt naar de voltooiingen-log met een eigen
-          lid-selector, niet naar de open/geplande taken die deze filters sturen. */}
-      {scope !== 'jaar' ? (
+          Geldt nu voor élke scope — ook Jaar is een gewone, gefilterde lijst (UX-32). */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingVertical: 8, gap: 8, alignItems: 'center' }}>
+        {/* "Voor mij" — snelle toggle vooraan: alleen wat aan jou is toegewezen of met
+            jou gedeeld. Afspraken van anderen die met je gedeeld zijn blijven zichtbaar;
+            losse huishoud-taken vallen weg (UX, batch 2). */}
+        <Chip icon="person" label={t('tasks.audience.mine')} active={filters.audience === 'mine'}
+          onPress={() => setFilters((f) => ({ ...f, audience: f.audience === 'mine' ? 'all' : 'mine' }))} />
         <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button"
           accessibilityLabel={t('tasks.filter.title')}
           style={({ pressed }) => ({
@@ -224,30 +308,40 @@ export default function Taken() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      {/* Periode-kop: ‹ [ label 📅 ] › — de hele tekstbox is nu het tikdoel en opent
+          de kalenderkiezer (UX, batch 2 — niet alleen het icoontje). Geldt voor élke
+          scope, óók Jaar (een jaar-kiezer). Pijlen + horizontaal vegen bladeren mét
+          slide-animatie (UX-29). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm,
+        paddingHorizontal: space.lg, marginBottom: space.sm }}>
+        <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.period.prev')} onPress={() => slidePeriod(-1)} />
+        <Pressable onPress={() => setPickerOpen(true)} accessibilityRole="button"
+          accessibilityLabel={periodLabel} accessibilityHint={t('tasks.picker.hint')}
+          style={({ pressed }) => ({
+            flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+            minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1.5,
+            borderColor: colors.line, backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+          })}>
+          <Text style={[type.title, { fontWeight: '700' }]} numberOfLines={1}>{periodLabel}</Text>
+          <Icon name="agenda" size={16} color={colors.forest} />
+        </Pressable>
+        <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.period.next')} onPress={() => slidePeriod(1)} />
+      </View>
+
+      {error && !loading ? (
+        <Banner tone="warning" icon="warning" title={t('home.error.title')} style={{ marginHorizontal: space.lg, marginBottom: space.sm }}>
+          <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+            <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+          </Pressable>
+        </Banner>
       ) : null}
 
-      {/* Dag/Week-cursor */}
-      {scope === 'dag' ? (
-        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          <DateStepper date={cursor} onChange={setCursor} />
-        </View>
-      ) : scope === 'week' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          <IconButton icon="back" tint={colors.forest} accessibilityLabel={t('tasks.week.prev')} onPress={() => stepCursor(-1)} />
-          <Text style={[type.title, { fontWeight: '700' }]}>{weekLabel}</Text>
-          <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.week.next')} onPress={() => stepCursor(1)} />
-        </View>
-      ) : null}
-
-      {/* Scope-inhoud */}
-      {scope === 'jaar' ? (
-        <YearActivity members={members} />
-      ) : scope === 'maand' ? (
-        <MonthView tasks={filtered} members={members} onToggle={toggle}
-          selectedKey={selected} onSelectDay={setSelected}
-          emptyIllustration="tasks" emptyTitle={t('tasks.scope.empty.title')} emptySubtitle={t('tasks.scope.empty.day')} />
-      ) : (
+      {/* Eén lijst voor élke scope; horizontaal vegen → vorige/volgende periode (UX-29),
+          met de content die mee-/in-schuift (listAnim). */}
+      <GestureDetector gesture={swipe}>
+        <Animated.View style={[{ flex: 1 }, listAnim]}>
         <SectionList
           contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: 40, flexGrow: 1 }}
           sections={sections}
@@ -272,7 +366,7 @@ export default function Taken() {
               left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(item) }}
               right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(item) }}
             >
-              <TaskRow task={item} members={members} onToggle={toggle} />
+              <TaskRow task={item} members={members} tags={tags} onToggle={toggle} />
             </SwipeRow>
           )}
           ListEmptyComponent={
@@ -283,21 +377,31 @@ export default function Taken() {
                 subtitle={t('tasks.empty.done.subtitle')} />
             ) : (
               <Empty illustration="tasks" title={t('tasks.scope.empty.title')}
-                subtitle={scope === 'week' ? t('tasks.scope.empty.week') : t('tasks.scope.empty.day')}
+                subtitle={scope === 'week' ? t('tasks.scope.empty.week')
+                  : scope === 'maand' ? t('tasks.scope.empty.month')
+                    : scope === 'jaar' ? t('tasks.scope.empty.year')
+                      : t('tasks.scope.empty.day')}
                 actionTitle={t('task.add')} onAction={() => router.push('/task/new')} />
             )
           }
         />
-      )}
+        </Animated.View>
+      </GestureDetector>
 
-      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
+      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')}
+        onPress={() => router.push(scope === 'dag' ? `/task/new?date=${dateKey(cursor)}` : '/task/new')} />
 
       <ChoreLibrarySheet visible={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={addFromLibrary} />
+
+      <PeriodPicker
+        visible={pickerOpen} onClose={() => setPickerOpen(false)}
+        scope={scope} value={cursor} tasks={filtered} onPick={setCursor}
+      />
 
       <TaskFilterSheet
         visible={filterOpen} onClose={() => setFilterOpen(false)}
         filters={filters} setFilters={setFilters}
-        members={members} subgroups={subgroups} tasks={tasks} filterArg={filterArg}
+        members={members} subgroups={subgroups} tags={tags} tasks={tasks} filterArg={filterArg}
       />
 
       <Celebrate show={celebrate} message={t('tasks.allDoneToday')} onDone={() => setCelebrate(false)} />
@@ -308,7 +412,7 @@ export default function Taken() {
 // Bottom-sheet met gegroepeerde filterkeuzes (categorie/persoon/groep/status).
 // Filters werken live; de sheet is enkel de editor. Categorie toont per-categorie
 // tellers (countBy) op de huidige selectie minus de categorie-as.
-function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tasks, filterArg }) {
+function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tags = [], tasks, filterArg }) {
   const catCounts = useMemo(
     () => countBy(applyTaskFilters(tasks, { ...filterArg, categories: [] }), (tk) => tk.category),
     [tasks, filterArg],
@@ -316,11 +420,14 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
   const toggleCategory = (k) => setFilters((f) => ({
     ...f, categories: f.categories.includes(k) ? f.categories.filter((x) => x !== k) : [...f.categories, k],
   }));
+  const toggleTag = (id) => setFilters((f) => ({
+    ...f, tagIds: f.tagIds.includes(id) ? f.tagIds.filter((x) => x !== id) : [...f.tagIds, id],
+  }));
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <ModalHeader title={t('tasks.filter.title')} onClose={onClose} />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+      <SheetScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
         {/* Categorie (multi) */}
         <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.category')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
@@ -330,6 +437,19 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
               active={filters.categories.includes(k)} onPress={() => toggleCategory(k)} />
           ))}
         </View>
+
+        {/* Labels (multi) — alleen tonen als er tags zijn */}
+        {tags.length > 0 ? (
+          <>
+            <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.tags')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
+              {tags.map((tag) => (
+                <Chip key={tag.id} label={tag.name} color={tag.color}
+                  active={filters.tagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {/* Toegewezen aan (single) */}
         <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.assignee')}</Text>
@@ -369,7 +489,7 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
             <Button title={t('tasks.filter.apply')} onPress={onClose} />
           </View>
         </Row>
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   );
 }

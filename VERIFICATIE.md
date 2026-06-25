@@ -100,6 +100,50 @@ npx --yes supabase@latest db push
 > ```
 > Veiliger is de twee commando's hierboven zelf te draaien.
 
+---
+
+## Te-verifiëren-batch — de open 🔧's in één device-sessie
+
+> **Waarom deze sectie.** De backlog §6 telt veel `🔧 Te verifiëren`-items (gebouwd, wacht op
+> een toestelcheck). Om te voorkomen dat die kolom dichtslibt, geldt de **verificatie-ratchet**
+> (backlog §6-spelregels): staat de 🔧-teller boven ~10, dan is de eerstvolgende device-sessie
+> een **batch** langs onderstaande lijst — geen nieuw bouwwerk. Eén dev-build + USB-sessie op de
+> moto (zie [`memory: expo-local-devbuild`] / `adb reverse`-recept) dekt het meeste in één keer.
+> Vink af; een bevestigd item → backlog ✅ → archief.
+
+**A. Geen dev-build nodig (web of bestaande build)**
+- [ ] **STR-10** — de laatste 6 illustratie-scènes visueel nalopen (alle hoofdtabs, beide thema's).
+- [ ] **PERF-2** — tab-wissel-soepelheid op **web** (toestel is al bevestigd 2026-06-25).
+
+**B. Dev-build + 2 accounts in één huishouden (tenant-isolatie + realtime)**
+- [ ] **SEC-1** — met account B: `insert household_members` op een vreemd `household_id` → **deny**;
+      `create_household`-RPC maakt household + owner-membership atomair aan.
+- [ ] **SEC-4** — niet-owner `update households … set invite_code` → **deny**; owner wél.
+- [ ] **INF-1 / INF-12** — volledige JS-RLS-suite **18/18** (na de INF-12 batch/backoff-fix) +
+      de 2-account-rooktest uit Stap 3 onderaan.
+- [ ] **INF-8** — realtime-patch + gebundelde household-subscriptie **2-richtingen** (wijziging op
+      A verschijnt incrementeel op B).
+- [ ] **BOO-11 / PLT-6 / HUI-1 / TKN-2** — realtime bijwerken bevestigen (vaste boodschappen,
+      activiteitenfeed, huisdier-tijdlijn, heatmap).
+
+**C. Dev-build, één toestel**
+- [ ] **SEC-3** — `adb shell run-as app.huishoek` → de AsyncStorage-sqlite (`RKStorage`) bevat
+      **geen** `sb-…-auth-token` meer; SecureStore wél.
+- [ ] **BOO-9** — `expo-camera`-scannerscherm + scan-knop op Boodschappen/Voorraad.
+- [ ] **BOO-10** — bestaande bon openen via "Bewerken" en opslaan.
+- [ ] **MLT-3** — recept-omslagfoto kiezen/uploaden/tonen.
+- [ ] **HUI-1** — foto kiezen/uploaden, checklist-flow, tijdlijn + gewicht-log.
+- [ ] **TKN-2** — heatmap rendering + scroll (jankt het → SVG-variant, zie §6-notitie).
+- [ ] **UX-12** — Android-back (hardware-knop én veeggebaar) keert naar de vórige tab.
+- [ ] **INF-9** — `scan-receipt` happy-path (echte foto → Orq) — vereist de Orq-secrets (zie D).
+
+**D. Flip-on (apart van de device-batch; account-/secret-afhankelijk)**
+- [ ] **PLT-1** — notify trap 2: secret + `functions deploy notify` + Database Webhook op `tasks`
+      + 2-account-test (`docs/notify-setup.md`). **Gate: SEC-5** eerst.
+- [ ] **BOO-7** — Orq-deployment + secrets (`docs/orq-receipt-scan.md`).
+
+---
+
 Controleer daarna in het Dashboard (Table editor) dat deze nieuw zijn:
 `zones`, `expenses`, `expense_shares`, `plant_species`, `plants`, en de extra
 kolommen `tasks.end_time` / `tasks.zone_id` / `tasks.plant_id`. `plant_species`

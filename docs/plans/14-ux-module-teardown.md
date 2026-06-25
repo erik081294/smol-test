@@ -149,11 +149,11 @@ FAB-keuze) zijn **bewust verworpen** en niet als rij opgenomen.
 
 | ID | Bevinding (Vandaag) | Bron | Insp. | Status |
 |----|---------------------|------|-------|--------|
-| UX-22 | **Hero-ring leest als knop maar is dood.** In de lege staat (`nothingToday`) toont de `ProgressRing` een zon-achtig `today`-icoon in een cirkel met accentrand → schreeuwt "tik mij", doet niets. Geef 'm betekenis (tik → Taken) óf maak 'm visueel platter/minder knop-achtig in de lege staat. | `lib/HomeHero.js:70-74` | S | ⏳ |
-| UX-23 | **Geen loading-/fout-/offline-staat op Vandaag.** Alleen `RefreshControl`; tijdens laden is `tasks` leeg → hero toont vrolijk "Een rustige dag" terwijl er nog niets binnen is (misleidend). Geen skeleton (sluit aan op UX-15), geen foutstaat als `reload` faalt, geen offline-indicatie. | `app/(tabs)/vandaag.js:141-144` | M | ⏳ |
-| UX-24 | **Widget-preview puilt uit de tegel.** Tegel-inhoud zit in een harde `height: tileH` (132px) zonder `overflow:hidden`; zodra de preview (taaktitels, afgevinkte activiteit) hoger wordt, tekent die over de tegel/elementen eronder. Brede tegels hebben juist veel ongebruikte ruimte. Fix-richting: laat brede tegels hun ruimte benutten om de items netjes te tónen (i.p.v. overflow) — bv. tegel groeit mee of preview vult de breedte. | `lib/widgets/WidgetGrid.js:143` + `lib/widgets/WidgetHost.js:28,51` | M | ⏳ |
-| UX-25 | **Widgets slepen met long-press óók buiten aanpas-modus.** Drag staat nu op `.enabled(editing)`; gewenst: long-press (≈220ms) tilt een tegel op en herschikt, terwijl een korte tik blijft navigeren. Let op: buiten bewerkmodus is er geen controlebalk — dit is puur herschikken; per-ongeluk optillen tijdens scrollen vermijden. | `lib/widgets/WidgetGrid.js:177` | M | ⏳ |
-| UX-26 | **"Aanpassen"-regel onder de widget-grid.** De grid-kop (`Overzicht` + Aanpassen-toggle) staat nu bóven de tegels; verplaats naar onder de grid. Gevolg: de stijl-keuze + drag-hint die bij bewerkmodus horen verschijnen dan ook onder de grid — meenemen in de verplaatsing. | `app/(tabs)/vandaag.js:186-210` | S | ⏳ |
+| UX-22 | **Hero-ring leest als knop maar is dood.** In de lege staat (`nothingToday`) toont de `ProgressRing` een zon-achtig `today`-icoon in een cirkel met accentrand → schreeuwt "tik mij", doet niets. Geef 'm betekenis (tik → Taken) óf maak 'm visueel platter/minder knop-achtig in de lege staat. | `lib/HomeHero.js:70-74` | S | ✅ |
+| UX-23 | **Geen loading-/fout-/offline-staat op Vandaag.** Alleen `RefreshControl`; tijdens laden is `tasks` leeg → hero toont vrolijk "Een rustige dag" terwijl er nog niets binnen is (misleidend). Geen skeleton (sluit aan op UX-15), geen foutstaat als `reload` faalt, geen offline-indicatie. | `app/(tabs)/vandaag.js:141-144` | M | ✅ |
+| UX-24 | **Widget-preview puilt uit de tegel.** Tegel-inhoud zit in een harde `height: tileH` (132px) zonder `overflow:hidden`; zodra de preview (taaktitels, afgevinkte activiteit) hoger wordt, tekent die over de tegel/elementen eronder. Brede tegels hebben juist veel ongebruikte ruimte. Fix-richting: laat brede tegels hun ruimte benutten om de items netjes te tónen (i.p.v. overflow) — bv. tegel groeit mee of preview vult de breedte. | `lib/widgets/WidgetGrid.js:143` + `lib/widgets/WidgetHost.js:28,51` | M | ✅ |
+| UX-25 | **Widgets slepen met long-press óók buiten aanpas-modus.** Drag staat nu op `.enabled(editing)`; gewenst: long-press (≈220ms) tilt een tegel op en herschikt, terwijl een korte tik blijft navigeren. Let op: buiten bewerkmodus is er geen controlebalk — dit is puur herschikken; per-ongeluk optillen tijdens scrollen vermijden. | `lib/widgets/WidgetGrid.js:177` | M | ✅ |
+| UX-26 | **"Aanpassen"-regel onder de widget-grid.** De grid-kop (`Overzicht` + Aanpassen-toggle) staat nu bóven de tegels; verplaats naar onder de grid. Gevolg: de stijl-keuze + drag-hint die bij bewerkmodus horen verschijnen dan ook onder de grid — meenemen in de verplaatsing. | `app/(tabs)/vandaag.js:186-210` | S | ✅ |
 
 > Verworpen in deze sessie (vastgelegd zodat ze niet terugkomen): accent-regen in de grid,
 > dubbele dag-stand hero↔Taken-tegel, `playful`/`neutral`-stijltoggle schrappen, dubbele
@@ -176,36 +176,36 @@ maakt: module-taken dragen al hun bron-koppeling (`category:'plant' + plant_id`,
 
 | ID | Bevinding | Bron | Insp. | Status |
 |----|-----------|------|-------|--------|
-| UX-27 | **Agenda samenvoegen met Taken; Agenda-tab vervalt.** Maand-scope in Taken neemt de rol over (de subgroep-filter uit Agenda erbij). Agenda is nu een feature-arme kopie van Taken/Maand (zelfde `MonthView`, alleen subgroep-chips, geen filter/loading/leeg/swipe). | `agenda.js` ↔ `taken.js:246` | M | ⏳ |
-| UX-28 | **Module-taken linken terug naar hun bron-element.** Tik op een afspraak die via een module is ontstaan (bv. `category:'plant'` met `plant_id`) → navigeer naar de logische detailview in díe module (plant/huisdier/…), niet naar de generieke editor. De handmatige afspraken openen wél de editor. Voorkomt parallelle werelden. | `lib/TaskRow.js` + `usePlants.js:70` | M | ⏳ |
+| UX-27 | **Agenda samenvoegen met Taken; Agenda-tab vervalt.** Maand-scope in Taken neemt de rol over (de subgroep-filter uit Agenda erbij). Agenda is nu een feature-arme kopie van Taken/Maand (zelfde `MonthView`, alleen subgroep-chips, geen filter/loading/leeg/swipe). | `agenda.js` ↔ `taken.js:246` | M | ✅ |
+| UX-28 | **Module-taken linken terug naar hun bron-element.** Tik op een afspraak die via een module is ontstaan (bv. `category:'plant'` met `plant_id`) → navigeer naar de logische detailview in díe module (plant/huisdier/…), niet naar de generieke editor. De handmatige afspraken openen wél de editor. Voorkomt parallelle werelden. | `lib/TaskRow.js` + `usePlants.js:70` | M | ✅ |
 
 ### Overzicht-interactie (Taken)
 
 | ID | Bevinding | Bron | Insp. | Status |
 |----|-----------|------|-------|--------|
-| UX-29 | **Horizontaal swipen tussen periodes.** Veeg links/rechts = vorige/volgende reeks (dag/week/maand). Let op: verticaal scrollen mag niet wiebelig worden — gesture-conflict (horizontaal pannen vs verticaal scrollen) netjes afvangen. | `taken.js:251` (SectionList) | M | ⏳ |
-| UX-30 | **Kalender pas op klik.** Standaard alleen het periode-/datumlabel tonen; tik erop opent de kalenderkiezer, met het schaalniveau van de actieve tab (dag/week/maand). Maandview toont dus niet meer standaard de kalender. | `taken.js:230-241` + `MonthView` | M | ⏳ |
-| UX-31 | **Default = week-view** bij openen van Taken (nu `'dag'`). | `taken.js:39` | S | ⏳ |
-| UX-32 | **Jaar-scope gelijktrekken** met de andere tabs (zelfde lijst-/periodebediening), maar zónder kalenderkiezer (niet nodig op jaar). | `taken.js:244` | S | ⏳ |
-| UX-33 | **YearActivity-statistieken naar een aparte, vriendelijke plek.** Niet schrappen — ze zijn waardevol. Locatie nog TBD (kandidaat: een "inzichten"-/profielplek). | `lib/YearActivity.js` | M | ⏳ |
+| UX-29 | **Horizontaal swipen tussen periodes.** Veeg links/rechts = vorige/volgende reeks (dag/week/maand). Let op: verticaal scrollen mag niet wiebelig worden — gesture-conflict (horizontaal pannen vs verticaal scrollen) netjes afvangen. | `taken.js:251` (SectionList) | M | ✅ |
+| UX-30 | **Kalender pas op klik.** Standaard alleen het periode-/datumlabel tonen; tik erop opent de kalenderkiezer, met het schaalniveau van de actieve tab (dag/week/maand). Maandview toont dus niet meer standaard de kalender. | `taken.js:230-241` + `MonthView` | M | ✅ |
+| UX-31 | **Default = week-view** bij openen van Taken (nu `'dag'`). | `taken.js:39` | S | ✅ |
+| UX-32 | **Jaar-scope gelijktrekken** met de andere tabs (zelfde lijst-/periodebediening), maar zónder kalenderkiezer (niet nodig op jaar). | `taken.js:244` | S | ✅ |
+| UX-33 | **YearActivity-statistieken naar een aparte, vriendelijke plek.** Niet schrappen — ze zijn waardevol. Locatie nog TBD (kandidaat: een "inzichten"-/profielplek). | `lib/YearActivity.js` | M | ✅ |
 
 ### Editor vereenvoudigen (`task/[id].js` → afspraken-editor)
 
 | ID | Bevinding | Bron | Insp. | Status |
 |----|-----------|------|-------|--------|
-| UX-34 | **Zone-keuze eruit.** Bij alleen-afspraken is de zone-koppeling overbodig; zones horen bij de Schoonmaak-flow. | `task/[id].js:204-215` | S | ⏳ |
-| UX-35 | **"Voor wie?" → multi-select + groepen.** Meerdere leden selecteerbaar (nu single-select `assignedTo`); subgroepen verschijnen hier indien aanwezig. | `task/[id].js:217-220` | M | ⏳ |
-| UX-36 | **Datumselectie herontwerpen.** Default = **vandaag** (nu "geen datum"). Andere datum via een datum-icoon; terugkerend via een vinkje dat pas dán de herhaalinstellingen onthult. Weg met "expander-op-expander"; nette, gefaseerde stappen. | `task/[id].js:222-327` | L | ⏳ |
-| UX-37 | **"Delen met" + "Voor wie" samenvoegen** tot één begrijpelijk blok, ook in de copy: "Voor wie is deze afspraak?" / "Wie ziet deze afspraak in de agenda?". | `task/[id].js:217-220, 336-347` | M | ⏳ |
-| UX-38 | **Beschrijving via progressive disclosure.** "Notitie (optioneel)" wordt een nette toggle onder de titel ("Beschrijving toevoegen?") die het veld pas op klik onthult. | `task/[id].js:329-334` | S | ⏳ |
-| UX-39 | **Primaire actieknop óók onderaan.** Naast de bevestiging rechtsboven een duidelijke, goed-gelabelde knop onderaan ("Afspraak opslaan"/"Toevoegen") — niet alleen de rechtsboven-knop (zwakke UX). | `lib/ui.js` (`Editor`) | M | ⏳ |
-| UX-40 | **Rotatie/rouleren eruit.** Beurtrotatie hoort bij de modules waar dat telt; afspraken zijn agenda-items. | `task/[id].js:289-325` | S | ⏳ |
+| UX-34 | **Zone-keuze eruit.** Bij alleen-afspraken is de zone-koppeling overbodig; zones horen bij de Schoonmaak-flow. | `task/[id].js:204-215` | S | ✅ |
+| UX-35 | **"Voor wie?" → multi-select + groepen.** Meerdere leden selecteerbaar (nu single-select `assignedTo`); subgroepen verschijnen hier indien aanwezig. | `task/[id].js:217-220` | M | ✅ |
+| UX-36 | **Datumselectie herontwerpen.** Default = **vandaag** (nu "geen datum"). Andere datum via een datum-icoon; terugkerend via een vinkje dat pas dán de herhaalinstellingen onthult. Weg met "expander-op-expander"; nette, gefaseerde stappen. | `task/[id].js:222-327` | L | ✅ |
+| UX-37 | **"Delen met" + "Voor wie" samenvoegen** tot één begrijpelijk blok, ook in de copy: "Voor wie is deze afspraak?" / "Wie ziet deze afspraak in de agenda?". | `task/[id].js:217-220, 336-347` | M | ✅ |
+| UX-38 | **Beschrijving via progressive disclosure.** "Notitie (optioneel)" wordt een nette toggle onder de titel ("Beschrijving toevoegen?") die het veld pas op klik onthult. | `task/[id].js:329-334` | S | ✅ |
+| UX-39 | **Primaire actieknop óók onderaan.** Naast de bevestiging rechtsboven een duidelijke, goed-gelabelde knop onderaan ("Afspraak opslaan"/"Toevoegen") — niet alleen de rechtsboven-knop (zwakke UX). | `lib/ui.js` (`Editor`) | M | ✅ |
+| UX-40 | **Rotatie/rouleren eruit.** Beurtrotatie hoort bij de modules waar dat telt; afspraken zijn agenda-items. | `task/[id].js:289-325` | S | ✅ |
 
 ### Flexibiliteit
 
 | ID | Bevinding | Bron | Insp. | Status |
 |----|-----------|------|-------|--------|
-| UX-41 | **Door gebruiker gemaakte, gekleurde tags** koppelbaar aan afspraken; voeding voor de filters. Behoudt ultieme flexibiliteit voor afspraaktypes die de modules niet dekken. **Let op:** raakt de datalaag (tag-entiteit + kleur + koppeling) — valt buiten de "geen-migratie"-belofte van dit plan; apart inplannen. | nieuw (filters: `lib/agenda.js`) | L | ⏳ |
+| UX-41 | **Door gebruiker gemaakte, gekleurde tags** koppelbaar aan afspraken; voeding voor de filters. Behoudt ultieme flexibiliteit voor afspraaktypes die de modules niet dekken. **Let op:** raakt de datalaag (tag-entiteit + kleur + koppeling) — valt buiten de "geen-migratie"-belofte van dit plan; apart inplannen. | nieuw (filters: `lib/agenda.js`) | L | ✅ |
 
 > **Niet behandeld / nog open (geparkeerd, geen besluit deze sessie):** Taken mist een
 > **foutstaat** (alleen pull-to-refresh); de editor toont een **blanco scherm** tijdens het
@@ -215,6 +215,100 @@ maakt: module-taken dragen al hun bron-koppeling (`category:'plant' + plant_id`,
 > zelf krijgt een eigen teardown (UXR-2 richtte zich op Taken/Agenda/editor).
 
 ---
+
+## Build-notitie — UXR-1 + UXR-2 uitgevoerd (2026-06-24)
+
+Alle rijen **UX-22 t/m UX-41 zijn gebouwd** (branch `feat/ux-batch-22-41-vandaag-taken`,
+4 commits per fase). `npm test` 497 groen, `expo lint` 0 errors, mutatie-ratchet groen
+(agenda **91.4 %**, i18n 73.2 %, modules 88.7 % — geen daling).
+
+**Belangrijke implementatiebeslissingen (door Erik geaccordeerd of als verantwoorde default):**
+- **category vs. tags.** `category` (klus/plant/huisdier/…) blijft de *module-herkomst*-marker
+  die UX-28 nodig heeft om terug te linken; de mensgerichte indeling van handmatige afspraken
+  is nu de **eigen gekleurde tags** (UX-41). De categorie-picker is uit de editor; een nieuwe
+  handmatige afspraak krijgt `category:'afspraak'`. Filters filteren op beide assen.
+- **UX-33 → nieuw `/inzichten`-scherm** (jaar-activiteit/heatmap), bereikbaar via "Meer".
+  De `agenda`-module-slot is herbestemd naar `inzichten` (kind `overview`).
+- **UX-41 datalaag.** Migratie `0039_tags.sql` (tags-tabel + `is_member`-RLS + realtime +
+  `tasks.tag_ids uuid[]`) is **toegepast op de live DB** via MCP; security-advisors schoon.
+- **assigned_to-behoud.** "Voor wie?" (custom, 1 persoon) zet `assigned_to`; bij Hele-huishouden/
+  subgroep blijft de bestaande `assigned_to` staan, zodat bewerkte schoonmaaktaken hun beurt
+  niet verliezen. `zone_id` en `rotation` blijven eveneens passthrough (UI eruit, data intact).
+- **Bonus.** `useCollection` wist de lijst niet meer leeg bij een transiënte laadfout en legt
+  een `error` bloot (foutbanner op Vandaag én Taken). Jaar-scope dropt z'n filters niet meer.
+
+**On-device rooktest — uitgevoerd & geslaagd (moto g72, 2026-06-24).** Geverifieerd:
+Vandaag (hero-ring → Taken, widget-preview netjes binnen de tegel, bewerk-modus-controlebalk),
+Taken (week-default, periode-kop, "Achterstallig" bovenaan, dag-groepering), **UX-30** kalender-
+op-klik ("Kies een dag" met dag-stippen), **UX-32** Jaar als maand-gegroepeerde lijst, **UX-28**
+plant-taak → plant-detail, **UX-41** end-to-end (tag "Sport" live aangemaakt + getoond op de rij),
+de **afspraken-editor** (datum=vandaag, "Voor wie?"-blok, Herhalen-vinkje, beschrijving-toggle,
+actieknop onderaan, géén categorie/zone/rotatie) en het opslaan van een afspraak. **UX-29**
+horizontaal periode-vegen werkt (22–28 jun → 29–5 jul); rij-swipe wint op een rij, periode-veeg
+op kop/tussenruimte (let op: via adb vereist een Pan een tráge drag ≥1000ms — geen ontwerpfout).
+
+**Geparkeerd, bewust nog niet gedaan:** editor toont nog een **blanco** scherm tijdens het laden
+  van een bestaande taak (geen skeleton); **Schoonmaak** rauwe `Modal` + geen swipe (eigen
+  teardown). Deze stonden al als "open" genoteerd onder UXR-2.
+
+## Build-notitie — UXR-2 batch 2 (gebruikersfeedback 2026-06-24)
+
+Tweede ronde verfijningen op dezelfde branch/PR (#41). `npm test` **512 groen**, `expo lint`
+0 errors, mutatie-ratchet **groen** (agenda 91.3 %, recurrence 92.8 %, widgets 79.8 %, i18n/
+modules/constants ongemoeid — geen daling; `advanceRecurrence` + `forMe`/audience + details-
+toggle gedekt).
+
+Gebouwd (11 punten):
+1. **Vandaag — hele groene hero-kaart klikbaar** i.p.v. alleen de ring (één knop, samengestelde a11y).
+2. **Vandaag — focus-taken weg-swipen:** rechts = afvinken (groen, omkeerbaar, geen undo-toast),
+   links = uitstellen (oker, +1 dag, met undo). Verwijderen hoort hier bewust níet.
+3. **Vandaag — "Klaar" prominent in bewerkmodus:** gevulde groene pil in de kop + primaire knop
+   onderaan de bewerkgroep (was een fluisterstil tekstlinkje).
+4. **Widgets instelbaar:** breedte (1/2 kolommen) + **details-toggle** per tegel; een brede tegel
+   toont nu **side-by-side** (stat-blok links, preview rechts). Pure `toggleWidgetDetails`/
+   `widgetShowsDetails` in `grid.js`; placement-veld `details` (default aan = backward compat).
+5. **Afspraken — subtiel delen:** `VisibilityPicker` in collapsible-modus ("Voor wie? — Hele
+   huishouden", vouwt pas op tik open). **Taken — "Voor mij"-filter:** pure `forMe` (toegewezen/
+   gemaakt/gedeeld) + `audience`-as in `applyTaskFilters`; losse huishoud-taken vallen weg, met
+   jou gedeelde afspraken blijven zichtbaar.
+6. **Drawers — grijp-handvat + omlaag-swipen om te sluiten** op de gedeelde `BottomSheet` (raakt
+   álle sheets); `GestureHandlerRootView` in de `Modal`, Pan op een ruime (~44dp) handvat-zone
+   zodat scrollende inhoud los blijft scrollen. Overlay-tik + kruisje blijven als sluit-routes.
+7. **Taken — content schuift mee** tussen periodes (translateX volgt de vinger, nieuwe periode
+   schuift van de overkant in; respecteert "verminder beweging"). **Volledige datumbox klikbaar**
+   (alle scopes, óók Jaar) + **jaar-kiezer** toegevoegd aan `PeriodPicker`.
+8. **Herhaal-einde** (subtiel, zoals "Beschrijving toevoegen"): stopdatum óf na X keer. Pure
+   `advanceRecurrence` beslist doorrollen vs. stoppen; `completeTask` telt `recur_count` af.
+   Migratie **`0040_recur_end.sql`** (`tasks.recur_until` + `recur_count`, beide nullable) is
+   **op de live DB toegepast** via MCP (na expliciete toestemming Erik).
+9. **Kalender van maand naar maand swipen** (`PeriodPicker`): horizontaal vegen bladert dag/
+   week-grid maand-naar-maand, maand-grid jaar-naar-jaar, jaar-grid per pagina; content schuift
+   mee. De ‹ › knoppen blijven als betrouwbare bediening.
+10. **Hele drawer naar beneden swipen om te sluiten** (niet enkel het handvat), mét **scroll-
+    voorrang.** De dismiss-Pan loopt **simultaan** met de scroll (scroll wordt nooit geblokkeerd)
+    en sluit alleen wanneer de lijst bovenaan staat (`scrollY ≤ 0`). Nieuwe `SheetScrollView`
+    deelt de scrollpositie; de verticaal-scrollende sheets (Taken-filter, maaltijden, plant-/
+    huisdier-detail) zijn erop omgezet.
+11. **Breedte-knop met richtinggevoelig icoon**: een smalle tegel toont "verbreden", een brede
+    "versmallen" — duidelijker dan één ⟳-icoon.
+
+**Verificatie 2026-06-24.** Op het tóestel (moto g72) geverifieerd: hele hero-kaart als één knop
+(gecombineerde a11y), "Voor mij"-chip, volledige klikbare datumbox. Op de **emulator** (toestel
+was in gebruik): app boot + Vandaag/Taken renderen, **brede Agenda-widget toont side-by-side**,
+afspraken-editor met **subtiele "Voor wie?"-rij**, **herhaal-einde** ("Op datum"-pill + "Na aantal
+keer"-stepper, ook in de niet-bewaard-guard), Filter-sheet mét **grijp-handvat**.
+Daarna óók geverifieerd op de emulator: **widget-bewerkmodus** — gevulde "Klaar"-pil in de kop +
+prominente "Klaar"-knop onderaan (#2), en de control-balk met de **details-toggle alléén op brede
+tegels** + het richtinggevoelige breedte-icoon (#3/#11); de **side-by-side**-preview op de
+Activiteit-widget; de **koud-laad-skeleton + "Even laden…"** op Vandaag.
+
+**Niet via adb verifieerbaar:** álle RNGH-Pan-gebaren (periode-content-slide #7, drawer-swipe-omlaag
+#10, kalender-maand-swipe #9) — `adb input swipe` dríjft op deze emulator géén RNGH-Pan aan (ook de
+in batch 1 op het toestel bewezen periode-swipe reageert niet via adb-emulator; dat isoleert het als
+emulator/adb-beperking, geen code-bug). Alles degradeert veilig: drawers blijven sluitbaar via
+overlay-tik/kruisje, de kalender via de ‹ › knoppen, en de scroll-Pan loopt simultaan met scrollen
+(scroll kan niet geblokkeerd worden). **Op een echt toestel te bevestigen:** drawer-swipe-omlaag
+(incl. scroll-voorrang), kalender-maand-swipe en de periode-content-slide.
 
 ## Acceptatie
 

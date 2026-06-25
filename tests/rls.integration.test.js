@@ -55,12 +55,8 @@ test('RLS: huisgenoot ziet household-taak, buitenstaander niet', opts, async () 
   const bob = await makeUser('bob');       // huisgenoot
   const eve = await makeUser('eve');        // buitenstaander
 
-  // Alice maakt een huishouden en deelt de code met Bob.
-  const { data: hh, error: hhErr } = await alice.client
-    .from('households').insert({ name: 'Testhuis', created_by: alice.id }).select().single();
-  assert.ok(!hhErr, `huishouden: ${hhErr?.message}`);
-  await alice.client.from('household_members')
-    .insert({ household_id: hh.id, profile_id: alice.id, role: 'owner' });
+  // Alice maakt een huishouden (via create_household-RPC) en deelt de code met Bob.
+  const hh = await makeHousehold(alice, 'Testhuis');
 
   const { data: code } = await alice.client
     .from('households').select('invite_code').eq('id', hh.id).single();
@@ -85,10 +81,7 @@ test('RLS: custom-taak alleen zichtbaar voor genoemde personen', opts, async () 
   const bob = await makeUser('bob2');
   const carol = await makeUser('carol2');
 
-  const { data: hh } = await alice.client
-    .from('households').insert({ name: 'Testhuis2', created_by: alice.id }).select().single();
-  await alice.client.from('household_members')
-    .insert({ household_id: hh.id, profile_id: alice.id, role: 'owner' });
+  const hh = await makeHousehold(alice, 'Testhuis2');
   const { data: code } = await alice.client
     .from('households').select('invite_code').eq('id', hh.id).single();
   await bob.client.rpc('join_household', { code: code.invite_code });
@@ -111,15 +104,8 @@ test('RLS: integriteit — delen met subgroep uit ander huishouden wordt geweige
   const alice = await makeUser('alice3');
 
   // Twee huishoudens van Alice.
-  const mk = async (name) => {
-    const { data: hh } = await alice.client
-      .from('households').insert({ name, created_by: alice.id }).select().single();
-    await alice.client.from('household_members')
-      .insert({ household_id: hh.id, profile_id: alice.id, role: 'owner' });
-    return hh;
-  };
-  const hhA = await mk('Huis A');
-  const hhB = await mk('Huis B');
+  const hhA = await makeHousehold(alice, 'Huis A');
+  const hhB = await makeHousehold(alice, 'Huis B');
 
   // Subgroep in huis B.
   const { data: sg } = await alice.client.from('subgroups')
@@ -132,15 +118,65 @@ test('RLS: integriteit — delen met subgroep uit ander huishouden wordt geweige
   assert.ok(error, 'cross-huishouden subgroep-deling had geweigerd moeten worden');
 });
 
+// --- SEC-1/SEC-4: tenant-isolatie van huishouden-aanmaak en -beheer ------------
+
+test('RLS: SEC-1 — niemand kan zich als owner aan een vreemd huishouden toevoegen', opts, async () => {
+  const alice = await makeUser('alice_sec1');
+  const eve = await makeUser('eve_sec1');   // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Forthuis');
+
+  // Directe member-insert is server-side ingetrokken (revoke insert), dus de
+  // owner-escalatie uit de audit moet falen — ongeacht de geclaimde rol.
+  const { error } = await eve.client.from('household_members')
+    .insert({ household_id: hh.id, profile_id: eve.id, role: 'owner' });
+  assert.ok(error, 'directe owner-insert in een vreemd huishouden moet geweigerd worden');
+
+  // En Eve krijgt geen lidmaatschap/zicht op het huishouden.
+  const eveMembers = await eve.client.from('household_members').select('profile_id').eq('household_id', hh.id);
+  assert.equal(eveMembers.data?.length ?? 0, 0, 'Eve mag geen lidmaatschap op het huishouden krijgen');
+});
+
+test('RLS: SEC-1 — create_household maakt huishouden + owner-membership atomair', opts, async () => {
+  const alice = await makeUser('alice_sec1b');
+  const hh = await makeHousehold(alice, 'RPC-huis');
+  assert.ok(hh?.id, 'create_household geeft de huishoudrij terug');
+  assert.ok(hh?.invite_code, 'huishouden krijgt een invite_code');
+
+  const { data: mine } = await alice.client.from('household_members')
+    .select('role').eq('household_id', hh.id).eq('profile_id', alice.id).single();
+  assert.equal(mine?.role, 'owner', 'de maker is owner');
+});
+
+test('RLS: SEC-4 — alleen de owner mag het huishouden bewerken (invite_code/naam)', opts, async () => {
+  const alice = await makeUser('alice_sec4'); // owner
+  const bob = await makeUser('bob_sec4');     // gewoon lid
+
+  const hh = await makeHousehold(alice, 'Beheerhuis');
+  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
+  await bob.client.rpc('join_household', { code: code.invite_code });
+
+  // Bob (lid, geen owner) probeert te wijzigen → RLS-using filtert de rij weg (0 rijen).
+  const { data: bobUpd } = await bob.client.from('households')
+    .update({ name: 'Gekaapt' }).eq('id', hh.id).select();
+  assert.equal(bobUpd?.length ?? 0, 0, 'een gewoon lid mag het huishouden niet bewerken');
+
+  // Alice (owner) kan het wel.
+  const { data: aliceUpd, error: aErr } = await alice.client.from('households')
+    .update({ name: 'Beheerhuis 2' }).eq('id', hh.id).select();
+  assert.ok(!aErr, `owner-update: ${aErr?.message}`);
+  assert.equal(aliceUpd?.length, 1, 'de owner mag het huishouden bewerken');
+});
+
 // --- Kosten-module: expenses (via de create_expense RPC) + expense_shares ----
 // Verifieert dat (a) de atomaire RPC werkt, (b) de hoofdtabel het contract volgt
 // en (c) de kindtabel expense_shares de zichtbaarheid van zijn parent erft.
 
 async function makeHousehold(owner, name) {
-  const { data: hh } = await owner.client
-    .from('households').insert({ name, created_by: owner.id }).select().single();
-  await owner.client.from('household_members')
-    .insert({ household_id: hh.id, profile_id: owner.id, role: 'owner' });
+  // Huishouden + owner-membership via de DEFINER-RPC (SEC-1): directe inserts op
+  // household_members zijn server-side ingetrokken, dus we maken het zo aan.
+  const { data: hh, error } = await owner.client.rpc('create_household', { p_name: name });
+  assert.ok(!error, `huishouden (${name}): ${error?.message}`);
   return hh;
 }
 
