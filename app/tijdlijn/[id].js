@@ -30,7 +30,7 @@ export default function PostDetail() {
   const author = post ? (members ?? []).find((m) => m.id === post.author_id) : null;
 
   const onDelete = async () => {
-    const ok = await dialog.confirm({ title: t('timeline.deleteConfirm'), confirmLabel: t('common.delete'), destructive: true });
+    const ok = await dialog.confirm({ title: t('timeline.deleteConfirm'), confirmLabel: t('common.delete'), tone: 'danger' });
     if (!ok) return;
     await deletePost(id);
     router.back();
