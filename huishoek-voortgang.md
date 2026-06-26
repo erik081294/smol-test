@@ -408,7 +408,11 @@ Toestelfeedback op de keuken-loop → drie losse PR's op volgorde.
   gezichten: **leespagina** (default — cover, badges, ingrediënten, bereiding, knoppen Bewerken/
   Inplannen) vs **editor** (`?edit=1` of het `new`-sentinel; editor kreeg categorie-chips). De
   scheiding aanmaken/inplannen/lezen die "openen = editor" miste. Iconen `edit`/`link` toegevoegd.
-- **PR C (in aanbouw) — weekmenu "wie eet mee".** Migr. `0060` (`meal_plan_entries.eater_ids[]` +
-  `extra_eaters`); leden aanvinken + gasten-teller, porties auto = eters (overschrijfbaar), eters
-  op de dagkaart.
-**Rest:** PR C afronden + mergen; device/web-rooktest van de hele loop.
+- **PR C (#69) — weekmenu "wie eet mee".** Migr. `0060` (`meal_plan_entries.eater_ids[]` +
+  `extra_eaters`; **live**, DB t/m `0060`). Pure helpers `eaterCount`/`defaultServings` in
+  [`lib/mealPlan.js`](lib/mealPlan.js) (unit-getest). De inplan-sheet kreeg een catalogus-stijl
+  recept-picker (cover + categorie-badge i.p.v. platte chips) plus **"Wie eet mee?"**: leden
+  aanvinken (default = heel huishouden) + een gasten-teller; porties vullen automatisch op het
+  aantal eters maar ontkoppelen zodra je ze zelf bijstelt. De dagkaart toont mini-avatars van de
+  eters + "+N gasten".
+**Rest:** PR's A→B→C mergen (gestackt); device/web-rooktest van de hele loop.
