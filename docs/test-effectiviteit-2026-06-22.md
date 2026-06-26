@@ -1,5 +1,13 @@
 # Test-effectiviteit — mutatietest-rapport (2026-06-22)
 
+> **Gedateerde momentopname (2026-06-22) — geen statustracker.** De cijfers en de
+> modulelijst hieronder zijn bevroren op de meetdatum (40 modules, 84,9 %, 3381 mutanten).
+> De suite is sindsdien gegroeid (o.a. de voertuig-/geld-laag, `formValidation`, en
+> tijdzone-hardening). **De actuele, levende cijfers staan in
+> [`mutation-baseline.json`](../mutation-baseline.json)**; de praktische gids is
+> [`mutatietesten.md`](./mutatietesten.md). Lees dit document voor de *analyse en de patronen*
+> (grenswaarden, volgorde, null-paden), niet voor het huidige getal per module.
+
 ## Samenvatting
 
 De unit-tests **raken** veel code, maar **vangen** lang niet elke gedragsfout.

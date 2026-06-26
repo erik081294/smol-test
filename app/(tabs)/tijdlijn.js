@@ -58,7 +58,7 @@ function PostCard({ post, author, onPress }) {
 
 export default function Tijdlijn() {
   const router = useRouter();
-  const { posts, loading, reload, members } = useTimeline();
+  const { posts, loading, reload, loadMore, hasMore, members } = useTimeline();
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
     [members],
@@ -77,6 +77,8 @@ export default function Tijdlijn() {
         keyExtractor={(it) => it.id}
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
+        onEndReached={hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
         renderItem={({ item }) => (
           <PostCard post={item} author={byId[item.author_id]} onPress={() => router.push(`/tijdlijn/${item.id}`)} />
         )}

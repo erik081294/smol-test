@@ -3,7 +3,7 @@
 // de JS-spiegeling die de UI gebruikt om netjes te valideren en lokaal te filteren.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visibilityPayload, validateVisibility, canView } from '../lib/visibility.js';
+import { visibilityPayload, validateVisibility, visibilityRule, canView } from '../lib/visibility.js';
 import { VISIBILITY } from '../lib/constants.js';
 
 // --- visibilityPayload ------------------------------------------------------
@@ -49,6 +49,22 @@ test('validateVisibility: subgroup zonder gekozen groep faalt', () => {
 test('validateVisibility: custom zonder personen faalt', () => {
   assert.match(validateVisibility({ visibility: VISIBILITY.CUSTOM, shareWith: [] }), /wie/i);
   assert.equal(validateVisibility({ visibility: VISIBILITY.CUSTOM, shareWith: ['a'] }), null);
+});
+
+// --- visibilityRule (regel-fabriek voor de form-runner, ARCH-1) -------------
+test('visibilityRule: geldige zichtbaarheid → geen regel-fout (null)', () => {
+  assert.equal(visibilityRule()({ visibility: VISIBILITY.HOUSEHOLD }), null);
+});
+
+test('visibilityRule: ongeldige keuze → { field, message } met de validateVisibility-tekst', () => {
+  const res = visibilityRule()({ visibility: VISIBILITY.SUBGROUP, shareSubgroupId: null });
+  assert.equal(res.field, 'visibility');
+  assert.match(res.message, /groep/i);
+});
+
+test('visibilityRule: foutsleutel is instelbaar', () => {
+  const res = visibilityRule('zichtbaarheid')({ visibility: VISIBILITY.CUSTOM, shareWith: [] });
+  assert.equal(res.field, 'zichtbaarheid');
 });
 
 // --- canView (spiegelt public.can_view) ------------------------------------

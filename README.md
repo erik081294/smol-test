@@ -25,25 +25,29 @@ storage).
   (default aan). De minder-gebruikte modules staan onder een **"Meer"-overflowtab** zodat
   de tabbalk leesbaar blijft.
 
-**Modules**
+**Modules** (allemaal toggle-baar; de bron van waarheid is de registry in
+[`lib/modules.js`](./lib/modules.js))
+- **Thuis** — dagoverzicht met achterstallige, vandaag- en afgeronde taken, plus een
+  configureerbaar widget-grid. Een ingebedde maandkalender (eigen `date-fns`-grid, geen
+  native library) biedt het agenda-overzicht.
 - **Taken** met categorieën (🔧 klusje, 🧹 huishouden, 🪴 plant, 📅 afspraak, 📌 overig),
   toewijzing aan een lid of iedereen, en herhaling (dagelijks / wekelijks met specifieke
   weekdagen / maandelijks). Bij afvinken verschijnt automatisch de volgende keer.
-  Inclusief een **klus-bibliotheek** met veelvoorkomende klussen (rookmelder testen,
-  cv-druk, ontkalken…) en **seizoenssuggesties** die met één tik een taak met passend
-  ritme toevoegen.
-- **Vandaag** — dagoverzicht met achterstallige, vandaag- en afgeronde taken.
-- **Agenda** — echte maandkalender met subgroep-/categoriefilter (eigen date-fns-grid,
-  geen native library).
-- **Schoonmaak** — kamer-/zonegerichte taken en een **weekschema** dat je in één keer
-  opzet vanuit regelgebaseerde sjablonen.
-- **Boodschappen** — gedeelde, realtime lijst met afvinken.
+  Inclusief een **klus-bibliotheek** en **seizoenssuggesties** (één tik → taak met ritme).
+- **Schoonmaak** — kamer-/zonegerichte taken en een **weekschema** uit regelgebaseerde
+  sjablonen, met een eerlijkheids-/beurtoverzicht op de voltooiingen-log.
+- **Boodschappen** — gedeelde, realtime lijst met afvinken, gekoppeld aan een
+  productcatalogus (Open Food Facts) en bon-scan.
+- **Keuken & Voorraad** — maaltijdplanning gekoppeld aan de boodschappenlijst, en een
+  voorraadkast die meebeweegt met wat je koopt/verbruikt.
 - **Kosten / WieBetaaltWat** — uitgaven splitsen (gelijk / op aandeel / exact), een
-  saldo-overzicht en een **vereffen-suggestie** die het aantal onderlinge betalingen
-  minimaliseert.
-- **Planten** — soortdatabase met regelgebaseerd verzorgingsschema (water/voeding als
-  terugkerende taken), een verzorgingskaart, foto's via private Storage en een
-  **plantendagboek** (foto's over tijd; de nieuwste is automatisch de omslag).
+  saldo-overzicht, een **vereffen-suggestie** en terugkerende uitgaven.
+- **Planten** — soortdatabase met regelgebaseerd verzorgingsschema, een verzorgingskaart,
+  foto's via private Storage en een **plantendagboek** (nieuwste foto = omslag).
+- **Huisdieren** & **Voertuigen** — eigen modules met dossier, foto's en kosten-/onderhoudslog.
+- **Tijdlijn (prikbord)** — gedeelde berichten met tekst en foto's voor het huishouden.
+- **Samen** — gedeelde bronnen/spullen binnen het huishouden.
+- **Inzichten** — overzichten over de modules heen.
 
 **Platform**
 - **Realtime** — wijzigingen van een gezinslid verschijnen meteen bij de rest.
@@ -64,16 +68,17 @@ storage).
 
 ### 1. Supabase-project opzetten
 1. Maak een gratis project op [supabase.com](https://supabase.com).
-2. Voer **alle migraties** uit `supabase/migrations/` uit (in volgorde `0001` → `0011`).
-   De aanrader is de Supabase CLI:
+2. Voer **alle migraties** uit `supabase/migrations/` uit, in **numerieke volgorde**
+   (`0001`, `0002`, … — `supabase migration list` toont de actuele stand). De aanrader
+   is de Supabase CLI:
    ```bash
    npx supabase login                       # of: export SUPABASE_ACCESS_TOKEN=sbp_...
    npx supabase link --project-ref <jouw-ref>
-   npx supabase db push                     # past 0001..0011 toe
+   npx supabase db push                     # past alle migraties in volgorde toe
    ```
    Geen CLI? Plak elke migratie in volgorde in de **SQL Editor** en run ze. Dit maakt
    alle tabellen, RLS, de invite-functie, het module-framework, de modules en de
-   `plants`-storagebucket aan. Migratie `0009` seedt ~30 plantensoorten.
+   storagebuckets aan; een vroege migratie seedt ~30 plantensoorten.
    (`supabase/schema.sql` is alleen een wegwijzer naar de migraties.)
 3. (Optioneel) Plak [`supabase/tests/can_view_test.sql`](./supabase/tests/can_view_test.sql)
    en run het — het controleert de zichtbaarheidsregels en draait zichzelf terug.
@@ -127,33 +132,30 @@ huishoek/
 ├── app/                          # Schermen (expo-router, file-based routing)
 │   ├── _layout.js                # Providers + auth-gate
 │   ├── (auth)/welcome.js         # Inloggen & registreren
-│   ├── onboarding.js             # Huishouden aanmaken of aansluiten via code
-│   ├── (tabs)/                   # Tabbalk + Meer-overflowtab
-│   │   ├── vandaag.js            #   Dagoverzicht
-│   │   ├── taken.js              #   Alle taken + klus-bibliotheek
-│   │   ├── agenda.js             #   Maandkalender met subgroep-filter
-│   │   ├── boodschappen.js       #   Gedeelde, realtime lijst
-│   │   ├── schoonmaak.js         #   Zones + weekschema
-│   │   ├── kosten.js             #   WieBetaaltWat: uitgaven & saldo
-│   │   ├── planten.js            #   Plantenlijst met foto-omslag
-│   │   ├── huishouden.js         #   Leden, groepen, invite-code, modules
+│   ├── onboarding.js             # Huishouden aanmaken of aansluiten via uitnodigingslink
+│   ├── (tabs)/                   # Tabbalk + Meer-overflowtab — één scherm per module
+│   │   ├── vandaag.js            #   "Thuis": dagoverzicht + widget-grid
+│   │   ├── taken.js              #   Alle taken + klus-bibliotheek + ingebedde kalender
+│   │   ├── boodschappen.js · maaltijden.js · voorraad.js   # Eten-groep
+│   │   ├── schoonmaak.js · planten.js · huisdieren.js · voertuigen.js · tijdlijn.js
+│   │   ├── kosten.js · delen.js · inzichten.js             # Geld/overzicht
+│   │   ├── huishouden.js · instellingen.js                 # Beheer
 │   │   └── meer.js               #   Overflow-navigatie
-│   ├── task/[id].js              # Taak toevoegen/bewerken + "Delen met"
-│   ├── expense/[id].js           # Uitgave toevoegen/bewerken + splitsen
-│   └── plant/[id].js             # Plantdetail: verzorgingskaart + dagboek
-├── lib/
+│   │                             # Bron van waarheid voor de modulelijst: lib/modules.js
+│   ├── task/[id].js · expense/[id].js · plant/[id].js …   # Detail-/editor-stacks
+│   └── pet/ · vehicle/ · recipe/ · product/ · purchase/ · resource/  # (idem, per module)
+├── lib/                          # ~110 modules — onderstaand een representatieve selectie
 │   ├── supabase.js · auth.js · household.js · db.js   # Client, contexten, foutafhandeling
 │   ├── useCollection.js          # Generieke huishouden-gescopete CRUD + realtime
-│   ├── useTasks/useGroceries/useZones/useExpenses/usePlants.js  # Module-hooks
-│   ├── recurrence.js             # Volgende-datum berekening + labels
-│   ├── agenda.js · cleaningTemplates.js · choreLibrary.js       # Pure module-logica
-│   ├── expenses.js · plantCare.js · plantPhoto.js               # (volledig getest)
+│   ├── useTasks.js · useExpenses.js · …    # Module-hooks (bouwen op useCollection)
+│   ├── recurrence.js · agenda.js · cleaningTemplates.js · choreLibrary.js   # Pure logica
+│   ├── expenses.js · plantCare.js · fairness.js · vehicleCosts.js           # (unit-getest)
 │   ├── visibility.js · modules.js · constants.js               # Contract & bron van waarheid
 │   ├── theme.js · icons.js · ui.js                             # Design-systeem
-│   └── TaskRow.js · VisibilityPicker.js · ChoreLibrarySheet.js # Gedeelde componenten
+│   └── VisibilityPicker.js · ChoreLibrarySheet.js · …         # Gedeelde componenten
 ├── supabase/
 │   ├── schema.sql                # Wegwijzer — de waarheid leeft in migrations/
-│   ├── migrations/0001..0011.sql # Schema, RLS, framework, modules, storage, seed
+│   ├── migrations/NNNN_*.sql     # Schema, RLS, framework, modules, storage, seed (genummerd)
 │   └── tests/can_view_test.sql   # Test voor de zichtbaarheidsregels (rollback)
 ├── tests/                        # node:test units + RLS-integratietests
 ├── .github/workflows/ci.yml      # CI: npm test op elke push/PR

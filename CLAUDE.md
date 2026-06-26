@@ -4,6 +4,26 @@ Huishoek is een Expo/React-Native app. De logica zit in pure modules onder `lib/
 (los van React/Supabase), unit-getest met `node:test`. Schermen/hooks/UI zijn de dunne
 React-laag eromheen.
 
+## Waar staat wat (oriëntatie)
+
+Begin hier; ga niet op je geheugen af — de code beweegt sneller dan losse docs.
+
+- **Status & roadmap (wat af/open is) — single source of truth:**
+  [`huishoek-backlog.md`](huishoek-backlog.md) §6. Géén andere doc is gezaghebbend over status.
+- **Chronologisch logboek (wat wanneer is gebouwd):** [`huishoek-voortgang.md`](huishoek-voortgang.md).
+- **Build-ready plannen (het *hoe*, per ronde):** [`docs/plans/00-overzicht.md`](docs/plans/00-overzicht.md).
+- **Waarom/architectuur:** [`huishoek-backlog.md`](huishoek-backlog.md) §1 + [`README.md`](README.md).
+- **Module-ruggengraat (zo blijft het modulair, geen spaghetti):**
+  [`docs/architectuur.md`](docs/architectuur.md). Het gedeelde contract dat elke module volgt —
+  `modules.js` → `useCollection` → `enable_module_rls`, de 3-lagen-scheiding (pure logica /
+  React-schil / RLS), en de gedeelde entity-editor (`useEntityForm` + `formValidation`).
+  Een nieuwe editor of cross-module overzicht? Lees dit eerst.
+- **Migratie-/RLS-runbook:** [`VERIFICATIE.md`](VERIFICATIE.md). Live migratiestand: `supabase migration list`
+  (lees geen hardgecodeerd nummer uit een doc). **`supabase db push` is in dit project kapot**
+  (history diverged) → nieuwe migraties via MCP `apply_migration`.
+- **Design-systeem:** [`DESIGN.md`](DESIGN.md). **Overige naslag/how-to & gedateerde reviews:**
+  [`docs/README.md`](docs/README.md).
+
 Onderstaande **definition of done** borgt onze integratiesnelheid: testgaten horen dicht
 vóór de PR, niet pas bij de merge. (Deze sessie kostte een half uur omdat een PR pas bij
 de merge op de mutatie-ratchet zakte — dat voorkomen we hiermee.)

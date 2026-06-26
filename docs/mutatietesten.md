@@ -82,6 +82,14 @@ Faalt de check, dan heb je drie opties:
    git add mutation-baseline.json && git commit -m "chore: mutatie-baseline bijwerken"
    ```
 
+> **Over optie 3 — de baseline mag omlaag, en dat is bewust.** Er is géén automatische poort
+> die een baseline-verlaging blokkeert: equivalente mutanten en bewust verwijderde logica
+> moeten de norm kunnen bijstellen, anders loopt de ratchet vast op onvangbare mutanten. De
+> ratchet zelf bewaakt het echte geval (score zakt onder de baseline zónder dat je 'm bijwerkt
+> → faalt). De controle op misbruik van optie 3 is de **zichtbare `mutation-baseline.json`-diff
+> in de PR-review**: een verlaging hoort daar uitgelegd te staan. Zet `mutation-baseline.json`
+> desgewenst onder CODEOWNERS-review als je daar een extra paar ogen op wilt.
+
 > Vuistregel: **~85 % is een gezonde streefwaarde, geen 100 %.** Boven ~85 % jaag je
 > vooral equivalente mutanten na met kunstmatige tests; dat maakt de suite slechter, niet
 > beter. Dicht het *patroon* (grenzen, volgordes, null-paden), niet het laatste getal.
@@ -89,8 +97,12 @@ Faalt de check, dan heb je drie opties:
 ## Onderhoud
 
 - **Nieuwe logica-module met tests toegevoegd?** Voeg een regel toe aan `GROUPS` in
-  [`scripts/mutation.mjs`](../scripts/mutation.mjs) (`{ test: '<testnaam>', srcs: ['lib/<module>.js'] }`)
-  en herijk de baseline (`npm run test:mutation:baseline`).
+  [`scripts/mutation-groups.mjs`](../scripts/mutation-groups.mjs) (de Stryker-vrije data-laag;
+  `{ test: '<testnaam>', srcs: ['lib/<module>.js'] }`) en herijk de baseline
+  (`npm run test:mutation:baseline`). Vergeet je dit, dan vangt
+  [`tests/groupsCoverage.test.js`](../tests/groupsCoverage.test.js) het: die faalt zodra een
+  `tests/*.test.js` geen mutatiegroep heeft (tenzij hij bewust op `UNMUTATED_TESTS` staat).
+  Zo kan een geteste module niet meer stil aan de ratchet ontsnappen.
 - **Pure datatabel** (alleen lookup-/vertaal-/stijldata, zoals `i18n`, `offCategoryMap`,
   `colorSchemes`)? Voeg `exclude: ['StringLiteral']` toe aan de groep — losse
   data-strings muteren meet geen logica en vertekent de score.
@@ -108,6 +120,10 @@ Faalt de check, dan heb je drie opties:
 - De Babel-parser-plugins staan expliciet op `["jsx"]` omdat `babel-preset-expo` de
   `decorators`-plugin aanzet (anders botst dat met Stryker's `decorators-legacy`).
 - `coverageAnalysis` staat op `off` (de command-runner ondersteunt geen per-test-coverage).
+- De runner ge-`--import`t `tests/register.mjs` en erft daarmee de gepinde tijdzone (zie de
+  comment daar): baseline én CI meten zo op dezelfde "lokale dag"-aannames, ongeacht de
+  machine-tijdzone. Timeouts tellen als kill (een hang-mutant is gevangen) maar worden in de
+  output apart geteld (`timeout-kills=…`) zodat een trage runner de score niet ongemerkt opblaast.
 
 ## Snelheid
 

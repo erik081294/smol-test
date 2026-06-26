@@ -22,6 +22,24 @@ Roteer een sleutel direct bij (vermoeden van) lekkage, en verder periodiek:
 | Sentry DSN/auth-token | Sentry-project | Genereer opnieuw; werk env/secret bij |
 | `NOTIFY_WEBHOOK_SECRET` | gedeeld geheim van de notify-functie | Genereer opnieuw; `supabase secrets set` + de Database-Webhook-header bijwerken |
 
+## Toetreding & multi-tenant-isolatie
+
+- **Toetreden tot een huishouden gaat uitsluitend via persoonlijke, eenmalige,
+  24u-geldige invite-tokens** (`create_invite`/`accept_invite`, migratie `0053`).
+  De oude statische `households.invite_code` + `join_household`-RPC is verwijderd
+  (migratie `0055`) omdat een korte, niet-verlopende, herbruikbare code
+  bruteforcebaar was — een cross-household datalek (SEC-5). Voeg **geen** nieuwe
+  gedeelde-code-route toe; houd toetreding op single-use tokens.
+- **Betaalde externe calls hebben een getrapte rem.** `scan-receipt` (Orq.ai) wordt
+  begrensd op drie lagen in `record_receipt_scan`: burst (20/uur, `0026`),
+  per-gebruiker dag-quota (30/24u, `0057`) en een globaal dag-vangnet (10k, `0056`).
+  De per-gebruiker dag-quota is de hoofd-rem: de totale kosten schalen zo vanzelf mee
+  met het aantal echte gebruikers. De edge-limiter is bovendien fail-closed. Hanteer
+  dit patroon (burst + per-user quota + globaal vangnet + fail-closed) voor elke
+  nieuwe call naar een betaalde/gemeterde dienst.
+- Volledige onderbouwing: [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-06-26.md)
+  en de RLS-integratietest [`tests/rls.integration.test.js`](tests/rls.integration.test.js).
+
 ## Geautomatiseerd vangnet
 
 - **GitHub secret scanning + push protection** — zet dit aan in de

@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-22T22:13:43.237Z",
+  "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 3178,
-    "total": 3704,
-    "score": 85.8
+    "killed": 4263,
+    "total": 5144,
+    "score": 82.9
   },
   "files": {
     "lib/activity.js": {
@@ -28,9 +28,9 @@
       "score": 97.1
     },
     "lib/buyFrequency.js": {
-      "killed": 75,
-      "total": 80,
-      "score": 93.8
+      "killed": 88,
+      "total": 96,
+      "score": 91.7
     },
     "lib/choreLibrary.js": {
       "killed": 110,
@@ -66,6 +66,11 @@
       "killed": 97,
       "total": 119,
       "score": 81.5
+    },
+    "lib/formValidation.js": {
+      "killed": 35,
+      "total": 38,
+      "score": 92.1
     },
     "lib/i18n.js": {
       "killed": 30,
@@ -133,9 +138,9 @@
       "score": 88.6
     },
     "lib/plantTimeline.js": {
-      "killed": 42,
-      "total": 48,
-      "score": 87.5
+      "killed": 55,
+      "total": 64,
+      "score": 85.9
     },
     "lib/priceTrack.js": {
       "killed": 58,
@@ -178,9 +183,9 @@
       "score": 93.5
     },
     "lib/visibility.js": {
-      "killed": 56,
-      "total": 63,
-      "score": 88.9
+      "killed": 60,
+      "total": 67,
+      "score": 89.6
     },
     "lib/offCategoryMap.js": {
       "killed": 53,
@@ -241,6 +246,61 @@
       "killed": 33,
       "total": 35,
       "score": 94.3
+    },
+    "lib/vehicleCosts.js": {
+      "killed": 74,
+      "total": 89,
+      "score": 83.1
+    },
+    "lib/vehicleSharing.js": {
+      "killed": 41,
+      "total": 52,
+      "score": 78.8
+    },
+    "lib/vehicleCare.js": {
+      "killed": 114,
+      "total": 134,
+      "score": 85.1
+    },
+    "lib/vehicleTimeline.js": {
+      "killed": 166,
+      "total": 224,
+      "score": 74.1
+    },
+    "lib/vehicleAppearance.js": {
+      "killed": 52,
+      "total": 75,
+      "score": 69.3
+    },
+    "lib/rdw.js": {
+      "killed": 96,
+      "total": 122,
+      "score": 78.7
+    },
+    "lib/petCare.js": {
+      "killed": 184,
+      "total": 288,
+      "score": 63.9
+    },
+    "lib/yearHeatmap.js": {
+      "killed": 158,
+      "total": 178,
+      "score": 88.8
+    },
+    "lib/contrast.js": {
+      "killed": 21,
+      "total": 26,
+      "score": 80.8
+    },
+    "lib/realtimeHub.js": {
+      "killed": 57,
+      "total": 73,
+      "score": 78.1
+    },
+    "lib/secureStorage.js": {
+      "killed": 51,
+      "total": 98,
+      "score": 52
     }
   }
 }

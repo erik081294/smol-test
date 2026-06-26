@@ -1,0 +1,42 @@
+name: RLS-integratietest (handmatig)
+
+# Draait de RLS-integratietest (tests/rls.integration.test.js) tegen een ECHT Supabase-
+# project. BEWUST alleen handmatig (`workflow_dispatch`) — niet op elke PR:
+#   - de test maakt/verwijdert echte users + rijen en kent auth-rate-limits met wachttijden;
+#   - binnen de huidige (free-)tier is er geen aparte staging, dus dit raakt het live project.
+# Per-PR draaien zou productie hameren en flaky/traag zijn. Handmatig + geserialiseerd is de
+# robuuste vorm: je triggert 'm bewust ná RLS-/migratiewerk om het contract in de DB te bewijzen.
+#
+# Activeren: zet de repo-secrets SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY.
+# Zónder die secrets skipt de test zichzelf (de job slaagt dan zonder iets te verifiëren).
+# Zie docs/mutatietesten.md (testlagen) en de RLS-notitie in het geheugen/VERIFICATIE.md.
+on:
+  workflow_dispatch:
+
+# Serialiseer: nooit twee runs tegelijk op hetzelfde live project.
+concurrency:
+  group: rls-live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: RLS-integratietest tegen live Supabase
+        run: npm test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

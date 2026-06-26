@@ -18,16 +18,20 @@
 //   ORQ_API_KEY         — Orq.ai API-sleutel
 //   ORQ_DEPLOYMENT_KEY  — sleutel van de Orq-deployment (default 'receipt-extractor')
 //
-// Hardening (INF-9 / audit S-M4): per-gebruiker rate-limit (DB-RPC `record_receipt_scan`,
-// migratie 0026) + MIME-whitelist, beide vóór de betaalde Orq-call.
+// Hardening (INF-9 / audit S-M4): getrapte rate-limit via DB-RPC `record_receipt_scan`
+// — burst per uur (0026) + per-gebruiker dag-quota + globaal dag-vangnet (0056/0057) —
+// fail-closed, plus een MIME-whitelist, alles vóór de betaalde Orq-call.
 
 // @ts-ignore — Deno laadt het .js-buurbestand; types niet nodig in deze schil.
 import { extractText, parseModelJson, normalize, effectiveMime, isAllowedMime } from './core.js';
 
 const ORQ_INVOKE_URL = 'https://api.orq.ai/v2/deployments/invoke';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // ~8MB base64-payload; grotere foto's weigeren
-const SCAN_MAX_PER_WINDOW = 20;          // max scans per gebruiker...
-const SCAN_WINDOW_SECONDS = 3600;        // ...per uur (schuivend venster)
+const SCAN_MAX_PER_WINDOW = 30;          // burst: max scans per gebruiker per uur
+const SCAN_WINDOW_SECONDS = 3600;        // ...(schuivend venster)
+const SCAN_MAX_PER_DAY = 50;             // per gebruiker per 24u — de hoofd-rem (schaalt
+                                         // de totale kosten mee met het aantal echte users)
+const SCAN_GLOBAL_DAILY_MAX = 10000;     // globaal vangnet (alle gebruikers samen)
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -72,31 +76,49 @@ Deno.serve(async (req) => {
     return json({ error: 'Niet-ondersteund bestandstype — gebruik een JPEG-, PNG- of WebP-foto.' }, 415);
   }
 
-  // Rate-limit per gebruiker vóór de betaalde Orq-call. De functie draait achter
-  // verify_jwt, dus het Authorization-JWT identificeert de gebruiker; de RPC telt
-  // het schuivende venster. Fail-open bij infra-fouten (een storing in de teller
-  // mag het scannen niet breken), fail-closed bij een expliciete over-de-limiet.
+  // Rate-limit vóór de betaalde Orq-call. De functie draait achter verify_jwt, dus
+  // het Authorization-JWT identificeert de gebruiker; de RPC (0057) telt drie lagen:
+  // burst (20/uur), per-gebruiker dag-quota (30/24u — schaalt de kosten mee met het
+  // aantal echte users) en een globaal dag-vangnet (10k). FAIL-CLOSED: kunnen we niet
+  // betrouwbaar limiteren, dan weigeren we liever dan een onbegrensde kostenpost te
+  // riskeren (account-farming → kosten-explosie/DoS).
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
   const authHeader = req.headers.get('Authorization') ?? '';
-  if (SUPABASE_URL && SUPABASE_ANON_KEY && authHeader) {
-    try {
-      const rl = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_receipt_scan`, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_ANON_KEY, authorization: authHeader, 'content-type': 'application/json' },
-        body: JSON.stringify({ p_max: SCAN_MAX_PER_WINDOW, p_window_seconds: SCAN_WINDOW_SECONDS }),
-      });
-      if (rl.ok) {
-        const allowed = await rl.json().catch(() => true);
-        if (allowed === false) {
-          return json({ error: 'Te veel bonscans in korte tijd — probeer het straks opnieuw.' }, 429);
-        }
-      } else {
-        console.warn('[scan-receipt] rate-limit-check status', rl.status);
-      }
-    } catch (e) {
-      console.warn('[scan-receipt] rate-limit-check faalde (fail-open)', String(e));
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !authHeader) {
+    // Zonder deze drie kunnen we de rate-limit-RPC niet aanroepen → niet limiteerbaar.
+    // In productie zijn ze er altijd (Supabase injecteert URL/key, verify_jwt levert auth),
+    // dus dit blokkeert geen legitiem verkeer; het dicht het "limiter overgeslagen"-gat.
+    console.error('[scan-receipt] rate-limit niet uitvoerbaar (config/auth ontbreekt) — fail-closed');
+    return json({ error: 'Bonscan is tijdelijk niet beschikbaar.' }, 503);
+  }
+  try {
+    const rl = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_receipt_scan`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, authorization: authHeader, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        p_max: SCAN_MAX_PER_WINDOW,
+        p_window_seconds: SCAN_WINDOW_SECONDS,
+        p_daily_max: SCAN_MAX_PER_DAY,
+        p_global_daily_max: SCAN_GLOBAL_DAILY_MAX,
+      }),
+    });
+    if (!rl.ok) {
+      console.error('[scan-receipt] rate-limit-check status', rl.status);
+      return json({ error: 'Bonscan is tijdelijk niet beschikbaar.' }, 503);
     }
+    const allowed = await rl.json().catch(() => null);
+    if (allowed === false) {
+      return json({ error: 'Te veel bonscans in korte tijd — probeer het straks opnieuw.' }, 429);
+    }
+    if (allowed !== true) {
+      // Onverwacht antwoord (geen boolean) → niet als "toegestaan" behandelen.
+      console.error('[scan-receipt] onverwacht rate-limit-antwoord', JSON.stringify(allowed)?.slice(0, 200));
+      return json({ error: 'Bonscan is tijdelijk niet beschikbaar.' }, 503);
+    }
+  } catch (e) {
+    console.error('[scan-receipt] rate-limit-check faalde (fail-closed)', String(e));
+    return json({ error: 'Bonscan is tijdelijk niet beschikbaar.' }, 503);
   }
 
   const dataUrl = imageBase64.startsWith('data:')
@@ -126,7 +148,9 @@ Deno.serve(async (req) => {
       }),
     });
   } catch (e) {
-    return json({ error: 'Kon de bonscan-service niet bereiken', detail: String(e) }, 502);
+    // Log de details server-side; geef de client geen interne foutstring (infra-fingerprint).
+    console.error('[scan-receipt] Orq onbereikbaar', String(e));
+    return json({ error: 'Kon de bonscan-service niet bereiken' }, 502);
   }
 
   if (!orqRes.ok) {

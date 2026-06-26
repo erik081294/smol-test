@@ -13,6 +13,12 @@ test('dayKeyOf: ongeldige datum -> null', () => {
   assert.equal(dayKeyOf(undefined), null);
 });
 
+test('dayKeyOf: datum-only string is tijdzone-veilig (geen UTC-dagverschuiving)', () => {
+  // '2026-06-01' is een kalenderdag; mag onder een negatieve-offset-zone niet 31 mei worden
+  // (zie tests/register.mjs — de suite draait gepind op zo'n zone).
+  assert.equal(dayKeyOf('2026-06-01'), '2026-06-01');
+});
+
 test('groupTimelineByDay: groepeert opeenvolgende entries van dezelfde dag', () => {
   const entries = [
     { id: 'a', created_at: '2026-06-22T10:00:00' },

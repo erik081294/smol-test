@@ -13,7 +13,9 @@ import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, Editor, Date
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { validateVisibility } from '../../lib/visibility';
+import { visibilityRule } from '../../lib/visibility';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText, when } from '../../lib/formValidation';
 import {
   SPLIT, computeShares, exactSharesValid, formatCents, parseAmountToCents,
 } from '../../lib/expenses';
@@ -57,9 +59,10 @@ export default function ExpenseEditor() {
   const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
   const [shareSubgroupId, setShareSubgroupId] = useState(null);
   const [shareWith, setShareWith] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState({}); // inline validatie i.p.v. Alert
-  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels. De velden zelf houden we hier nog als losse state (incrementele migratie —
+  // zie docs/architectuur.md); een nieuwe editor laat de hook óók de values beheren.
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
 
   // Selecteer standaard alle leden zodra ze geladen zijn.
   useEffect(() => {
@@ -118,18 +121,23 @@ export default function ExpenseEditor() {
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
 
   const save = async () => {
-    const e = {};
-    if (!description.trim()) e.description = t('expense.error.description');
-    if (amountCents <= 0) e.amount = t('expense.error.amount');
-    if (!paidBy) e.paidBy = t('expense.error.paidBy');
-    if (selected.length === 0) e.participants = t('expense.error.participants');
-    if (splitType === SPLIT.EXACT && !exactSharesValid(amountCents, participants)) {
-      e.exact = t('expense.error.exact', { amount: formatCents(exactRemaining) });
-    }
-    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) e.visibility = visError;
-    setErrors(e);
-    if (Object.keys(e).length) { haptics.error(); return; }
+    // Eén bron van waarheid voor de waarden die de regels lezen; de validatie zelf
+    // draait door de pure runRules (lib/formValidation.js, ratchet-bewaakt).
+    const subject = {
+      description, amountCents, paidBy, selected, splitType, participants,
+      visibility, shareSubgroupId, shareWith,
+    };
+    const ok = validate([
+      requiredText('description', t('expense.error.description')),
+      // Foutsleutel 'amount' (zo leest het bedragveld 'm), waarde uit 'amountCents'.
+      when('amount', (v) => v.amountCents > 0, t('expense.error.amount')),
+      when('paidBy', (v) => !!v.paidBy, t('expense.error.paidBy')),
+      when('participants', (v) => v.selected.length > 0, t('expense.error.participants')),
+      when('exact', (v) => v.splitType !== SPLIT.EXACT || exactSharesValid(v.amountCents, v.participants),
+        t('expense.error.exact', { amount: formatCents(exactRemaining) })),
+      visibilityRule('visibility'),
+    ], subject);
+    if (!ok) return; // validate() heeft de errors gezet + de haptische foutpuls gegeven
 
     setBusy(true);
     try {

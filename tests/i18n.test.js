@@ -14,6 +14,15 @@ test('t valt terug op de sleutel zelf bij een ontbrekende vertaling', () => {
   assert.equal(t('does.not.exist'), 'does.not.exist');
 });
 
+test('t valt terug op de default-taal (nl) als de actieve taal de sleutel mist', () => {
+  registerDict('en', { 'common.cancel': 'Cancel' }); // en kent enkel deze sleutel
+  setLang('en');
+  assert.equal(t('common.cancel'), 'Cancel');        // en-vertaling wint
+  assert.equal(t('tasks.title'), 'Taken');           // ontbreekt in en → nl-fallback, niet de kale sleutel
+  assert.equal(t('really.absent.key'), 'really.absent.key'); // ook nl mist 'm → kale sleutel
+  setLang('nl');                                      // terug voor de overige tests
+});
+
 test('t vult {vars}-placeholders in', () => {
   registerDict('nl', { 'test.greet': 'Hoi {naam}, je hebt {n} taken' });
   assert.equal(t('test.greet', { naam: 'Tim', n: 3 }), 'Hoi Tim, je hebt 3 taken');

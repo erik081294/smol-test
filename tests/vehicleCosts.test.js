@@ -42,6 +42,30 @@ test('maintenanceMonthlyAvgCents: alleen kosten binnen het venster → maandgemi
   assert.equal(maintenanceMonthlyAvgCents([], { now }), 0);
 });
 
+test('maintenanceMonthlyAvgCents: eind-van-maand-cutoff overflowt niet (28 feb, niet 3 mrt)', () => {
+  // now = 31 mrt, venster = 1 maand. De cutoff hoort ~28 feb te zijn. Met het kale
+  // Date.setMonth zou de cutoff naar 3 mrt overflowen → een log van 1 mrt zou dan
+  // (fout) buiten het venster vallen. We assert dat 'ie juist binnen valt.
+  const now = new Date('2026-03-31T12:00:00Z');
+  const beginMaart = [{ performed_on: '2026-03-01', cost_cents: 6000 }];
+  assert.equal(maintenanceMonthlyAvgCents(beginMaart, { now, months: 1 }), 6000); // /max(1,1)
+  // Een log van eind januari ligt vóór 28 feb → buiten het 1-maands-venster.
+  const eindJan = [{ performed_on: '2026-01-28', cost_cents: 6000 }];
+  assert.equal(maintenanceMonthlyAvgCents(eindJan, { now, months: 1 }), 0);
+});
+
+test('maintenanceMonthlyAvgCents: venster is inclusief op beide grenzen', () => {
+  // Lokale Date-constructie (geen string-parsing) houdt de grensgelijkheid tijdzone-robuust:
+  // now, cutoff (= now − 12 mnd) en de logs liggen allemaal in dezelfde lokale tijd.
+  const now = new Date(2026, 5, 25, 12, 0, 0);                 // 25 jun 2026 12:00 lokaal
+  const opOndergrens = new Date(2025, 5, 25, 12, 0, 0).toISOString(); // exact now − 12 mnd
+  const opBovengrens = new Date(2026, 5, 25, 12, 0, 0).toISOString(); // exact now
+  // Een log precies óp de ondergrens telt mee (>= cutoff, niet > cutoff).
+  assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opOndergrens, cost_cents: 1200 }], { now }), 100);
+  // Een log precies óp de bovengrens telt mee (<= now, niet < now).
+  assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opBovengrens, cost_cents: 1200 }], { now }), 100);
+});
+
 test('vehicleCostSummary: telt vaste lasten + onderhoud + afschrijving op', () => {
   const now = new Date('2026-06-25');
   const s = vehicleCostSummary({

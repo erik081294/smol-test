@@ -98,12 +98,10 @@ test('RLS: huisgenoot ziet household-taak, buitenstaander niet', opts, async () 
   const bob = await makeUser('bob');       // huisgenoot
   const eve = await makeUser('eve');        // buitenstaander
 
-  // Alice maakt een huishouden (via create_household-RPC) en deelt de code met Bob.
+  // Alice maakt een huishouden (via create_household-RPC) en nodigt Bob uit.
   const hh = await makeHousehold(alice, 'Testhuis');
 
-  const { data: code } = await alice.client
-    .from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Alice maakt een household-taak.
   const { data: task, error: tErr } = await alice.client.from('tasks')
@@ -125,10 +123,8 @@ test('RLS: custom-taak alleen zichtbaar voor genoemde personen', opts, async () 
   const carol = await makeUser('carol2');
 
   const hh = await makeHousehold(alice, 'Testhuis2');
-  const { data: code } = await alice.client
-    .from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
-  await carol.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
+  await addMember(alice, carol, hh.id);
 
   // Alice deelt alleen met Bob (custom).
   const { data: task, error } = await alice.client.from('tasks')
@@ -184,20 +180,18 @@ test('RLS: SEC-1 — create_household maakt huishouden + owner-membership atomai
   const alice = await makeUser('alice_sec1b');
   const hh = await makeHousehold(alice, 'RPC-huis');
   assert.ok(hh?.id, 'create_household geeft de huishoudrij terug');
-  assert.ok(hh?.invite_code, 'huishouden krijgt een invite_code');
 
   const { data: mine } = await alice.client.from('household_members')
     .select('role').eq('household_id', hh.id).eq('profile_id', alice.id).single();
   assert.equal(mine?.role, 'owner', 'de maker is owner');
 });
 
-test('RLS: SEC-4 — alleen de owner mag het huishouden bewerken (invite_code/naam)', opts, async () => {
+test('RLS: SEC-4 — alleen de owner mag het huishouden bewerken (naam/budget)', opts, async () => {
   const alice = await makeUser('alice_sec4'); // owner
   const bob = await makeUser('bob_sec4');     // gewoon lid
 
   const hh = await makeHousehold(alice, 'Beheerhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Bob (lid, geen owner) probeert te wijzigen → RLS-using filtert de rij weg (0 rijen).
   const { data: bobUpd } = await bob.client.from('households')
@@ -223,14 +217,25 @@ async function makeHousehold(owner, name) {
   return hh;
 }
 
+// Voegt `member` toe aan `householdId` via het invite-token-systeem (0053): de owner
+// maakt een eenmalige, persoonlijke invite en het lid wisselt 'm in. Vervangt de oude
+// statische join_household-route (in 0055 verwijderd — bruteforcebaar). Elk lid krijgt
+// z'n eigen invite, want een token is single-use.
+async function addMember(owner, member, householdId, role = 'member') {
+  const { data: inv, error: cErr } = await owner.client
+    .rpc('create_invite', { p_household_id: householdId, p_role: role });
+  assert.ok(!cErr, `invite maken: ${cErr?.message}`);
+  const { error: aErr } = await member.client.rpc('accept_invite', { p_token: inv.token });
+  assert.ok(!aErr, `invite accepteren: ${aErr?.message}`);
+}
+
 test('RLS: household-uitgave + shares zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
   const alice = await makeUser('alice_exp');
   const bob = await makeUser('bob_exp');     // huisgenoot
   const eve = await makeUser('eve_exp');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Kostenhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Alice maakt een uitgave van €30, gelijk over Alice + Bob, via de RPC.
   const { data: expId, error: rpcErr } = await alice.client.rpc('create_expense', {
@@ -263,8 +268,7 @@ test('RLS: uitgave bijwerken (update_expense) vervangt bedrag + shares; buitenst
   const eve = await makeUser('eve_updexp');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Bijwerkhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: expId } = await alice.client.rpc('create_expense', {
     p_household_id: hh.id, p_description: 'Etentje', p_amount_cents: 2000,
@@ -312,8 +316,7 @@ test('RLS: subgroep-uitgave alleen voor subgroepleden (huisgenoot buiten de groe
   const bob = await makeUser('bob_sg_exp');   // huisgenoot, NIET in de subgroep
 
   const hh = await makeHousehold(alice, 'Ouderhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Subgroep met alleen Alice.
   const { data: sg } = await alice.client.from('subgroups')
@@ -346,8 +349,7 @@ test('RLS: household-plant zichtbaar voor huisgenoot, niet voor buitenstaander',
   const eve = await makeUser('eve_plant');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Plantenhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: plant, error } = await alice.client.from('plants')
     .insert({ household_id: hh.id, name: 'Monstera', visibility: 'household', created_by: alice.id })
@@ -365,8 +367,7 @@ test('RLS: subgroep-plant alleen voor subgroepleden', opts, async () => {
   const bob = await makeUser('bob_plant_sg');   // huisgenoot, niet in subgroep
 
   const hh = await makeHousehold(alice, 'Privéplant');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: sg } = await alice.client.from('subgroups')
     .insert({ household_id: hh.id, name: 'Alleen Alice', created_by: alice.id }).select().single();
@@ -391,8 +392,7 @@ test('RLS: zones zichtbaar voor huisgenoot, niet voor buitenstaander', opts, asy
   const eve = await makeUser('eve_zone');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Zonehuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: zone, error } = await alice.client.from('zones')
     .insert({ household_id: hh.id, name: 'Badkamer', emoji: '🛁' }).select().single();
@@ -412,8 +412,7 @@ test('RLS: dagboekfoto zichtbaar voor huisgenoot, niet voor buitenstaander', opt
   const eve = await makeUser('eve_diary');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Dagboekhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: plant } = await alice.client.from('plants')
     .insert({ household_id: hh.id, name: 'Ficus', visibility: 'household', created_by: alice.id }).select().single();
@@ -437,8 +436,7 @@ test('RLS: voltooiing van household-taak zichtbaar voor huisgenoot, niet voor bu
   const eve = await makeUser('eve_compl');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Voltooiinghuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: task } = await alice.client.from('tasks')
     .insert({ household_id: hh.id, title: 'Stofzuigen', visibility: 'household', created_by: alice.id })
@@ -460,9 +458,8 @@ test('RLS: voltooiing van custom-taak alleen zichtbaar voor genoemde personen', 
   const carol = await makeUser('carol_compl_c');  // huisgenoot, niet genoemd
 
   const hh = await makeHousehold(alice, 'Custom-voltooiinghuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
-  await carol.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
+  await addMember(alice, carol, hh.id);
 
   // Custom-taak alleen gedeeld met Bob.
   const { data: task } = await alice.client.from('tasks')
@@ -490,8 +487,7 @@ test('RLS: bon + bonregels zichtbaar voor huisgenoot, niet voor buitenstaander',
   const eve = await makeUser('eve_boo');        // buitenstaander
 
   const hh = await makeHousehold(alice, 'Boodschappenhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Alice maakt een product in de catalogus en voert een bon met twee regels in via de RPC.
   const { data: product, error: pErr } = await alice.client.from('products')
@@ -535,8 +531,7 @@ test('RLS: recept + ingrediënt + weekmenu + voorraad household-gescoped', opts,
   const eve = await makeUser('eve_keuken');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Keukenhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: recipe, error: rErr } = await alice.client.from('recipes')
     .insert({ household_id: hh.id, title: 'Pasta pesto', servings: 2, created_by: alice.id }).select().single();
@@ -565,8 +560,7 @@ test('RLS: gedeeld item + reservering zichtbaar voor huisgenoot, niet voor buite
   const eve = await makeUser('eve_delen');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Deelhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: res, error: resErr } = await alice.client.from('shared_resources')
     .insert({ household_id: hh.id, name: 'De auto', kind: 'auto', visibility: 'household', created_by: alice.id }).select().single();
@@ -586,8 +580,7 @@ test('RLS: reservering van een custom-resource alleen voor genoemde personen', o
   const alice = await makeUser('alice_delen2');
   const bob = await makeUser('bob_delen2');     // huisgenoot, NIET in de custom-share
   const hh = await makeHousehold(alice, 'Deelhuis2');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   // Resource alleen gedeeld met Alice (de maker). Bob is huisgenoot maar niet genoemd.
   const { data: res } = await alice.client.from('shared_resources')
@@ -611,8 +604,7 @@ test('RLS: terugkerende uitgave zichtbaar voor huisgenoot, niet voor buitenstaan
   const eve = await makeUser('eve_recur');      // buitenstaander
 
   const hh = await makeHousehold(alice, 'Recurhuis');
-  const { data: code } = await alice.client.from('households').select('invite_code').eq('id', hh.id).single();
-  await bob.client.rpc('join_household', { code: code.invite_code });
+  await addMember(alice, bob, hh.id);
 
   const { data: tpl, error } = await alice.client.from('recurring_expenses')
     .insert({ household_id: hh.id, description: 'Huur', amount_cents: 120000, paid_by: alice.id,
@@ -639,4 +631,60 @@ test('RLS: create_expense schrijft de categorie (0019)', opts, async () => {
   assert.ok(!error, `create_expense: ${error?.message}`);
   const { data: row } = await alice.client.from('expenses').select('category').eq('id', expId).single();
   assert.equal(row.category, 'boodschappen', 'de categorie is opgeslagen');
+});
+
+// --- Tijdlijn / prikbord (0054) — de nieuwste, hoogste-churn tabel -----------
+test('RLS: tijdlijnbericht + foto zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_tl');
+  const bob = await makeUser('bob_tl');     // huisgenoot
+  const eve = await makeUser('eve_tl');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Tijdlijnhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: post, error } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Hoi huis!', visibility: 'household' })
+    .select().single();
+  assert.ok(!error, `post: ${error?.message}`);
+
+  // Foto-rij (kind-tabel, erft de zichtbaarheid van de parent-post).
+  const { error: phErr } = await alice.client.from('timeline_photos')
+    .insert({ household_id: hh.id, post_id: post.id, photo_path: `${hh.id}/${post.id}/x.jpg`, position: 0 });
+  assert.ok(!phErr, `foto: ${phErr?.message}`);
+
+  const bobSees = await bob.client.from('timeline_posts').select('id').eq('id', post.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet het bericht');
+  const bobPhoto = await bob.client.from('timeline_photos').select('id').eq('post_id', post.id);
+  assert.equal(bobPhoto.data?.length, 1, 'huisgenoot ziet de foto-rij (erft post-zichtbaarheid)');
+
+  const eveSees = await eve.client.from('timeline_posts').select('id').eq('id', post.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet het bericht NIET');
+  const evePhoto = await eve.client.from('timeline_photos').select('id').eq('post_id', post.id);
+  assert.equal(evePhoto.data?.length ?? 0, 0, 'buitenstaander ziet de foto-rij NIET');
+});
+
+// --- Uitnodigingen (0053) — de toetredingsroute zelf moet waterdicht zijn -----
+test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander buitenspel', opts, async () => {
+  const alice = await makeUser('alice_inv');   // owner
+  const bob = await makeUser('bob_inv');       // wordt lid
+  const eve = await makeUser('eve_inv');        // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Invitehuis');
+
+  // Buitenstaander mag geen invite voor een vreemd huishouden maken (is_owner faalt).
+  const { error: eveErr } = await eve.client.rpc('create_invite', { p_household_id: hh.id, p_role: 'member' });
+  assert.ok(eveErr, 'een buitenstaander mag geen invite voor een vreemd huishouden maken');
+
+  // Owner maakt een invite; Bob wisselt 'm in (wordt lid).
+  const { data: inv, error: cErr } = await alice.client.rpc('create_invite', { p_household_id: hh.id, p_role: 'member' });
+  assert.ok(!cErr, `invite maken: ${cErr?.message}`);
+  const { error: aErr } = await bob.client.rpc('accept_invite', { p_token: inv.token });
+  assert.ok(!aErr, `accept: ${aErr?.message}`);
+
+  // Single-use: Eve kan hetzelfde token niet alsnog inwisselen.
+  const { error: reuseErr } = await eve.client.rpc('accept_invite', { p_token: inv.token });
+  assert.ok(reuseErr, 'een al gebruikt invite-token mag niet opnieuw worden ingewisseld');
+  const eveMember = await eve.client.from('household_members')
+    .select('profile_id').eq('household_id', hh.id).eq('profile_id', eve.id);
+  assert.equal(eveMember.data?.length ?? 0, 0, 'Eve is geen lid geworden via een gebruikt token');
 });

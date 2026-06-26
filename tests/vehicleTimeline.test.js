@@ -13,6 +13,14 @@ test('dayKeyOf: lokale dag-sleutel, null bij leeg/ongeldig', () => {
   assert.equal(dayKeyOf('geen-datum'), null);
 });
 
+test('dayKeyOf: datum-only string is tijdzone-veilig, timestamp blijft lokaal', () => {
+  // '2026-06-01' is een kalenderdag; mag onder een negatieve-offset-zone niet 31 mei worden
+  // (zie tests/register.mjs — de suite draait gepind op zo'n zone).
+  assert.equal(dayKeyOf('2026-06-01'), '2026-06-01');
+  // Een volledige timestamp blijft lokaal afgelezen (instant → lokale kalenderdag).
+  assert.equal(dayKeyOf('2026-06-22T08:30:00'), '2026-06-22');
+});
+
 test('relativeDayLabel: vandaag/gisteren/anders', () => {
   const now = new Date('2026-06-25T12:00:00');
   assert.equal(relativeDayLabel('2026-06-25', now), 'today');
@@ -45,6 +53,19 @@ test('buildVehicleTimeline: voegt 3 bronnen samen, nieuwste eerst', () => {
   assert.equal(entries[1].kind, 'taak');
   assert.equal(entries[3].kind, 'mijlpaal');
   assert.equal(entries[3].title, 'Eerste toelating (RDW)');
+});
+
+test('buildVehicleTimeline: sorteer-vergelijker is stabiel — invoervolgorde maakt niet uit', () => {
+  // Forceert beide takken van de vergelijker: dezelfde entries in omgekeerde volgorde
+  // moeten dezelfde nieuwste-eerst-uitkomst geven (anders overleeft een </> -mutant).
+  const logs = [
+    { id: 'oud', performed_on: '2024-01-10' },
+    { id: 'mid', performed_on: '2025-03-15' },
+    { id: 'nieuw', performed_on: '2026-06-01' },
+  ];
+  const order = (ls) => buildVehicleTimeline({ logs: ls }).map((e) => e.id);
+  assert.deepEqual(order(logs), ['log:nieuw', 'log:mid', 'log:oud']);
+  assert.deepEqual(order([...logs].reverse()), ['log:nieuw', 'log:mid', 'log:oud']);
 });
 
 test('buildVehicleTimeline: lege bronnen → lege lijst; geen eerste-toelating → geen mijlpaal', () => {

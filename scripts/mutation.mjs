@@ -25,6 +25,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
+// Pure data (Stryker-vrij) — zie scripts/mutation-groups.mjs. Lokale bindingen + her-export
+// zodat scripts/mutation-check.mjs (`from './mutation.mjs'`) ongewijzigd blijft werken.
+import { GROUPS, MUTATED_SOURCES, selectGroups } from './mutation-groups.mjs';
+
+export { GROUPS, MUTATED_SOURCES, selectGroups };
 
 // V8 compile-cache: elke mutant start een vers `node`-proces dat dezelfde modules
 // (date-fns!) opnieuw inlaadt. Eén gedeelde, absolute cache laat die processen de
@@ -33,80 +38,6 @@ import path from 'node:path';
 process.env.NODE_COMPILE_CACHE ||= path.resolve('node_modules/.cache/huishoek-mutation-cc');
 
 const CORES = os.cpus()?.length || 4;
-
-// In-scope: pure, (vrijwel) dep-loze logica met een bijbehorende unit-test.
-// Gegroepeerd per testfile: { test, srcs, exclude? }.
-//   - test:    basisnaam van tests/<test>.test.js
-//   - srcs:    bronbestanden die deze test geacht wordt af te dekken
-//   - exclude: mutators die voor deze groep ruis opleveren (zie i18n: vertaaldata)
-//
-// Bewust NIET gemuteerd: React-gekoppelde lagen (lib/use*.js, lib/ui.js, schermen,
-// componenten) — die hebben geen unit-tests en zouden alleen "survived" ruis geven.
-// De RLS-integratietest vereist secrets/egress en valt buiten pure logica.
-export const GROUPS = [
-  { test: 'activity', srcs: ['lib/activity.js'] },
-  { test: 'agenda', srcs: ['lib/agenda.js'] },
-  { test: 'appRoute', srcs: ['lib/appRoute.js'] },
-  { test: 'barcode', srcs: ['lib/barcode.js'] },
-  { test: 'buyFrequency', srcs: ['lib/buyFrequency.js'] },
-  { test: 'choreLibrary', srcs: ['lib/choreLibrary.js'] },
-  { test: 'cleaningTemplates', srcs: ['lib/cleaningTemplates.js'] },
-  { test: 'dataCache', srcs: ['lib/dataCache.js'] },
-  { test: 'decisions', srcs: ['lib/decisions.js'] },
-  { test: 'expenses', srcs: ['lib/expenses.js'] },
-  { test: 'fairness', srcs: ['lib/fairness.js'] },
-  { test: 'favoriteGroceries', srcs: ['lib/favoriteGroceries.js'] },
-  // i18n.js is grotendeels vertaaldata; StringLiteral-mutaties daarop zijn ruis.
-  { test: 'i18n', srcs: ['lib/i18n.js'], exclude: ['StringLiteral'] },
-  { test: 'insights', srcs: ['lib/insights.js'] },
-  { test: 'invites', srcs: ['lib/invites.js'] },
-  { test: 'mealPlan', srcs: ['lib/mealPlan.js'] },
-  { test: 'modules', srcs: ['lib/modules.js'] },
-  { test: 'navMeta', srcs: ['lib/navMeta.js'] },
-  { test: 'notifications', srcs: ['lib/notifications.js'] },
-  { test: 'offCatalog', srcs: ['lib/offCatalog.js'] },
-  { test: 'offDelta', srcs: ['lib/offDelta.js'] },
-  { test: 'pantry', srcs: ['lib/pantry.js'] },
-  { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
-  { test: 'plantCare', srcs: ['lib/plantCare.js'] },
-  { test: 'plantPhoto', srcs: ['lib/plantPhoto.js'] },
-  { test: 'plantTimeline', srcs: ['lib/plantTimeline.js'] },
-  { test: 'priceTrack', srcs: ['lib/priceTrack.js'] },
-  { test: 'productMatch', srcs: ['lib/productMatch.js'] },
-  { test: 'realtimePatch', srcs: ['lib/realtimePatch.js'] },
-  { test: 'recurrence', srcs: ['lib/recurrence.js'] },
-  { test: 'recurringExpense', srcs: ['lib/recurringExpense.js'] },
-  { test: 'reservations', srcs: ['lib/reservations.js'] },
-  { test: 'rotation', srcs: ['lib/rotation.js'] },
-  { test: 'timeline', srcs: ['lib/timeline.js'] },
-  { test: 'visibility', srcs: ['lib/visibility.js'] },
-  // offCategoryMap.js is een token-regeltabel (data); StringLiteral-mutaties op die
-  // tokens zijn ruis — de test dekt de match-LOGICA + representatieve mappings, niet
-  // elk los token. Zelfde redenering als i18n.
-  { test: 'catalogCategory', srcs: ['lib/offCategoryMap.js'], exclude: ['StringLiteral'] },
-  { test: 'constants-sync', srcs: ['lib/constants.js'] },
-  // groceryCatalog.js is grotendeels een data-tabel (productnamen/emoji's); StringLiteral-
-  // mutaties daarop zijn ruis, zelfde redenering als i18n. De helper-LOGICA wordt wél gemuteerd.
-  { test: 'groceryCatalog', srcs: ['lib/groceryCatalog.js'], exclude: ['StringLiteral'] },
-  { test: 'productImage', srcs: ['lib/productImage.js'] },
-  { test: 'quantity', srcs: ['lib/quantity.js'] },
-  { test: 'groceryCount', srcs: ['lib/groceryCount.js'] },
-  { test: 'groceryList', srcs: ['lib/groceryList.js'] },
-  { test: 'widgets', srcs: ['lib/widgets/grid.js', 'lib/widgets/summaries.js'] },
-  // colorSchemes.js is een kleur/stijl-datatabel; StringLiteral = hex/kleurnamen (data).
-  { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },
-  { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
-  { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
-];
-
-// Alle muteerbare bronbestanden (voor het mappen van gewijzigde bestanden → groepen).
-export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
-
-// Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
-export function selectGroups(filter) {
-  if (!filter) return GROUPS;
-  return GROUPS.filter((g) => g.test.includes(filter) || g.srcs.some((s) => s.includes(filter)));
-}
 
 // Hoeveel mutanten Stryker tegelijk draait. Elke mutant is een vers node-proces dat
 // tijdens het laden van date-fns even op I/O wacht; licht oversubscriben (2× cores)
@@ -135,17 +66,25 @@ async function runGroup(group) {
   return stryker.runMutationTest();
 }
 
-// Tel een MutantResult[] om naar { killed, survived, total, score } (score in %).
+// Tel een MutantResult[] om naar { killed, survived, total, timeout, score } (score in %).
 // Ignored/NoCoverage tellen niet mee (geen test draaide ze).
+//
+// Timeout telt als killed: een mutant die een hang/oneindige lus veroorzaakt (bv. een
+// gemuteerde lus-grens) is door de tests "gevangen" doordat het proces de tijdslimiet
+// raakt — dat is een echte kill, geen survivor. We hebben die limiet dus nodig (anders
+// hangt de hele run op zo'n mutant). We tellen timeouts wél apart, zodat zichtbaar is of
+// een trage runner de score via timeouts opblaast i.p.v. via echte test-falingen.
 export function tallyMutants(mutants) {
   let killed = 0;
+  let timeout = 0;
   let total = 0;
   for (const m of mutants) {
     if (m.status === 'Ignored' || m.status === 'NoCoverage') continue;
     total += 1;
+    if (m.status === 'Timeout') timeout += 1;
     if (m.status === 'Killed' || m.status === 'Timeout') killed += 1;
   }
-  return { killed, survived: total - killed, total, score: total ? (killed / total) * 100 : 0 };
+  return { killed, survived: total - killed, total, timeout, score: total ? (killed / total) * 100 : 0 };
 }
 
 // Draai de gegeven groepen (sequentieel) en geef per bronbestand de resultaten + score.
@@ -204,14 +143,15 @@ async function main() {
   const rows = Object.entries(scores).map(([file, s]) => ({ file, ...s })).sort((a, b) => a.score - b.score);
   let gKilled = 0;
   let gTotal = 0;
+  let gTimeout = 0;
   console.log('\n=== Mutatie-score per module (zwakste eerst) ===');
   console.log('score%  killed/total  survived  module');
   for (const r of rows) {
-    gKilled += r.killed; gTotal += r.total;
+    gKilled += r.killed; gTotal += r.total; gTimeout += r.timeout ?? 0;
     console.log(`${r.score.toFixed(1).padStart(6)}  ${`${r.killed}/${r.total}`.padStart(11)}  ${String(r.survived).padStart(8)}  ${r.file}`);
   }
   console.log('-----------------------------------------------');
-  console.log(`TOTAAL: ${gTotal ? ((gKilled / gTotal) * 100).toFixed(2) : '0'}%  (${gKilled}/${gTotal})  survived=${gTotal - gKilled}`);
+  console.log(`TOTAAL: ${gTotal ? ((gKilled / gTotal) * 100).toFixed(2) : '0'}%  (${gKilled}/${gTotal})  survived=${gTotal - gKilled}  timeout-kills=${gTimeout}`);
   console.log('\nGecombineerd rapport: reports/mutation/mutation.json');
   process.exit(errors.length ? 1 : 0);
 }
