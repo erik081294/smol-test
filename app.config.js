@@ -36,7 +36,16 @@ export default ({ config }) => ({
   // streamt binnen bij navigatie. Korter "grijs scherm" bij opstarten. Op
   // 'development' gescoped → productie-builds bundelen gewoon eager (geen impact).
   experiments: { asyncRoutes: 'development' },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-font', 'expo-localization', '@sentry/react-native'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    'expo-font',
+    'expo-localization',
+    // Sentry-config-plugin schrijft sentry.properties voor de native source-map-upload.
+    // org/project/url staan hier; de auth-token NOOIT hier (zou gecommit worden) → via de
+    // SENTRY_AUTH_TOKEN-env op de EAS-build. url = EU-region (project leeft op de.sentry.io).
+    ['@sentry/react-native', { organization: 'evdn', project: 'huishoek', url: 'https://de.sentry.io/' }],
+  ],
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,

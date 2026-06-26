@@ -372,3 +372,19 @@ de docs (zie [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-
   unit-test (7 cases) + een echte git-smoke (comment-only `fairness` overgeslagen, echte wijziging
   `quantity` wél gemuteerd).
 - **EAS (PR #62).** Build-profielen aan de production-environment gekoppeld (`eas.json`).
+
+---
+
+**Sentry gekoppeld — INF-4 DSN + source-map-upload (2026-06-26).**
+- **Project aangemaakt** via de Sentry-MCP: `evdn/huishoek` (platform react-native, team `evdn`),
+  EU-region `de.sentry.io`. DSN uitgelezen en als `EXPO_PUBLIC_SENTRY_DSN` in `.env` gezet
+  (publieke client-waarde; `.env` is gitignored) + gedocumenteerd in `.env.example`.
+- **Source-map-upload bedraad.** `metro.config.js` draait nu via `getSentryExpoConfig`
+  (genereert de maps + injecteert debug-ID's, met behoud van de OTEL-resolver-stub); de
+  `@sentry/react-native`-config-plugin kreeg `{ organization, project, url }` zodat de native
+  build `sentry.properties` schrijft. Auth via `SENTRY_AUTH_TOKEN` als EAS-env (sensitive),
+  nooit in git. Ontbreekt de token → build draait door, upload wordt overgeslagen.
+- **Runbook** in [`docs/eas-setup.md`](docs/eas-setup.md) (Sentry-sectie: beide env-vars,
+  publiek vs. secret, `eas env:create`-commando's). De app-laag (`lib/monitoring.js` env-gated,
+  `ErrorBoundary`) stond al uit plan 08. **Rest:** `SENTRY_AUTH_TOKEN` als EAS-env + eerste
+  build die maps uploadt, en een crash op toestel terugzien in Sentry.
