@@ -22,7 +22,9 @@ import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { validateVisibility } from '../../lib/visibility';
+import { visibilityRule } from '../../lib/visibility';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText, when } from '../../lib/formValidation';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { useToast } from '../../lib/toast';
@@ -90,9 +92,9 @@ export default function PetScreen() {
   const [shareWith, setShareWith] = useState([]);
   const [photoAsset, setPhotoAsset] = useState(null);
   const [care, setCare] = useState(() => initCareState('hond'));
-  const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState({});
-  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
 
   // Soort kiezen → de voorgestelde verzorging-checklist meteen opnieuw opzetten.
   const chooseKind = (key) => { setPetKind(key); setCare(initCareState(key)); };
@@ -103,13 +105,12 @@ export default function PetScreen() {
   const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
-    const e = {};
-    if (!name.trim()) e.name = t('pet.error.name');
-    if (birthDate && !DATE_RE.test(birthDate.trim())) e.birth = t('pet.error.birth');
-    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) e.visibility = visError;
-    setErrors(e);
-    if (Object.keys(e).length) { haptics.error(); return; }
+    const ok = validate([
+      requiredText('name', t('pet.error.name')),
+      when('birth', (v) => !v.birthDate || DATE_RE.test(v.birthDate.trim()), t('pet.error.birth')),
+      visibilityRule('visibility'),
+    ], { name, birthDate, visibility, shareSubgroupId, shareWith });
+    if (!ok) return;
     setBusy(true);
     try {
       const careKeys = Object.entries(care).filter(([, v]) => v.on).map(([k]) => k);

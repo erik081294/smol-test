@@ -19,7 +19,9 @@ import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { validateVisibility } from '../../lib/visibility';
+import { visibilityRule } from '../../lib/visibility';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText, when } from '../../lib/formValidation';
 import { careCard } from '../../lib/plantCare';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -50,9 +52,9 @@ export default function PlantScreen() {
   const [shareSubgroupId, setShareSubgroupId] = useState(null);
   const [shareWith, setShareWith] = useState([]);
   const [photoAsset, setPhotoAsset] = useState(null); // { uri, base64, ext } of null
-  const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState({}); // inline validatie i.p.v. Alert
-  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, setErrors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
 
   const matches = useMemo(() => searchSpecies(species, query).slice(0, 8), [species, query]);
   const chosen = species.find((s) => s.id === speciesId) ?? null;
@@ -65,15 +67,12 @@ export default function PlantScreen() {
   const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
-    const e = {};
-    if (!name.trim()) e.name = t('plant.error.name');
-    if (!speciesId && !(parseInt(waterDays, 10) > 0)) {
-      e.water = t('plant.error.water');
-    }
-    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) e.visibility = visError;
-    setErrors(e);
-    if (Object.keys(e).length) { haptics.error(); return; }
+    const ok = validate([
+      requiredText('name', t('plant.error.name')),
+      when('water', (v) => !!v.speciesId || parseInt(v.waterDays, 10) > 0, t('plant.error.water')),
+      visibilityRule('visibility'),
+    ], { name, speciesId, waterDays, visibility, shareSubgroupId, shareWith });
+    if (!ok) return;
     setBusy(true);
     try {
       await addPlant({
@@ -189,7 +188,7 @@ export default function PlantScreen() {
     setEditing(true);
   };
   const saveEdit = async () => {
-    if (!name.trim()) { setErrors({ name: t('plant.error.name') }); haptics.error(); return; }
+    if (!validate([requiredText('name', t('plant.error.name'))], { name })) return;
     setEditBusy(true);
     try {
       const patch = { name: name.trim(), species_id: speciesId, location };
