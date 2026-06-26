@@ -19,6 +19,8 @@ import { parseAmount } from '../../lib/quantity';
 import { Icon } from '../../lib/icons';
 import { colors, space, type, radius } from '../../lib/theme';
 import { success, error as hapticError } from '../../lib/haptics';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText } from '../../lib/formValidation';
 import { UNITS } from '../../lib/constants';
 import { t, plural } from '../../lib/i18n';
 
@@ -90,8 +92,9 @@ function RecipeEditor() {
   const [sourceUrl, setSourceUrl] = useState('');
   const [mealMoment, setMealMoment] = useState(null);
   const [dishType, setDishType] = useState(null);
-  const [titleError, setTitleError] = useState(null);
-  const [busy, setBusy] = useState(false);
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
   const [loaded, setLoaded] = useState(isNew);
   // Omslagfoto (MLT-3): nieuw recept bewaart het asset tot opslaan; bestaand recept
   // uploadt meteen. `photoNonce` forceert een verse signed URL na vervangen.
@@ -203,7 +206,7 @@ function RecipeEditor() {
   };
 
   const save = async () => {
-    if (!title.trim()) { setTitleError(t('recipe.error.title')); hapticError(); return; }
+    if (!validate([requiredText('title', t('recipe.error.title'))], { title })) return;
     setBusy(true);
     try {
       if (isNew) {
@@ -265,8 +268,8 @@ function RecipeEditor() {
           </Pressable>
 
           <Field label={t('recipe.field.title')} value={title}
-            onChangeText={(x) => { setTitle(x); if (titleError) setTitleError(null); }}
-            placeholder={t('recipe.field.title.placeholder')} autoFocus={isNew} error={titleError} />
+            onChangeText={(x) => { setTitle(x); clearErr('title'); }}
+            placeholder={t('recipe.field.title.placeholder')} autoFocus={isNew} error={errors.title} />
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recipe.field.servings')}</Text>
           <Stepper value={servings} onChange={setServings} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
