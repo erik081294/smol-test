@@ -1,0 +1,8 @@
+# Cloudflare Pages — forceer JSON content-type op de associatiebestanden. De AASA heeft
+# bewust geen extensie (Apple-vereiste), dus Cloudflare zou 'm anders als octet-stream/
+# plain serveren; iOS/Android verwachten application/json.
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+
+/.well-known/assetlinks.json
+  Content-Type: application/json

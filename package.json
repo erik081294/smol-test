@@ -7,6 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "export:web": "expo export --platform web",
+    "deploy:web": "expo export --platform web && npx wrangler pages deploy dist --project-name=huishoek",
     "device": "bash scripts/dev-device.sh",
     "test": "node --import ./tests/register.mjs --test tests/*.test.js",
     "test:mutation": "node scripts/mutation.mjs",
