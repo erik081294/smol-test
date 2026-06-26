@@ -38,6 +38,12 @@ jobs:
         # React-compiler-regels staan bewust op "warn" (zie eslint.config.js).
         run: npx eslint .
 
+      - name: Typecheck
+        # Opt-in type-laag (// @ts-check) over de pure logica-modules, gescoped via
+        # tsconfig.check.json. Vangt verkeerde shapes/arg-fouten vóór de tests.
+        # Goedkoop-dan-duur: enkele seconden, dus vóór de (tragere) testsuite.
+        run: npm run typecheck
+
       - name: Tests
         run: npm test
         env:

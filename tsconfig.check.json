@@ -1,0 +1,86 @@
+// CI-typecheck-poort voor de pure logica-laag. Apart van tsconfig.json (de IDE/Expo-
+// config) zodat de scope hier bewust smal is en de editor onaangeroerd blijft.
+//
+// - checkJs:false        → OPT-IN: alleen .js-bestanden met een `// @ts-check`-regel
+//                          worden gecontroleerd. Zo rollen we incrementeel uit zonder
+//                          een lawine over alle 115 lib-bestanden + de React-schil.
+// - strictNullChecks:true → vangt de hoogwaarde-bug: dereferencen van iets dat
+//                          undefined/null kan zijn (bv. .find(...) dat niets vindt).
+// - allowJs/noEmit/moduleResolution erven van expo/tsconfig.base via ./tsconfig.json.
+//   noImplicitAny blijft uit (geen `strict`), zodat niet-geannoteerde params geen ruis
+//   geven; aanscherpen is een latere ratchet-stap.
+//
+// Scope = EXACT de pure logica-modules uit GROUPS/MUTATED_SOURCES (scripts/mutation-
+// groups.mjs) — dezelfde laag die de mutatie-ratchet bewaakt. De React-schil
+// (lib/use*.js, componenten, lib/ui.js, schermen) en de Deno-edge-function index.ts
+// vallen hier bewust buiten: die trekken RN/JSX (en third-party .tsx-source) de
+// typegraaf in. De meta-test tests/typecheckCoverage.test.js bewaakt dat deze lijst
+// en MUTATED_SOURCES niet uit elkaar lopen.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "checkJs": false,
+    "strict": false
+  },
+  "include": [
+    "lib/activity.js",
+    "lib/agenda.js",
+    "lib/appRoute.js",
+    "lib/barcode.js",
+    "lib/buyFrequency.js",
+    "lib/choreLibrary.js",
+    "lib/cleaningTemplates.js",
+    "lib/constants.js",
+    "lib/contrast.js",
+    "lib/dataCache.js",
+    "lib/decisions.js",
+    "lib/expenses.js",
+    "lib/fairness.js",
+    "lib/favoriteGroceries.js",
+    "lib/formValidation.js",
+    "lib/groceryCatalog.js",
+    "lib/groceryCount.js",
+    "lib/groceryList.js",
+    "lib/i18n.js",
+    "lib/insights.js",
+    "lib/invites.js",
+    "lib/mealPlan.js",
+    "lib/modules.js",
+    "lib/navMeta.js",
+    "lib/notifications.js",
+    "lib/offCatalog.js",
+    "lib/offCategoryMap.js",
+    "lib/offDelta.js",
+    "lib/pantry.js",
+    "lib/pendingDeletes.js",
+    "lib/petCare.js",
+    "lib/plantCare.js",
+    "lib/plantPhoto.js",
+    "lib/plantTimeline.js",
+    "lib/priceTrack.js",
+    "lib/productImage.js",
+    "lib/productMatch.js",
+    "lib/quantity.js",
+    "lib/rdw.js",
+    "lib/realtimeHub.js",
+    "lib/realtimePatch.js",
+    "lib/recurrence.js",
+    "lib/recurringExpense.js",
+    "lib/reservations.js",
+    "lib/rotation.js",
+    "lib/secureStorage.js",
+    "lib/timeline.js",
+    "lib/vehicleAppearance.js",
+    "lib/vehicleCare.js",
+    "lib/vehicleCosts.js",
+    "lib/vehicleSharing.js",
+    "lib/vehicleTimeline.js",
+    "lib/visibility.js",
+    "lib/yearHeatmap.js",
+    "lib/widgets/grid.js",
+    "lib/widgets/summaries.js",
+    "lib/widgets/colorSchemes.js",
+    "supabase/functions/notify/core.js",
+    "supabase/functions/scan-receipt/core.js"
+  ]
+}

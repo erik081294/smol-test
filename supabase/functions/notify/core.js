@@ -1,3 +1,4 @@
+// @ts-check
 // Pure, testbare kern voor de `notify` Edge Function (PLT-1, trap 2 — remote push).
 //
 // Géén Deno/Supabase/network: dit bepaalt alleen WELKE push naar WIE moet, gegeven

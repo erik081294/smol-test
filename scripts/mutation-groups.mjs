@@ -97,7 +97,9 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 //   - perfAggregates: dekt aggregatie ín expenses + fairness, die hun eigen groep hebben.
 //   - rls.integration: integratietest tegen live Supabase (secrets/egress), geen pure logica.
 //   - groupsCoverage: meta-test op deze lijst zelf, geen lib-module om te muteren.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage'];
+//   - typecheckCoverage: meta-test op de type-laag (// @ts-check + tsconfig.check.json),
+//     geen lib-module om te muteren.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
