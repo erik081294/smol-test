@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
-import { ScreenHeader, Card, Avatar, FAB, Empty, ListSkeleton } from '../../lib/ui';
+import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
 
@@ -71,7 +71,8 @@ export default function Tijdlijn() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('timeline.title')} subtitle={t('timeline.subtitle')} />
+      <ScreenHeader title={t('timeline.title')} subtitle={t('timeline.subtitle')}
+        right={<ModuleHelpButton module="tijdlijn" />} />
       <FlatList
         data={posts}
         keyExtractor={(it) => it.id}
@@ -94,7 +95,11 @@ export default function Tijdlijn() {
           />
         )}
       />
-      <FAB label={t('timeline.fab')} accessibilityLabel={t('timeline.compose.title')} onPress={() => router.push('/tijdlijn/compose')} />
+      {/* Lege-staat dedupe (DESIGN.md principe 4): de Empty-CTA draagt de primaire
+          actie bij een leeg prikbord; de FAB komt pas terug zodra er berichten zijn. */}
+      {posts.length > 0 ? (
+        <FAB label={t('timeline.fab')} accessibilityLabel={t('timeline.compose.title')} onPress={() => router.push('/tijdlijn/compose')} />
+      ) : null}
     </SafeAreaView>
   );
 }

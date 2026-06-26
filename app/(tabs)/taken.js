@@ -13,7 +13,7 @@ import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
 import { PeriodPicker } from '../../lib/PeriodPicker';
 import {
-  Empty, Chip, FAB, ScreenHeader, IconButton, SegmentedControl, SectionHeader,
+  Empty, Chip, FAB, ScreenHeader, IconButton, ModuleHelpButton, SegmentedControl, SectionHeader,
   BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner, SheetScrollView,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
@@ -286,8 +286,12 @@ export default function Taken() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('tasks.title')} subtitle={t('tasks.subtitle')}
-        right={<IconButton icon="library" accessibilityLabel={t('chores.library')}
-          tint={colors.forest} onPress={() => setLibraryOpen(true)} />} />
+        right={
+          <ModuleHelpButton
+            module="taken"
+            actions={[{ label: t('chores.library'), icon: 'library', onPress: () => setLibraryOpen(true) }]}
+          />
+        } />
 
       {/* Tijdscope-switcher (TKN-1) */}
       <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>

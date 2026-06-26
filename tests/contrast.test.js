@@ -50,4 +50,10 @@ for (const [theme, c] of [['licht', lightColors], ['donker', darkColors]]) {
   test(`contrast (${theme}): toast-tekst op toast-bg haalt AA-tekst`, () => {
     atLeast(c.toastText, c.toastBg, AA_TEXT, `${theme} toast`);
   });
+
+  test(`contrast (${theme}): kenteken-plaatje (donkere tekst op ocher) haalt AA-tekst`, () => {
+    // Badge tone="plate" — een geel NL-plaatje met hardgecodeerde donkere tekst
+    // (#1A2420), bewust thema-onafhankelijk. Borgt dat het op ocher leesbaar blijft.
+    atLeast('#1A2420', c.ocher, AA_TEXT, `${theme} kenteken-plaatje`);
+  });
 }

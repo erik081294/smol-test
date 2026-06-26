@@ -500,3 +500,24 @@ In vier assen opgetrokken naar één gedeelde laag, elk los gemerged met groene 
   week-wissel werkt (`useMealPlan`, venster-keyed). `usePurchases` = identiek patroon.
 Geen crashes/red-boxes; **geen fixes nodig.** Daarna #74–#77 gemerged → `main` in balans (0 open PR's,
 alle branches volledig in main).
+
+**Design-politoer o.b.v. screenshot-review (2026-06-26).** Per-scherm doorlichting van de rooktest-
+screenshots → één getierd verbeterplan, uitgevoerd binnen het design-systeem (analyse +
+uitvoeringsstatus in [`docs/design-review-2026-06-26.md`](docs/design-review-2026-06-26.md)). Gebouwd:
+- **Module-explainer (cross-module).** Nieuwe `ModuleHelpButton` (`lib/ui.js`) + content in
+  [`lib/moduleHelp.js`](lib/moduleHelp.js); in alle 12 module-headers. Vervangt de losse, cryptische
+  kop-icoonknoppen; Kosten (Inzichten/Terugkerend), Planten/Huisdieren (tijdlijn) en Taken
+  (klusbibliotheek) landen nu als gelabelde acties ín de uitleg-drawer.
+- **Plant-tijdlijn.** Geen "Geen notitie"-tekst meer; "door wie" toegevoegd; **Lijst/Groot**-
+  weergavetoggle (Reddit-stijl); notitie-only in Groot = leesbare tekstkaart i.p.v. beeld-placeholder;
+  wit notitie-icoon op de groene vlek (`app/plant/[id].js`).
+- **Tier 1/2.** Login-link wit+onderstreept (AA in beide thema's); middot-spatiëring Kosten; eigen
+  `pinboard`-icoon voor Tijdlijn (los van de voeding-leaf); compacte lege weekmenu-dagen + sterkere
+  vandaag-indicator (hele week in één blik); lege-staat dedupe (FAB verborgen bij lege lijst) op
+  Huisdieren/Tijdlijn/Kosten/Voertuigen; geel kenteken-plaatje (`Badge` tone `plate`) + contrast-test;
+  Verzorgingskaart in `Collapsible`; Kosten-widgettint van koel violet → warme bes.
+- **Herontwerpen.** Recepten-toevoegen → ocher FAB (uniform); Catalogus "Eerder gekozen"-× →
+  swipe-links (`SwipeRow`, a11y-actie behouden).
+- **Verificatie.** `typecheck` + **780 unit-tests** + volledige ESLint groen; geen mutatie-geteste
+  module geraakt. **Live op moto g72** bevestigd: explainer (Keuken+Kosten), weekmenu-compactie,
+  widget-tint, middot, plant-tijdlijn (Groot/notitiekaart/door-wie), Verzorgingskaart-Collapsible.

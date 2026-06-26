@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { useVehicles } from '../../lib/useVehicles';
-import { Empty, FAB, ScreenHeader, ItemRow, ListSkeleton, Badge, Row } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ListSkeleton, Badge, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { CarGlyph } from '../../lib/CarGlyph';
 import { colors, type, space } from '../../lib/theme';
@@ -34,7 +34,8 @@ export default function Voertuigen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('voertuigen.title')} subtitle={t('voertuigen.subtitle')} />
+      <ScreenHeader title={t('voertuigen.title')} subtitle={t('voertuigen.subtitle')}
+        right={<ModuleHelpButton module="voertuigen" />} />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}
@@ -54,7 +55,7 @@ export default function Voertuigen() {
               meta={
                 <Row gap={space.sm} wrap>
                   {sub ? <Text style={type.caption}>{sub}</Text> : null}
-                  {item.license_plate ? <Badge label={item.license_plate} tone="neutral" /> : null}
+                  {item.license_plate ? <Badge label={item.license_plate} tone="plate" /> : null}
                   {next ? (
                     <Text style={[type.caption, { color: colors.forest }]} numberOfLines={1}>
                       {t('vehicle.next', { label: dueLabel(next) })}
@@ -78,7 +79,11 @@ export default function Voertuigen() {
         }
       />
 
-      <FAB label={t('fab.vehicle')} accessibilityLabel={t('vehicle.add')} onPress={() => router.push('/vehicle/new')} />
+      {/* Lege-staat dedupe (DESIGN.md principe 4): de Empty-CTA draagt de primaire
+          actie bij een lege lijst; de FAB verschijnt pas zodra er voertuigen zijn. */}
+      {vehicles.length > 0 ? (
+        <FAB label={t('fab.vehicle')} accessibilityLabel={t('vehicle.add')} onPress={() => router.push('/vehicle/new')} />
+      ) : null}
     </SafeAreaView>
   );
 }

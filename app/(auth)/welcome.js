@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../lib/auth';
 import { isConfigured } from '../../lib/supabase';
@@ -83,12 +83,20 @@ export default function Welcome() {
             />
           </View>
 
-          <Button
-            variant="ghost"
-            title={mode === 'signup' ? t('auth.toggle.toSignin') : t('auth.toggle.toSignup')}
+          {/* Secundaire actie (inloggen ↔ account maken) als duidelijk zichtbare link:
+              wit (onDark) + onderstreping leest ruim AA op de forest-achtergrond in béíde
+              thema's — de oude ghost-knop gaf donkere ink-tekst op donkergroen (vrijwel
+              onzichtbaar), en ocherSoft zou in donkere modus onder AA zakken. */}
+          <Pressable
             onPress={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
-            style={{ marginTop: 16, borderColor: 'transparent' }}
-          />
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => ({ marginTop: 20, paddingVertical: 12, alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={{ color: colors.onDark, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' }}>
+              {mode === 'signup' ? t('auth.toggle.toSignin') : t('auth.toggle.toSignup')}
+            </Text>
+          </Pressable>
           {!isConfigured && (
             <Text style={{ color: colors.ocherSoft, textAlign: 'center', marginTop: 12, fontSize: 13 }}>
               {t('auth.notConfigured')}

@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
 import { TaskRow } from '../../lib/TaskRow';
 import { FairnessBars } from '../../lib/FairnessBars';
-import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ModuleHelpButton, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
@@ -111,7 +111,8 @@ export default function Schoonmaak() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('cleaning.title')} subtitle={t('cleaning.subtitle')} />
+      <ScreenHeader title={t('cleaning.title')} subtitle={t('cleaning.subtitle')}
+        right={<ModuleHelpButton module="schoonmaak" />} />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}

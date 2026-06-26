@@ -11,7 +11,7 @@ import { CATEGORIES, catalogByCategory, searchCatalog, itemByName } from '../lib
 import { recentProducts } from '../lib/favoriteGroceries';
 import { countOf } from '../lib/groceryCount';
 import { ProductImageView } from '../lib/ProductImageView';
-import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
+import { ModalHeader, Empty, Chip, Stepper, SwipeRow } from '../lib/ui';
 import { Icon } from '../lib/icons';
 import { SearchField } from '../lib/SearchField';
 import { animateNextLayout } from '../lib/motion';
@@ -24,11 +24,16 @@ const RECENT_CAP = 24;
 // Eén catalogus-/eerder-gekozen-rij. De stepper IS het mechaniek: zijn waarde is het
 // aantal dat op de boodschappenlijst staat (0 = er niet op). 0→n zet het op de lijst,
 // →0 haalt het eraf. Gememoiseerd zodat één tik niet de hele lijst hertekent.
+//
+// "Eerder gekozen"-rijen verwijder je nu door naar LINKS te vegen (de app-brede conventie:
+// links = verwijderen), i.p.v. een vaste × naast de stepper — dat ontruimt de rij en houdt
+// de stepper de enige knop. De veegactie is óók als accessibility-actie beschikbaar (SwipeRow).
 const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, onPrune }) {
   const onList = count >= 1;
-  return (
+  const row = (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
+      backgroundColor: colors.bg,
       borderBottomWidth: 1, borderBottomColor: colors.line,
     }}>
       <ProductImageView item={entry.image} size={40} />
@@ -36,20 +41,18 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
         <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
         {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
       </View>
-      <Row gap={space.xs} align="center">
-        <Stepper value={count} onChange={(v) => onSetCount(entry, v)} min={0} max={99}
-          accessibilityLabel={t('catalog.qty.for', { name: entry.name })} />
-        {entry.isRecent ? (
-          <Pressable onPress={() => onPrune(entry)} hitSlop={8} accessibilityRole="button"
-            accessibilityLabel={t('catalog.recent.remove', { name: entry.name })}
-            // Volwaardig 44pt-aanraakdoel (A11Y-2/A5) i.p.v. de eerdere krappe 28×36.
-            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="close" size={15} color={colors.inkFaint} />
-          </Pressable>
-        ) : null}
-      </Row>
+      <Stepper value={count} onChange={(v) => onSetCount(entry, v)} min={0} max={99}
+        accessibilityLabel={t('catalog.qty.for', { name: entry.name })} />
     </View>
   );
+  if (entry.isRecent) {
+    return (
+      <SwipeRow left={{ icon: 'delete', label: t('catalog.recent.remove', { name: entry.name }), color: colors.danger, onTrigger: () => onPrune(entry) }}>
+        {row}
+      </SwipeRow>
+    );
+  }
+  return row;
 });
 
 // Bladeren/zoeken in de gebundelde catalogus (lib/groceryCatalog). Picnic-stijl: schappen

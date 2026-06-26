@@ -15,9 +15,9 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useHousehold } from '../../lib/household';
 import { useToast } from '../../lib/toast';
 import {
-  Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
+  Empty, ScreenHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Chip, Row, Card, Button,
   Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
-  SegmentedControl, Avatar,
+  SegmentedControl, Avatar, FAB,
 } from '../../lib/ui';
 import { filterRecipes, MEAL_MOMENTS, DISH_TYPES, dishTypeMeta } from '../../lib/recipeCatalog';
 import { SearchField } from '../../lib/SearchField';
@@ -138,12 +138,37 @@ export default function Keuken() {
   const renderDay = (date) => {
     const dayEntries = byDay[date] ?? [];
     const today = isToday(parseISO(date));
+    const dayLabel = format(parseISO(date), 'EEEE d MMM', { locale: nl });
+
+    // Lege dag → compacte, tikbare rij (minder hoogte, zodat de hele week in één blik
+    // past — DESIGN.md principe 1). Vandaag krijgt een stip + dikkere forest-rand.
+    if (dayEntries.length === 0) {
+      return (
+        <Card onPress={() => setAddFor(date)} accessibilityLabel={t('meals.addForDay')} raised={false}
+          style={{
+            marginBottom: space.sm, paddingVertical: space.sm, paddingHorizontal: space.md,
+            borderColor: today ? colors.forest : colors.line, borderWidth: today ? 1.5 : 1,
+          }}>
+          <Row justify="space-between" align="center">
+            <Row gap={space.sm} align="center">
+              {today ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.forest }} /> : null}
+              <Text style={[type.title, { fontSize: 15 }, { color: today ? colors.forest : colors.inkSoft }]}>{dayLabel}</Text>
+            </Row>
+            <Icon name="add" size={18} color={colors.forest} />
+          </Row>
+        </Card>
+      );
+    }
+
     return (
-      <Card style={{ marginBottom: space.md, borderColor: today ? colors.forest : colors.line }}>
-        <Row justify="space-between" style={{ marginBottom: dayEntries.length ? space.sm : 0 }}>
-          <Text style={[type.title, today ? { color: colors.forest } : null]}>
-            {format(parseISO(date), 'EEEE d MMM', { locale: nl })}
-          </Text>
+      <Card style={{ marginBottom: space.md, borderColor: today ? colors.forest : colors.line, borderWidth: today ? 1.5 : 1 }}>
+        <Row justify="space-between" style={{ marginBottom: space.sm }}>
+          <Row gap={space.sm} align="center">
+            {today ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.forest }} /> : null}
+            <Text style={[type.title, today ? { color: colors.forest } : null]}>
+              {dayLabel}
+            </Text>
+          </Row>
           <IconButton icon="add" size={20} tint={colors.forest}
             accessibilityLabel={t('meals.addForDay')} onPress={() => setAddFor(date)} />
         </Row>
@@ -174,7 +199,8 @@ export default function Keuken() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('keuken.title')} subtitle={t('keuken.subtitle')} />
+      <ScreenHeader title={t('keuken.title')} subtitle={t('keuken.subtitle')}
+        right={<ModuleHelpButton module="maaltijden" />} />
 
       <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
         <SegmentedControl
@@ -227,6 +253,13 @@ export default function Keuken() {
           onDelete={onDeleteRecipe}
         />
       )}
+
+      {/* Uniforme toevoeg-affordance (DESIGN.md principe 5): Recepten gebruikt nu dezelfde
+          ocher FAB als elke andere module, i.p.v. een afwijkende grijze inline-knop. Het
+          Weekmenu houdt zijn eigen per-dag "+" en de "Boodschappen aanvullen"-actie. */}
+      {view === 'recepten' ? (
+        <FAB label={t('recipe.fab')} accessibilityLabel={t('recipe.new')} onPress={() => router.push('/recipe/new')} />
+      ) : null}
 
       <AddEntryModal
         date={addFor}
@@ -300,9 +333,6 @@ function RecipesView({ recipes, loading, onNew, onOpen, onDelete }) {
         data={filtered}
         keyExtractor={(r) => r.id}
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
-        }
         renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
         ListEmptyComponent={
           loading ? <ListSkeleton count={4} /> : hasFilter ? (

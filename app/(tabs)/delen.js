@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useResources } from '../../lib/useResources';
 import { useHousehold } from '../../lib/household';
-import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModalHeader, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModuleHelpButton, ModalHeader, BottomSheet, SheetScrollView } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { colors, space, type } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
@@ -22,7 +22,8 @@ export default function Delen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('share.title')} subtitle={t('share.subtitle')} />
+      <ScreenHeader title={t('share.title')} subtitle={t('share.subtitle')}
+        right={<ModuleHelpButton module="delen" />} />
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: 96 }}
         data={resources}
