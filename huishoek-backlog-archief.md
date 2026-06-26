@@ -159,6 +159,7 @@ Gegroepeerd per module (ID-prefix). Kolommen gelijk aan de canonieke tabel.
 |----|--------|---------|------|------|-------|--------|------|---------|
 | UXR-1 | UX-review | Ontleding: Vandaag / overzicht | 1.6 | Should | S | ✅ | — | **Teardown gedaan (2026-06-23).** `vandaag.js` is strak (VDG-epic): heldere 5-sec-lens (hero → focus → grid → "alles bekijken" → FAB), één primaire actie (FAB), nette affordances. Bevindingen → nieuwe rijen **UX-23** (veeg-acties op focus-taken, consistent met Taken) en **UX-24** (laad-skeleton bij koud laden). Lens: [`docs/plans/14`](docs/plans/14-ux-module-teardown.md). |
 | UXR-3 | UX-review | Ontleding: Boodschappen | 1.6 | Should | S | ✅ | — | **Teardown gedaan (2026-06-23).** `boodschappen.js` is compleet (snel toevoegen → product-hints → "misschien weer nodig" → afvinken → afgevinkte wissen + undo → vaste boodschappen/catalogus/bon). **Quick win meteen meegenomen:** `blurOnSubmit={false}` op de toevoegbalk zodat het toetsenbord openblijft voor razendsnel achter-elkaar toevoegen (matcht de DESIGN-intentie). Geen verdere doodlopende einden gevonden. Zie plan 14. |
+| UXR-2 | UX-review | Ontleding: Taken & de tasks-weergaven | 1.6 | Should | M | ✅ | — | **Teardown gedaan (2026-06-23/24).** STR-1 herijkt: Taken werd het centrale afspraken/agenda-oppervlak, de Agenda-tab vervalt. Bevindingen → **UX-22 t/m UX-41** (gebouwd, PR #41, op de moto geverifieerd 2026-06-24 — zie build-notities in [plan 14](docs/plans/14-ux-module-teardown.md)). Migr. `0039_tags` + `0040_recur_end` live. |
 
 ## VDG — Vandaag/UX
 
