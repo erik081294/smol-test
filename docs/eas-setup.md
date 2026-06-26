@@ -31,23 +31,37 @@ eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "<anon-key>"        
 
 Het Sentry-project (`evdn/huishoek`, EU-region `de.sentry.io`) en de app-bedrading staan
 klaar: `@sentry/react-native` als config-plugin (org/project/url in `app.config.js`),
-`metro.config.js` via `getSentryExpoConfig` (genereert source maps), en `lib/monitoring.js`
-dat Sentry alleen init zodra er een DSN is. Twee env-variabelen sturen het:
+`metro.config.js` via `getSentryExpoConfig` (genereert de source maps + debug-ID's), en
+`lib/monitoring.js` dat Sentry alleen init zodra er een DSN is. Twee dingen moeten kloppen:
+de **runtime-DSN** (zodat de app rapporteert) en de **source-map-upload** (zodat stack traces
+gesymboliceerd zijn).
 
-| Variabele | Soort | Waar | Doel |
-| --- | --- | --- | --- |
-| `EXPO_PUBLIC_SENTRY_DSN` | **publiek** (in de bundle) | `.env` + EAS-env | runtime-init; leeg = monitoring uit (no-op) |
-| `SENTRY_AUTH_TOKEN` | **secret**, build-time | EAS-env (sensitive) | source-map-upload tijdens de native build |
+### 1. Runtime-DSN — `EXPO_PUBLIC_SENTRY_DSN`
+
+Publieke client-waarde (mag in de bundle). Zonder DSN init't `lib/monitoring.js` niet en is
+alle monitoring een no-op. Lokaal komt 'ie uit `.env`; voor cloud-builds als EAS-env:
 
 ```sh
-eas env:create --name EXPO_PUBLIC_SENTRY_DSN --value "<DSN>"        --visibility plaintext --environment production --environment preview --environment development
-eas env:create --name SENTRY_AUTH_TOKEN      --value "<auth-token>" --visibility sensitive --environment production --environment preview
+eas env:create --name EXPO_PUBLIC_SENTRY_DSN --value "<DSN>" --visibility plaintext --environment production --environment preview --environment development
 ```
 
-De DSN staat in Sentry onder *Project Settings → Client Keys (DSN)*; de auth-token maak je
-onder *Settings → Auth Tokens* (org-token met `project:releases`). Ontbreekt de token, dan
-draait de build gewoon door — alleen de source-map-upload wordt overgeslagen (stack traces
-blijven dan ongesymboliceerd). Zet de token **nooit** in `app.config.js`/git.
+> **Live (2026-06-26):** staat als EAS-env op `@evdns-team/huishoek` (production/preview/development).
+> De DSN vind je in Sentry onder *Project Settings → Client Keys (DSN)*.
+
+### 2. Source-map-upload — via de EAS↔Sentry-integratie
+
+De **EAS-dashboard-integratie** (Expo-UI → project → Sentry koppelen) regelt dit en is de
+**actieve route**: EAS uploadt de maps zelf na de build via de gekoppelde Sentry-account en zet
+daarvoor automatisch `SENTRY_DISABLE_AUTO_UPLOAD=true` als EAS-env — dat vertelt de in-build
+plugin om níét óók te uploaden (anders dubbel/conflict). Je hoeft dan **geen
+`SENTRY_AUTH_TOKEN` te beheren**.
+
+> **Alternatief (zonder dashboard-integratie):** zet zelf een org-auth-token
+> (`SENTRY_AUTH_TOKEN`, Sentry → *Settings → Auth Tokens*, scope `project:releases`) als
+> EAS-env (sensitive) en laat `SENTRY_DISABLE_AUTO_UPLOAD` weg — dan uploadt de config-plugin
+> tijdens de native build via `sentry.properties` (org/project/url uit `app.config.js`). Zet de
+> token **nooit** in `app.config.js`/git. Ontbreekt zowel de integratie als de token, dan draait
+> de build door maar blijven stack traces ongesymboliceerd.
 
 ## Preview build — snelste test op je telefoon (geen dev-server)
 

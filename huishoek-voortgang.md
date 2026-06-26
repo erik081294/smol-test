@@ -380,12 +380,16 @@ de docs (zie [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-
 - **Project aangemaakt** via de Sentry-MCP: `evdn/huishoek` (platform react-native, team `evdn`),
   EU-region `de.sentry.io`. DSN uitgelezen en als `EXPO_PUBLIC_SENTRY_DSN` in `.env` gezet
   (publieke client-waarde; `.env` is gitignored) + gedocumenteerd in `.env.example`.
-- **Source-map-upload bedraad.** `metro.config.js` draait nu via `getSentryExpoConfig`
+- **Source-map-generatie bedraad.** `metro.config.js` draait nu via `getSentryExpoConfig`
   (genereert de maps + injecteert debug-ID's, met behoud van de OTEL-resolver-stub); de
-  `@sentry/react-native`-config-plugin kreeg `{ organization, project, url }` zodat de native
-  build `sentry.properties` schrijft. Auth via `SENTRY_AUTH_TOKEN` als EAS-env (sensitive),
-  nooit in git. Ontbreekt de token → build draait door, upload wordt overgeslagen.
-- **Runbook** in [`docs/eas-setup.md`](docs/eas-setup.md) (Sentry-sectie: beide env-vars,
-  publiek vs. secret, `eas env:create`-commando's). De app-laag (`lib/monitoring.js` env-gated,
-  `ErrorBoundary`) stond al uit plan 08. **Rest:** `SENTRY_AUTH_TOKEN` als EAS-env + eerste
-  build die maps uploadt, en een crash op toestel terugzien in Sentry.
+  `@sentry/react-native`-config-plugin kreeg `{ organization, project, url }`.
+- **DSN live als EAS-env.** `EXPO_PUBLIC_SENTRY_DSN` staat op `@evdns-team/huishoek`
+  (production/preview/development) + lokaal in `.env` (gitignored) / `.env.example`.
+- **Upload via de EAS↔Sentry-dashboard-integratie.** Sentry gekoppeld in de Expo-UI → EAS
+  uploadt de maps zelf na de build en zette daarvoor `SENTRY_DISABLE_AUTO_UPLOAD=true` als
+  EAS-env (de in-build plugin staat dus bewust stil; geen handmatige `SENTRY_AUTH_TOKEN` nodig).
+  Het handmatige token-alternatief staat als fallback in de runbook.
+- **Runbook** in [`docs/eas-setup.md`](docs/eas-setup.md) (Sentry-sectie: runtime-DSN +
+  upload-route). De app-laag (`lib/monitoring.js` env-gated, `ErrorBoundary`) stond al uit
+  plan 08. **Rest:** eerste cloud-build laten uploaden + een crash op toestel gesymboliceerd
+  terugzien in Sentry.
