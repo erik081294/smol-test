@@ -128,9 +128,23 @@ reeks kleinere; hieronder per stuk wat het was en wat er is gedaan.
 
 ## Validatiestatus
 
-- `npm test` — groen (679 pass, 21 RLS-tests geskipt zonder live-DB-secrets).
-- Migraties 0055 + 0056 — live toegepast en geverifieerd op het productieproject.
-- RLS-integratietests — code bijgewerkt; nog te draaien tegen de live DB ter
-  bevestiging (vereist de service-role-key; zie de header van het testbestand).
-- Device-verificatie van de UI-wijzigingen (heatmap, ErrorBoundary, tijdlijn-
-  paginering, onboarding) — nog uit te voeren; zie [`VERIFICATIE.md`](../VERIFICATIE.md).
+- `npm test` mét live-DB-secrets — **groen: 729 pass / 0 skip / 0 fail** (2026-06-26).
+  De 21 RLS-integratietests draaiden dus écht (niet geskipt) tegen de live DB.
+- Migraties 0055 + 0056 + **0057** (per-gebruiker dag-quota) — live toegepast en
+  geverifieerd. MCP `list_migrations` bevestigt: de **volledige repo-set is live
+  t/m `0057`** (incl. `0053_household_invites` en `0054_tijdlijn`).
+- RLS-integratietests — **gedraaid tegen de live DB en groen** (2026-06-26), incl.
+  de nieuwe isolatiecases voor `timeline_posts`/`timeline_photos` en
+  `household_invites` en de naar het invite-token-systeem gemigreerde testhelper.
+- Device-verificatie van de UI-wijzigingen — **emulator-rooktest 2026-06-26**
+  (`Medium_Phone_API_36`, debug-APK op live Metro via `adb reverse`): de app **boot en
+  bundelt schoon, géén crash/red-box** → alle LRN-JS-wijzigingen (per-segment
+  ErrorBoundary, heatmap-memo, i18n nl-fallback, tijdlijn-paginering) laden zónder een
+  gevallen segment. Geverifieerd: **Thuis** (echte data: voertuigtaak, gedeelde
+  herhaalafspraak, widgetgrid), **Meer**-modulelijst (incl. de `activiteit`→`tijdlijn`-
+  rename, Voertuigen + Huisdieren, Inzichten), **Tijdlijn**-feed (laadt tegen live `0054`
+  → echte lege staat met illustratie + CTA, niet de oude crash-/leeg-fallback),
+  **Inzichten/heatmap** (102 voltooiingen, rendert soepel — 2e toestel naast de moto).
+  **Niet sluitend te testen op deze opstelling:** ErrorBoundary-fallback (vereist een
+  geforceerde render-fout), tijdlijn-paginering (>100 posts nodig), onboarding (sessie
+  was ingelogd). Zie [`VERIFICATIE.md`](../VERIFICATIE.md).

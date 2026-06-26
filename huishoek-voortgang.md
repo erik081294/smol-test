@@ -330,3 +330,25 @@ Drie parallelle review-agents (autonomie / mutatie-infra / unit-suite+CI). Doorg
 - **Tests/ratchet:** `npm test` groen (704 pass / 23 skip), `eslint` zonder errors. Baseline
   aangevuld met **alleen** `realtimeHub`/`secureStorage` (overige entries ongemoeid). **Nog niet
   gecommit/PR.**
+
+---
+
+**Launch-readiness — verificatieronde (2026-06-26).** Status geverifieerd tegen de bron i.p.v.
+de docs (zie [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-06-26.md)):
+- **Live DB volledig gemigreerd t/m `0057`** (MCP `list_migrations`). Dit corrigeerde stale §6-
+  claims: TML-1/PLT-7 zeiden "migr. `0053`/`0054` nog live zetten" terwijl beide al live waren;
+  INF-1 zei "0001–0036". §6 + archief bijgewerkt (UXR-2 → archief).
+- **Volledige live-RLS-suite groen — 729 pass / 0 skip / 0 fail.** De 21 RLS-integratietests
+  draaiden écht (niet geskipt) tegen de live DB, incl. de nieuwe `timeline_posts`/`timeline_photos`-
+  en `household_invites`-isolatiecases + de naar invite-tokens gemigreerde testhelper.
+- **Security-advisors:** geen ERROR. WARNs zijn by-design (`authenticated` op user-facing DEFINER-
+  RPC's; `peek_invite` anon) of al bekend (pg_trgm in `public`, leaked-password-toggle). **Eén
+  losse eindje:** anon kan nog de RLS-helpers (`is_member`/`is_owner`/`in_subgroup`/`can_view`/
+  `check_subgroup_household`) + trigger-fns (`handle_new_user`/`cleanup_vehicle_resource`) via REST
+  aanroepen — `0042`–`0044` raakten alleen de user-facing RPC's. Laag risico; klein revoke-migratietje waard.
+- **Emulator-rooktest** (`Medium_Phone_API_36`, debug-APK op live Metro): app boot/bundelt schoon,
+  géén crash/red-box. Geverifieerd: Thuis (echte data), Meer-modulelijst (incl. `tijdlijn`-rename),
+  Tijdlijn-feed (echte lege staat tegen live `0054`), Inzichten/heatmap (102 voltooiingen). Niet
+  sluitend op deze opstelling: ErrorBoundary-fallback, tijdlijn-paginering (>100 posts), onboarding.
+- **CLAUDE.md:** DoD-gate #4 toegevoegd (doc bijwerken bij een verschoven feit; status tegen de
+  bron verifiëren) om dit soort stale docs voortaan te voorkomen.
