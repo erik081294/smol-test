@@ -16,6 +16,8 @@ import { parseRatePerKm, formatRatePerKm } from '../../lib/vehicleSharing';
 import { formatCents, parseAmountToCents } from '../../lib/expenses';
 import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader, ItemRow } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText } from '../../lib/formValidation';
 import { VISIBILITY } from '../../lib/constants';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -124,11 +126,12 @@ export default function VehicleEditor() {
     return next;
   });
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
 
   const save = async () => {
-    if (!name.trim()) { setError(t('vehicle.error.name')); return; }
+    if (!validate([requiredText('name', t('vehicle.error.name'))], { name })) return;
     setBusy(true);
     const payload = {
       name, make, model, vehicleType, year: toInt(year), licensePlate: plate, mileage: toInt(mileage), notes,
@@ -220,8 +223,8 @@ export default function VehicleEditor() {
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
         keyboardShouldPersistTaps="handled">
 
-        <Field label={t('vehicle.field.name')} value={name} onChangeText={(v) => { setName(v); setError(null); }}
-          placeholder={t('vehicle.field.name.placeholder')} autoFocus={isNew} error={error} />
+        <Field label={t('vehicle.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+          placeholder={t('vehicle.field.name.placeholder')} autoFocus={isNew} error={errors.name} />
         <Field label={t('vehicle.field.plate')} value={plate} onChangeText={setPlate}
           placeholder={t('vehicle.field.plate.placeholder')} autoCapitalize="characters"
           helper={lookupState === 'busy' ? t('vehicle.rdw.busy')

@@ -12,6 +12,8 @@ import { ModalHeader, Field, Stepper, Button, Chip, Checkbox, Row, AvatarSelect,
 import { colors, space, type } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { success, error as hapticError } from '../../lib/haptics';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText, when } from '../../lib/formValidation';
 import { RECUR } from '../../lib/constants';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
@@ -40,8 +42,9 @@ export default function RecurringExpenseEditor() {
   // Optionele koppeling aan een voertuig (V3): meegegeven bij 'nieuw' vanaf de auto, of
   // geladen bij een bestaande vaste last. Zo telt het voertuig-kostenoverzicht 'm mee.
   const [vehicleId, setVehicleId] = useState(vehicle ?? null);
-  const [errors, setErrors] = useState({});
-  const [busy, setBusy] = useState(false);
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
   const [loaded, setLoaded] = useState(isNew);
 
   useEffect(() => {
@@ -72,12 +75,12 @@ export default function RecurringExpenseEditor() {
 
   const save = async () => {
     const amountCents = parseAmountToCents(amountText);
-    const next = {};
-    if (!description.trim()) next.description = t('recurring.error.description');
-    if (!amountCents || amountCents <= 0) next.amount = t('recurring.error.amount');
-    if (participants.length === 0) next.participants = t('recurring.error.participants');
-    setErrors(next);
-    if (Object.keys(next).length) { hapticError(); return; }
+    const ok = validate([
+      requiredText('description', t('recurring.error.description')),
+      when('amount', (v) => v.amountCents > 0, t('recurring.error.amount')),
+      when('participants', (v) => v.participants.length > 0, t('recurring.error.participants')),
+    ], { description, amountCents, participants });
+    if (!ok) return;
 
     setBusy(true);
     const payload = {
@@ -130,11 +133,11 @@ export default function RecurringExpenseEditor() {
       confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
     >
           <Field label={t('recurring.field.description')} value={description}
-            onChangeText={(x) => { setDescription(x); setErrors((e) => ({ ...e, description: null })); }}
+            onChangeText={(x) => { setDescription(x); clearErr('description'); }}
             placeholder={t('recurring.field.description.placeholder')} autoFocus={isNew} error={errors.description} />
 
           <Field label={t('recurring.field.amount')} value={amountText}
-            onChangeText={(x) => { setAmountText(x); setErrors((e) => ({ ...e, amount: null })); }}
+            onChangeText={(x) => { setAmountText(x); clearErr('amount'); }}
             placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
@@ -149,7 +152,7 @@ export default function RecurringExpenseEditor() {
             return (
               <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
                 borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                <Checkbox checked={on} onPress={() => { toggleParticipant(m.id); setErrors((e) => ({ ...e, participants: null })); }}
+                <Checkbox checked={on} onPress={() => { toggleParticipant(m.id); clearErr('participants'); }}
                   accessibilityLabel={m.display_name} />
                 <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
                 {on && perPerson ? <Text style={[type.body, { color: colors.inkSoft }]}>{formatCents(perPerson)}</Text> : null}
