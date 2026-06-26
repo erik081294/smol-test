@@ -1,7 +1,7 @@
 // Units voor de pure weekmenu-logica (lib/mealPlan.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weekRange, groupByDate, aggregateIngredients, ingredientKey, MEAL_ORDER } from '../lib/mealPlan.js';
+import { weekRange, groupByDate, aggregateIngredients, ingredientKey, MEAL_ORDER, eaterCount, defaultServings } from '../lib/mealPlan.js';
 
 test('weekRange: maandag-start + 7 dagen', () => {
   // 18 jun 2026 is een donderdag → week begint ma 15 jun.
@@ -92,4 +92,46 @@ test('aggregateIngredients: catalog_product_id wordt overgenomen', () => {
     { r: { servings: 1, ingredients: [{ catalog_product_id: 'c1', name: 'X', quantity: 1, unit: 'stuk' }] } },
   );
   assert.equal(out[0].catalogProductId, 'c1');
+});
+
+// --- "wie eet mee": eaterCount + defaultServings (MLT) -----------------------
+
+test('eaterCount: leden + gasten', () => {
+  assert.equal(eaterCount({ eater_ids: ['a', 'b'], extra_eaters: 1 }), 3);
+});
+
+test('eaterCount: alleen leden', () => {
+  assert.equal(eaterCount({ eater_ids: ['a', 'b', 'c'] }), 3);
+});
+
+test('eaterCount: alleen gasten', () => {
+  assert.equal(eaterCount({ extra_eaters: 2 }), 2);
+});
+
+test('eaterCount: ontbrekende velden tellen als nul', () => {
+  assert.equal(eaterCount({}), 0);
+  assert.equal(eaterCount(), 0); // default-param: zonder argument ook 0
+});
+
+test('eaterCount: eater_ids dat geen array is telt als nul leden', () => {
+  assert.equal(eaterCount({ eater_ids: null, extra_eaters: 1 }), 1);
+});
+
+test('defaultServings: aantal eters wint', () => {
+  assert.equal(defaultServings({ eater_ids: ['a', 'b'] }, 2), 2);
+  assert.equal(defaultServings({ eater_ids: ['a', 'b', 'c'], extra_eaters: 1 }, 2), 4);
+});
+
+test('defaultServings: zonder eters valt het terug op de fallback', () => {
+  assert.equal(defaultServings({}, 2), 2);
+  assert.equal(defaultServings({ eater_ids: [] }, 5), 5);
+});
+
+test('defaultServings: fallback default is 2 (geen argument)', () => {
+  assert.equal(defaultServings({}), 2);
+  assert.equal(defaultServings(), 2);
+});
+
+test('defaultServings: gasten alleen tellen ook mee', () => {
+  assert.equal(defaultServings({ extra_eaters: 3 }, 2), 3);
 });

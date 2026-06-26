@@ -1,29 +1,31 @@
 /* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Image, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Image, Pressable, TextInput, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format, parseISO, addDays, isToday } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useMealPlan } from '../../lib/useMealPlan';
 import { useRecipes, useRecipePhotoUrl } from '../../lib/useRecipes';
 import { usePantry } from '../../lib/usePantry';
 import { useGroceries } from '../../lib/useGroceries';
+import { useHousehold } from '../../lib/household';
 import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ListSkeleton, Chip, Row, Card, Button,
   Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
-  SegmentedControl,
+  SegmentedControl, Avatar,
 } from '../../lib/ui';
+import { filterRecipes, MEAL_MOMENTS, DISH_TYPES, dishTypeMeta } from '../../lib/recipeCatalog';
+import { defaultServings, eaterCount } from '../../lib/mealPlan';
 import { Icon } from '../../lib/icons';
-import { colors, space, type, radius } from '../../lib/theme';
+import { colors, space, type, radius, screenPadding, touchTarget } from '../../lib/theme';
 import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
-import { normalize } from '../../lib/productMatch';
 import { t, plural } from '../../lib/i18n';
 
 // "Keuken" — de eigen omgeving voor het weekmenu (plannen) én het beheren van recepten.
@@ -38,11 +40,29 @@ export default function Keuken() {
   const { recipes, loading: recipesLoading, removeRecipe } = useRecipes();
   const { items: pantryItems } = usePantry();
   const { removeMany: removeGroceries } = useGroceries();
+  const { members } = useHousehold();
   const toast = useToast();
 
+  // Snel een profiel-id → lid opzoeken voor de eters-avatars op de dagkaart.
+  const memberById = useMemo(() => Object.fromEntries((members ?? []).map((m) => [m.id, m])), [members]);
+
   const [addFor, setAddFor] = useState(null);
+  const [planRecipeId, setPlanRecipeId] = useState(null);
   const [listItems, setListItems] = useState(null);
   const [hiddenIds, setHiddenIds] = useState([]);
+
+  // "Inplannen" vanaf een receptpagina (?planRecipe=<id>): spring naar het weekmenu en
+  // open de toevoeg-sheet met dit recept voorgevuld voor de eerste dag van de week. Daarna
+  // de param wissen zodat 'ie niet opnieuw afgaat bij een re-render.
+  const params = useLocalSearchParams();
+  React.useEffect(() => {
+    const rid = typeof params.planRecipe === 'string' ? params.planRecipe : null;
+    if (!rid) return;
+    setView('weekmenu');
+    setPlanRecipeId(rid);
+    setAddFor(weekDays[0]);
+    router.setParams({ planRecipe: undefined });
+  }, [params.planRecipe]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byDay = useMemo(() => {
     const m = {};
@@ -132,9 +152,10 @@ export default function Keuken() {
             <ItemRow
               title={e.recipe?.title || e.title || t('mealtype.' + e.meal_type)}
               meta={
-                <Row gap={space.sm}>
+                <Row gap={space.sm} wrap>
                   <Badge label={t('mealtype.' + e.meal_type)} tone="brand" />
                   <Text style={type.caption}>{t('meals.entry.servings', { n: e.servings })}</Text>
+                  <EaterAvatars eaterIds={e.eater_ids} extraEaters={e.extra_eaters} memberById={memberById} />
                 </Row>
               }
               trailing={
@@ -209,9 +230,10 @@ export default function Keuken() {
       <AddEntryModal
         date={addFor}
         recipes={recipes}
-        onClose={() => setAddFor(null)}
+        initialRecipeId={planRecipeId}
+        onClose={() => { setAddFor(null); setPlanRecipeId(null); }}
         onAdd={addEntry}
-        onNewRecipe={() => { setAddFor(null); router.push('/recipe/new'); }}
+        onNewRecipe={() => { setAddFor(null); setPlanRecipeId(null); router.push('/recipe/new'); }}
       />
 
       <ShoppingListModal
@@ -235,30 +257,87 @@ export default function Keuken() {
   );
 }
 
-// Recepten-beheer: bladerbare lijst (met coverfoto), nieuw recept, tik → editor,
-// swipe = verwijderen (met bevestiging in de ouder).
+// Recepten-catalogus: zoekbalk + filter-chips (eet-moment & soort gerecht) bovenop een
+// bladerbare lijst met coverfoto + categorie-badge — dezelfde beeldtaal als de
+// boodschappen-catalogus (catalog.js). Tik → receptpagina (lezen), swipe = verwijderen.
 function RecipesView({ recipes, loading, onNew, onOpen, onDelete }) {
+  const [query, setQuery] = useState('');
+  const [moment, setMoment] = useState(null);
+  const [dishType, setDishType] = useState(null);
+  const q = query.trim();
+  const filtered = useMemo(
+    () => filterRecipes(recipes, { query: q, moment, dishType }),
+    [recipes, q, moment, dishType],
+  );
+  const hasFilter = !!(q || moment || dishType);
+
   return (
-    <FlatList
-      contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
-      data={recipes}
-      keyExtractor={(r) => r.id}
-      ListHeaderComponent={
-        <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
-      }
-      renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
-      ListEmptyComponent={
-        loading ? <ListSkeleton count={4} /> : (
-          <Empty illustration="meals" title={t('recipes.empty.title')} subtitle={t('recipes.empty.subtitle')}
-            actionTitle={t('recipe.new')} onAction={onNew} />
-        )
-      }
-    />
+    <View style={{ flex: 1 }}>
+      {/* Zoekbalk (gelijk aan de boodschappen-catalogus) */}
+      <View style={{ paddingHorizontal: screenPadding }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
+          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
+        }}>
+          <Icon name="search" size={20} color={colors.inkFaint} />
+          <TextInput
+            value={query} onChangeText={setQuery}
+            placeholder={t('recipes.search')} placeholderTextColor={colors.inkFaint}
+            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('recipes.search')}
+            style={{
+              flex: 1, minHeight: touchTarget, marginLeft: space.sm,
+              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
+            }}
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
+              <Icon name="close" size={18} color={colors.inkFaint} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Twee filter-assen: eet-moment + soort gerecht. Nogmaals tikken = filter uit. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingVertical: space.xs, alignItems: 'center' }}>
+        {MEAL_MOMENTS.map((m) => (
+          <Chip key={m.key} label={`${m.emoji} ${m.label}`} active={moment === m.key}
+            onPress={() => setMoment((cur) => (cur === m.key ? null : m.key))} />
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.xs, alignItems: 'center' }}>
+        {DISH_TYPES.map((d) => (
+          <Chip key={d.key} label={`${d.emoji} ${d.label}`} active={dishType === d.key}
+            onPress={() => setDishType((cur) => (cur === d.key ? null : d.key))} />
+        ))}
+      </ScrollView>
+
+      <FlatList
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
+        data={filtered}
+        keyExtractor={(r) => r.id}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
+        }
+        renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
+        ListEmptyComponent={
+          loading ? <ListSkeleton count={4} /> : hasFilter ? (
+            <Empty illustration="meals" title={t('recipes.empty.search.title')} subtitle={t('recipes.empty.search.subtitle')} />
+          ) : (
+            <Empty illustration="meals" title={t('recipes.empty.title')} subtitle={t('recipes.empty.subtitle')}
+              actionTitle={t('recipe.new')} onAction={onNew} />
+          )
+        }
+      />
+    </View>
   );
 }
 
 function RecipeCard({ recipe, onOpen, onDelete }) {
   const url = useRecipePhotoUrl(recipe.photo_path);
+  const dish = recipe.dish_type ? dishTypeMeta(recipe.dish_type) : null;
   return (
     <SwipeRow left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onDelete(recipe) }}>
       <Pressable onPress={() => onOpen(recipe)} accessibilityRole="button" accessibilityLabel={recipe.title}
@@ -272,7 +351,10 @@ function RecipeCard({ recipe, onOpen, onDelete }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={type.title} numberOfLines={1}>{recipe.title}</Text>
-          <Text style={type.caption}>{plural(recipe.servings ?? 2, 'recipe.servings.one', 'recipe.servings.other')}</Text>
+          <Row gap={space.xs} align="center" wrap style={{ marginTop: 2 }}>
+            {dish ? <Badge label={`${dish.emoji} ${dish.label}`} tone="neutral" /> : null}
+            <Text style={type.caption}>{plural(recipe.servings ?? 2, 'recipe.servings.one', 'recipe.servings.other')}</Text>
+          </Row>
         </View>
         <Icon name="chevron" size={18} color={colors.inkFaint} />
       </Pressable>
@@ -281,39 +363,101 @@ function RecipeCard({ recipe, onOpen, onDelete }) {
 }
 
 // Maaltijd toevoegen voor één dag: recept kiezen óf vrije tekst, type + servings.
-function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
+// Mini-avatars van wie er mee-eet, op de dagkaart. Toont de eerste vier leden + "+N"
+// voor de rest, en "+N gast(en)" voor eters van buiten het huishouden. Niets → leeg.
+function EaterAvatars({ eaterIds, extraEaters = 0, memberById }) {
+  const ids = (Array.isArray(eaterIds) ? eaterIds : []).filter((id) => memberById[id]);
+  const guests = Number(extraEaters) || 0;
+  if (ids.length === 0 && guests === 0) return null;
+  const shown = ids.slice(0, 4);
+  return (
+    <Row gap={2} align="center">
+      {shown.map((id) => (
+        <Avatar key={id} emoji={memberById[id].avatar_emoji} name={memberById[id].display_name} size={20} />
+      ))}
+      {ids.length > 4 ? <Text style={type.caption}>+{ids.length - 4}</Text> : null}
+      {guests > 0 ? <Text style={type.caption}>+{plural(guests, 'meals.eaters.guest.one', 'meals.eaters.guest.other')}</Text> : null}
+    </Row>
+  );
+}
+
+// Eén selecteerbare receptrij in de inplan-sheet: coverfoto/placeholder + titel +
+// categorie-badge — dezelfde beeldtaal als de recepten-catalogus.
+function RecipePickRow({ recipe, selected, onPress }) {
+  const url = useRecipePhotoUrl(recipe.photo_path);
+  const dish = recipe.dish_type ? dishTypeMeta(recipe.dish_type) : null;
+  return (
+    <ItemRow
+      leading={
+        <View style={{ width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {url ? <Image source={{ uri: url }} style={{ width: 40, height: 40 }} accessibilityIgnoresInvertColors />
+            : <Icon name="meals" size={20} color={colors.inkFaint} />}
+        </View>
+      }
+      title={recipe.title}
+      titleColor={selected ? colors.forest : undefined}
+      borderColor={selected ? colors.forest : undefined}
+      meta={dish ? <Badge label={`${dish.emoji} ${dish.label}`} tone="neutral" /> : null}
+      onPress={onPress}
+      trailing={selected ? <Icon name="check" size={18} color={colors.forest} /> : null}
+    />
+  );
+}
+
+function AddEntryModal({ date, recipes, initialRecipeId = null, onClose, onAdd, onNewRecipe }) {
   const dialog = useDialog();
+  const { members } = useHousehold();
   const [mealType, setMealType] = useState('diner');
   const [query, setQuery] = useState('');
   const [recipeId, setRecipeId] = useState(null);
   const [freeTitle, setFreeTitle] = useState('');
   const [servings, setServings] = useState(2);
+  const [eaterIds, setEaterIds] = useState([]);
+  const [extraEaters, setExtraEaters] = useState(0);
+  // Zodra je het portie-aantal zélf bijstelt, ontkoppelt het van "wie eet mee" (anders
+  // zou de volgende eter-tik je handmatige waarde overschrijven).
+  const [servingsManual, setServingsManual] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  React.useEffect(() => {
-    if (date) { setMealType('diner'); setQuery(''); setRecipeId(null); setFreeTitle(''); setServings(2); }
-  }, [date]);
-
-  const matches = useMemo(() => {
-    const q = normalize(query);
-    const list = q ? recipes.filter((r) => normalize(r.title).includes(q)) : recipes;
-    return list.slice(0, 8);
-  }, [query, recipes]);
-
   const chosen = recipeId ? recipes.find((r) => r.id === recipeId) : null;
+
+  React.useEffect(() => {
+    if (!date) return;
+    setMealType('diner'); setQuery(''); setFreeTitle(''); setServingsManual(false);
+    const pre = initialRecipeId ? recipes.find((r) => r.id === initialRecipeId) : null;
+    setRecipeId(pre ? pre.id : null);
+    // Standaard eet het hele huishouden mee; porties volgen dat aantal (overschrijfbaar).
+    const ids = (members ?? []).map((m) => m.id);
+    setEaterIds(ids);
+    setExtraEaters(0);
+    setServings(defaultServings({ eater_ids: ids, extra_eaters: 0 }, pre?.servings ?? 2));
+  }, [date, initialRecipeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Houd porties gekoppeld aan het aantal eters zolang je het niet handmatig overschreef.
+  const syncServings = (ids, guests) => {
+    if (!servingsManual) setServings(defaultServings({ eater_ids: ids, extra_eaters: guests }, chosen?.servings ?? 2));
+  };
+  const toggleMember = (id) => {
+    const next = eaterIds.includes(id) ? eaterIds.filter((x) => x !== id) : [...eaterIds, id];
+    setEaterIds(next);
+    syncServings(next, extraEaters);
+  };
+  const changeGuests = (n) => { setExtraEaters(n); syncServings(eaterIds, n); };
+
+  const matches = useMemo(() => filterRecipes(recipes, { query }).slice(0, 8), [query, recipes]);
 
   const save = async () => {
     if (!recipeId && !freeTitle.trim()) return;
     setBusy(true);
     try {
-      await onAdd({ planDate: date, mealType, recipeId, title: recipeId ? null : freeTitle, servings });
+      await onAdd({ planDate: date, mealType, recipeId, title: recipeId ? null : freeTitle, servings, eaterIds, extraEaters });
       onClose();
     } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
     finally { setBusy(false); }
   };
 
   return (
-    <BottomSheet visible={!!date} onClose={onClose} avoidKeyboard>
+    <BottomSheet visible={!!date} onClose={onClose} avoidKeyboard maxHeight="90%">
       <ModalHeader
         title={date ? format(parseISO(date), 'EEEE d MMM', { locale: nl }) : ''}
         onClose={onClose} onConfirm={save} busy={busy}
@@ -325,24 +469,50 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
               ))}
             </Row>
 
-            <Field label={t('meals.recipe.pick')} value={query} onChangeText={(x) => { setQuery(x); setRecipeId(null); }}
-              placeholder={t('meals.recipe.pick')} />
-            <Row gap={space.xs} wrap style={{ marginTop: -space.sm, marginBottom: space.md }}>
-              {matches.map((r) => (
-                <Chip key={r.id} label={r.title} icon="meals" active={recipeId === r.id}
-                  onPress={() => { setRecipeId(r.id); setServings(r.servings ?? 2); setFreeTitle(''); }} />
-              ))}
-              <Chip label={t('recipe.new')} icon="add" onPress={onNewRecipe} />
-            </Row>
+            {/* Recept kiezen — catalogus-stijl zoekbalk + rijen met cover (i.p.v. platte chips) */}
+            <Field label={t('meals.recipe.pick')} value={query} onChangeText={(x) => { setQuery(x); }}
+              placeholder={t('recipes.search')} style={{ marginBottom: space.sm }} />
+            {matches.map((r) => (
+              <RecipePickRow key={r.id} recipe={r} selected={recipeId === r.id}
+                onPress={() => { setRecipeId((cur) => (cur === r.id ? null : r.id)); setFreeTitle(''); }} />
+            ))}
+            <Button title={t('recipe.new')} icon="add" variant="ghost" onPress={onNewRecipe} style={{ marginTop: space.xs, marginBottom: space.md }} />
 
             {!recipeId ? (
               <Field label={t('meals.recipe.orFree')} value={freeTitle} onChangeText={setFreeTitle}
                 placeholder={t('meals.recipe.orFree')} />
             ) : null}
 
+            {/* Wie eet mee — huishoudleden aanvinken + gasten van buiten */}
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('meals.eaters.title')}</Text>
+            {members.length > 0 ? (
+              <Row gap={space.md} wrap style={{ marginBottom: space.sm }}>
+                {members.map((m) => {
+                  const on = eaterIds.includes(m.id);
+                  return (
+                    <Pressable key={m.id} onPress={() => toggleMember(m.id)} accessibilityRole="button"
+                      accessibilityState={{ selected: on }} accessibilityLabel={m.display_name}
+                      style={{ alignItems: 'center', opacity: on ? 1 : 0.4 }}>
+                      <View style={{ borderWidth: 2, borderRadius: radius.pill, borderColor: on ? colors.forest : 'transparent' }}>
+                        <Avatar emoji={m.avatar_emoji} name={m.display_name} size={44} />
+                      </View>
+                      <Text style={[type.caption, { marginTop: 2 }]} numberOfLines={1}>{m.display_name?.split(' ')[0]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </Row>
+            ) : null}
+            <Row gap={space.md} align="center" style={{ marginBottom: space.lg }}>
+              <Text style={type.caption}>{t('meals.eaters.guests')}</Text>
+              <Stepper value={extraEaters} onChange={changeGuests} min={0} max={20} accessibilityLabel={t('meals.eaters.guests')} />
+            </Row>
+
             <Text style={[type.label, { marginBottom: space.xs }]}>{t('recipe.field.servings')}</Text>
-            <Stepper value={servings} onChange={setServings} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
-            {chosen ? <Text style={[type.caption, { marginTop: space.sm }]}>{chosen.title}</Text> : null}
+            <Stepper value={servings} onChange={(v) => { setServingsManual(true); setServings(v); }}
+              min={1} max={40} accessibilityLabel={t('recipe.field.servings')} />
+            <Text style={[type.caption, { marginTop: space.xs }]}>
+              {t('meals.eaters.summary', { n: eaterCount({ eater_ids: eaterIds, extra_eaters: extraEaters }) })}
+            </Text>
             <View style={{ height: space.xl }} />
       </SheetScrollView>
     </BottomSheet>

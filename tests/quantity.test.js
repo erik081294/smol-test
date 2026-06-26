@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseQuantity, formatQuantity, mergeQuantity } from '../lib/quantity.js';
+import { parseQuantity, formatQuantity, mergeQuantity, parseAmount } from '../lib/quantity.js';
 
 test('parseQuantity: getal + eenheid', () => {
   assert.deepEqual(parseQuantity('2 pak'), { count: 2, unit: 'pak' });
@@ -156,4 +156,44 @@ test('mergeQuantity: decimale som die op een heel getal uitkomt laat de fractie 
 
 test('mergeQuantity: float-ruis bij optellen wordt weggerond', () => {
   assert.equal(mergeQuantity('0.1 kg', '0.2 kg'), '0.3 kg');
+});
+
+// --- parseAmount: strikt numeriek voor het typbare hoeveelheid-veld (MLT) --------
+
+test('parseAmount: heel getal', () => {
+  assert.equal(parseAmount('250'), 250);
+});
+
+test('parseAmount: decimaal met punt én komma (NL)', () => {
+  assert.equal(parseAmount('1.5'), 1.5);
+  assert.equal(parseAmount('1,5'), 1.5);
+});
+
+test('parseAmount: breuk < 1 blijft staan', () => {
+  assert.equal(parseAmount('0.5'), 0.5);
+});
+
+test('parseAmount: trimt omliggende spaties', () => {
+  assert.equal(parseAmount('  2  '), 2);
+});
+
+test('parseAmount: rondt af op 3 decimalen', () => {
+  assert.equal(parseAmount('1,2345'), 1.235);
+});
+
+test('parseAmount: lege/null/undefined -> null', () => {
+  assert.equal(parseAmount(''), null);
+  assert.equal(parseAmount(null), null);
+  assert.equal(parseAmount(undefined), null);
+});
+
+test('parseAmount: niet-numeriek -> null', () => {
+  assert.equal(parseAmount('abc'), null);
+  assert.equal(parseAmount('2 pak'), null);   // eenheid erbij = geen schoon getal
+  assert.equal(parseAmount('1.2.3'), null);
+});
+
+test('parseAmount: nul en negatief -> null (geen geldige hoeveelheid)', () => {
+  assert.equal(parseAmount('0'), null);
+  assert.equal(parseAmount('-2'), null);
 });
