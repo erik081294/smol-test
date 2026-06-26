@@ -1,7 +1,7 @@
 // Units voor de pure plantfoto-helpers (lib/plantPhoto.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { storagePath, diaryPhotoPath, extFromUri, normalizeExt, contentTypeForExt, parseDataUrl, PLANT_BUCKET } from '../lib/plantPhoto.js';
+import { storagePath, diaryPhotoPath, extFromUri, normalizeExt, contentTypeForExt, parseDataUrl, collectPhotoPaths, PLANT_BUCKET } from '../lib/plantPhoto.js';
 
 test('PLANT_BUCKET is de verwachte naam', () => {
   assert.equal(PLANT_BUCKET, 'plants');
@@ -50,4 +50,30 @@ test('contentTypeForExt: juiste MIME, default image/jpeg', () => {
   assert.equal(contentTypeForExt('png'), 'image/png');
   assert.equal(contentTypeForExt('webp'), 'image/webp');
   assert.equal(contentTypeForExt('gif'), 'image/jpeg'); // onbekend -> default
+});
+
+test('collectPhotoPaths: filtert lege/ontbrekende paden en ontdubbelt (volgorde behouden)', () => {
+  const rows = [
+    { photo_path: 'a' },
+    { photo_path: null },
+    { photo_path: 'b' },
+    { photo_path: 'a' },   // duplicaat -> één keer
+    {},                     // ontbrekend veld
+    { photo_path: '' },     // lege string telt niet
+  ];
+  assert.deepEqual(collectPhotoPaths(rows), ['a', 'b']);
+});
+
+test('collectPhotoPaths: lege/null invoer -> lege lijst (ook zonder argument)', () => {
+  assert.deepEqual(collectPhotoPaths([]), []);
+  assert.deepEqual(collectPhotoPaths(null), []);
+  assert.deepEqual(collectPhotoPaths(), []);              // default-param
+  assert.deepEqual(collectPhotoPaths([null, undefined]), []); // null-rijen veilig
+});
+
+test('collectPhotoPaths: andere kolomnaam via field-parameter', () => {
+  const rows = [{ cover: 'x' }, { cover: 'y' }, { photo_path: 'z' }];
+  assert.deepEqual(collectPhotoPaths(rows, 'cover'), ['x', 'y']);
+  // default field kijkt naar photo_path, niet naar cover
+  assert.deepEqual(collectPhotoPaths(rows), ['z']);
 });
