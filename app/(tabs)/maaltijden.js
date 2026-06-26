@@ -1,11 +1,11 @@
 /* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Image, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Image, Pressable, TextInput, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format, parseISO, addDays, isToday } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useMealPlan } from '../../lib/useMealPlan';
@@ -18,8 +18,9 @@ import {
   Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
   SegmentedControl,
 } from '../../lib/ui';
+import { filterRecipes, MEAL_MOMENTS, DISH_TYPES, dishTypeMeta } from '../../lib/recipeCatalog';
 import { Icon } from '../../lib/icons';
-import { colors, space, type, radius } from '../../lib/theme';
+import { colors, space, type, radius, screenPadding, touchTarget } from '../../lib/theme';
 import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
@@ -41,8 +42,22 @@ export default function Keuken() {
   const toast = useToast();
 
   const [addFor, setAddFor] = useState(null);
+  const [planRecipeId, setPlanRecipeId] = useState(null);
   const [listItems, setListItems] = useState(null);
   const [hiddenIds, setHiddenIds] = useState([]);
+
+  // "Inplannen" vanaf een receptpagina (?planRecipe=<id>): spring naar het weekmenu en
+  // open de toevoeg-sheet met dit recept voorgevuld voor de eerste dag van de week. Daarna
+  // de param wissen zodat 'ie niet opnieuw afgaat bij een re-render.
+  const params = useLocalSearchParams();
+  React.useEffect(() => {
+    const rid = typeof params.planRecipe === 'string' ? params.planRecipe : null;
+    if (!rid) return;
+    setView('weekmenu');
+    setPlanRecipeId(rid);
+    setAddFor(weekDays[0]);
+    router.setParams({ planRecipe: undefined });
+  }, [params.planRecipe]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byDay = useMemo(() => {
     const m = {};
@@ -209,9 +224,10 @@ export default function Keuken() {
       <AddEntryModal
         date={addFor}
         recipes={recipes}
-        onClose={() => setAddFor(null)}
+        initialRecipeId={planRecipeId}
+        onClose={() => { setAddFor(null); setPlanRecipeId(null); }}
         onAdd={addEntry}
-        onNewRecipe={() => { setAddFor(null); router.push('/recipe/new'); }}
+        onNewRecipe={() => { setAddFor(null); setPlanRecipeId(null); router.push('/recipe/new'); }}
       />
 
       <ShoppingListModal
@@ -235,30 +251,87 @@ export default function Keuken() {
   );
 }
 
-// Recepten-beheer: bladerbare lijst (met coverfoto), nieuw recept, tik → editor,
-// swipe = verwijderen (met bevestiging in de ouder).
+// Recepten-catalogus: zoekbalk + filter-chips (eet-moment & soort gerecht) bovenop een
+// bladerbare lijst met coverfoto + categorie-badge — dezelfde beeldtaal als de
+// boodschappen-catalogus (catalog.js). Tik → receptpagina (lezen), swipe = verwijderen.
 function RecipesView({ recipes, loading, onNew, onOpen, onDelete }) {
+  const [query, setQuery] = useState('');
+  const [moment, setMoment] = useState(null);
+  const [dishType, setDishType] = useState(null);
+  const q = query.trim();
+  const filtered = useMemo(
+    () => filterRecipes(recipes, { query: q, moment, dishType }),
+    [recipes, q, moment, dishType],
+  );
+  const hasFilter = !!(q || moment || dishType);
+
   return (
-    <FlatList
-      contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
-      data={recipes}
-      keyExtractor={(r) => r.id}
-      ListHeaderComponent={
-        <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
-      }
-      renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
-      ListEmptyComponent={
-        loading ? <ListSkeleton count={4} /> : (
-          <Empty illustration="meals" title={t('recipes.empty.title')} subtitle={t('recipes.empty.subtitle')}
-            actionTitle={t('recipe.new')} onAction={onNew} />
-        )
-      }
-    />
+    <View style={{ flex: 1 }}>
+      {/* Zoekbalk (gelijk aan de boodschappen-catalogus) */}
+      <View style={{ paddingHorizontal: screenPadding }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
+          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
+        }}>
+          <Icon name="search" size={20} color={colors.inkFaint} />
+          <TextInput
+            value={query} onChangeText={setQuery}
+            placeholder={t('recipes.search')} placeholderTextColor={colors.inkFaint}
+            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('recipes.search')}
+            style={{
+              flex: 1, minHeight: touchTarget, marginLeft: space.sm,
+              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
+            }}
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
+              <Icon name="close" size={18} color={colors.inkFaint} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Twee filter-assen: eet-moment + soort gerecht. Nogmaals tikken = filter uit. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingVertical: space.xs, alignItems: 'center' }}>
+        {MEAL_MOMENTS.map((m) => (
+          <Chip key={m.key} label={`${m.emoji} ${m.label}`} active={moment === m.key}
+            onPress={() => setMoment((cur) => (cur === m.key ? null : m.key))} />
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: space.xs, alignItems: 'center' }}>
+        {DISH_TYPES.map((d) => (
+          <Chip key={d.key} label={`${d.emoji} ${d.label}`} active={dishType === d.key}
+            onPress={() => setDishType((cur) => (cur === d.key ? null : d.key))} />
+        ))}
+      </ScrollView>
+
+      <FlatList
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: space.xxl }}
+        data={filtered}
+        keyExtractor={(r) => r.id}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <Button title={t('recipe.new')} icon="add" variant="soft" onPress={onNew} style={{ marginBottom: space.md }} />
+        }
+        renderItem={({ item }) => <RecipeCard recipe={item} onOpen={onOpen} onDelete={onDelete} />}
+        ListEmptyComponent={
+          loading ? <ListSkeleton count={4} /> : hasFilter ? (
+            <Empty illustration="meals" title={t('recipes.empty.search.title')} subtitle={t('recipes.empty.search.subtitle')} />
+          ) : (
+            <Empty illustration="meals" title={t('recipes.empty.title')} subtitle={t('recipes.empty.subtitle')}
+              actionTitle={t('recipe.new')} onAction={onNew} />
+          )
+        }
+      />
+    </View>
   );
 }
 
 function RecipeCard({ recipe, onOpen, onDelete }) {
   const url = useRecipePhotoUrl(recipe.photo_path);
+  const dish = recipe.dish_type ? dishTypeMeta(recipe.dish_type) : null;
   return (
     <SwipeRow left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => onDelete(recipe) }}>
       <Pressable onPress={() => onOpen(recipe)} accessibilityRole="button" accessibilityLabel={recipe.title}
@@ -272,7 +345,10 @@ function RecipeCard({ recipe, onOpen, onDelete }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={type.title} numberOfLines={1}>{recipe.title}</Text>
-          <Text style={type.caption}>{plural(recipe.servings ?? 2, 'recipe.servings.one', 'recipe.servings.other')}</Text>
+          <Row gap={space.xs} align="center" wrap style={{ marginTop: 2 }}>
+            {dish ? <Badge label={`${dish.emoji} ${dish.label}`} tone="neutral" /> : null}
+            <Text style={type.caption}>{plural(recipe.servings ?? 2, 'recipe.servings.one', 'recipe.servings.other')}</Text>
+          </Row>
         </View>
         <Icon name="chevron" size={18} color={colors.inkFaint} />
       </Pressable>
@@ -281,7 +357,7 @@ function RecipeCard({ recipe, onOpen, onDelete }) {
 }
 
 // Maaltijd toevoegen voor één dag: recept kiezen óf vrije tekst, type + servings.
-function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
+function AddEntryModal({ date, recipes, initialRecipeId = null, onClose, onAdd, onNewRecipe }) {
   const dialog = useDialog();
   const [mealType, setMealType] = useState('diner');
   const [query, setQuery] = useState('');
@@ -291,8 +367,13 @@ function AddEntryModal({ date, recipes, onClose, onAdd, onNewRecipe }) {
   const [busy, setBusy] = useState(false);
 
   React.useEffect(() => {
-    if (date) { setMealType('diner'); setQuery(''); setRecipeId(null); setFreeTitle(''); setServings(2); }
-  }, [date]);
+    if (!date) return;
+    setMealType('diner'); setQuery(''); setFreeTitle('');
+    // Voorgevuld vanaf een receptpagina: recept selecteren + porties uit dat recept.
+    const pre = initialRecipeId ? recipes.find((r) => r.id === initialRecipeId) : null;
+    setRecipeId(pre ? pre.id : null);
+    setServings(pre?.servings ?? 2);
+  }, [date, initialRecipeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matches = useMemo(() => {
     const q = normalize(query);

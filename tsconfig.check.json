@@ -64,6 +64,7 @@
     "lib/rdw.js",
     "lib/realtimeHub.js",
     "lib/realtimePatch.js",
+    "lib/recipeCatalog.js",
     "lib/recurrence.js",
     "lib/recurringExpense.js",
     "lib/reservations.js",
