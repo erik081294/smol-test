@@ -16,6 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { GROUPS, runGroups } from './mutation.mjs';
+import { isBehaviorallyEqual } from './codeEquivalence.mjs';
 
 const BASELINE_PATH = 'mutation-baseline.json';
 // Hoeveel procentpunt een module mag zakken vóór de check faalt. Klein, maar niet 0,
@@ -58,19 +59,51 @@ async function updateBaseline() {
 }
 
 // --- gewijzigde modules bepalen ----------------------------------------------
+// Heeft dit bronbestand een ECHTE (gedrags)wijziging t.o.v. de basis, of alleen
+// comments/opmaak? Een comment-only wijziging (bv. // @ts-check, JSDoc, een type-cast)
+// kan de mutatie-score niet veranderen, dus die slaan we over — anders her-muteert één
+// brede comment-sweep nodeloos álle modules (en flakt op timeout-ruis). Bij twijfel
+// (bestand nieuw/onleesbaar of parse-fout) → true: liever onnodig testen dan iets missen.
+function srcChangedBehaviorally(src, base) {
+  let baseSrc;
+  try {
+    baseSrc = execFileSync('git', ['show', `${base}:${src}`], { encoding: 'utf8' });
+  } catch {
+    return true; // bestond niet in de basis → nieuw bestand = echte wijziging
+  }
+  let headSrc;
+  try {
+    headSrc = readFileSync(src, 'utf8');
+  } catch {
+    return true; // niet leesbaar (verwijderd?) → conservatief
+  }
+  return !isBehaviorallyEqual(baseSrc, headSrc);
+}
+
 function changedGroups(since) {
   let changed = [];
+  let base = since;
   try {
-    const out = execFileSync('git', ['diff', '--name-only', `${since}...HEAD`], { encoding: 'utf8' });
+    base = execFileSync('git', ['merge-base', since, 'HEAD'], { encoding: 'utf8' }).trim() || since;
+    const out = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { encoding: 'utf8' });
     changed = out.split('\n').map((s) => s.trim()).filter(Boolean);
   } catch {
     console.error(`Kon 'git diff' tegen ${since} niet draaien; val terug op ALLE modules.`);
     return GROUPS;
   }
   const changedSet = new Set(changed);
-  // Een groep is relevant als een bronbestand óf zijn testfile wijzigde.
-  const groups = GROUPS.filter((g) =>
-    g.srcs.some((s) => changedSet.has(s)) || changedSet.has(`tests/${g.test}.test.js`));
+  // Kandidaten: een groep waarvan de testfile óf een bronbestand wijzigde.
+  const candidates = GROUPS.filter((g) =>
+    changedSet.has(`tests/${g.test}.test.js`) || g.srcs.some((s) => changedSet.has(s)));
+  // Relevant = testfile wijzigde (tests bepalen de score) óf een bron met een ECHTE
+  // gedragswijziging. Alleen-comment/opmaak-wijzigingen vallen weg.
+  const groups = candidates.filter((g) =>
+    changedSet.has(`tests/${g.test}.test.js`) ||
+    g.srcs.some((s) => changedSet.has(s) && srcChangedBehaviorally(s, base)));
+  const skipped = candidates.filter((g) => !groups.includes(g));
+  if (skipped.length) {
+    console.log(`Overgeslagen — alleen comments/opmaak gewijzigd: ${skipped.map((g) => g.test).join(', ')}`);
+  }
   return groups;
 }
 
