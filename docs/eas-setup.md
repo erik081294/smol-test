@@ -27,6 +27,42 @@ eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "<anon-key>"        
 > `SUPABASE_SERVICE_ROLE_KEY` hoort **niet** in een client-build — die is alleen voor de
 > RLS-integratietests (lokaal/CI).
 
+## Sentry — crash-/foutmonitoring (INF-4)
+
+Het Sentry-project (`evdn/huishoek`, EU-region `de.sentry.io`) en de app-bedrading staan
+klaar: `@sentry/react-native` als config-plugin (org/project/url in `app.config.js`),
+`metro.config.js` via `getSentryExpoConfig` (genereert de source maps + debug-ID's), en
+`lib/monitoring.js` dat Sentry alleen init zodra er een DSN is. Twee dingen moeten kloppen:
+de **runtime-DSN** (zodat de app rapporteert) en de **source-map-upload** (zodat stack traces
+gesymboliceerd zijn).
+
+### 1. Runtime-DSN — `EXPO_PUBLIC_SENTRY_DSN`
+
+Publieke client-waarde (mag in de bundle). Zonder DSN init't `lib/monitoring.js` niet en is
+alle monitoring een no-op. Lokaal komt 'ie uit `.env`; voor cloud-builds als EAS-env:
+
+```sh
+eas env:create --name EXPO_PUBLIC_SENTRY_DSN --value "<DSN>" --visibility plaintext --environment production --environment preview --environment development
+```
+
+> **Live (2026-06-26):** staat als EAS-env op `@evdns-team/huishoek` (production/preview/development).
+> De DSN vind je in Sentry onder *Project Settings → Client Keys (DSN)*.
+
+### 2. Source-map-upload — via de EAS↔Sentry-integratie
+
+De **EAS-dashboard-integratie** (Expo-UI → project → Sentry koppelen) regelt dit en is de
+**actieve route**: EAS uploadt de maps zelf na de build via de gekoppelde Sentry-account en zet
+daarvoor automatisch `SENTRY_DISABLE_AUTO_UPLOAD=true` als EAS-env — dat vertelt de in-build
+plugin om níét óók te uploaden (anders dubbel/conflict). Je hoeft dan **geen
+`SENTRY_AUTH_TOKEN` te beheren**.
+
+> **Alternatief (zonder dashboard-integratie):** zet zelf een org-auth-token
+> (`SENTRY_AUTH_TOKEN`, Sentry → *Settings → Auth Tokens*, scope `project:releases`) als
+> EAS-env (sensitive) en laat `SENTRY_DISABLE_AUTO_UPLOAD` weg — dan uploadt de config-plugin
+> tijdens de native build via `sentry.properties` (org/project/url uit `app.config.js`). Zet de
+> token **nooit** in `app.config.js`/git. Ontbreekt zowel de integratie als de token, dan draait
+> de build door maar blijven stack traces ongesymboliceerd.
+
 ## Preview build — snelste test op je telefoon (geen dev-server)
 
 Het `preview`-profiel bouwt een **zelfstandige APK met de JS al ingebundeld**. Je hoeft

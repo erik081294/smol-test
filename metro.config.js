@@ -1,6 +1,11 @@
-const { getDefaultConfig } = require('expo/metro-config');
+// getSentryExpoConfig == expo's getDefaultConfig + de Sentry-serializer die debug-ID's
+// in de bundle injecteert en source maps genereert. Nodig zodat de EAS-build de maps
+// kan uploaden en stack traces in Sentry leesbaar (gesymboliceerd) zijn (zie
+// docs/eas-setup.md). Zonder SENTRY_AUTH_TOKEN draait de build gewoon door; de upload
+// wordt dan overgeslagen.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // @supabase/supabase-js (v2.108+) doet een optionele dynamische import van
 // '@opentelemetry/api' voor tracing. Metro negeert de webpackIgnore-hint en
