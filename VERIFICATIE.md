@@ -127,14 +127,44 @@ npx --yes supabase@latest db push
       activiteitenfeed, huisdier-tijdlijn, heatmap).
 
 **C. Dev-build, één toestel**
-- [ ] **SEC-3** — `adb shell run-as app.huishoek` → de AsyncStorage-sqlite (`RKStorage`) bevat
+- [x] **ARCH-1** — uitgave-editor (`app/expense/[id].js`, omgezet naar `useEntityForm`):
+      nieuw + bewerken opslaan, en elke validatie-melding tonen — leeg omschrijving, bedrag ≤ 0,
+      geen betaler, geen deelnemers, exact-split die niet sluit, en een ongeldige zichtbaarheid.
+      Gedragsneutrale conversie; dit bevestigt dat de gedeelde validatie identiek werkt.
+      **✅ Device 2026-06-26 (moto):** nieuw opslaan (`addExpense`) + laden/bewerken/opslaan
+      (`updateExpense`) werken; de gedeelde `runRules` vuurt omschrijving-, bedrag- en
+      deelnemers-meldingen tegelijk, en een niet-sluitende exact-split blokkeert opslaan
+      (inline rode "Nog te verdelen"-cue; de editor rendert géén losse `errors.exact`-regel).
+      *Niet uitgelokt:* `paidBy` (defaultt op self, niet te deselecteren via AvatarSelect) en
+      `visibility` (huishouden hééft een subgroep) — beide via dezelfde `runRules`/unit-tests gedekt.
+- [x] **SEC-3** — `adb shell run-as app.huishoek` → de AsyncStorage-sqlite (`RKStorage`) bevat
       **geen** `sb-…-auth-token` meer; SecureStore wél.
+      **✅ Device 2026-06-26 (moto):** `RKStorage` bevat enkel `huishoek.notifPrefs/themePrefs/widgetStyle`
+      (0× auth-token); `SecureStore.xml` bevat het token **gechunkt** (`key_v1-sb-…-auth-token.0/.1/__n`).
 - [ ] **BOO-9** — `expo-camera`-scannerscherm + scan-knop op Boodschappen/Voorraad.
 - [ ] **BOO-10** — bestaande bon openen via "Bewerken" en opslaan.
+      **⚠️ Geblokkeerd 2026-06-26:** in héél `app/`+`lib/` bestaat alléén `router.push('/purchase/new')` —
+      er is **geen** navigatie naar een bestaande bon (`/purchase/<id>`). De read-only "Bewerken"-tak
+      in [`app/purchase/[id].js`](app/purchase/[id].js) (rgl. 169+) is dus niet bereikbaar via de UI.
+      Niet "rest: op toestel" maar **entry-point ontbreekt** — eerst inbouwen (bv. vanuit de
+      activiteitenfeed of een bonnenlijst), dan rooktesten.
 - [ ] **MLT-3** — recept-omslagfoto kiezen/uploaden/tonen.
+      **◐ Device 2026-06-26 (moto):** *tonen* ✓ ("Pasta pest" toont z'n cover) en de Galerij-picker
+      **opent** (systeem-`com.google.android.photopicker`). Het daadwerkelijke kiezen/uploaden bewust
+      **niet** uitgevoerd — ik upload geen willekeurige persoonlijke galerij-foto naar de gedeelde
+      cloud-opslag zonder dat Erik kiest wélke. **Gotcha gevonden:** een Android-config-change die de
+      Activity herrijst (bv. nav-modus wisselen) breekt `expo-image-picker`'s ActivityResultLauncher
+      ("unregistered ActivityResultLauncher") tot een app-herstart — geen app-bug, wel goed om te weten.
 - [ ] **HUI-1** — foto kiezen/uploaden, checklist-flow, tijdlijn + gewicht-log.
-- [ ] **TKN-2** — heatmap rendering + scroll (jankt het → SVG-variant, zie §6-notitie).
-- [ ] **UX-12** — Android-back (hardware-knop én veeggebaar) keert naar de vórige tab.
+- [x] **TKN-2** — heatmap rendering + scroll (jankt het → SVG-variant, zie §6-notitie).
+      **✅ Device 2026-06-26 (moto):** Inzichten-heatmap rendert mét data (102 voltooiingen, gevulde
+      cellen, streak-stats); horizontaal scrollen door de maanden is **soepel** — `gfxinfo`: 4,98%
+      janky frames, p90 19ms / p95 21ms. **Geen SVG-variant nodig.** (De legacy-jank-metric 97% is de
+      bekend-opgeblazen variant; negeren.)
+- [x] **UX-12** — Android-back (hardware-knop én veeggebaar) keert naar de vórige tab.
+      **✅ Device 2026-06-26 (moto):** hardware-back loopt Boodschappen→Taken→Thuis (per-tab,
+      dump-bevestigd); en met tijdelijk ingeschakelde gesture-nav keert óók de edge-swipe naar de
+      vorige tab (`backBehavior="history"`). Nav-modus daarna teruggezet op 3-knops.
 - [ ] **INF-9** — `scan-receipt` happy-path (echte foto → Orq) — vereist de Orq-secrets (zie D).
 
 **D. Flip-on (apart van de device-batch; account-/secret-afhankelijk)**

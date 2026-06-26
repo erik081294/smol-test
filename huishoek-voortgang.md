@@ -250,3 +250,83 @@ De drie-agent security-doorlichting omgezet in werk en op de live DB (`nayqbzekp
   de notitie-kolom ingekort (audit-items → één regel + planlink; unieke specs naar §2 of compact),
   en een **verificatie-ratchet** ingevoerd — een cap op `🔧` met een gebundelde
   **"Te-verifiëren-batch"** in [`VERIFICATIE.md`](VERIFICATIE.md). Geen code; alleen documentatie.
+
+---
+
+**2026-06-26 — Launch-readiness-review (5 agents) + remediatie.** Volledige analyse +
+doorgevoerde fixes in [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-06-26.md);
+backlog-tracking als **LRN-1**. Kort:
+- **DB live (productieproject):** migratie `0055` dropt de oude `join_household` + de
+  `households.invite_code`-kolom (SEC-5: de statische 6-char join-code was nog
+  `authenticated`-grantable → bruteforcebaar cross-household datalek; de client gebruikte
+  enkel nog het token-systeem `0053`). **Scan-receipt getrapte rate-limit**: `0056`
+  (globaal dag-vangnet) + `0057` (per-gebruiker dag-quota 30/24u — de hoofd-rem, schaalt
+  de kosten mee met het aantal echte users) bovenop de burst van 20/uur; anon expliciet
+  ge-revoked. De `scan-receipt` edge-function (fail-closed + error-leakage dicht) is
+  **gedeployed via de CLI** (version 3, `verify_jwt` behouden). Alles geverifieerd.
+- **Client/realtime:** `realtime.setAuth()` propageren in `lib/auth.js` (RLS-subscriptions
+  vielen na ~1u token-refresh stil); reload-storm gedebounced in `lib/useRealtimeReload.js`;
+  signed-URL-cache (`lib/photoStorage.js`) + 12-maands-venster op `useProductFrequencies`.
+- **Tijdlijn:** paginering (groeiend venster + `onEndReached`), feed-query op het feed-index
+  afgestemd, parallelle uploads + orphan-storage-cleanup (`lib/useTimeline.js`).
+- **Overig:** per-segment `ErrorBoundary` (tab- + tijdlijn-groep), heatmap-memo + kleinere
+  hitSlop, `vehicleCosts` maand-overflow (`subMonths`) + test, i18n nl-fallback +
+  `SUPPORTED_LANGS=['nl']`, twee `t('common.close')`-labels.
+- **Tests/ratchet:** nieuwe units (vehicleCosts/expenses/i18n); `npm test` groen
+  (679 pass). Mutatie-ratchet `GROUPS` uitgebreid met de voertuig-/geld-/pet-/heatmap-/
+  contrast-modules + baseline hergegenereerd. RLS-integratietest: helper gemigreerd naar
+  `create_invite`/`accept_invite` + isolatietests voor `timeline_posts/photos` en `household_invites`.
+- **Open (bewust):** captcha op signup (uitgesteld op verzoek), realtime-tier-check vs
+  10k DAU (config), Orq-side budget-alert (dashboard), en device-/live-RLS-verificatie.
+  **Nog niet gecommit/PR** — werkboom op `feat/tijdlijn-fundament`.
+
+**2026-06-26 — Architectuur-review + module-ruggengraat vastgelegd (ARCH-1).** Review op
+schaalbaarheid/modulariteit (zorg: "losse modules → spaghetti"). Bevinding: de `lib/`-laag
+is al een plug-in-architectuur (`modules.js` → `useCollection` → `enable_module_rls`, breed
+geadopteerd, geen circulaire imports); het echte risico zit in de gekopieerde entity-editors
+en impliciete module-contracten. Doorgevoerd:
+- **Gedeelde entity-editor-fundament:** pure [`lib/formValidation.js`](lib/formValidation.js)
+  (`runRules`/`isValid` + regel-fabrieken `requiredText`/`positive`/`when`) — getest
+  ([`tests/formValidation.test.js`](tests/formValidation.test.js)) en in `GROUPS` opgenomen
+  (ratchet **92,1%**). Dunne React-schil [`lib/useEntityForm.js`](lib/useEntityForm.js)
+  (`errors`/`busy`/`validate`/optioneel `values`). `visibilityRule` toegevoegd aan
+  [`lib/visibility.js`](lib/visibility.js) (ratchet **88,9% → 92,5%**).
+- **Referentie-conversie:** [`app/expense/[id].js`](app/expense/[id].js) gebruikt nu de hook
+  + gedeelde regels i.p.v. een eigen `errors+clearErr+validate`-blok (incrementeel,
+  gedragsneutraal). Daarbij een latente bug gevangen: de bedragfout moet op sleutel `amount`
+  staan (die het veld uitleest), niet op `amountCents`.
+- **Documentatie (meeliftend op de bestaande structuur):** nieuw levend naslag-document
+  [`docs/architectuur.md`](docs/architectuur.md) (het module-contract, naast `zichtbaarheid.md`),
+  opgenomen in [`docs/README.md`](docs/README.md) + een oriëntatie-verwijzing in
+  [`CLAUDE.md`](CLAUDE.md). Guardrail-routekaart als **ARCH-1..4** in backlog §6.
+- **Tests/ratchet:** `npm test` groen (704 pass / 23 skip), `eslint` zonder errors,
+  baseline bijgewerkt (formValidation + visibility).
+- **🔧 Smoke-test open:** de uitgave-editor-conversie is gedragsneutraal maar nog niet op
+  toestel/web bevestigd → opgenomen in de device-batch §C van [`VERIFICATIE.md`](VERIFICATIE.md)
+  en als 🔧 in de ARCH-1-rij (§6). Schermlaag valt buiten de unit-/mutatietests, dus dit is
+  de laatste stap vóór ARCH-1 → ✅.
+- **Open (ARCH-2..4):** capability-interface voor overzichten (lost de `useNotifications`→3-hooks
+  koppeling op), module-gating op `effectiveModules()`, en `i18n.js`/`ui.js` per namespace splitsen.
+
+**2026-06-26 — Testframework-review (multi-agent) + reliability-hardening (INF-3).**
+Drie parallelle review-agents (autonomie / mutatie-infra / unit-suite+CI). Doorgevoerd:
+- **Tijdzone-bug gefixt** in [`buyFrequency`](lib/buyFrequency.js)/[`vehicleTimeline`](lib/vehicleTimeline.js)/[`plantTimeline`](lib/plantTimeline.js):
+  datum-only strings (`'2026-06-01'`) werden als UTC-instant geparsed → dagverschuiving in
+  negatieve-offset-zones (5 falende tests onder LA; CI op UTC bleef blind). Volledige timestamps
+  blijven correct lokaal. [`tests/register.mjs`](tests/register.mjs) pint nu de suite **én** de
+  mutatie-runner op een vaste zone → deterministisch ongeacht machine-tijdzone.
+- **Mutatie-GROUPS zelf-bewaakt:** `realtimeHub`+`secureStorage` (hadden een test maar ontsnapten
+  aan de ratchet) toegevoegd; GROUPS-data losgeweekt naar Stryker-vrij
+  [`scripts/mutation-groups.mjs`](scripts/mutation-groups.mjs); [`tests/groupsCoverage.test.js`](tests/groupsCoverage.test.js)
+  faalt bij een geteste-maar-niet-gemuteerde module (allowlist `UNMUTATED_TESTS`).
+- **Timeout-kills zichtbaar** in de mutatie-output (legde score-ruis op timeout-zware modules
+  bloot: realtimeHub 10, vehicleTimeline 62, buyFrequency 16 timeout-kills). **`npm run lint` =
+  `eslint .`** (spiegelt CI). Loader-`/index.js`-fallback in [`tests/loader.mjs`](tests/loader.mjs).
+- **RLS-CI** als handmatige `workflow_dispatch`-job ([`rls-check.yml`](.github/workflows/rls-check.yml)) —
+  per-PR is niet robuust binnen de free-tier (rate-limits, live data, geen aparte staging).
+- **Docs:** [`mutatietesten.md`](docs/mutatietesten.md) bijgewerkt (self-check, mutation-groups-split,
+  TZ-pin, timeout-zichtbaarheid, en de bewuste keuze géén anti-verlaging-poort op de baseline —
+  optie 3 blijft mogelijk, controle = PR-diff); snapshot-notitie boven het effectiviteit-rapport.
+- **Tests/ratchet:** `npm test` groen (704 pass / 23 skip), `eslint` zonder errors. Baseline
+  aangevuld met **alleen** `realtimeHub`/`secureStorage` (overige entries ongemoeid). **Nog niet
+  gecommit/PR.**
