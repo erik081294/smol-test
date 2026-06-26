@@ -7,9 +7,14 @@ import { dirname, resolve as pathResolve } from 'node:path';
 export async function resolve(specifier, context, nextResolve) {
   if ((specifier.startsWith('./') || specifier.startsWith('../')) && !/\.[a-z]+$/i.test(specifier)) {
     const parentPath = fileURLToPath(context.parentURL);
-    const candidate = pathResolve(dirname(parentPath), specifier + '.js');
-    if (existsSync(candidate)) {
-      return { url: pathToFileURL(candidate).href, shortCircuit: true };
+    const base = pathResolve(dirname(parentPath), specifier);
+    // Probeer './x.js' en dan './x/index.js' — zoals Metro/Node-CJS in de app doen. Zonder
+    // de index-stap breekt alléén `npm test` (niet de app) zodra een module een map-index
+    // importeert (ERR_UNSUPPORTED_DIR_IMPORT) — een verwarrende, asymmetrische breuk.
+    for (const candidate of [`${base}.js`, pathResolve(base, 'index.js')]) {
+      if (existsSync(candidate)) {
+        return { url: pathToFileURL(candidate).href, shortCircuit: true };
+      }
     }
   }
   return nextResolve(specifier, context);

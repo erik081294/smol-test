@@ -12,7 +12,7 @@
     "test:mutation": "node scripts/mutation.mjs",
     "test:mutation:check": "node scripts/mutation-check.mjs",
     "test:mutation:baseline": "node scripts/mutation-check.mjs --update",
-    "lint": "expo lint",
+    "lint": "eslint .",
     "import:catalog": "node scripts/import-off-nl.mjs"
   },
   "dependencies": {
