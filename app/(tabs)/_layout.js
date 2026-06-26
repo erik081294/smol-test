@@ -7,6 +7,10 @@ import { Icon } from '../../lib/icons';
 import { MODULES, MORE_TAB } from '../../lib/modules';
 import { useHousehold } from '../../lib/household';
 
+// Per-segment foutvangnet (expo-router): een render-fout in één tab-scherm valt hier
+// op de nette fallback i.p.v. dat 'ie de hele app (auth/providers/navigatie) meesleept.
+export { RouteErrorBoundary as ErrorBoundary } from '../../lib/ErrorBoundary';
+
 function TabIcon({ icon, label, focused }) {
   const tint = focused ? colors.forest : colors.inkFaint;
   return (
