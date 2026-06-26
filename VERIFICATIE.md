@@ -127,6 +127,10 @@ npx --yes supabase@latest db push
       activiteitenfeed, huisdier-tijdlijn, heatmap).
 
 **C. Dev-build, één toestel**
+- [ ] **ARCH-1** — uitgave-editor (`app/expense/[id].js`, omgezet naar `useEntityForm`):
+      nieuw + bewerken opslaan, en elke validatie-melding tonen — leeg omschrijving, bedrag ≤ 0,
+      geen betaler, geen deelnemers, exact-split die niet sluit, en een ongeldige zichtbaarheid.
+      Gedragsneutrale conversie; dit bevestigt dat de gedeelde validatie identiek werkt.
 - [ ] **SEC-3** — `adb shell run-as app.huishoek` → de AsyncStorage-sqlite (`RKStorage`) bevat
       **geen** `sb-…-auth-token` meer; SecureStore wél.
 - [ ] **BOO-9** — `expo-camera`-scannerscherm + scan-knop op Boodschappen/Voorraad.

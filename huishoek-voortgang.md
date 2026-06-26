@@ -250,3 +250,31 @@ De drie-agent security-doorlichting omgezet in werk en op de live DB (`nayqbzekp
   de notitie-kolom ingekort (audit-items → één regel + planlink; unieke specs naar §2 of compact),
   en een **verificatie-ratchet** ingevoerd — een cap op `🔧` met een gebundelde
   **"Te-verifiëren-batch"** in [`VERIFICATIE.md`](VERIFICATIE.md). Geen code; alleen documentatie.
+
+**2026-06-26 — Architectuur-review + module-ruggengraat vastgelegd (ARCH-1, branch `chore/arch-1-entity-editor`).**
+Review op schaalbaarheid/modulariteit (zorg: "losse modules → spaghetti"). Bevinding: de `lib/`-laag
+is al een plug-in-architectuur (`modules.js` → `useCollection` → `enable_module_rls`, breed geadopteerd,
+geen circulaire imports); het echte risico zit in de gekopieerde entity-editors en impliciete
+module-contracten. Doorgevoerd in deze PR:
+- **Gedeelde entity-editor-fundament:** pure [`lib/formValidation.js`](lib/formValidation.js)
+  (`runRules`/`isValid` + regel-fabrieken `requiredText`/`positive`/`when`) — getest
+  ([`tests/formValidation.test.js`](tests/formValidation.test.js)) en in `GROUPS` opgenomen
+  (ratchet **92,1%**). Dunne React-schil [`lib/useEntityForm.js`](lib/useEntityForm.js)
+  (`errors`/`busy`/`validate`/optioneel `values`). `visibilityRule` in
+  [`lib/visibility.js`](lib/visibility.js) (door tests gedekt; baseline blijft conservatief op
+  **88,9%** — mutatiescore schommelt licht per machine, dus de bar niet kunstmatig opgetrokken).
+- **Referentie-conversie:** [`app/expense/[id].js`](app/expense/[id].js) gebruikt nu de hook +
+  gedeelde regels i.p.v. een eigen `errors+clearErr+validate`-blok (incrementeel, gedragsneutraal).
+  Daarbij een latente bug gevangen: de bedragfout moet op sleutel `amount` staan (die het veld
+  uitleest), niet op `amountCents`.
+- **Documentatie:** nieuw levend contract [`docs/architectuur.md`](docs/architectuur.md) (naast
+  `zichtbaarheid.md`) + oriëntatie-verwijzing in [`CLAUDE.md`](CLAUDE.md). Guardrail-routekaart
+  als **ARCH-1..4** in backlog §6.
+- **🔧 Smoke-test open:** de uitgave-editor-conversie is gedragsneutraal maar nog niet op toestel/web
+  bevestigd → device-batch §C in [`VERIFICATIE.md`](VERIFICATIE.md). Schermlaag valt buiten de
+  unit-/mutatietests; dit is de laatste stap vóór ARCH-1 → ✅.
+- **Verificatie:** `npm test` groen, `eslint` zonder errors, mutatie-ratchet groen
+  (formValidation + visibility). **Bewust geïsoleerde PR** vanaf `origin/main` — los van het
+  parallelle launch-readiness-/tijdlijn-/mutatie-refactor-werk in de werkboom.
+- **Open (ARCH-2..4):** capability-interface voor overzichten, module-gating op `effectiveModules()`,
+  en `i18n.js`/`ui.js` per namespace splitsen.

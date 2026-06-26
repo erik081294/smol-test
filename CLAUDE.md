@@ -4,6 +4,12 @@ Huishoek is een Expo/React-Native app. De logica zit in pure modules onder `lib/
 (los van React/Supabase), unit-getest met `node:test`. Schermen/hooks/UI zijn de dunne
 React-laag eromheen.
 
+> **Module-ruggengraat (zo blijft het modulair, geen spaghetti):**
+> [`docs/architectuur.md`](docs/architectuur.md). Het gedeelde contract dat elke module
+> volgt — `modules.js` → `useCollection` → `enable_module_rls`, de 3-lagen-scheiding
+> (pure logica / React-schil / RLS), en de gedeelde entity-editor (`useEntityForm` +
+> `formValidation`). Bouw je een nieuwe editor of een cross-module overzicht? Lees dit eerst.
+
 Onderstaande **definition of done** borgt onze integratiesnelheid: testgaten horen dicht
 vóór de PR, niet pas bij de merge. (Deze sessie kostte een half uur omdat een PR pas bij
 de merge op de mutatie-ratchet zakte — dat voorkomen we hiermee.)

@@ -67,6 +67,11 @@
       "total": 119,
       "score": 81.5
     },
+    "lib/formValidation.js": {
+      "killed": 35,
+      "total": 38,
+      "score": 92.1
+    },
     "lib/i18n.js": {
       "killed": 30,
       "total": 41,

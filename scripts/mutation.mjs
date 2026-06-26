@@ -56,6 +56,9 @@ export const GROUPS = [
   { test: 'expenses', srcs: ['lib/expenses.js'] },
   { test: 'fairness', srcs: ['lib/fairness.js'] },
   { test: 'favoriteGroceries', srcs: ['lib/favoriteGroceries.js'] },
+  // Gedeelde formulier-validatie van de entity-editors (ARCH-1, docs/architectuur.md).
+  // Pure regel-runner; de schermen leunen erop voor hun foutmeldingen → ratchet-bewaakt.
+  { test: 'formValidation', srcs: ['lib/formValidation.js'] },
   // i18n.js is grotendeels vertaaldata; StringLiteral-mutaties daarop zijn ruis.
   { test: 'i18n', srcs: ['lib/i18n.js'], exclude: ['StringLiteral'] },
   { test: 'insights', srcs: ['lib/insights.js'] },
