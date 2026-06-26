@@ -99,7 +99,7 @@ Volledige onderbouwing: de architectuur-review (sessie 2026-06-26). Actuele stat
 
 | ID | Guardrail | Kern |
 |----|-----------|------|
-| **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; expense-editor als referentie, rest incrementeel. **Fundament gebouwd.** |
+| **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; **alle 8 editors gemigreerd** (uitgave/recept/voertuig/vaste-last/plant/huisdier/taak). **Afgerond + device-smoke-getest 2026-06-26** → archief. |
 | **ARCH-2** | Capability-interface voor overzichten | Vandaag/Notificaties vragen modules om hun samenvatting i.p.v. zusterhooks te importeren. |
 | **ARCH-3** | Module-gating in de datalaag | Hooks/schermen respecteren `effectiveModules()`. |
 | **ARCH-4** | Bestandsgrootte-hotspots splitsen | [`i18n.js`](../lib/i18n.js)/[`ui.js`](../lib/ui.js) per domein-namespace. Puur opruimen. |
