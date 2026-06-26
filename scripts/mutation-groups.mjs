@@ -99,7 +99,9 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 //   - groupsCoverage: meta-test op deze lijst zelf, geen lib-module om te muteren.
 //   - typecheckCoverage: meta-test op de type-laag (// @ts-check + tsconfig.check.json),
 //     geen lib-module om te muteren.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage'];
+//   - codeEquivalence: test op de gedrags-equivalentie-helper van de ratchet zelf
+//     (scripts/codeEquivalence.mjs), geen lib-module om te muteren.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
