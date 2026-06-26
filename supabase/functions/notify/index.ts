@@ -114,6 +114,8 @@ Deno.serve(async (req) => {
 
     return json({ processed: intents.length, sent, pruned, skipped });
   } catch (e) {
-    return json({ error: String((e as any)?.message ?? e) }, 500);
+    // Log server-side; geef de client een generieke melding (geen interne foutstring).
+    console.error('[notify] onverwachte fout', String((e as any)?.message ?? e));
+    return json({ error: 'Versturen mislukt' }, 500);
   }
 });
