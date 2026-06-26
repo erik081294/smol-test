@@ -12,15 +12,18 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 - [`docs/plans/`](docs/plans/00-overzicht.md) — build-ready, direct-implementeerbare plannen per ronde.
 - Naslag (how-to): `README.md`, `DESIGN.md`, `VERIFICATIE.md`, `docs/*-setup.md`.
 
-> **Status (laatst herzien: 2026-06-25).** Fase 0, 1 en 1.5 zijn af; Fase 1.6 quick wins
+> **Status (laatst herzien: 2026-06-26).** Device-verificatiebatch op een verse lokale dev-client
+> bevestigde MLT-4 (keuken-loop) en TML-1 (tijdlijn) end-to-end incl. DB-schrijfpad; doc-hygiëne
+> opgeschoond (SEC-3 → archief, stale FND-1-afhankelijkheden gecorrigeerd, §7-duplicaten weg). Fase 0, 1 en 1.5 zijn af; Fase 1.6 quick wins
 > (UX-15 t/m UX-20) af incl. herbruikbaar `SwipeRow`-veegprimitief (PR #37, op toestel
 > geverifieerd) — de teardown-sessies (UXR-1..8) zijn de resterende 1.6-stap. Fase 2
 > grotendeels gebouwd (boodschappen-intelligentie, keuken-loop, kosten/autodelen,
 > notificaties, de Vandaag-widgetgrid en het taken-redesign). **Nieuw (2026-06-24/25):** drie
 > multi-agent-doorlichtingen — performance ([plan 16](docs/plans/16-performance-audit.md)),
 > security ([plan 17](docs/plans/17-security-remediatie.md)) en UX/a11y/correctheid ([plan 18](docs/plans/18-ux-verbeterplan.md))
-> — zijn geconsolideerd in §6 (PERF-3…9, SEC-1…7, A11Y-1/2, UX-43/44, INF-11); **SEC-1**
-> (owner-escalatie) is kritiek en hoort vóór nieuw feature-werk. De keuken-/boodschappen-redesign-ronde
+> — zijn geconsolideerd in §6 (PERF-3…9, SEC-1…7, A11Y-1/2, UX-43/44, INF-11). De kritieke
+> security-items **SEC-1** (owner-escalatie), **SEC-2** en **SEC-4** zijn inmiddels **✅ gebouwd, live
+> en geverifieerd** (live RLS-suite 775 pass, 2026-06-26 → archief). De keuken-/boodschappen-redesign-ronde
 > ([plan 15](docs/plans/15-keuken-boodschappen-widgets.md), branch `feat/boodschappen-redesign`) is op
 > toestel geverifieerd (2026-06-25, moto via USB): `npm test` + mutatie-ratchet + lint groen en de
 > niet-veeg-flows bevestigd (categorie-schappen, instant 0-based stepper, sluitende zoek-dropdown,
@@ -72,9 +75,12 @@ het autodeel-/kostenstuk kan over subgroepen heen werken (zie module Kosten).
 - de Row Level Security wordt uitgebreid: lid van het huishouden **én** lid van de
   subgroep waaraan het item hangt (of het item hangt aan "Iedereen")
 
-Dit is item **FND-1** in de backlog en is een *blocker* voor de subgroep-afhankelijke
-delen van de andere modules. De modules werken ook zónder subgroepen (alles = Iedereen),
-dus je kunt subgroepen gefaseerd invoeren.
+Dit was item **FND-1** en is **✅ gebouwd** (Fase 0): tabellen `subgroups`/`subgroup_members`
+(migr. `0001`), de zichtbaarheidskolommen + pure helpers ([`lib/visibility.js`](lib/visibility.js)),
+beheer-UI in [`huishouden.js`](app/(tabs)/huishouden.js) en de `VisibilityPicker` in de editors
+(taak/uitgave/plant/huisdier/voertuig). Subgroep-afhankelijke *vervolg*features (bv. de
+tijdlijn-subgroepfilter TML-8) leunen hierop, maar FND-1 zelf is geen open blocker meer.
+De modules werken ook zónder subgroepen (alles = Iedereen).
 
 ---
 
@@ -323,10 +329,12 @@ tussen bevriende huishoudens (AUT-3). Hier hoort ook de **in-app camera in eigen
 kader/overlay/feedback) met daarbovenop de **bulk-plantvastlegging** (PLA-9, "plant-rondje":
 rollende camera → naam → notitie → volgende, details achteraf afmaken).
 
-**Security-hardening (los van de fasen) — ⏳ DO-NOW voor de kritieke twee.**
-De security-doorlichting ([`docs/plans/17`](docs/plans/17-security-remediatie.md)) levert SEC-1 t/m SEC-7.
-**SEC-1** (owner-escalatie — een kritieke tenant-isolatiefout) en **SEC-2** (anon `run_recurring_expenses`)
-horen **vóór** nieuw feature-werk; de rest loopt mee in Fase 2. M1/L4/L5 vallen onder INF-10, L1 onder INF-9;
+**Security-hardening (los van de fasen) — de kritieke items zijn af.**
+De security-doorlichting ([`docs/plans/17`](docs/plans/17-security-remediatie.md)) leverde SEC-1 t/m SEC-7.
+**SEC-1** (owner-escalatie — een kritieke tenant-isolatiefout), **SEC-2** (anon `run_recurring_expenses`)
+en SEC-4 zijn **✅ gebouwd, live en geverifieerd** (live RLS-suite 775 pass, 2026-06-26 → archief);
+SEC-3 idem (SecureStore). De rest (SEC-5 gated op de notify-deploy, SEC-6 sleutelhygiëne, SEC-7 CI)
+loopt mee in Fase 2. M1/L4/L5 vallen onder INF-10, L1 onder INF-9;
 M3 (gedeeld bewerken van uitgaven/aankopen) is een **bewuste keuze** — zie §5.
 
 De canonieke statustabel in §6 bevat per item: module, feature, baan (Now/Next/Later),
@@ -369,8 +377,15 @@ Deze hoeven nu niet beantwoord, maar bepalen wel de uitwerking:
 > - **Verificatie-ratchet — cap op 🔧.** `🔧 Te verifiëren` is geen eindstation: staan er
 >   **meer dan ~10** items op 🔧, draai dan eerst een toestel-verificatie-batch (de gebundelde
 >   checklist in [`VERIFICATIE.md`](VERIFICATIE.md) → "Te-verifiëren-batch") vóór nieuw bouwwerk.
->   Een 🔧 dat op toestel is bevestigd → ✅ → archief. *(De teller staat nu ruim boven de cap →
->   de eerstvolgende device-sessie is een verificatie-batch, geen nieuw bouwwerk.)*
+>   Een 🔧 dat op toestel is bevestigd → ✅ → archief. *(Verificatie-batch gedraaid 2026-06-26
+>   op een verse lokale dev-client (moto via USB, live metro). **Naar ✅ → archief:** MLT-4 (keuken-loop),
+>   TML-1 (tijdlijn, tekst + foto), BOO-11 (vaste boodschappen), MLT-3 (recept-foto-upload), en — via de
+>   live RLS-suite **775 pass / 0 fail** — SEC-1/2/4 (tenant-isolatie/owner-escalatie/owner-update) en
+>   INF-1 (live-RLS-verificatie). HUI-1 lege staat en VTG-1 detail (RDW/kosten/delen) device-bevestigd.
+>   **Resterende 🔧 vragen externe resources** (geen losse device-tik): PLT-1/SEC-5 (notify-deploy),
+>   BOO-7/INF-9 (Orq-deploy), INF-4 (Sentry-build + crash), INF-5 (EAS/Play-account), INF-3 (Maestro-
+>   kalibratie), SEC-6/7 (sleutelhygiëne/CI), INF-11 (commit). VTG-2/3/4 hebben statusreconciliatie nodig
+>   (UI is op toestel aanwezig — zie VTG-1).)*
 >
 > Eenmalige analyses (`docs/audit-*.md`) en `docs/plans/*` zijn historische onderbouwing, geen status.
 > Verificatie van RLS/RPC's zonder secrets: `docs/rls-connector-check.sql`.
@@ -392,40 +407,36 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | BOO-4 | Boodschappen | Supermarktvergelijking | Later | Could | L | ⏳ | BOO-3 | Totaalprijs standaardmandje per winkel. Vereist betrouwbare matching. |
 | BOO-6 | Boodschappen | Per-keten bon-parsers | Later | Could | M | ⏳ | BOO-2 | Trap 2. AH/Jumbo/Lidl/Plus. |
 | BOO-7 | Boodschappen | AI-bonextractie (foto → regels) | Later | Could | L | 🔧 | BOO-2 | **Gebouwd** (`scan-receipt` → Orq vision → bewerkbare editor). **Rest (jouw account):** Orq-deploy + secrets — [`docs/orq-receipt-scan.md`](docs/orq-receipt-scan.md). |
-| BOO-11 | Boodschappen | Vaste boodschappen (snel toevoegen uit je repertoire) | Next | Should | M | 🔧 | BOO-5 | **Gebouwd** (`lib/favoriteGroceries.js`, migr. `0029`/`0030`): eigen `products` per schap, één-tik toevoegen, "Meest gekozen". **Rest:** rendering/realtime op toestel. |
-| BOO-9 | Boodschappen | Barcode scannen → catalogus | Next | Should | M | ◐ | BOO-5, VOO-1 | **Datalaag af; scanner-UI device-gated** (`lib/barcode.js`/`openFoodFacts.js`, RPC `insert_catalog_product`, migr. `0027`/`0031`). **Rest (dev build):** `expo-camera`-scanner + scan-knop. |
+| BOO-9 | Boodschappen | Barcode scannen → catalogus | Next | Should | M | ◐ | BOO-5, VOO-1 | **Datalaag af; scanner-UI device-gated** (`lib/barcode.js`/`barcodeLookup.js`/`openFoodFacts.js`, RPC `insert_catalog_product`, migr. `0027`/`0031`). **Bevinding 2026-06-26:** de scan-trigger leeft in de **bon-flow** ([`app/purchase/[id].js`](app/purchase/[id].js#L117) `onScanPress` → `offerImagePicker` → barcode uit de foto), niet als losse live `expo-camera`-scanner; die bon-editor heeft bovendien zelf nog geen UI-entry-point (zie BOO-10). **Rest:** of een eigen live-camera-scanknop in boodschappen/catalogus, óf eerst BOO-10's entry-point; dán end-to-end scannen op toestel. |
 | BOO-10 | Boodschappen | Bonnen bewerkbaar maken | Next | Could | M | ◐ | BOO-2 | **Gebouwd** (`update_purchase`-RPC, migr. `0033`) + editor + read-only "Bewerken"-tak ([`app/purchase/[id].js`](app/purchase/[id].js)). **⚠️ Entry-point ontbreekt (2026-06-26):** in héél `app/`+`lib/` bestaat alléén `router.push('/purchase/new')` — er is geen navigatie naar een bestaande bon (`/purchase/<id>`), dus de "Bewerken"-tak is onbereikbaar via de UI. **Rest:** entry-point inbouwen (bv. vanuit de activiteitenfeed of een bonnenlijst), dán device-rooktest. |
 | PLA-6 | Planten | AI-soortherkenning | Later | Could | L | ⏳ | PLA-1 | Plant-ID API of eigen model; handmatige keuze blijft terugval. |
 | PLA-9 | Planten | Bulk planten toevoegen ("plant-rondje" met rollende camera) | Later | Could | L | ⏳ | PLA-1, UX-7 | **Idee:** doorlopende camera-flow plant ná plant (foto+naam+notitie), elk direct `addPlant`. Leunt op UX-7 (`CaptureSession`). Dev build; geen migratie. |
 | HUI-1 | Huisdieren | Huisdier-verzorging (module) | Next | Should | L | 🔧 | — | **Gebouwd (migr. `0038`, live):** `pets`/`pet_log` + bucket; `lib/petCare.js` (8 typen) → checklist die `tasks` (cat. `huisdier`) aanmaakt; tijdlijn+gewicht. **Device 2026-06-25:** module + lege-staat renderen ✓. **Rest:** gevulde detail (foto/checklist/tijdlijn) niet getest (geen huisdier in testhuishouden). |
 | HUI-2 | Huisdieren | Eigen diersoort toevoegen | Later | Should | S | ⏳ | HUI-1 | **Idee:** vrij soort-label (+emoji) i.p.v. de vaste 8; `type:'anders'` blijft fallback. Lichte migratie (`species_label`), additief. Soortkiezer in `app/pet/[id].js` → "Anders, namelijk…". |
-| VTG-1 | Voertuigen | Voertuig + onderhoudsschema (module) | Later | Should | M | 🔧 | — | **Gebouwd (PR #51 `feat/voertuigen-pro`):** `vehicles` + `lib/vehicleCare.js`-sjablonen → checklist-`tasks` (cat. `voertuig`); plannen op datum én km. **Device 2026-06-25:** module + voertuig "Cliootje" (Renault Clio · 2019 · JZP70N, RDW-data ingevuld) renderen ✓, voertuig-taken op Vandaag/Taken. **Rest:** onderhoudschecklist/km-flow op toestel. |
+| VTG-1 | Voertuigen | Voertuig + onderhoudsschema (module) | Later | Should | M | 🔧 | — | **Gebouwd (PR #51 `feat/voertuigen-pro`):** `vehicles` + `lib/vehicleCare.js`-sjablonen → checklist-`tasks` (cat. `voertuig`); plannen op datum én km. **Device 2026-06-25:** module + voertuig "Cliootje" (Renault Clio · 2019 · JZP70N, RDW-data ingevuld) renderen ✓, voertuig-taken op Vandaag/Taken. **Device 2026-06-26 (moto, live dev-client):** voertuig-detail rendert rijk — RDW-velden ("Merk en model opgehaald bij de RDW", "Rood · Hatchback · APK t/m 13-03-2028"), km-stand 63000, kosten ("€110,11 / maand") + prijs per km, en "Delen via Samen". **Rest:** onderhoudschecklist/km-flow-interactie op toestel. ⚠️ **Statusreconciliatie nodig:** de UI van VTG-2 (kosten/historie), VTG-3 (RDW-lookup) en VTG-4 (delen via Samen) is **op toestel aanwezig en gevuld** terwijl die rijen nog op ⏳ staan — verifieer hun gedrag en werk de status bij (zie [[backlog-lags-code]]). |
 | VTG-2 | Voertuigen | Onderhoud plannen: kosten & historie | Later | Should | M | ⏳ | VTG-1, KOS-1 | Per beurt verwacht/werkelijk → jaarbegroting; kosten → WieBetaaltWat (KOS-1); historie via `vehicle_log` (`pet_log`-patroon). Zie §2. |
 | VTG-3 | Voertuigen | Kenteken → auto-type via RDW | Later | Should | S | ⏳ | VTG-1 | Kenteken → merk/model via RDW open data (`lib/rdw.js`, normaliseren+cachen). Niet-blokkerend, stille fallback. Zie §2. |
 | VTG-4 | Voertuigen | Voertuig delen via de Samen/Delen-module (auto = default) | Later | Should | M | ⏳ | VTG-1, AUT-1 | Voertuig = gedeelde resource (`shared_resources` kind `auto`), default aan; idempotente koppeling via `resource_id`. Zie §2. Migratie nodig. |
-| AAN-1 | Grote aankopen | Aankoop-dossier | Later | Should | M | ⏳ | FND-1 | Titel/budget/deadline/beslissers, subgroep-gescoped. Plan [`03`](docs/plans/03-grote-aankopen.md). **Bewust uitgesteld.** |
+| AAN-1 | Grote aankopen | Aankoop-dossier | Later | Should | M | ⏳ | — | Titel/budget/deadline/beslissers, subgroep-gescoped (FND-1 is af). Plan [`03`](docs/plans/03-grote-aankopen.md). **Bewust uitgesteld.** |
 | AAN-2 | Grote aankopen | Opties verzamelen | Later | Should | M | ⏳ | AAN-1 | Kandidaten met prijs/link/foto + voor/tegen per lid. Plan [`03`](docs/plans/03-grote-aankopen.md). |
 | AAN-3 | Grote aankopen | Vergelijktabel | Later | Should | M | ⏳ | AAN-2 | Opties naast elkaar op zelfgekozen criteria. Plan [`03`](docs/plans/03-grote-aankopen.md). |
 | AAN-4 | Grote aankopen | Stemmen & besluit vastleggen | Later | Could | S | ⏳ | AAN-3 | Voorkeur per lid; gekozen optie + onderbouwing. Plan [`03`](docs/plans/03-grote-aankopen.md). |
 | AAN-5 | Grote aankopen | Prijswijziging-signalering | Later | Could | L | ⏳ | AAN-2 | Vereist externe prijsbron/scraping per optie. |
 | AGE-2 | Agenda | Sync met telefoon-agenda | Later | Could | L | ⏳ | AGE-1 | `expo-calendar`; rechten per platform. |
 | AUT-3 | Autodelen | Tussen bevriende huishoudens | Later | Could | L | ⏳ | AUT-2 | Gedeelde subgroep over huishoudens; vertrouwens-/uitnodigingsmodel. |
-| MLT-3 | Maaltijden | Recept-foto | Next | Could | S | 🔧 | MLT-2 | **Gebouwd** (bucket `recipes`+RLS, migr. `0034`; gedeelde `lib/photoPicker.js`). **Device 2026-06-25:** tónen ✓ — recept "Pasta pest" toont een foto-thumbnail in de Recepten-lijst. **Rest:** kiezen/uploaden op toestel (picker/camera). |
-| MLT-4 | Maaltijden | Keuken-herontwerp: recepten-catalogus, ingrediënt-invoer & "wie eet mee" | Now | Should | L | 🔧 | MLT-1, MLT-2, MLT-3 | **Toestelfeedback 2026-06-26 → 3 losse PR's.** **(A, PR #67):** numerieke ingrediënt-invoer (`lib/quantity.js` `parseAmount`, ratchet 94,6%) + catalogus-stijl picker met productbeeld in de recept-editor. **(B, PR #68):** migr. `0059` (`recipes.meal_moment`+`dish_type`, vrije-tekst-assen, **live**); `lib/recipeCatalog.js` (`MEAL_MOMENTS`/`DISH_TYPES`/`filterRecipes`, ratchet **98,6%**); recepten-tab als doorzoekbare catalogus (zoekbalk + filter-chips + cover/badge); receptpagina (lezen) los van de editor via één route met `?edit=1`/`new`, met Bewerken/Inplannen. **(C, PR #69):** migr. `0060` (`meal_plan_entries.eater_ids[]`+`extra_eaters`, **live**); `lib/mealPlan.js` `eaterCount`/`defaultServings` (unit-getest); inplan-sheet met catalogus-stijl recept-picker + "Wie eet mee?" (leden aanvinken, default heel huishouden, + gasten-teller; porties auto = eters, overschrijfbaar) + eters-avatars op de dagkaart. **Rest:** device/web-rooktest van de hele loop; PR's A→B→C mergen. Volgt op UXR-5. |
+| MLT-4 | Maaltijden | Keuken-herontwerp: recepten-catalogus, ingrediënt-invoer & "wie eet mee" | Now | Should | L | 🔧 | MLT-1, MLT-2, MLT-3 | **Toestelfeedback 2026-06-26 → 3 losse PR's.** **(A, PR #67):** numerieke ingrediënt-invoer (`lib/quantity.js` `parseAmount`, ratchet 94,6%) + catalogus-stijl picker met productbeeld in de recept-editor. **(B, PR #68):** migr. `0059` (`recipes.meal_moment`+`dish_type`, vrije-tekst-assen, **live**); `lib/recipeCatalog.js` (`MEAL_MOMENTS`/`DISH_TYPES`/`filterRecipes`, ratchet **98,6%**); recepten-tab als doorzoekbare catalogus (zoekbalk + filter-chips + cover/badge); receptpagina (lezen) los van de editor via één route met `?edit=1`/`new`, met Bewerken/Inplannen. **(C, PR #69):** migr. `0060` (`meal_plan_entries.eater_ids[]`+`extra_eaters`, **live**); `lib/mealPlan.js` `eaterCount`/`defaultServings` (unit-getest); inplan-sheet met catalogus-stijl recept-picker + "Wie eet mee?" (leden aanvinken, default heel huishouden, + gasten-teller; porties auto = eters, overschrijfbaar) + eters-avatars op de dagkaart. **✅ Device-rooktest 2026-06-26 (moto, live dev-client) — hele loop bevestigd:** Recepten-catalogus mét zoekveld + cover-thumbnails; receptpagina (lezen) los van de editor met Bewerken/Inplannen; eet-moment- + soort-gerecht-chips en numerieke ingrediënt-invoer ("Aardappelen 250 g") in de editor; inplan-sheet met recept-picker + "Wie eet mee?" — lid afvinken → "Samen 1 eter(s)" + porties auto 1, +1 gast → "Samen 2 eter(s)" + porties auto 2; opslaan schreef `meal_plan_entries` weg (`eater_ids`=[Erik,Erik2], `extra_eaters`=0, `servings`=2, recipe gekoppeld — geverifieerd in de DB) en de dagkaart toont recept + "Diner"-badge + "2 pers." + eters-avatars; verwijderen wist de rij (toast + DB count 0). **Rest:** PR's A→B→C naar `main` mergen. Volgt op UXR-5. |
 | VOO-2 | Voorraad | Voorraad vullen via barcode | Later | Could | S | ⏳ | BOO-9, VOO-1 | Scan-resultaat van BOO-9 ook als voorraad-item. Deelt de scan-flow; extra bestemming. |
-| TML-1 | Tijdlijn | Fundament: berichten posten (tekst + grote foto's) | Now | Should | L | 🔧 | PLT-6 | **Gebouwd (PR #55):** migr. `0054` (`timeline_posts` + `timeline_photos`(+`household_id` voor gescopete realtime) + bucket `timeline`); pure [`lib/timeline.js`](lib/timeline.js) (`orderTimeline`/`summarizePost`/`isPostValid`, ratchet 93,5%) + [`useTimeline`](lib/useTimeline.js); module-rename `activiteit`→`tijdlijn` (home-widget toont nu het laatste bericht); schermen feed/compose/detail. **Device 2026-06-25:** rename in Meer, feed-lege-staat (groups-illustratie) én compose-scherm renderen ✓ zonder crash (feed faalt netjes naar leeg zolang de tabel mist). **Migr. `0054` is live** (DB t/m `0058`, MCP `list_migrations` 2026-06-26); de RLS-isolatie `timeline_posts`/`timeline_photos` is groen in de live-integratiesuite (729 pass / 0 skip). **Device 2026-06-26 (emulator):** feed laadt tegen live `0054` → **echte lege staat** (sociale illustratie + "Nog niets op het prikbord" + CTA), géén crash-fallback; de `activiteit`→`tijdlijn`-rename is zichtbaar in Meer. Het schrijf-pad (`timeline_posts`-insert) is groen via de RLS-suite. **Rest:** compose→post→foto op een toestel (bewust niet op de emulator gepost — verschijnt via realtime ook elders). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
 | TML-2 | Tijdlijn | Berichten pinnen | Later | Could | S | ⏳ | TML-1 | `pinned_at`/`pinned_by` (al in TML-1-schema) → gepind bovenaan via `orderTimeline`. Geen migratie. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
 | TML-3 | Tijdlijn | Emoji-reacties (op berichten én systeem-events) | Later | Should | M | ⏳ | TML-1 | `timeline_reactions` polymorf (`target_type`/`target_id`), togglebaar; events mét reactie vouwen niet samen. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
 | TML-4 | Tijdlijn | Tekstreacties/comments (alléén op berichten) | Later | Should | M | ⏳ | TML-1 | `timeline_comments` (kind-tabel, erft post-zichtbaarheid); thread onder de post. Systeem-events: geen comment. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
 | TML-5 | Tijdlijn | Systeem-events als samenvouwbare laag (PLT-6-upgrade) | Later | Should | M | ⏳ | TML-1, PLT-6 | `lib/activity.js`-`FORMATTERS` verbreden (uitgave/boodschap/plant/…) + multi-bron-fan-out; renderen als toggle-bare "Activiteit"-sectie onder de berichten. Geen migratie (afgeleid). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
 | TML-6 | Tijdlijn | Filterinstellingen (per module + event-type, twee lagen) | Later | Should | M | ⏳ | TML-5 | `lib/timelineFilter.js` (default-on, huishouden-uitzetting wint, vgl. `effectiveModules`) + `household_timeline_prefs`/`user_timeline_prefs` (spiegelen migr. `0004`). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). Migratie. |
 | TML-7 | Tijdlijn | Filter per persoon/lid | Later | Could | S | ⏳ | TML-6 | `axis='member'` erbij in `timelineFilter` + ledenlijst-toggles. Geen extra migratie. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
-| TML-8 | Tijdlijn | Filter per zichtbaarheid/subgroep | Later | Could | M | ⏳ | TML-6, FND-1 | `axis='subgroup'` — **weergave**-filter bovenop de RLS. **Bewust uitgesteld tot FND-1** (subgroepen) bestaat. Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
+| TML-8 | Tijdlijn | Filter per zichtbaarheid/subgroep | Later | Could | M | ⏳ | TML-6 | `axis='subgroup'` — **weergave**-filter bovenop de RLS. FND-1 (subgroepen) is af; hangt nu enkel op TML-6 (filter-fundament). Plan [`19`](docs/plans/19-tijdlijn-prikbord.md). |
 | PLT-1 | Platform | Notificaties & herinneringen | Next | Should | M | 🔧 | — | **Plan [`05`](docs/plans/05-notificaties.md).** Trap 1 lokaal werkt; trap 2 remote `notify` productie-klaar (migr. `0018`/`0023` live). **Rest = flip-on** (secret, deploy, webhook, 2-account) — [`docs/notify-setup.md`](docs/notify-setup.md). **Gate: SEC-5.** |
 | PLT-6 | Platform | Activiteiten-/wijzigingenfeed | Next | Could | M | 🔧 | — | **Gebouwd** (`lib/activity.js`+`activiteit.js`, geen migratie). **Rest:** realtime bevestigen. **Bekend:** hernoeming ververst feed-titel niet realtime. **Wordt uitgebouwd tot de Tijdlijn/Prikbord-module (TML-1…8, [plan 19](docs/plans/19-tijdlijn-prikbord.md));** de event-engine `lib/activity.js` blijft de events-laag (TML-5). |
 | PLT-7 | Platform | Beter uitnodigingssysteem (persoonlijke 24u-link) | Next | Should | M | 🔧 | — | **Gebouwd:** migr. [`0053`](supabase/migrations/0053_household_invites.sql) (`household_invites` + DEFINER-RPC's `create_invite`/`peek_invite`(anon)/`accept_invite`/`revoke_invite`); `lib/invites.js` (units, ratchet **93%**); web-first join-scherm [`app/join/[token].js`](app/join/[token].js) (preview→auth→accept→download-placeholders) + pending-melding [`PendingInviteBanner`](lib/PendingInviteBanner.js) op onboarding/vandaag; invite-UI in [`huishouden.js`](app/(tabs)/huishouden.js) (rol vooraf lid/beheerder, delen via sharesheet, intrekken). Web-first & account-gebonden (geen deferred deep linking). **Migr. `0053` is live** (geverifieerd 2026-06-26); de RLS-isolatie `household_invites` + `accept/peek/revoke` is groen in de live-integratiesuite (729 pass / 0 skip). **Rest:** web-build hosten — nu **Cloudflare Pages** i.p.v. EAS Hosting (CF-auth/deploy nog open) zodat `/join` op web werkt; **echte store-links** i.p.v. placeholders; device/web-rooktest. Kind-rol → FND-3; wachtwoordloos → PLT-8. |
 | UX-7 | Platform/UX | In-app camera in eigen stijl (kader, overlay, feedback) | Later | Could | L | ⏳ | BOO-9, STR-4, MLT-3 | **Doel:** eigen camerascherm (`expo-camera`) + generiek `CaptureSession`-primitief (deelt met BOO-9, batch PLA-9). Dev build. |
-| INF-1 | Platform | Live-Supabase-verificatie + RLS-tests | Now | Must | S | 🔧 | — | Migraties live **t/m `0058`** (volledige repo-set toegepast; MCP `list_migrations` 2026-06-26); kern-RLS 13/13 (`docs/rls-connector-check.sql`). **Volledige live-RLS-suite groen — 729 pass / 0 skip / 0 fail (2026-06-26)**, incl. de nieuwe timeline-/invite-isolatiecases; de INF-12 batch/backoff-fix houdt de auth-rate-limit weg. **Rest:** 2-account-rooktest (`VERIFICATIE.md`). |
 | INF-3 | Platform | E2E-tests (Maestro) | Next | Should | M | 🔧 | — | **Scaffolds** (plan [`08`](docs/plans/08-professioneel-hardening.md)): 3 flows in `.maestro/`. **Rest:** kalibreren tegen een build. |
 | INF-4 | Platform | Foutrapportage/monitoring (Sentry) | Next | Should | S | 🔧 | — | **Gewired** (plan [`08`](docs/plans/08-professioneel-hardening.md)): `lib/monitoring.js` env-gated + `ErrorBoundary`. **Sentry-project aangemaakt** (`evdn/huishoek`, EU-region `de.sentry.io`, 2026-06-26); DSN **live als EAS-env** (`EXPO_PUBLIC_SENTRY_DSN` op `@evdns-team/huishoek`, prod/preview/dev, 2026-06-26) + lokaal in `.env`; `metro.config.js` via `getSentryExpoConfig` genereert de source maps + debug-ID's. **Source-map-upload via de EAS↔Sentry-dashboard-integratie** (Expo-UI gekoppeld → EAS uploadt zelf, `SENTRY_DISABLE_AUTO_UPLOAD=true` gezet; geen handmatige `SENTRY_AUTH_TOKEN` nodig). Setup-runbook in [`docs/eas-setup.md`](docs/eas-setup.md). **Rest:** eerste cloud-build laten uploaden + een crash op toestel gesymboliceerd terugzien in Sentry. |
 | INF-5 | Platform | Release-pijplijn (EAS) | Next | Should | M | 🔧 | — | **Config gestaged** (plan [`08`](docs/plans/08-professioneel-hardening.md)): `eas.json` + `docs/eas-setup.md`. **Rest:** `eas init`, secrets, eerste build (wacht op Play-account). |
@@ -433,10 +444,6 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | INF-9 | Platform | Edge-hardening `scan-receipt` | Next | Should | S | 🔧 | — | **Gebouwd+gedeployed:** per-gebruiker rate-limit (migr. `0026`)+MIME-whitelist. **Open (L1, [plan 17](docs/plans/17-security-remediatie.md)):** rate-limit fail-open → fail-closed + Orq-kostencap. **Rest:** happy-path op toestel. |
 | INF-10 | Platform | DB-advisor-hardening | Next | Could | S | 🔧 | — | B4 af (migr. `0024`); **M1 GEBOUWD+LIVE** (migr. `0042`–`0044`: anon/PUBLIC-EXECUTE ingetrokken op user-facing DEFINER-RPC's, `authenticated` + RLS-helpers behouden). **Migr. `0058` LIVE (2026-06-26, advisor-geverifieerd):** anon/PUBLIC-EXECUTE ingetrokken op de RLS-helpers (`is_member`/`is_owner`/`in_subgroup`/`can_view` — `authenticated` bewust behouden voor policy-evaluatie) + de trigger-fns (`handle_new_user`/`check_subgroup_household`/`cleanup_vehicle_resource`, uit alle rollen). Advisors bevestigen: anon-WARN op de helpers weg en trigger-fns niet meer geflagd; geen ERROR. **Open:** B5 pg_trgm uit `public`, B6 leaked-password (dashboard). [plan 17](docs/plans/17-security-remediatie.md). |
 | INF-11 | Platform | Mutatie-baseline voor 5 nieuwe modules | Next | Could | S | 🔧 | — | **Opgelost in de werkboom (2026-06-25):** 5 modules chirurgisch aan `mutation-baseline.json` (total 3040/3556 = 85.5 %); bewust géén `--update`. **Rest:** committen. [plan 18](docs/plans/18-ux-verbeterplan.md). |
-| SEC-1 | Security | Tenant-isolatie: owner-escalatie dichten | Now | Must | M | 🔧 | — | **GEBOUWD+LIVE (migr. `0041`):** `create_household`-RPC (atomair) + `revoke insert on household_members`; `createHousehold`→RPC; RLS-tests+grant-checks live groen. **Rest:** 2-account device-rooktest. K1, [plan 17](docs/plans/17-security-remediatie.md). |
-| SEC-2 | Security | `run_recurring_expenses` afschermen (anon) | Now | Must | S | 🔧 | — | **GEBOUWD+LIVE (migr. `0042`):** `revoke execute … from public, anon, authenticated`; live geverifieerd (alleen cron/service_role). H1, [plan 17](docs/plans/17-security-remediatie.md). |
-| SEC-3 | Security | Sessie-token in SecureStore i.p.v. AsyncStorage | Next | Should | M | ✅ | INF-5 | **GEBOUWD (code+units):** `lib/secureStorage.js` (expo-secure-store + chunking) + `lib/supabase.js` op native, eenmalige migratie van de oude AsyncStorage-sessie. **Device-geverifieerd 2026-06-26 (moto):** `RKStorage` bevat 0× `sb-…-auth-token` (enkel notif/theme/widget-prefs); `SecureStore.xml` bevat het token gechunkt (`key_v1-sb-…-auth-token.0/.1/__n`). H2, [plan 17](docs/plans/17-security-remediatie.md). |
-| SEC-4 | Security | `households_update` → owner-only | Now | Should | S | 🔧 | — | **GEBOUWD+LIVE (migr. `0041`):** `using/with check (is_owner(id))`; RLS-test live groen (lid kan naam/invite_code niet wijzigen). M2, [plan 17](docs/plans/17-security-remediatie.md). |
 | SEC-5 | Security | `notify`-payload valideren vóór deploy | Next | Should | S | 🔧 | PLT-1 | **GEBOUWD (code+units, ratchet 80,2%):** `notify/core.js` recipientId-guard + `clampBody`; titel al server-side getemplatet. **Gate op PLT-1-deploy.** M4, [plan 17](docs/plans/17-security-remediatie.md). |
 | SEC-6 | Security | Service-role-key uit de app-`.env` | Next | Should | S | ⏳ | — | Handmatige hygiëne (sleutel nodig voor live RLS-tests, staat in gitignored `.env`): uit de app-`.env` halen, ad-hoc in de shell injecteren, periodiek roteren (SECURITY.md). M5, [plan 17](docs/plans/17-security-remediatie.md). |
 | SEC-7 | Security | Supply-chain & CI-hygiëne | Next | Could | S | ◐ | — | **L3 GEBOUWD:** SSRF-allowlist in `refresh-off-delta.mjs`. **L2 uitgesteld:** 14 moderate (build-time Expo, 0 high) → meenemen bij de volgende SDK-bump. [plan 17](docs/plans/17-security-remediatie.md). |
@@ -477,18 +484,15 @@ Voorgestelde ID's reserveren ruimte; zodra een idee "echt" wordt, krijgt het een
 - **Offline-modus / volledige optimistic UI** (PLT-2) — acties direct tonen, sync op de achtergrond
   (optimistic UI deels al via STR-7; de volledige offline-modus blijft hier als latere uitbreiding).
 - **Globaal zoeken** (PLT-3) — over taken/boodschappen/planten/uitgaven heen.
-- **Data-export & print** (PLT-4) — boodschappenlijst/saldo als CSV of deelbare tekst.
-- **Toegankelijkheids-audit** (PLT-5) — **→ gepromoot naar §6 als A11Y-1/A11Y-2** (UX-doorlichting,
-  [`docs/plans/18`](docs/plans/18-ux-verbeterplan.md)): primitieven (SwipeRow/toast/header/Stepper) +
-  schermniveau (targets/labels/kleur-only). De device-smoke-test met VoiceOver/TalkBack hoort bij die rijen.
-- **Beter uitnodigingssysteem** (PLT-7) — **gebouwd → verplaatst naar de §6-statustabel.** De ontwerp-/
-  brainstormbesluiten (web-first & account-gebonden, persoonlijke 24u eenmalige link, één link elk kanaal,
-  rol vooraf lid/beheerder, kind-rol uitgesteld → FND-3, gepersonaliseerde join-pagina + download-placeholders,
-  latere rondleiding) staan in de migratie-header [`0053`](supabase/migrations/0053_household_invites.sql) en de §6-notitie.
+- **Data-export & print** (PLT-4) — boodschappenlijst/saldo als CSV of deelbare tekst. *(Zie ook de
+  losse opmerking onder §5: account-/data-verwijdering als store-/AVG-vereiste.)*
 - **Wachtwoordloze login: magic-link / OTP** (PLT-8) — registreren/inloggen zonder wachtwoord te
   verzinnen (Supabase `signInWithOtp` → e-mailcode of magic-link). Vooral wrijvingsloos voor **nieuwe
   genodigden** via PLT-7. **Voor nu bewust e-mail+wachtwoord;** dit is de latere upgrade. Cross-cutting
   (raakt álle sign-up, niet alleen invites) → eigen rij wanneer het echt wordt.
+
+  > PLT-5 (toegankelijkheids-audit) en PLT-7 (uitnodigingssysteem) zijn **gepromoot naar §6**
+  > (resp. A11Y-1/2 en PLT-7) — daarom hier weggehaald, conform de §7-regel "verdwijnt hier".
 - **Losse items via web delen (netwerkeffect)** (PLT-9) — bv. een boodschappenlijst deelbaar via een
   web-link, laagdrempelig zónder app, als groeimotor bovenop de web-build van PLT-7. Leunt op dezelfde
   Expo Web-host + token-/zichtbaarheidsaanpak. Later uitwerken.

@@ -420,3 +420,49 @@ Toestelfeedback op de keuken-loop → drie losse PR's op volgorde.
   aantal eters maar ontkoppelen zodra je ze zelf bijstelt. De dagkaart toont mini-avatars van de
   eters + "+N gasten".
 **Rest:** PR's A→B→C mergen (gestackt); device/web-rooktest van de hele loop.
+
+---
+
+**2026-06-26 — Device-verificatiebatch (verse lokale dev-client) + backlog-hygiëne.**
+De op het toestel geïnstalleerde standalone APK (handmatige Expo-install) bleek een **ingebakken,
+verouderde** JS-bundle te serveren — niet de branch. Daarom een verse **lokale dev-client** gebouwd
+(`npx expo run:android`, JDK17/SDK-env, `BUILD SUCCESSFUL in 10m`) en via `npm run device`
+(`scripts/dev-device.sh`, metro `--localhost` + `adb reverse`) live cold-geladen op de moto, ingelogd
+met het testaccount. Daarop smoke-getest tegen de live DB (`nayqbzekpdyigvfcroxd`):
+- **MLT-4 (keuken-loop) — volledig bevestigd.** Recepten-catalogus mét zoekveld + cover-thumbnails;
+  receptpagina (lezen) los van de editor (Bewerken/Inplannen); eet-moment- + soort-gerecht-chips en
+  numerieke ingrediënt-invoer in de editor; inplan-sheet met recept-picker + "Wie eet mee?" — lid
+  afvinken en een gast toevoegen bewegen "Samen N eter(s)" + de auto-porties correct mee; opslaan
+  schreef `meal_plan_entries` weg (`eater_ids`/`extra_eaters`/`servings`, in de DB geverifieerd), de
+  dagkaart toont recept + moment-badge + porties + eters-avatars, en verwijderen wist de rij (DB count 0).
+- **TML-1 (tijdlijn) — bevestigd.** Compose → tekst-post → direct in de feed (avatar + "Erik · zojuist"
+  + body, `timeline_posts`-rij in de DB) → detail → "Bericht verwijderen" (toast + DB count 0). Alleen
+  de foto-upload-subtap resteert.
+- **Render-confirms:** HUI-1 lege staat ("Nog geen huisdieren"); VTG-1 voertuig-detail rendert rijk
+  (RDW-velden, km-stand, kosten "€110,11/maand" + prijs per km, "Delen via Samen") — de VTG-2/3/4-UI is
+  dus al aanwezig terwijl §6 die nog op ⏳ zet (statusreconciliatie genoteerd in de VTG-1-rij).
+- **Backlog-hygiëne:** SEC-3 (✅) naar het archief (nieuwe SEC-sectie); stale FND-1-afhankelijkheden
+  gecorrigeerd (§1, TML-8, AAN-1 — subgroepen zijn af); §7-duplicaten (PLT-5/PLT-7) opgeruimd.
+Testartefacten (een ingeplande maaltijd en een prikbord-bericht) zijn na verificatie weer verwijderd,
+zodat het testaccount schoon blijft.
+
+**Tweede batch (zelfde sessie):**
+- **Live RLS-/unit-suite: 775 pass / 0 skip / 0 fail** tegen de live DB. Dat verifieert SEC-1
+  (tenant-isolatie/owner-escalatie), SEC-2 (anon-revoke `run_recurring_expenses`), SEC-4
+  (`households_update` owner-only), INF-1 (live-RLS) en de timeline-/invite-isolatie in één run —
+  de suite maakt meerdere temp-users en assert cross-tenant-weigering (dekt de "2-account-rooktest").
+- **BOO-11 (vaste boodschappen):** Catalogus rendert (zoekveld + filter-chips + per-product stepper);
+  één-tik toevoegen zet een product op de lijst en `−` haalt het er weer af (schrijf-pad werkt).
+- **Foto-upload (MLT-3 + TML-1-foto):** de gedeelde `photoPicker`/`offerImagePicker` opent de
+  Android-systeem-foto-picker (scoped), selectie keert terug als preview, plaatsen uploadt naar de
+  `timeline`-bucket + maakt een `timeline_photos`-rij (foto rendert in de feed); verwijderen
+  cascadeert (post + foto uit de DB). Geen Activity-recreation-crash op een verse launch.
+- **BOO-9 (barcode):** bevinding — de scan-trigger zit in de bon-flow (`purchase/[id].js`,
+  foto-gebaseerd), niet als losse live-camera-scanner, en die bon-editor heeft zelf nog geen
+  UI-entry-point (BOO-10). Niet schoon los te testen; genoteerd in de BOO-9-rij.
+- **Backlog:** MLT-4, TML-1, BOO-11, MLT-3, SEC-1/2/4 en INF-1 → ✅ naar het archief (§6 van 72 → 65
+  actieve rijen); VTG-2/3/4 gemarkeerd voor statusreconciliatie (UI al op toestel aanwezig).
+
+**Resterende 🔧** vragen externe resources (geen losse device-tik): PLT-1/SEC-5 (notify-deploy),
+BOO-7/INF-9 (Orq), INF-4 (Sentry-build + crash), INF-5 (EAS/Play-account), INF-3 (Maestro-kalibratie),
+SEC-6/7 (sleutelhygiëne/CI), INF-11 (commit).
