@@ -10,7 +10,7 @@ import { useGroceries } from '../../lib/useGroceries';
 import { useToast } from '../../lib/toast';
 import { status, daysUntil, sortByUrgency, PANTRY_STATUS } from '../../lib/pantry';
 import {
-  Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Chip, Row,
+  Empty, ScreenHeader, SectionHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Chip, Row,
   Badge, Banner, FAB, Field, Stepper, Button, ModalHeader, SwipeRow, BottomSheet, SheetScrollView,
 } from '../../lib/ui';
 import { colors, space, type } from '../../lib/theme';
@@ -165,7 +165,8 @@ export default function Voorraad() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('pantry.title')} subtitle={t('pantry.subtitle')} />
+      <ScreenHeader title={t('pantry.title')} subtitle={t('pantry.subtitle')}
+        right={<ModuleHelpButton module="voorraad" />} />
 
       <Row gap={space.sm} style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
         <Chip label={t('pantry.view.urgency')} active={view === 'urgentie'} onPress={() => setView('urgentie')} />

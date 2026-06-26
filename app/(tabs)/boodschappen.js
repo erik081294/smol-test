@@ -13,7 +13,7 @@ import { groupGroceriesByCategory } from '../../lib/groceryList';
 import { normalize } from '../../lib/productMatch';
 import { parseQuantity, formatQuantity } from '../../lib/quantity';
 import { ProductImageView } from '../../lib/ProductImageView';
-import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ListSkeleton, Row, SwipeRow, Button, Stepper, Banner } from '../../lib/ui';
+import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Row, SwipeRow, Button, Stepper, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
@@ -208,7 +208,8 @@ export default function Boodschappen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')} />
+      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
+        right={<ModuleHelpButton module="boodschappen" />} />
 
       {/* Toevoegbalk — typen zoekt direct in de catalogus (dropdown hieronder). */}
       <View onLayout={(e) => setSearchTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}

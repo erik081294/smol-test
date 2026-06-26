@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePets, usePetPhotoUrl } from '../../lib/usePets';
 import { petType } from '../../lib/petCare';
-import { Empty, FAB, ScreenHeader, IconButton, ListSkeleton } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
@@ -67,11 +67,14 @@ export default function Huisdieren() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('pets.title')} subtitle={t('pets.subtitle')}
-        right={pets.length > 0 ? (
-          <IconButton icon="timeline" tint={colors.forest}
-            accessibilityLabel={t('pets.timeline.open')}
-            onPress={() => router.push('/pet/timeline')} />
-        ) : null} />
+        right={
+          <ModuleHelpButton
+            module="huisdieren"
+            actions={pets.length > 0
+              ? [{ label: t('pets.timeline.open'), icon: 'timeline', onPress: () => router.push('/pet/timeline') }]
+              : undefined}
+          />
+        } />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}
@@ -102,7 +105,11 @@ export default function Huisdieren() {
         }
       />
 
-      <FAB label={t('fab.pet')} accessibilityLabel={t('pet.add')} onPress={() => router.push('/pet/new')} />
+      {/* Lege-staat dedupe (DESIGN.md principe 4): bij een lege lijst draagt de
+          Empty-CTA de primaire actie; de FAB verschijnt pas zodra er huisdieren zijn. */}
+      {pets.length > 0 ? (
+        <FAB label={t('fab.pet')} accessibilityLabel={t('pet.add')} onPress={() => router.push('/pet/new')} />
+      ) : null}
     </SafeAreaView>
   );
 }

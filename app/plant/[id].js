@@ -13,7 +13,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView, SegmentedControl, Collapsible } from '../../lib/ui';
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -105,6 +105,9 @@ export default function PlantScreen() {
   // Tijdlijnpost-detail (modal): grote foto (indien aanwezig), notitie bewerken,
   // verwijderen.
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  // Weergave van de tijdlijn: 'compact' (rustige rij-rail) of 'photos' (grote foto's,
+  // Reddit-stijl). Lokale voorkeur, geen persistentie nodig.
+  const [diaryView, setDiaryView] = useState('compact');
   const [noteText, setNoteText] = useState('');
   const selectedPhotoUrl = usePlantPhotoUrl(selectedPhoto?.photo_path);
   useEffect(() => { setNoteText(selectedPhoto?.note ?? ''); }, [selectedPhoto?.id]);
@@ -261,13 +264,17 @@ export default function PlantScreen() {
             </Pressable>
           </View>
 
-          <Text style={[type.label, { marginBottom: space.sm }]}>{t('plant.careCard')}</Text>
-          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space.lg }}>
-            <CareRow icon="light" label={t('plant.care.light')} value={card.light} />
-            <CareRow icon="water" label={t('plant.care.water')} value={card.waterText} />
-            <CareRow icon="feed" label={t('plant.care.feed')} value={card.feedText} />
-            {card.notes ? <CareRow icon="note" label={t('plant.care.tip')} value={card.notes} /> : null}
-          </View>
+          {/* Verzorgingskaart inklapbaar (standaard open): de altijd-uitgeklapte kaart
+              duwde taken en tijdlijn ver naar onderen — inklapbaar haalt je sneller bij
+              de actie zonder de info te verliezen. */}
+          <Collapsible label={t('plant.careCard')} summary={t('plant.careCard.summary')} defaultOpen>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space.lg }}>
+              <CareRow icon="light" label={t('plant.care.light')} value={card.light} />
+              <CareRow icon="water" label={t('plant.care.water')} value={card.waterText} />
+              <CareRow icon="feed" label={t('plant.care.feed')} value={card.feedText} />
+              {card.notes ? <CareRow icon="note" label={t('plant.care.tip')} value={card.notes} /> : null}
+            </View>
+          </Collapsible>
 
           <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>{t('plant.careTasks')}</Text>
           {plantTasks.length === 0
@@ -289,7 +296,24 @@ export default function PlantScreen() {
           {diary.length === 0 ? (
             <Text style={[type.caption]}>{t('plant.timeline.empty')}</Text>
           ) : (
-            <DiaryTimeline photos={diary} onSelect={setSelectedPhoto} />
+            <>
+              {/* Weergave-toggle (Reddit-stijl): rustige lijst of grote foto's. */}
+              <SegmentedControl
+                value={diaryView}
+                onChange={setDiaryView}
+                options={[
+                  { value: 'compact', label: t('plant.timeline.view.compact') },
+                  { value: 'photos', label: t('plant.timeline.view.photos') },
+                ]}
+                style={{ marginBottom: space.md }}
+              />
+              <DiaryTimeline
+                photos={diary}
+                view={diaryView}
+                nameOf={(uid) => members.find((m) => m.id === uid)?.display_name}
+                onSelect={setSelectedPhoto}
+              />
+            </>
           )}
 
           <Button title={t('plant.deleteButton')} variant="ghost" onPress={confirmRemove} style={{ marginTop: 24 }} />
@@ -454,7 +478,18 @@ export default function PlantScreen() {
 // Verticale tijdlijn van de plant: elke post (foto of notitie) is een knooppunt op
 // een doorlopende rail, nieuwste bovenaan. Rustig terugbladeren door de groei;
 // tikken opent het detail-sheet (notitie bewerken / verwijderen).
-function DiaryTimeline({ photos, onSelect }) {
+function DiaryTimeline({ photos, view = 'compact', nameOf, onSelect }) {
+  // Grote-foto-weergave (Reddit-stijl): elke post als ruime kaart, los van de rail.
+  if (view === 'photos') {
+    return (
+      <View>
+        {photos.map((ph) => (
+          <TimelinePhotoCard key={ph.id} photo={ph} nameOf={nameOf} onPress={() => onSelect(ph)} />
+        ))}
+      </View>
+    );
+  }
+  // Compacte weergave: rustige verticale rail.
   return (
     <View>
       {photos.map((ph, i) => (
@@ -463,10 +498,55 @@ function DiaryTimeline({ photos, onSelect }) {
           photo={ph}
           first={i === 0}
           last={i === photos.length - 1}
+          nameOf={nameOf}
           onPress={() => onSelect(ph)}
         />
       ))}
     </View>
+  );
+}
+
+// Grote kaart voor de "Groot"-weergave. Een foto-post toont het vol-bleed beeld; een
+// notitie-only post is géén nep-beeld maar een duidelijke tekstkaart met de notitie
+// groot en leesbaar. Datum + wie het plaatste staan eronder.
+function TimelinePhotoCard({ photo, nameOf, onPress }) {
+  const isNote = !photo.photo_path;
+  const url = usePlantPhotoUrl(photo.photo_path);
+  const dateLabel = format(parseISO(photo.created_at), 'd MMMM yyyy', { locale: dateLocale() });
+  const author = nameOf?.(photo.created_by);
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${isNote ? t('plant.timeline.note') : t('plant.timeline.photo')} · ${dateLabel}`}
+      style={({ pressed }) => ({ marginBottom: space.lg, opacity: pressed ? 0.85 : 1 })}
+    >
+      {isNote ? (
+        // Notitie-only: een leesbare tekstkaart i.p.v. een beeld-placeholder. De notitie
+        // staat hier groot; daarom wordt 'ie in de voet niet nog eens herhaald.
+        <View style={{ backgroundColor: colors.forestTint, borderRadius: radius.md, padding: space.lg }}>
+          <Row gap={space.xs} align="center" style={{ marginBottom: space.sm }}>
+            <Icon name="note" size={18} color={colors.brandText} />
+            <Text style={[type.label, { color: colors.brandText }]}>{t('plant.timeline.note')}</Text>
+          </Row>
+          <Text style={[type.bodyLg, { color: colors.ink }]}>{photo.note || t('plant.timeline.noNote')}</Text>
+        </View>
+      ) : url ? (
+        <Image source={{ uri: url }} style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }} resizeMode="cover" />
+      ) : (
+        <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="plants" size={32} color={colors.inkFaint} />
+        </View>
+      )}
+      <View style={{ marginTop: space.sm }}>
+        <Row justify="space-between" align="center" gap={space.sm}>
+          <Text style={[type.title, { fontSize: 15, flex: 1 }]}>{dateLabel}</Text>
+          {author ? <Text style={type.caption}>{t('plant.timeline.by', { name: author })}</Text> : null}
+        </Row>
+        {/* Bij een foto-post de notitie eronder; bij een notitie-only post staat 'ie al in de kaart. */}
+        {!isNote && photo.note ? <Text style={[type.body, { color: colors.inkSoft, marginTop: 2 }]}>{photo.note}</Text> : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -476,10 +556,11 @@ const TL_RAIL = 28;
 const TL_DOT = 14;
 const TL_DOT_TOP = 36;
 
-function TimelineEntry({ photo, first, last, onPress }) {
+function TimelineEntry({ photo, first, last, nameOf, onPress }) {
   const isNote = !photo.photo_path; // notitie-only post (geen foto)
   const url = usePlantPhotoUrl(photo.photo_path);
   const dateLabel = format(parseISO(photo.created_at), 'd MMMM yyyy', { locale: dateLocale() });
+  const author = nameOf?.(photo.created_by);
   return (
     <Pressable
       onPress={onPress}
@@ -508,15 +589,17 @@ function TimelineEntry({ photo, first, last, onPress }) {
           <View style={{ width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
             backgroundColor: isNote ? colors.forestSoft : colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
             {isNote
-              ? <Icon name="note" size={22} color={colors.forest} />
+              ? <Icon name="note" size={22} color={colors.onDark} />
               : url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} resizeMode="cover" />
                 : <Icon name="plants" size={20} color={colors.inkSoft} />}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[type.title, { fontSize: 15 }]}>{dateLabel}</Text>
+            {/* Geen "Geen notitie"-ruis meer: zonder notitie tonen we alleen datum + wie. */}
             {photo.note
               ? <Text style={[type.body, { color: colors.inkSoft, marginTop: 2 }]} numberOfLines={2}>{photo.note}</Text>
-              : <Text style={[type.caption, { marginTop: 2 }]}>{t('plant.timeline.noNote')}</Text>}
+              : null}
+            {author ? <Text style={[type.caption, { marginTop: 2 }]}>{t('plant.timeline.by', { name: author })}</Text> : null}
           </View>
         </View>
       </View>

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePlants, usePlantSpecies, usePlantPhotoUrl } from '../../lib/usePlants';
-import { Empty, FAB, ScreenHeader, IconButton, ListSkeleton } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
@@ -72,11 +72,14 @@ export default function Planten() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('plants.title')} subtitle={t('plants.subtitle')}
-        right={plants.length > 0 ? (
-          <IconButton icon="timeline" tint={colors.forest}
-            accessibilityLabel={t('plants.timeline.open')}
-            onPress={() => router.push('/plant/timeline')} />
-        ) : null} />
+        right={
+          <ModuleHelpButton
+            module="planten"
+            actions={plants.length > 0
+              ? [{ label: t('plants.timeline.open'), icon: 'timeline', onPress: () => router.push('/plant/timeline') }]
+              : undefined}
+          />
+        } />
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}

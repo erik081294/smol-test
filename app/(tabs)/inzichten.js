@@ -1,7 +1,7 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHousehold } from '../../lib/household';
-import { ScreenHeader } from '../../lib/ui';
+import { ScreenHeader, ModuleHelpButton } from '../../lib/ui';
 import { YearActivity } from '../../lib/YearActivity';
 import { colors } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -13,7 +13,8 @@ export default function Inzichten() {
   const { members } = useHousehold();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('insights.title')} subtitle={t('insights.subtitle')} />
+      <ScreenHeader title={t('insights.title')} subtitle={t('insights.subtitle')}
+        right={<ModuleHelpButton module="inzichten" />} />
       <YearActivity members={members} />
     </SafeAreaView>
   );

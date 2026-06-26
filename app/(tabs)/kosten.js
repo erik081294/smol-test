@@ -8,7 +8,7 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, IconButton, ModalHeader, Button, Row, ListSkeleton } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
@@ -48,12 +48,13 @@ export default function Kosten() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')}
         right={
-          <Row gap={space.xs}>
-            <IconButton icon="price" accessibilityLabel={t('insights.title')} tint={colors.forest}
-              onPress={() => router.push('/kosten-inzichten')} />
-            <IconButton icon="repeat" accessibilityLabel={t('recurring.title')} tint={colors.forest}
-              onPress={() => setRecurringOpen(true)} />
-          </Row>
+          <ModuleHelpButton
+            module="kosten"
+            actions={[
+              { label: t('insights.title'), icon: 'insights', onPress: () => router.push('/kosten-inzichten') },
+              { label: t('recurring.title'), icon: 'repeat', onPress: () => setRecurringOpen(true) },
+            ]}
+          />
         } />
 
       {/* Subgroep-scope */}
@@ -104,8 +105,9 @@ export default function Kosten() {
               trailing={<Text style={[type.title, { color: colors.forest }]}>{formatCents(item.amount_cents)}</Text>}
               meta={
                 <Text style={type.caption}>
-                  {emojiOf(item.paid_by)} {t('expenses.row.paid', { name: nameOf(item.paid_by) })} · {plural(n, 'expenses.participants.one', 'expenses.participants.other')}
-                  · {format(parseISO(item.spent_on), 'd MMM', { locale: dateLocale() })}
+                  {emojiOf(item.paid_by)} {t('expenses.row.paid', { name: nameOf(item.paid_by) })}
+                  {' · '}{plural(n, 'expenses.participants.one', 'expenses.participants.other')}
+                  {' · '}{format(parseISO(item.spent_on), 'd MMM', { locale: dateLocale() })}
                 </Text>
               }
               onPress={() => router.push(`/expense/${item.id}`)}
@@ -123,7 +125,11 @@ export default function Kosten() {
         }
       />
 
-      <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
+      {/* Lege-staat dedupe (DESIGN.md principe 4): bij een lege lijst draagt de
+          Empty-CTA de primaire actie; de FAB komt terug zodra er uitgaven zijn. */}
+      {filtered.length > 0 ? (
+        <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
+      ) : null}
 
       {/* Terugkerende uitgaven beheren */}
       <Modal visible={recurringOpen} animationType="slide" onRequestClose={() => setRecurringOpen(false)}>

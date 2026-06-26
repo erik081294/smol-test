@@ -40,6 +40,7 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 
 | Document | Datum | Waarover |
 |----------|-------|----------|
+| [`design-review-2026-06-26.md`](./design-review-2026-06-26.md) | 2026-06-26 | Design-review per scherm (rooktest-screenshots) + getierd verbeterplan (quick wins → herontwerpen). |
 | [`launch-readiness-2026-06-26.md`](./launch-readiness-2026-06-26.md) | 2026-06-26 | Launch-readiness review (5 parallelle agents) richting ~10.000 gebruikers. |
 | [`test-effectiviteit-2026-06-22.md`](./test-effectiviteit-2026-06-22.md) | 2026-06-22 | Mutatietest-rapport — cijfers per module (achtergrond bij `mutatietesten.md`). |
 | [`security-review-ai-2026-06-21.md`](./security-review-ai-2026-06-21.md) | 2026-06-21 | Security review / threat model voor AI-assisted development. |
