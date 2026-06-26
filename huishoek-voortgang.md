@@ -352,3 +352,23 @@ de docs (zie [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-
   sluitend op deze opstelling: ErrorBoundary-fallback, tijdlijn-paginering (>100 posts), onboarding.
 - **CLAUDE.md:** DoD-gate #4 toegevoegd (doc bijwerken bij een verschoven feit; status tegen de
   bron verifiëren) om dit soort stale docs voortaan te voorkomen.
+
+---
+
+**Verificatie-oppervlak verbreed — type-laag + ratchet-verfijning (2026-06-26).**
+- **Type-laag (PR #61).** Opt-in `// @ts-check` over alle pure logica-modules (`MUTATED_SOURCES`),
+  gescoped via `tsconfig.check.json` (`strict` bewust uit: vangt verkeerde shapes/arg-fouten,
+  niet elke null) en ingehaakt als CI-gate ná lint, vóór de tests. Meta-test
+  [`tests/typecheckCoverage.test.js`](tests/typecheckCoverage.test.js) bewaakt dat `// @ts-check`
+  + de tsconfig-scope synchroon blijven met de ratchet-set. ~10 modules kregen lichte
+  JSDoc/`@type`-casts/`.getTime()` — allemaal **type-only**, dus de mutatie-score bleef gelijk.
+  Pilot vond geen latente bug (de modules zijn goed getest); de winst is preventie van
+  toekomstige shape-/arg-regressies + geformaliseerde shapes. DoD-punt typecheck toegevoegd.
+- **Ratchet-verfijning (PR #63).** `changedGroups` slaat nu modules over waarin alléén
+  comments/opmaak veranderden (gedrags-equivalentie via
+  [`scripts/codeEquivalence.mjs`](scripts/codeEquivalence.mjs): Babel parse→print zónder comments).
+  Voorkomt dat een brede comment-sweep (zoals de #61-`@ts-check`-uitrol) álle modules opnieuw
+  muteert — dat veroorzaakte flaky timeout-ruis op de mutatie-job van #61. Geverifieerd met een
+  unit-test (7 cases) + een echte git-smoke (comment-only `fairness` overgeslagen, echte wijziging
+  `quantity` wél gemuteerd).
+- **EAS (PR #62).** Build-profielen aan de production-environment gekoppeld (`eas.json`).

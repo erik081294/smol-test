@@ -59,6 +59,13 @@ De ratchet is bewust **vriendelijk** opgezet:
 
 - **Hij checkt alleen wat jij raakte.** Wijzig je `lib/pantry.js` niet, dan kan je PR
   ook nooit op pantry falen. Een groene `main` blijft dus groen voor niet-gerelateerd werk.
+- **Een alleen-comment-wijziging telt niet.** Verander je in een module enkel comments/opmaak
+  (bv. een `// @ts-check`- of JSDoc-toevoeging), dan wordt die module overgeslagen — alleen een
+  echte gedragswijziging triggert de mutatie. De gedrags-equivalentie bepaalt
+  [`scripts/codeEquivalence.mjs`](../scripts/codeEquivalence.mjs) (Babel parse→print zónder
+  comments); een gewijzigde testfile telt altijd mee (tests bepalen de score). Zo her-muteert
+  een brede comment-sweep (bv. een `// @ts-check`-uitrol over alle modules) niet nodeloos álle
+  modules — wat anders flaky timeout-ruis gaf.
 - **Hij faalt alleen bij een echte daling**, niet als de score gelijk blijft of stijgt.
 - **De foutmelding zegt precies wat te doen** (zie hieronder).
 
@@ -131,7 +138,8 @@ Mutatietesten is hier **CPU-gebonden**: elke mutant draait een vers `node`-proce
 testfile + zijn imports herlaadt. De grootste kost is `date-fns` (een module die 'm
 importeert doet ~0,6 s/run; eentje zonder ~0,2 s). Wat we daaraan doen:
 
-- **De ratchet draait alleen de gewijzigde modules** — dat is veruit de belangrijkste
+- **De ratchet draait alleen de gewijzigde modules** (en slaat modules met een alleen-
+  comment-wijziging óók over — zie "De ratchet (CI)") — dat is veruit de belangrijkste
   versneller. Een typische PR (1–2 modules) is in ~1 minuut klaar; de volledige set
   (`--update` / een PR die alles raakt) duurt ~10 min.
 - **V8 compile-cache** (`NODE_COMPILE_CACHE`, automatisch gezet in `scripts/mutation.mjs`
