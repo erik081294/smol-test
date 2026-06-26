@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, SectionList, TextInput, Pressable, Platform, ScrollView } from 'react-native';
+import { View, Text, SectionList, Pressable, Platform, ScrollView } from 'react-native';
 import { useDialog } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -13,8 +13,9 @@ import { countOf } from '../lib/groceryCount';
 import { ProductImageView } from '../lib/ProductImageView';
 import { ModalHeader, Empty, Chip, Stepper, Row } from '../lib/ui';
 import { Icon } from '../lib/icons';
+import { SearchField } from '../lib/SearchField';
 import { animateNextLayout } from '../lib/motion';
-import { colors, space, radius, type, touchTarget, screenPadding } from '../lib/theme';
+import { colors, space, radius, type, screenPadding } from '../lib/theme';
 import { t } from '../lib/i18n';
 
 const RECENT_KEY = '__recent__';
@@ -168,26 +169,7 @@ export default function Catalog() {
 
       {/* Zoekbalk */}
       <View style={{ paddingHorizontal: screenPadding }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
-          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
-        }}>
-          <Icon name="search" size={20} color={colors.inkFaint} />
-          <TextInput
-            value={query} onChangeText={setQuery}
-            placeholder={t('catalog.search')} placeholderTextColor={colors.inkFaint}
-            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('catalog.search')}
-            style={{
-              flex: 1, minHeight: touchTarget, marginLeft: space.sm,
-              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
-            }}
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
-              <Icon name="close" size={18} color={colors.inkFaint} />
-            </Pressable>
-          ) : null}
-        </View>
+        <SearchField value={query} onChangeText={setQuery} label={t('catalog.search')} />
       </View>
 
       {/* Schap-filter — met "Eerder gekozen" als eerste chip; paddingVertical geeft de
