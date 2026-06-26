@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 4240,
-    "total": 5096,
-    "score": 83.2
+    "killed": 4263,
+    "total": 5144,
+    "score": 82.9
   },
   "files": {
     "lib/activity.js": {
@@ -28,9 +28,9 @@
       "score": 97.1
     },
     "lib/buyFrequency.js": {
-      "killed": 75,
-      "total": 80,
-      "score": 93.8
+      "killed": 88,
+      "total": 96,
+      "score": 91.7
     },
     "lib/choreLibrary.js": {
       "killed": 110,
@@ -138,9 +138,9 @@
       "score": 88.6
     },
     "lib/plantTimeline.js": {
-      "killed": 42,
-      "total": 48,
-      "score": 87.5
+      "killed": 55,
+      "total": 64,
+      "score": 85.9
     },
     "lib/priceTrack.js": {
       "killed": 58,
@@ -183,9 +183,9 @@
       "score": 93.5
     },
     "lib/visibility.js": {
-      "killed": 62,
+      "killed": 60,
       "total": 67,
-      "score": 92.5
+      "score": 89.6
     },
     "lib/offCategoryMap.js": {
       "killed": 53,
@@ -248,9 +248,9 @@
       "score": 94.3
     },
     "lib/vehicleCosts.js": {
-      "killed": 78,
+      "killed": 74,
       "total": 89,
-      "score": 87.6
+      "score": 83.1
     },
     "lib/vehicleSharing.js": {
       "killed": 41,
@@ -263,9 +263,9 @@
       "score": 85.1
     },
     "lib/vehicleTimeline.js": {
-      "killed": 163,
-      "total": 208,
-      "score": 78.4
+      "killed": 166,
+      "total": 224,
+      "score": 74.1
     },
     "lib/vehicleAppearance.js": {
       "killed": 52,

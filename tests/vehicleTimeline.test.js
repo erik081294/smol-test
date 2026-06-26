@@ -55,6 +55,19 @@ test('buildVehicleTimeline: voegt 3 bronnen samen, nieuwste eerst', () => {
   assert.equal(entries[3].title, 'Eerste toelating (RDW)');
 });
 
+test('buildVehicleTimeline: sorteer-vergelijker is stabiel — invoervolgorde maakt niet uit', () => {
+  // Forceert beide takken van de vergelijker: dezelfde entries in omgekeerde volgorde
+  // moeten dezelfde nieuwste-eerst-uitkomst geven (anders overleeft een </> -mutant).
+  const logs = [
+    { id: 'oud', performed_on: '2024-01-10' },
+    { id: 'mid', performed_on: '2025-03-15' },
+    { id: 'nieuw', performed_on: '2026-06-01' },
+  ];
+  const order = (ls) => buildVehicleTimeline({ logs: ls }).map((e) => e.id);
+  assert.deepEqual(order(logs), ['log:nieuw', 'log:mid', 'log:oud']);
+  assert.deepEqual(order([...logs].reverse()), ['log:nieuw', 'log:mid', 'log:oud']);
+});
+
 test('buildVehicleTimeline: lege bronnen → lege lijst; geen eerste-toelating → geen mijlpaal', () => {
   assert.deepEqual(buildVehicleTimeline(), []);
   assert.deepEqual(buildVehicleTimeline({ logs: [], vehicle: {} }), []);

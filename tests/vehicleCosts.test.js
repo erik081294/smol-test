@@ -54,6 +54,18 @@ test('maintenanceMonthlyAvgCents: eind-van-maand-cutoff overflowt niet (28 feb, 
   assert.equal(maintenanceMonthlyAvgCents(eindJan, { now, months: 1 }), 0);
 });
 
+test('maintenanceMonthlyAvgCents: venster is inclusief op beide grenzen', () => {
+  // Lokale Date-constructie (geen string-parsing) houdt de grensgelijkheid tijdzone-robuust:
+  // now, cutoff (= now − 12 mnd) en de logs liggen allemaal in dezelfde lokale tijd.
+  const now = new Date(2026, 5, 25, 12, 0, 0);                 // 25 jun 2026 12:00 lokaal
+  const opOndergrens = new Date(2025, 5, 25, 12, 0, 0).toISOString(); // exact now − 12 mnd
+  const opBovengrens = new Date(2026, 5, 25, 12, 0, 0).toISOString(); // exact now
+  // Een log precies óp de ondergrens telt mee (>= cutoff, niet > cutoff).
+  assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opOndergrens, cost_cents: 1200 }], { now }), 100);
+  // Een log precies óp de bovengrens telt mee (<= now, niet < now).
+  assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opBovengrens, cost_cents: 1200 }], { now }), 100);
+});
+
 test('vehicleCostSummary: telt vaste lasten + onderhoud + afschrijving op', () => {
   const now = new Date('2026-06-25');
   const s = vehicleCostSummary({
