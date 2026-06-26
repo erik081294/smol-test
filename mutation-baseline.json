@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 4263,
-    "total": 5144,
-    "score": 82.9
+    "killed": 4332,
+    "total": 5214,
+    "score": 83.1
   },
   "files": {
     "lib/activity.js": {
@@ -156,6 +156,11 @@
       "killed": 102,
       "total": 105,
       "score": 97.1
+    },
+    "lib/recipeCatalog.js": {
+      "killed": 69,
+      "total": 70,
+      "score": 98.6
     },
     "lib/recurrence.js": {
       "killed": 91,

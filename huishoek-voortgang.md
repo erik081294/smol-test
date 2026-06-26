@@ -389,3 +389,26 @@ de docs (zie [`docs/launch-readiness-2026-06-26.md`](docs/launch-readiness-2026-
   publiek vs. secret, `eas env:create`-commando's). De app-laag (`lib/monitoring.js` env-gated,
   `ErrorBoundary`) stond al uit plan 08. **Rest:** `SENTRY_AUTH_TOKEN` als EAS-env + eerste
   build die maps uploadt, en een crash op toestel terugzien in Sentry.
+
+---
+
+**Keuken-herontwerp — recepten-catalogus, ingrediënt-invoer & "wie eet mee" (MLT-4, 2026-06-26).**
+Toestelfeedback op de keuken-loop → drie losse PR's op volgorde.
+- **PR A (#67) — ingrediënt-invoer.** `lib/quantity.js` kreeg `parseAmount` (strikte numerieke
+  parser, NL-decimalen, `null` bij onzin/leeg/0; ratchet `quantity` 94,6%). De recept-editor
+  ([`app/recipe/[id].js`](app/recipe/%5Bid%5D.js)) kreeg de boodschappen-catalogus-beeldtaal:
+  `QtyControl` (−/+ mét typbaar decimaal-veld → grammen werkbaar), suggestierijen met productbeeld
+  i.p.v. losse chips, en een labelknop "Toevoegen"/"Bijwerken" i.p.v. de onduidelijke "+".
+- **PR B (#68) — catalogus + categorisering + receptpagina.** Migr. `0059` (`recipes.meal_moment`
+  + `dish_type`, vrije-tekst-assen, géén CHECK — taxonomie leeft in JS; **live**, DB t/m `0059`).
+  Nieuwe pure module [`lib/recipeCatalog.js`](lib/recipeCatalog.js) (`MEAL_MOMENTS`/`DISH_TYPES`/
+  `filterRecipes`/`momentMeta`/`dishTypeMeta`; ratchet **98,6%**, in baseline/mutation-groups/
+  tsconfig.check). De recepten-tab is nu een doorzoekbare catalogus (zoekbalk + filter-chips op
+  eet-moment & gerecht + rijen met cover/categorie-badge). Eén route `/recipe/:id` met twee
+  gezichten: **leespagina** (default — cover, badges, ingrediënten, bereiding, knoppen Bewerken/
+  Inplannen) vs **editor** (`?edit=1` of het `new`-sentinel; editor kreeg categorie-chips). De
+  scheiding aanmaken/inplannen/lezen die "openen = editor" miste. Iconen `edit`/`link` toegevoegd.
+- **PR C (in aanbouw) — weekmenu "wie eet mee".** Migr. `0060` (`meal_plan_entries.eater_ids[]` +
+  `extra_eaters`); leden aanvinken + gasten-teller, porties auto = eters (overschrijfbaar), eters
+  op de dagkaart.
+**Rest:** PR C afronden + mergen; device/web-rooktest van de hele loop.

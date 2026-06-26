@@ -61,6 +61,10 @@ export const GROUPS = [
   // groceryCatalog.js is grotendeels een data-tabel (productnamen/emoji's); StringLiteral-
   // mutaties daarop zijn ruis, zelfde redenering als i18n. De helper-LOGICA wordt wél gemuteerd.
   { test: 'groceryCatalog', srcs: ['lib/groceryCatalog.js'], exclude: ['StringLiteral'] },
+  // recipeCatalog.js is grotendeels een taxonomie-tabel (labels/emoji's); StringLiteral-
+  // mutaties daarop zijn data-ruis (zelfde redenering als groceryCatalog). De filter-LOGICA
+  // wordt wél gemuteerd.
+  { test: 'recipeCatalog', srcs: ['lib/recipeCatalog.js'], exclude: ['StringLiteral'] },
   { test: 'productImage', srcs: ['lib/productImage.js'] },
   { test: 'quantity', srcs: ['lib/quantity.js'] },
   { test: 'groceryCount', srcs: ['lib/groceryCount.js'] },
