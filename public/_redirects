@@ -1,0 +1,6 @@
+# Cloudflare Pages — SPA-fallback voor de single-output Expo-webexport.
+# Onbekende paden (bv. /join/<token> bij een koude load) booten de SPA via index.html;
+# client-side routing pakt het pad daarna op. Bestaande statische bestanden — o.a.
+# /.well-known/* — hebben voorrang en worden rechtstreeks geserveerd, niet door deze
+# catch-all gevangen.
+/*    /index.html    200

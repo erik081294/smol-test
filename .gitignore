@@ -12,3 +12,8 @@ dist/
 # Mutatietesten: Stryker-sandbox + (regenereerbaar) rapport — niet committen
 .stryker-tmp/
 reports/
+
+# EAS Submit-credentials: ASC API-key (.p8) + Google Play service-account JSON — geheim.
+# Map + README blijven in de repo (documentatie); de sleutelbestanden zelf niet.
+/credentials/*
+!/credentials/README.md

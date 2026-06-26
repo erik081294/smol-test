@@ -10,8 +10,27 @@ export default ({ config }) => ({
   userInterfaceStyle: 'automatic',  // app respecteert het apparaat-schema; 'Systeem'-thema werkt zo
   newArchEnabled: true,
   splash: { backgroundColor: '#0E3A2F' },
-  ios: { supportsTablet: true, bundleIdentifier: 'app.huishoek' },
-  android: { package: 'app.huishoek', adaptiveIcon: { backgroundColor: '#0E3A2F' } },
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: 'app.huishoek',
+    // Universal Links: een huishoek.app/join/<token>-link opent de app i.p.v. de browser.
+    // Apple verifieert dit tegen /.well-known/apple-app-site-association op huishoek.app.
+    associatedDomains: ['applinks:huishoek.app'],
+  },
+  android: {
+    package: 'app.huishoek',
+    adaptiveIcon: { backgroundColor: '#0E3A2F' },
+    // Android App Links: zelfde handoff, geverifieerd tegen /.well-known/assetlinks.json
+    // (autoVerify). Alleen het /join-pad — de rest van het web blijft in de browser.
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: 'huishoek.app', pathPrefix: '/join' }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
+  },
   web: { bundler: 'metro', output: 'single' },
   // Lazy routes in dev: alleen het startscherm zit in de eerste bundle, de rest
   // streamt binnen bij navigatie. Korter "grijs scherm" bij opstarten. Op
