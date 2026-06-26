@@ -14,6 +14,7 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
 import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -297,34 +298,21 @@ export default function PlantScreen() {
         {/* Tijdlijnpost-detail: (bij een foto) groot beeld, notitie bewerken,
             verwijderen. De sheet houdt zelf de onderrand vrij van de systeem-
             navigatie en wijkt voor het toetsenbord als je de notitie bewerkt. */}
-        <BottomSheet visible={!!selectedPhoto} onClose={() => setSelectedPhoto(null)} avoidKeyboard>
-          <ModalHeader title={selectedPhoto?.photo_path ? t('plant.timeline.photo') : t('plant.timeline.note')} onClose={() => setSelectedPhoto(null)} />
-          {/* De body krijgt een eigen padded wrapper (de ModalHeader pad zichzelf al). */}
-          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
-            {selectedPhoto?.photo_path ? (
-              <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
-                backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                {selectedPhotoUrl
-                  ? <Image source={{ uri: selectedPhotoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  : <ActivityIndicator color={colors.forest} />}
-              </View>
-            ) : null}
-            {selectedPhoto ? (
-              <Text style={[type.caption, { marginTop: 8 }]}>
-                {format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
-              </Text>
-            ) : null}
-            <View style={{ marginTop: space.md }}>
-              <Field label={t('plant.field.note')} value={noteText} onChangeText={setNoteText} multiline
-                placeholder={t('plant.field.note.placeholder')}
-                style={{ marginBottom: 0 }} />
-            </View>
-            <Row gap={space.sm} style={{ marginTop: space.md }}>
-              <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={confirmRemovePhoto} /></View>
-              <View style={{ flex: 1 }}><Button title={t('plant.note.save')} onPress={saveNote} /></View>
-            </Row>
-          </SheetScrollView>
-        </BottomSheet>
+        <PhotoDetailSheet
+          visible={!!selectedPhoto}
+          onClose={() => setSelectedPhoto(null)}
+          title={selectedPhoto?.photo_path ? t('plant.timeline.photo') : t('plant.timeline.note')}
+          hasPhoto={!!selectedPhoto?.photo_path}
+          imageUrl={selectedPhotoUrl}
+          dateText={selectedPhoto ? format(parseISO(selectedPhoto.created_at), 'd MMMM yyyy', { locale: dateLocale() }) : null}
+          noteValue={noteText}
+          onChangeNote={setNoteText}
+          noteLabel={t('plant.field.note')}
+          notePlaceholder={t('plant.field.note.placeholder')}
+          saveLabel={t('plant.note.save')}
+          onSave={saveNote}
+          onRemove={confirmRemovePhoto}
+        />
 
         {/* Losse notitie toevoegen aan de tijdlijn (zonder foto). */}
         <BottomSheet visible={composing} onClose={() => setComposing(false)} avoidKeyboard>

@@ -17,6 +17,7 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
 import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView } from '../../lib/ui';
+import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
@@ -361,33 +362,21 @@ export default function PetScreen() {
         </ScrollView>
 
         {/* Tijdlijn-post-detail */}
-        <BottomSheet visible={!!selected} onClose={() => setSelected(null)} avoidKeyboard>
-          <ModalHeader title={selected?.photo_path ? t('pet.timeline.photo') : (selected?.weight_grams != null ? t('pet.weight.title') : t('pet.timeline.note'))} onClose={() => setSelected(null)} />
-          <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18 }} keyboardShouldPersistTaps="handled">
-            {selected?.photo_path ? (
-              <View style={{ width: '100%', aspectRatio: 1, borderRadius: radius.md, overflow: 'hidden',
-                backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                {selectedUrl
-                  ? <Image source={{ uri: selectedUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  : <ActivityIndicator color={colors.forest} />}
-              </View>
-            ) : null}
-            {selected ? (
-              <Text style={[type.caption, { marginTop: 8 }]}>
-                {format(parseISO(selected.created_at), 'd MMMM yyyy', { locale: dateLocale() })}
-                {selected.weight_grams != null ? ` · ${t('pet.weight.value', { kg: (selected.weight_grams / 1000).toFixed(2).replace('.', ',') })}` : ''}
-              </Text>
-            ) : null}
-            <View style={{ marginTop: space.md }}>
-              <Field label={t('pet.field.note')} value={noteText} onChangeText={setNoteText} multiline
-                placeholder={t('pet.field.note.placeholder')} style={{ marginBottom: 0 }} />
-            </View>
-            <Row gap={space.sm} style={{ marginTop: space.md }}>
-              <View style={{ flex: 1 }}><Button title={t('common.remove')} icon="delete" variant="ghost" onPress={removeSelected} /></View>
-              <View style={{ flex: 1 }}><Button title={t('common.save')} onPress={saveNote} /></View>
-            </Row>
-          </SheetScrollView>
-        </BottomSheet>
+        <PhotoDetailSheet
+          visible={!!selected}
+          onClose={() => setSelected(null)}
+          title={selected?.photo_path ? t('pet.timeline.photo') : (selected?.weight_grams != null ? t('pet.weight.title') : t('pet.timeline.note'))}
+          hasPhoto={!!selected?.photo_path}
+          imageUrl={selectedUrl}
+          dateText={selected ? `${format(parseISO(selected.created_at), 'd MMMM yyyy', { locale: dateLocale() })}${selected.weight_grams != null ? ` · ${t('pet.weight.value', { kg: (selected.weight_grams / 1000).toFixed(2).replace('.', ',') })}` : ''}` : null}
+          noteValue={noteText}
+          onChangeNote={setNoteText}
+          noteLabel={t('pet.field.note')}
+          notePlaceholder={t('pet.field.note.placeholder')}
+          saveLabel={t('common.save')}
+          onSave={saveNote}
+          onRemove={removeSelected}
+        />
 
         {/* Notitie / gewicht toevoegen */}
         <BottomSheet visible={!!composing} onClose={() => setComposing(null)} avoidKeyboard>
