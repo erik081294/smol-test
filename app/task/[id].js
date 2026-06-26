@@ -17,7 +17,9 @@ import { colors, radius, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { visibilityPayload, validateVisibility } from '../../lib/visibility';
+import { visibilityPayload, visibilityRule } from '../../lib/visibility';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { requiredText, when } from '../../lib/formValidation';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { dateLocale, t, plural } from '../../lib/i18n';
@@ -72,10 +74,10 @@ export default function TaskEditor() {
   const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
   const [shareSubgroupId, setShareSubgroupId] = useState(null);
   const [shareWith, setShareWith] = useState([]); // profiel-ids bij 'custom'
-  const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState({});       // { title, date, visibility } — inline
   const [initialSnap, setInitialSnap] = useState(null);
-  const clearErr = (key) => setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
+  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
+  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
+  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
 
   // Bestaande taak inladen
   useEffect(() => {
@@ -146,14 +148,13 @@ export default function TaskEditor() {
     setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
 
   const save = async () => {
-    const e = {};
-    if (!title.trim()) e.title = t('task.error.title');
-    if (freq && !dueDate) e.date = t('task.error.recurDate');
-    if (freq && recurEndMode === 'until' && !recurUntil) e.recurEnd = t('task.recur.end.untilNone');
-    const visError = validateVisibility({ visibility, shareSubgroupId, shareWith });
-    if (visError) e.visibility = visError;
-    setErrors(e);
-    if (Object.keys(e).length) { haptics.error(); return; }
+    const ok = validate([
+      requiredText('title', t('task.error.title')),
+      when('date', (v) => !v.freq || !!v.dueDate, t('task.error.recurDate')),
+      when('recurEnd', (v) => !(v.freq && v.recurEndMode === 'until') || !!v.recurUntil, t('task.recur.end.untilNone')),
+      visibilityRule('visibility'),
+    ], { title, freq, dueDate, recurEndMode, recurUntil, visibility, shareSubgroupId, shareWith });
+    if (!ok) return;
     setBusy(true);
     // "Voor wie?" stuurt de toewijzing: precies één gekozen persoon → die persoon;
     // anders behouden we de bestaande assigned_to (Hele-huishouden/subgroep), zodat
