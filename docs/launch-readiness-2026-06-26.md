@@ -130,9 +130,10 @@ reeks kleinere; hieronder per stuk wat het was en wat er is gedaan.
 
 - `npm test` mét live-DB-secrets — **groen: 729 pass / 0 skip / 0 fail** (2026-06-26).
   De 21 RLS-integratietests draaiden dus écht (niet geskipt) tegen de live DB.
-- Migraties 0055 + 0056 + **0057** (per-gebruiker dag-quota) — live toegepast en
-  geverifieerd. MCP `list_migrations` bevestigt: de **volledige repo-set is live
-  t/m `0057`** (incl. `0053_household_invites` en `0054_tijdlijn`).
+- Migraties 0055 + 0056 + **0057** (per-gebruiker dag-quota) + **`0058`** (security: anon-
+  EXECUTE intrekken op de RLS-helpers + trigger-fns) — live toegepast en geverifieerd. MCP
+  `list_migrations` bevestigt: de **volledige repo-set is live t/m `0058`** (incl.
+  `0053_household_invites` en `0054_tijdlijn`).
 - RLS-integratietests — **gedraaid tegen de live DB en groen** (2026-06-26), incl.
   de nieuwe isolatiecases voor `timeline_posts`/`timeline_photos` en
   `household_invites` en de naar het invite-token-systeem gemigreerde testhelper.
