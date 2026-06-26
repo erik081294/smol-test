@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability -- Reanimated-worklets muteren SharedValue.value bewust (de regel ziet shared values ten onrechte als onveranderbaar). */
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Image, Pressable, TextInput, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Image, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS } from 'react-native-reanimated';
 import { useDialog } from '../../lib/dialog';
@@ -20,9 +20,10 @@ import {
   SegmentedControl, Avatar,
 } from '../../lib/ui';
 import { filterRecipes, MEAL_MOMENTS, DISH_TYPES, dishTypeMeta } from '../../lib/recipeCatalog';
+import { SearchField } from '../../lib/SearchField';
 import { defaultServings, eaterCount } from '../../lib/mealPlan';
 import { Icon } from '../../lib/icons';
-import { colors, space, type, radius, screenPadding, touchTarget } from '../../lib/theme';
+import { colors, space, type, radius, screenPadding } from '../../lib/theme';
 import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
@@ -275,26 +276,7 @@ function RecipesView({ recipes, loading, onNew, onOpen, onDelete }) {
     <View style={{ flex: 1 }}>
       {/* Zoekbalk (gelijk aan de boodschappen-catalogus) */}
       <View style={{ paddingHorizontal: screenPadding }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
-          borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md, marginBottom: space.sm,
-        }}>
-          <Icon name="search" size={20} color={colors.inkFaint} />
-          <TextInput
-            value={query} onChangeText={setQuery}
-            placeholder={t('recipes.search')} placeholderTextColor={colors.inkFaint}
-            autoCorrect={false} returnKeyType="search" accessibilityLabel={t('recipes.search')}
-            style={{
-              flex: 1, minHeight: touchTarget, marginLeft: space.sm,
-              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
-            }}
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
-              <Icon name="close" size={18} color={colors.inkFaint} />
-            </Pressable>
-          ) : null}
-        </View>
+        <SearchField value={query} onChangeText={setQuery} label={t('recipes.search')} />
       </View>
 
       {/* Twee filter-assen: eet-moment + soort gerecht. Nogmaals tikken = filter uit. */}
