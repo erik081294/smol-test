@@ -466,3 +466,37 @@ zodat het testaccount schoon blijft.
 **Resterende 🔧** vragen externe resources (geen losse device-tik): PLT-1/SEC-5 (notify-deploy),
 BOO-7/INF-9 (Orq), INF-4 (Sentry-build + crash), INF-5 (EAS/Play-account), INF-3 (Maestro-kalibratie),
 SEC-6/7 (sleutelhygiëne/CI), INF-11 (commit).
+
+---
+
+**2026-06-26 — Consolidatie-sweep (hergebruik) + device-smoketest.** Een sweep langs de codebase
+legde de rode draad bloot: de gedeelde abstracties bestónden al, maar de adoptie was half af (telkens
+gebruikte één vlaggenschip de gedeelde laag en hadden de andere domeinen een copy-paste-variant ernaast).
+In vier assen opgetrokken naar één gedeelde laag, elk los gemerged met groene CI:
+- **As 1 — foto-laag (#70).** plant/huisdier/voertuig leunen nu op de gedeelde, gecachte
+  `useSignedUrl`/`signedUrl`/`uploadPhoto` ([`lib/photoStorage.js`](lib/photoStorage.js)) i.p.v. eigen
+  kopieën. Bugfix: `useVehiclePhotoUrl` kreeg de ontbrekende `refreshKey`. `diaryPhotoPath`/`storagePath`
+  ontdubbeld (petPhoto re-exporteert uit plantPhoto). Nieuw `deletePhotoObjects` + pure `collectPhotoPaths`
+  ruimen recept-cover/voertuig-boekjefoto's op bij verwijderen (waren storage-wezen).
+- **As 2 — entity-editors (#71/#72/#73).** Alle 8 editors (uitgave + recept/voertuig/vaste-last/
+  plant/huisdier/taak) draaien nu op `useEntityForm` + de pure `formValidation`-regels i.p.v. een
+  per-scherm gekopieerd errors/validate-blok. **ARCH-1 daarmee afgerond.** Eén bewuste verbetering:
+  de voertuig-editor geeft nu óók de haptische foutpuls bij een lege naam (was niet zo).
+- **As 4 — gedeelde UI (#74/#75).** [`lib/PhotoDetailSheet.js`](lib/PhotoDetailSheet.js) (plant/huisdier
+  tijdlijn-detail) en [`lib/SearchField.js`](lib/SearchField.js) (catalogus + recepten) vervangen de
+  gedupliceerde markup; domein-verschillen blijven via props (gedragsneutraal).
+- **As 3 — datalaag, gescoped (#76).** [`lib/useCachedCollection.js`](lib/useCachedCollection.js) deelt
+  het stale-while-revalidate-seed + sleutelwissel-blok van useExpenses/usePurchases/useMealPlan. Bewust
+  níet de volledige rewrite op useCollection: hun venster-limiet/dubbele-tabel-realtime/RPC-CRUD en (bij
+  het weekmenu) venster-gekeyde cache verschillen te veel — dat zou net-negatief zijn.
+
+**Device-smoketest (moto, verse smoke-build van de PR's geïntegreerd op live main) — alles bevestigd:**
+- **SearchField:** catalogus ("kaas" → Geraspte/Jonge/Pinda/Smeerkaas) én recepten ("pasta" → Pasta
+  pesto) filteren correct; placeholder = toegankelijkheidslabel.
+- **PhotoDetailSheet:** plant — sheet opent, foto laadt (bevestigt meteen de foto-laag-signed-URL),
+  notitieveld, en Verwijderen toont de bevestig-dialog (plant-specifiek). **Huisdier — bevestigd**
+  (zelfde component; huisdier verwijdert zonder dialog, eigen pad).
+- **cached-collection:** Kosten laadt met saldo (`useExpenses`, household-keyed); Weekmenu laadt + de
+  week-wissel werkt (`useMealPlan`, venster-keyed). `usePurchases` = identiek patroon.
+Geen crashes/red-boxes; **geen fixes nodig.** Daarna #74–#77 gemerged → `main` in balans (0 open PR's,
+alle branches volledig in main).

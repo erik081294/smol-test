@@ -15,6 +15,7 @@ Gegroepeerd per module (ID-prefix). Kolommen gelijk aan de canonieke tabel.
 | FND-1 | Fundament | Subgroepen & zichtbaarheid | 0 | Must | L | ✅ | — | `subgroups`/`subgroup_members`, `can_view`, `lib/visibility.js`, migratie 0003. |
 | FND-2 | Fundament | Module-architectuur | 0 | Must | M | ✅ | — | `lib/modules.js`, `enable_module_rls()`, migratie 0003. |
 | FND-4 | Fundament | Module-toggles (huishouden + gebruiker) | 0 | Should | M | ✅ | FND-2 | Default-on; owner zet uit per huishouden, lid per gebruiker. Migratie 0004, `effectiveModules()`. |
+| ARCH-1 | Fundament | Gedeelde entity-editor (formValidation + useEntityForm) | — | Should | M | ✅ | — | Pure [`lib/formValidation.js`](lib/formValidation.js) + dunne [`lib/useEntityForm.js`](lib/useEntityForm.js) + `visibilityRule` ([`lib/visibility.js`](lib/visibility.js)). **Alle 8 editors gemigreerd** (uitgave/recept/voertuig/vaste-last/plant/huisdier/taak) — per-scherm errors/validate-blok weg. **Device-smoke-getest 2026-06-26 (moto).** Contract: [`docs/architectuur.md`](docs/architectuur.md). |
 
 ## KLU — Klussen
 
