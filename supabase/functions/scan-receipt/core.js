@@ -1,3 +1,4 @@
+// @ts-check
 // Pure kern van de scan-receipt Edge Function (BOO-7) — géén Deno/netwerk nodig,
 // los testbaar (tests/scanReceipt.test.js). De impure schil (index.ts) doet de
 // auth/rate-limit/Orq-call en gebruikt deze helpers voor validatie + normalisatie.

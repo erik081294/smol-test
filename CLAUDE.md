@@ -43,7 +43,30 @@ de merge op de mutatie-ratchet zakte — dat voorkomen we hiermee.)
    Geen losse functie zonder test mergen. Een test náást de functie vangt vrijwel de hele
    ratchet-daling af nog vóór de mutatietest eraan te pas komt — dit is de goedkoopste fix.
 
-3. **Volledige suite groen:** `npm test`.
+3. **Raakte je een pure logica-module? Houd de type-laag groen:** `npm run typecheck`.
+   De `MUTATED_SOURCES`-modules draaien opt-in onder `// @ts-check` (scope: `tsconfig.check.json`),
+   met `strict` bewust uit — het vangt verkeerde shapes/arg-fouten, niet elke null. Nieuwe pure
+   module? Zet `// @ts-check` op regel 1 én neem 'm op in de `include` van `tsconfig.check.json`
+   (de meta-test `tests/typecheckCoverage.test.js` bewaakt dit). Houd een fix **type-only**
+   (JSDoc / `@type`-cast): de runtime-code — en dus de mutatie-score — mag niet wijzigen.
+
+4. **Volledige suite groen:** `npm test`.
+
+5. **Verschoof je een feit dat een doc beweert? Werk die doc in dezelfde PR bij.**
+   Status leeft op één plek: backlog §6 (lopend/open) + het archief (✅). Raak je iets aan dat
+   een doc als waar neerzet — een migratie live, een test groen/rood, een feature verscheept,
+   een 🔧 dat op toestel bevestigd is — corrigeer dan de bijbehorende rij *vóór* de merge. Drie
+   vaste reflexen:
+   - **Verifieer status tegen de bron, niet tegen de doc.** Migratiestand via MCP
+     `list_migrations` (of `supabase migration list`), RLS via de live-suite, build-status via de
+     run — nooit via een nummer/claim dat ergens is overgetypt. (Dit beet ons: §6 zei "0036 live"
+     terwijl de DB op `0057` stond, en twee rijen claimden "nog live zetten" voor migraties die
+     al live waren.)
+   - **Eén feit, één plek.** Zet build-historie in [`huishoek-voortgang.md`](huishoek-voortgang.md)
+     of `docs/plans/*`, status in §6 — herhaal een status niet in een tweede doc, dan kan er niets
+     uiteenlopen.
+   - **Bevestigd 🔧 → ✅ → archief.** Verplaats het naar
+     [`huishoek-backlog-archief.md`](huishoek-backlog-archief.md) mét zijn notitie; laat geen ✅ in §6 staan.
 
 > Dev-omgeving: `node:test` draait via `npm test`. Ontbreekt `@stryker-mutator/core` bij
 > het mutatie-commando, draai dan eerst `npm ci` (mutatietesten zit in devDependencies).
