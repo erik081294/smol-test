@@ -13,6 +13,14 @@ test('dayKeyOf: lokale dag-sleutel, null bij leeg/ongeldig', () => {
   assert.equal(dayKeyOf('geen-datum'), null);
 });
 
+test('dayKeyOf: datum-only string is tijdzone-veilig, timestamp blijft lokaal', () => {
+  // '2026-06-01' is een kalenderdag; mag onder een negatieve-offset-zone niet 31 mei worden
+  // (zie tests/register.mjs — de suite draait gepind op zo'n zone).
+  assert.equal(dayKeyOf('2026-06-01'), '2026-06-01');
+  // Een volledige timestamp blijft lokaal afgelezen (instant → lokale kalenderdag).
+  assert.equal(dayKeyOf('2026-06-22T08:30:00'), '2026-06-22');
+});
+
 test('relativeDayLabel: vandaag/gisteren/anders', () => {
   const now = new Date('2026-06-25T12:00:00');
   assert.equal(relativeDayLabel('2026-06-25', now), 'today');

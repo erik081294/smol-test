@@ -42,6 +42,18 @@ test('maintenanceMonthlyAvgCents: alleen kosten binnen het venster → maandgemi
   assert.equal(maintenanceMonthlyAvgCents([], { now }), 0);
 });
 
+test('maintenanceMonthlyAvgCents: eind-van-maand-cutoff overflowt niet (28 feb, niet 3 mrt)', () => {
+  // now = 31 mrt, venster = 1 maand. De cutoff hoort ~28 feb te zijn. Met het kale
+  // Date.setMonth zou de cutoff naar 3 mrt overflowen → een log van 1 mrt zou dan
+  // (fout) buiten het venster vallen. We assert dat 'ie juist binnen valt.
+  const now = new Date('2026-03-31T12:00:00Z');
+  const beginMaart = [{ performed_on: '2026-03-01', cost_cents: 6000 }];
+  assert.equal(maintenanceMonthlyAvgCents(beginMaart, { now, months: 1 }), 6000); // /max(1,1)
+  // Een log van eind januari ligt vóór 28 feb → buiten het 1-maands-venster.
+  const eindJan = [{ performed_on: '2026-01-28', cost_cents: 6000 }];
+  assert.equal(maintenanceMonthlyAvgCents(eindJan, { now, months: 1 }), 0);
+});
+
 test('vehicleCostSummary: telt vaste lasten + onderhoud + afschrijving op', () => {
   const now = new Date('2026-06-25');
   const s = vehicleCostSummary({

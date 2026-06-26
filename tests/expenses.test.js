@@ -139,6 +139,18 @@ test('computeShares: restcenten gaan naar grootste fractie, dan op id', () => {
   assert.equal(sum(out2), 1002);
 });
 
+test('computeShares: som-invariant blijft kloppen, óók bij een negatief totaal', () => {
+  // De invoerpaden weigeren negatief, maar de functie hoort de som-invariant te
+  // bewaren als een toekomstige refund-feature dit tóch raakt (regressievangnet).
+  const neg = computeShares({ amountCents: -1000, splitType: SPLIT.EQUAL, participants: P('a', 'b', 'c') });
+  assert.equal(sum(neg), -1000);
+  const negShares = computeShares({
+    amountCents: -100, splitType: SPLIT.SHARES,
+    participants: [{ profileId: 'z', weight: 1 }, { profileId: 'a', weight: 2 }, { profileId: 'm', weight: 3 }],
+  });
+  assert.equal(sum(negShares), -100);
+});
+
 test('settle: deterministische koppeling bij gelijke bedragen (op id)', () => {
   const payments = settle({ x: -500, a: -500, c: 500, z: 500 });
   assert.deepEqual(payments, [

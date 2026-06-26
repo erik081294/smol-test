@@ -70,3 +70,12 @@ test('frequencyEstimate: zelfde dag twee keer → mediaan 0 en dueScore 0 (geen 
   assert.equal(est.medianDays, 0);
   assert.equal(est.dueScore, 0);
 });
+
+test('datum-only strings zijn tijdzone-veilig (geen UTC-dagverschuiving)', () => {
+  // '2026-06-15' is een kalenderdag, geen UTC-instant. Onder een negatieve-offset-tijdzone
+  // mag new Date('2026-06-15') 'm niet naar 14 juni verschuiven. (De suite draait gepind
+  // op zo'n zone — zie tests/register.mjs — zodat deze klasse fouten altijd zichtbaar is.)
+  const est = frequencyEstimate(['2026-06-01', '2026-06-15'], new Date(2026, 5, 20));
+  assert.equal(est.lastPurchasedOn, '2026-06-15'); // niet '2026-06-14'
+  assert.equal(est.daysSince, 5);                  // niet 6
+});
