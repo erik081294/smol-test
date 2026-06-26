@@ -16,7 +16,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView } from '../../lib/ui';
+import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView, SwipeRow } from '../../lib/ui';
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -26,7 +26,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when } from '../../lib/formValidation';
-import { recurrenceLabel } from '../../lib/recurrence';
+import { recurrenceLabel, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -77,7 +77,7 @@ export default function PetScreen() {
   const toast = useToast();
   const dialog = useDialog();
   const { addPet, removePet } = usePets();
-  const { tasks, reload: reloadTasks, completeTask, uncompleteTask } = useTasks();
+  const { tasks, reload: reloadTasks, completeTask, uncompleteTask, deleteTask, updateTask } = useTasks();
   const { subgroups, members, activeId } = useHousehold();
   const { user } = useAuth();
 
@@ -135,6 +135,9 @@ export default function PetScreen() {
 
   // ----- Bestaand huisdier: detail -----
   const [pet, setPet] = useState(null);
+  // Lokaal verborgen verzorgingstaken (optimistisch wissen met undo-vangnet, zelfde
+  // patroon als taken.js): pas bij het verlopen van de toast écht verwijderen.
+  const [hiddenTaskIds, setHiddenTaskIds] = useState([]);
   useEffect(() => {
     if (isNew) return;
     supabase.from('pets').select('*').eq('id', id).single()
@@ -221,8 +224,35 @@ export default function PetScreen() {
   if (!isNew) {
     if (!pet) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
     const tp = petType(pet.type);
-    const petTasks = tasks.filter((pt) => pt.pet_id === pet.id);
+    const petTasks = tasks.filter((pt) => pt.pet_id === pet.id && !hiddenTaskIds.includes(pt.id));
     const toggle = (task) => (task.completed_at ? uncompleteTask(task.id) : completeTask(task));
+
+    // Veeg-acties op verzorgingstaken (zelfde conventie als taken.js): links = verwijderen
+    // (met undo-vangnet, pas bij toast-expiry echt weg), rechts = uitstellen (één dag vooruit).
+    const removeTaskWithUndo = (task) => {
+      setHiddenTaskIds((h) => [...h, task.id]);
+      toast.show({
+        message: t('tasks.deleted', { name: task.title }),
+        actionLabel: t('common.undo'),
+        onAction: () => setHiddenTaskIds((h) => h.filter((x) => x !== task.id)),
+        onExpire: async () => {
+          try { await deleteTask(task.id); }
+          catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+          finally { setHiddenTaskIds((h) => h.filter((x) => x !== task.id)); }
+        },
+      });
+    };
+
+    const snoozeTaskWithUndo = (task) => {
+      const prev = task.due_date ?? null;
+      const next = snoozeDate(task, 1);
+      updateTask(task.id, { due_date: next });
+      toast.show({
+        message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
+        actionLabel: t('common.undo'),
+        onAction: () => updateTask(task.id, { due_date: prev }),
+      });
+    };
     const age = ageLabel(pet.birth_date);
 
     // Welke templates hebben al een gekoppelde taak (gematcht op titel-prefix)?
@@ -323,7 +353,14 @@ export default function PetScreen() {
           </Row>
           {petTasks.length === 0
             ? <Text style={type.caption}>{t('pet.noTasks')}</Text>
-            : petTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle} />)}
+            : petTasks.map((task) => (
+              <SwipeRow key={task.id}
+                left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(task) }}
+                right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(task) }}
+              >
+                <TaskRow task={task} members={members} onToggle={toggle} />
+              </SwipeRow>
+            ))}
 
           {/* Extra info (chip, dierenarts, notitie) — alleen tonen wat ingevuld is. */}
           {(pet.chip_number || pet.vet_name || pet.notes) ? (
