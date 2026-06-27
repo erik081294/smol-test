@@ -19,7 +19,7 @@ export const MAX_BODY = 178;       // praktische lengte voor APNs/Expo-notificat
 export function clampBody(text, max = MAX_BODY) {
   let s = '';
   for (const ch of String(text ?? '')) {
-    const code = ch.codePointAt(0);
+    const code = /** @type {number} */ (ch.codePointAt(0));
     s += code < 0x20 || code === 0x7f ? ' ' : ch; // controletekens → spatie
   }
   s = s.replace(/\s+/g, ' ').trim();

@@ -6,9 +6,13 @@
 //                          een lawine over alle 115 lib-bestanden + de React-schil.
 // - strictNullChecks:true → vangt de hoogwaarde-bug: dereferencen van iets dat
 //                          undefined/null kan zijn (bv. .find(...) dat niets vindt).
+//                          LET OP: dit moet EXPLICIET aan, want `strict:false` hieronder
+//                          zet strictNullChecks anders óók uit — dan draait de poort wél
+//                          groen maar bewaakt hij die bug-klasse niet (de laag is dan inert).
+// - strict:false         → houdt noImplicitAny uit, zodat niet-geannoteerde params geen
+//                          ruis geven; aanscherpen is een latere ratchet-stap. We zetten
+//                          alleen strictNullChecks gericht terug aan.
 // - allowJs/noEmit/moduleResolution erven van expo/tsconfig.base via ./tsconfig.json.
-//   noImplicitAny blijft uit (geen `strict`), zodat niet-geannoteerde params geen ruis
-//   geven; aanscherpen is een latere ratchet-stap.
 //
 // Scope = EXACT de pure logica-modules uit GROUPS/MUTATED_SOURCES (scripts/mutation-
 // groups.mjs) — dezelfde laag die de mutatie-ratchet bewaakt. De React-schil
@@ -20,7 +24,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "checkJs": false,
-    "strict": false
+    "strict": false,
+    "strictNullChecks": true
   },
   "include": [
     "lib/activity.js",

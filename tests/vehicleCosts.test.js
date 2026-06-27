@@ -13,6 +13,8 @@ test('monthlyEquivalentCents: maand/week/dag herschaald, onbekend → 0', () => 
   assert.equal(Math.round(monthlyEquivalentCents(100, RECUR.DAILY)), 3042);   // 100 × 365/12
   assert.equal(monthlyEquivalentCents(5000, 'yearly'), 0);                // onbekende freq
   assert.equal(monthlyEquivalentCents(null, RECUR.MONTHLY), 0);
+  assert.equal(monthlyEquivalentCents(5000, RECUR.MONTHLY, 0), 5000);     // interval 0 → `|| 1`-fallback
+  assert.equal(monthlyEquivalentCents(5000, RECUR.MONTHLY, -3), 5000);    // negatieve interval → Math.max(1,…)-vloer
 });
 
 test('depreciationEstimate: dalende balans, null zonder prijs/datum', () => {
@@ -20,6 +22,15 @@ test('depreciationEstimate: dalende balans, null zonder prijs/datum', () => {
   const est = depreciationEstimate({ catalogPriceCents: 3000000, firstRegistration: '2018-06-25', now });
   assert.ok(est.currentValueCents < 3000000 && est.currentValueCents > 0, 'waarde gedaald maar positief');
   assert.ok(est.annualCents > 0 && est.monthlyCents === Math.round(est.annualCents / 12));
+  // Exacte afschrijvingsfactor vastpinnen: leeftijd precies 1 jaar (365.25 dagen) → waarde =
+  // catalogus × 0.82^1, en het verlies van het afgelopen jaar = catalogus × (1 − 0.82). Dit pint
+  // r=0.82 én de exponent-richting (een mutant op r of Math.pow(r, age) wijkt af van deze centen).
+  const start = new Date('2020-01-01T00:00:00.000Z');
+  const eenJaarLater = new Date(start.getTime() + 365.25 * 24 * 3600 * 1000);
+  const exact = depreciationEstimate({ catalogPriceCents: 3000000, firstRegistration: start, now: eenJaarLater });
+  assert.equal(exact.currentValueCents, 2460000); // 3000000 × 0.82
+  assert.equal(exact.annualCents, 540000);        // 3000000 × (1 − 0.82)
+  assert.equal(exact.monthlyCents, 45000);        // 540000 / 12
   // Restwaarde-ondergrens: een heel oude auto zakt niet onder 10% catalogus.
   const oud = depreciationEstimate({ catalogPriceCents: 3000000, firstRegistration: '1990-01-01', now });
   assert.equal(oud.currentValueCents, 300000); // exact de 10%-vloer
@@ -40,6 +51,9 @@ test('maintenanceMonthlyAvgCents: alleen kosten binnen het venster → maandgemi
   ];
   assert.equal(maintenanceMonthlyAvgCents(logs, { now }), Math.round(36000 / 12)); // 3000
   assert.equal(maintenanceMonthlyAvgCents([], { now }), 0);
+  // months = 0: de Math.max(1, months)-vloer voorkomt deling door 0. Een log exact op `now` valt
+  // binnen het nul-brede venster [now, now]; zonder de vloer zou dit 1200/0 = Infinity geven.
+  assert.equal(maintenanceMonthlyAvgCents([{ performed_on: '2026-06-25', cost_cents: 1200 }], { now, months: 0 }), 1200);
 });
 
 test('maintenanceMonthlyAvgCents: eind-van-maand-cutoff overflowt niet (28 feb, niet 3 mrt)', () => {
