@@ -148,6 +148,11 @@ npx --yes supabase@latest db push
       in [`app/purchase/[id].js`](app/purchase/[id].js) (rgl. 169+) is dus niet bereikbaar via de UI.
       Niet "rest: op toestel" maar **entry-point ontbreekt** — eerst inbouwen (bv. vanuit de
       activiteitenfeed of een bonnenlijst), dan rooktesten.
+- [ ] **BOO-13** — producteditor: tik op een product in de Catalogus → editor; naam/schap/
+      eenheid/emoji aanpassen + opslaan (geldt huishouden-breed); **foto** kiezen → upload →
+      render via signed URL; de "even aankleden?"-prompt na een nieuw item; bewerkte emoji/foto
+      verschijnt in "Eerder gekozen". Migr. `0061`/`0062` live. (Foto-keuze: zelfde
+      ActivityResultLauncher-gotcha als MLT-3 hieronder.)
 - [ ] **MLT-3** — recept-omslagfoto kiezen/uploaden/tonen.
       **◐ Device 2026-06-26 (moto):** *tonen* ✓ ("Pasta pest" toont z'n cover) en de Galerij-picker
       **opent** (systeem-`com.google.android.photopicker`). Het daadwerkelijke kiezen/uploaden bewust
