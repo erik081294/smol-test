@@ -21,7 +21,9 @@ test('parseRatePerKm: euro/km → centen/km, leeg/onzin/negatief → null', () =
   assert.equal(parseRatePerKm(''), null);
   assert.equal(parseRatePerKm(null), null);
   assert.equal(parseRatePerKm('-2'), null);
+  assert.equal(parseRatePerKm('1-2'), null);     // minteken binnenin → null (s.includes('-'))
   assert.equal(parseRatePerKm('gratis'), null);
+  assert.equal(parseRatePerKm('0,255'), 26);     // 0,255 × 100 = 25,5 → Math.round → 26 (pint *100 + afronding)
 });
 
 test('formatRatePerKm: centen/km → toonbaar, null → leeg', () => {

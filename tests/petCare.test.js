@@ -125,7 +125,8 @@ test('ageLabel: maanden, jaren en samengesteld', () => {
   assert.equal(ageLabel(null, now), null);
   assert.equal(ageLabel('2026-05-22', now), '1 maand');
   assert.equal(ageLabel('2025-10-22', now), '8 maanden');
-  assert.equal(ageLabel('2025-06-22', now), '1 jaar');
+  assert.equal(ageLabel('2025-07-22', now), '11 maanden'); // net onder de grens (11 < 12)
+  assert.equal(ageLabel('2025-06-22', now), '1 jaar');     // exact 12 mnd → jaar (grens)
   assert.equal(ageLabel('2024-04-22', now), '2 jaar, 2 mnd');
 });
 
