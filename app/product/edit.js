@@ -1,18 +1,20 @@
-import React, { useMemo } from 'react';
-import { View, Text } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, Image, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useProducts } from '../../lib/useProducts';
+import { useProducts, PRODUCT_BUCKET } from '../../lib/useProducts';
 import { useToast } from '../../lib/toast';
+import { useSignedUrl } from '../../lib/photoStorage';
+import { offerImagePicker } from '../../lib/photoPicker';
 import { Editor, Field, Chip, EmojiPicker, Empty } from '../../lib/ui';
 import { requiredText } from '../../lib/formValidation';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { CATEGORIES } from '../../lib/groceryCatalog';
-import { colors, type, space } from '../../lib/theme';
+import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
 
 // Producteditor (BOO-13): bewerk een huishoud-catalogusproduct — naam, schap, standaard-
-// eenheid en een icoon (emoji). Schrijft naar de gedeelde `products`-rij, dus geldt
-// huishouden-breed. Bereikbaar vanuit de Catalogus (tik op een product) en uit de
+// eenheid, een icoon (emoji) en een foto. Schrijft naar de gedeelde `products`-rij, dus
+// geldt huishouden-breed. Bereikbaar vanuit de Catalogus (tik op een product) en uit de
 // "even aankleden?"-prompt nadat je een nieuw product toevoegt.
 
 // Curated icoon-set: de schap-emoji's + een handvol veelvoorkomende producten. De huidige
@@ -25,7 +27,7 @@ const BASE_EMOJI = [
 export default function ProductEditScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { products, loading, updateProduct } = useProducts();
+  const { products, loading, updateProduct, setProductPhoto, clearProductPhoto } = useProducts();
   const product = products.find((p) => p.id === id) ?? null;
 
   if (!product) {
@@ -37,10 +39,18 @@ export default function ProductEditScreen() {
   }
   // Pas als het product geladen is monteren we het formulier, zodat useEntityForm met de
   // juiste beginwaarden initialiseert (de hook leest initialValues alleen bij mount).
-  return <ProductEditForm key={product.id} product={product} updateProduct={updateProduct} />;
+  return (
+    <ProductEditForm
+      key={product.id}
+      product={product}
+      updateProduct={updateProduct}
+      setProductPhoto={setProductPhoto}
+      clearProductPhoto={clearProductPhoto}
+    />
+  );
 }
 
-function ProductEditForm({ product, updateProduct }) {
+function ProductEditForm({ product, updateProduct, setProductPhoto, clearProductPhoto }) {
   const router = useRouter();
   const toast = useToast();
   const { values, setField, errors, busy, submit } = useEntityForm({
@@ -49,12 +59,26 @@ function ProductEditForm({ product, updateProduct }) {
     unit: product.default_unit ?? '',
     emoji: product.emoji ?? null,
   });
+  const [photoAsset, setPhotoAsset] = useState(null); // vers gekozen { uri, base64, ext }
+  const [photoCleared, setPhotoCleared] = useState(false);
+
+  // Bestaande foto tonen tenzij er een verse is gekozen of 'm gewist is.
+  const showExisting = !!product.photo_path && !photoAsset && !photoCleared;
+  const existingUrl = useSignedUrl(PRODUCT_BUCKET, showExisting ? product.photo_path : null, product.photo_path);
+  const previewUri = photoAsset?.uri ?? (showExisting ? existingUrl : null);
+  const hasPhoto = !!photoAsset || showExisting;
 
   const dirty = (
     values.name !== (product.name ?? '')
     || (values.category ?? null) !== (product.category ?? null)
     || values.unit !== (product.default_unit ?? '')
     || (values.emoji ?? null) !== (product.emoji ?? null)
+    || !!photoAsset || photoCleared
+  );
+
+  const choosePhoto = () => offerImagePicker(
+    (asset) => { setPhotoAsset(asset); setPhotoCleared(false); },
+    { allowRemove: hasPhoto, onRemove: () => { setPhotoAsset(null); setPhotoCleared(true); } },
   );
 
   // De huidige emoji vooraan tonen als 'ie niet in de standaardset zit (geen dubbele).
@@ -71,6 +95,14 @@ function ProductEditForm({ product, updateProduct }) {
         defaultUnit: vals.unit?.trim() || null,
         emoji: vals.emoji,
       });
+      // Foto na de veldopslag (een foto-fout mag de rest niet terugdraaien).
+      try {
+        if (photoAsset) await setProductPhoto(product.id, photoAsset);
+        else if (photoCleared) await clearProductPhoto(product.id);
+      } catch (e) {
+        toast.show({ message: t('product.photo.failed') });
+        console.warn('[Huishoek] Productfoto opslaan mislukt:', e?.message ?? e);
+      }
       toast.show({ message: t('product.edit.saved', { name: vals.name.trim() }) });
       router.back();
     },
@@ -78,6 +110,28 @@ function ProductEditForm({ product, updateProduct }) {
 
   return (
     <Editor title={t('product.edit.title')} onClose={() => router.back()} onConfirm={save} busy={busy} dirty={dirty}>
+      {/* Foto */}
+      <Text style={[type.label, { marginBottom: space.sm }]}>{t('product.edit.photo')}</Text>
+      <Pressable
+        onPress={choosePhoto}
+        accessibilityRole="button"
+        accessibilityLabel={hasPhoto ? t('product.edit.photo.change') : t('product.edit.photo.add')}
+        style={{
+          width: 96, height: 96, borderRadius: radius.md, overflow: 'hidden',
+          backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+          borderWidth: 1, borderColor: colors.line, marginBottom: space.md,
+        }}
+      >
+        {previewUri
+          ? <Image source={{ uri: previewUri }} style={{ width: 96, height: 96 }} resizeMode="cover" />
+          : (
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 28 }}>📷</Text>
+              <Text style={[type.caption, { color: colors.inkSoft }]}>{t('product.edit.photo.add')}</Text>
+            </View>
+          )}
+      </Pressable>
+
       <Field
         label={t('product.edit.name')}
         value={values.name}

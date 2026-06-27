@@ -596,3 +596,18 @@ opdringerige "even aankleden?"-prompt → editor. Een bewerkte emoji verschijnt 
 776 pass / 0 fail, `typecheck` + ESLint groen; geen pure-logica-module geraakt (mutatie n.v.t.).
 **Rest:** device-rooktest; **foto-upload** als afbeelding (bucket + `photoPicker`) bewust als
 vervolg-increment — nu is het visueel een emoji.
+
+**BOO-13 vervolg — productfoto's (2026-06-27).** De foto-upload uit "rest" afgemaakt, door het
+bewezen foto-patroon te spiegelen i.p.v. een nieuw mechanisme te bouwen (volwassen/stabiel).
+Migr. `0062` (`products.photo_path` + private bucket `product-images` met household-gescopete
+RLS — exact het recepten/`0034`-patroon, `is_member` op het eerste pad-segment), **live via MCP**
++ repo-bestand. Hergebruikt de bestaande infra volledig: [`offerImagePicker`](lib/photoPicker.js)
+(resizet al, PERF-7), [`uploadPhoto`](lib/photoStorage.js) en [`useSignedUrl`](lib/photoStorage.js)
+(mét in-memory URL-cache → geen N+1 in lijsten). [`useProducts`](lib/useProducts.js) kreeg
+`setProductPhoto` (uniek pad per upload → cache-bust, oude foto best-effort opgeruimd) en
+`clearProductPhoto`. [`ProductImageView`](lib/ProductImageView.js) toont nu foto → asset → emoji →
+schap-emoji (signed URL, alleen voor producten mét `photo_path`, dus geen onnodige calls). Editor
+kreeg een foto-kiezer met preview + verwijderen; "Eerder gekozen" in de Catalogus toont de foto.
+**Verificatie:** `npm test` 776 pass / 0 fail, `typecheck` + ESLint groen; geen pure-logica-module
+geraakt. **Rest:** device-rooktest (upload + signed-URL-render op toestel) — security-RLS spiegelt
+de live-geverifieerde recepten-bucket.
