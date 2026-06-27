@@ -153,6 +153,10 @@ npx --yes supabase@latest db push
       render via signed URL; de "even aankleden?"-prompt na een nieuw item; bewerkte emoji/foto
       verschijnt in "Eerder gekozen". Migr. `0061`/`0062` live. (Foto-keuze: zelfde
       ActivityResultLauncher-gotcha als MLT-3 hieronder.)
+- [ ] **MLT-4 (UX) — recepteneditor ingrediënt-invoer** — typ/kies een ingrediënt → het
+      composer-kaartje verschijnt (Hoeveelheid-stepper + Eenheid-chips op volle breedte +
+      primary "Toevoegen"); controleer dat de twee `+`'jes niet meer verwarren, dat alle
+      eenheden zichtbaar zijn, en dat toevoegen/bewerken werkt. ([`app/recipe/[id].js`](app/recipe/%5Bid%5D.js))
 - [ ] **MLT-3** — recept-omslagfoto kiezen/uploaden/tonen.
       **◐ Device 2026-06-26 (moto):** *tonen* ✓ ("Pasta pest" toont z'n cover) en de Galerij-picker
       **opent** (systeem-`com.google.android.photopicker`). Het daadwerkelijke kiezen/uploaden bewust
