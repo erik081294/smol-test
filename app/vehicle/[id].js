@@ -9,7 +9,7 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { maintenanceTemplates, defaultMaintenanceKeys, intervalLabel } from '../../lib/vehicleCare';
-import { isValidPlate, lookupPlate } from '../../lib/rdw';
+import { isValidPlate, lookupPlate, normalizePlate } from '../../lib/rdw';
 import { CarGlyph } from '../../lib/CarGlyph';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { parseRatePerKm, formatRatePerKm } from '../../lib/vehicleSharing';
@@ -78,15 +78,19 @@ export default function VehicleEditor() {
   // Prijs per km (V4): tarief dat de eigenaar rekent bij delen. Leeg = gratis.
   const [priceKm, setPriceKm] = useState(existing?.price_per_km_cents != null ? formatRatePerKm(existing.price_per_km_cents) : '');
 
-  // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Bij een geldig kenteken
-  // vult 'ie merk/model/type — maar alléén lege velden, zodat handmatige invoer nooit
-  // wordt overschreven. Faalt de RDW (offline/onbekend/timeout), dan gebeurt er stil niets.
+  // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Faalt de RDW (offline/
+  // onbekend/timeout), dan gebeurt er stil niets.
+  //
+  // Gedrag bij invullen vs. wíjzigen (op verzoek): als de gebruiker het kenteken WIJZIGT
+  // naar een andere auto, dan ververst de lookup de afgeleide velden (merk/model/type/
+  // bouwjaar + de verrijking incl. APK) — die hoorden immers bij de vórige auto. Op het
+  // openen van een bestaand voertuig (kenteken ongewijzigd) vullen we alléén nog lege
+  // velden, zodat handmatige correcties op de opgeslagen auto niet worden overschreven.
+  // `appliedPlate` onthoudt voor welk kenteken de velden nu gelden.
   const [lookupState, setLookupState] = useState(null); // null | 'busy' | 'found' | 'none'
-  // Verrijking uit de laatste geslaagde RDW-lookup (kleur/carrosserie/APK/eerste-toelating/
-  // prijs/massa). Bij bewerken pas opgeslagen als er een verse lookup was; anders blijft
-  // de bestaande verrijking staan.
   const [rdw, setRdw] = useState(null);
   const lookupSeq = useRef(0);
+  const appliedPlate = useRef(normalizePlate(existing?.license_plate ?? ''));
   useEffect(() => {
     if (!isValidPlate(plate)) { setLookupState(null); return undefined; }
     const seq = ++lookupSeq.current;
@@ -95,10 +99,22 @@ export default function VehicleEditor() {
       const r = await lookupPlate(plate);
       if (seq !== lookupSeq.current) return; // kenteken intussen veranderd → verouderd
       if (r) {
-        setMake((m) => m || r.make || '');
-        setModel((m) => m || r.model || '');
-        setVehicleType((tp) => tp || r.vehicleType || '');
-        setRdw(r);
+        const changed = normalizePlate(plate) !== appliedPlate.current;
+        if (changed) {
+          // Andere auto → afgeleide velden overschrijven met de nieuwe RDW-data.
+          setMake(r.make || '');
+          setModel(r.model || '');
+          setVehicleType(r.vehicleType || '');
+          if (r.firstRegistration) setYear(r.firstRegistration.slice(0, 4));
+          appliedPlate.current = normalizePlate(plate);
+        } else {
+          // Zelfde auto (bij openen) → alleen lege velden aanvullen, niets overschrijven.
+          setMake((m) => m || r.make || '');
+          setModel((m) => m || r.model || '');
+          setVehicleType((tp) => tp || r.vehicleType || '');
+          if (r.firstRegistration) setYear((y) => y || r.firstRegistration.slice(0, 4));
+        }
+        setRdw(r); // verrijking (kleur/carrosserie/APK/…) wint altijd van de oude waarde
         setLookupState('found');
       } else {
         setLookupState('none');

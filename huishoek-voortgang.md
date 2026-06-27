@@ -648,3 +648,18 @@ de Keuken-UX (vgl. UXR-5).
 
 **Verificatie:** `npm test` 785 pass / 0 fail, `typecheck` + ESLint groen. TML-2/TML-5 → archief;
 UX-22/BOO-10 → 🔧 (device-rooktest rest). **Rest:** device-rooktest van de vier flows.
+
+**Grote werksessie — groep B (additieve migraties) (2026-06-27).**
+- **VTG-3 (kenteken → RDW, mét verversen bij wijziging):** de RDW-lookup bestond al maar vulde
+  alléén lege velden, dus een kenteken-wijziging liet de oude auto staan. Nu: bij een gewijzigd
+  kenteken worden merk/model/type/**bouwjaar** (uit `firstRegistration`) + de verrijking (incl.
+  **APK**) overschreven; op het openen van een bestaand voertuig (kenteken ongewijzigd) alleen
+  lege velden — via een `appliedPlate`-baseline ([`app/vehicle/[id].js`](app/vehicle/%5Bid%5D.js)).
+- **HUI-2 (eigen diersoort):** migr. `0063` (`pets.species_label`, additief, **live** via MCP);
+  bij soort "Anders" een vrij "Anders, namelijk…"-veld; [`usePets.addPet`](lib/usePets.js) schrijft
+  het label (alleen bij `type:'anders'`); pure [`speciesLabel(pet)`](lib/petCare.js) (eigen label
+  wint) — unit-getest. Mutatie-ratchet `petCare` van 63,9%-baseline naar **68,0%** getild (een
+  pre-existing dekkingsgat op `PET_TYPES` mee dichtgemaakt met een `deepEqual`-test).
+
+**Verificatie:** `npm test` 787 pass / 0 fail, `typecheck` + ESLint groen, mutatie `petCare` 68%.
+VTG-3/HUI-2 → 🔧. **Rest:** device-rooktest (kenteken wijzigen → velden verversen; "Anders"-soort).

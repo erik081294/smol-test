@@ -11,7 +11,7 @@ import * as haptics from '../../lib/haptics';
 import {
   usePets, usePetPhotoUrl, addPetPhoto, addPetLog, usePetLog, deletePetLog, updatePetLogNote,
 } from '../../lib/usePets';
-import { PET_TYPES, petType, careTemplates, buildCareTasks, ageLabel } from '../../lib/petCare';
+import { PET_TYPES, petType, speciesLabel, careTemplates, buildCareTasks, ageLabel } from '../../lib/petCare';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
@@ -84,6 +84,7 @@ export default function PetScreen() {
   // ----- Nieuw huisdier: formulier -----
   const [name, setName] = useState('');
   const [petKind, setPetKind] = useState('hond');
+  const [speciesText, setSpeciesText] = useState(''); // vrij soort-label bij type 'anders' (HUI-2)
   const [birthDate, setBirthDate] = useState('');
   const [chipNumber, setChipNumber] = useState('');
   const [vetName, setVetName] = useState('');
@@ -119,7 +120,7 @@ export default function PetScreen() {
         Object.entries(care).filter(([, v]) => v.on).map(([k, v]) => [k, v.interval])
       );
       await addPet({
-        name: name.trim(), type: petKind,
+        name: name.trim(), type: petKind, speciesLabel: speciesText,
         birthDate: birthDate.trim() || null,
         chipNumber, vetName, notes,
         visibility, shareSubgroupId, shareWith, photoAsset,
@@ -337,7 +338,7 @@ export default function PetScreen() {
             </Pressable>
             <Text style={[type.h1, { marginTop: 10 }]}>{pet.name}</Text>
             <Text style={[type.body, { color: colors.inkSoft }]}>
-              {tp.label}{age ? ` · ${age}` : ''}
+              {speciesLabel(pet)}{age ? ` · ${age}` : ''}
             </Text>
           </View>
 
@@ -496,6 +497,11 @@ export default function PetScreen() {
 
       <Text style={[type.label, { marginBottom: 6 }]}>{t('pet.field.type')}</Text>
       {kindEmojiGrid}
+      {/* Eigen soort bij "Anders" (HUI-2): vrij label, optioneel. */}
+      {petKind === 'anders' ? (
+        <Field label={t('pet.field.species')} value={speciesText} onChangeText={setSpeciesText}
+          placeholder={t('pet.field.species.placeholder')} style={{ marginTop: -space.sm }} />
+      ) : null}
 
       {/* Voorgestelde verzorging — voor-aangevinkt, alleen bevestigen of bijschaven. */}
       <Text style={[type.label, { marginBottom: 2 }]}>{t('pet.care.title')}</Text>
