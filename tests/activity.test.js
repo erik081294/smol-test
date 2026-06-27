@@ -123,6 +123,19 @@ test('buildFeed: opeenvolgende identieke boodschappen vouwen samen met teller', 
   assert.equal(feed[0].text, "Tim zette 'Melk' 2× op de lijst");
 });
 
+test('formatActivity: plant/huisdier/voertuig "toegevoegd" → juiste regel + icoon', () => {
+  assert.deepEqual(
+    { ...formatActivity({ id: 'pl1', type: 'plant_added', at: ago(MIN), actorName: 'Ann', subject: 'Monstera' }, NOW) },
+    { id: 'pl1', at: ago(MIN), when: '1 min geleden', icon: 'plants', text: "Ann voegde plant 'Monstera' toe" },
+  );
+  assert.equal(formatActivity({ id: 'pe1', type: 'pet_added', at: ago(MIN), actorName: 'Tim', subject: 'Rex' }, NOW).text, "Tim voegde huisdier 'Rex' toe");
+  assert.equal(formatActivity({ id: 'v1', type: 'vehicle_added', at: ago(MIN), actorName: 'Tim', subject: 'Clio' }, NOW).icon, 'voertuig');
+  // zonder actor → "Iemand"; zonder subject → null; teller bij samenvouwen.
+  assert.equal(formatActivity({ id: 'pl2', type: 'plant_added', at: ago(MIN), subject: 'Varen' }, NOW).text, "Iemand voegde plant 'Varen' toe");
+  assert.equal(formatActivity({ id: 'pl3', type: 'plant_added', at: ago(MIN), actorName: 'Ann' }, NOW), null);
+  assert.equal(formatActivity({ id: 'pe2', type: 'pet_added', at: ago(MIN), actorName: 'Tim', subject: 'Rex' }, NOW, 2).text, "Tim voegde huisdier 'Rex' toe 2×");
+});
+
 test('buildFeed: verschillende uitgaven van hetzelfde lid vouwen NIET samen (subject in groupKey)', () => {
   const feed = buildFeed([
     { id: 'e1', type: 'expense_added', at: ago(1 * MIN), actorName: 'Ann', subject: 'Benzine' },
