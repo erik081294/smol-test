@@ -682,3 +682,22 @@ VTG-3/HUI-2 → 🔧. **Rest:** device-rooktest (kenteken wijzigen → velden ve
 **Verificatie:** `npm test` 787 pass / 0 fail, `typecheck` + ESLint groen; beide migraties live
 geverifieerd via SQL. INF-10 B5 → ✅ (in INF-10-rij); PERF-8 → 🔧. **Rest:** device-rooktest van de
 "misschien weer nodig"-suggesties; ARCH-4 in een aparte sessie.
+
+**Losse eindjes uit de werksessie afgewerkt (2026-06-27).** Systematisch langs de restlijst
+(device-rooktests bewust overgeslagen):
+- **TML-5 uitgebreid** van 3 → 6 bronnen: plant/huisdier/voertuig-"toegevoegd"-events erbij
+  ([`activity.js`](lib/activity.js) `addedFormatter` + [`useActivity`](lib/useActivity.js)). Perf-veilig:
+  één `useRealtimeReload` die de realtime-hub bundelt (INF-8). Mutatie `activity` 87,2%.
+- **VTG-2 + VTG-4 statusreconciliatie:** code bevestigt dat kosten/historie (`vehicleCosts`/
+  `vehicle_log`) en delen (`resource_id` + prijs/km) gebouwd zijn → §6-rijen van ⏳ naar 🔧.
+- **PERF-8 `useTasksForReminders`:** bewust niet gebouwd — de debounce + gedeelde `useCollection`-
+  cache dekken de hookstorm al; een aparte hook zou logica dupliceren.
+- **petCare-dekking:** boven baseline (68% ≥ 63,9%) → geaccepteerd; resterende survivors zijn
+  pre-existing template-data, geen blokker.
+- **Niet door mij oplosbaar (genoteerd):** INF-10 B6 (leaked-password = dashboard-toggle, jouw
+  account); de stop-hook-fix overleeft de per-turn `~/.claude`-reset niet (permanent = buiten de
+  sessie); `supabase db push` blijft kapot (migraties via MCP + repo-spiegel).
+
+**Verificatie:** `npm test` 788 pass / 0 fail, `typecheck` + ESLint groen. **Enig resterend
+bouwwerk:** ARCH-4 (bewust uitgesteld). De rest is af of bewust afgesloten; alleen device-
+rooktests blijven (jouw kant).
