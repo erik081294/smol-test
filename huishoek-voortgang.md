@@ -522,6 +522,12 @@ uitvoeringsstatus in [`docs/design-review-2026-06-26.md`](docs/design-review-202
   module geraakt. **Live op moto g72** bevestigd: explainer (Keuken+Kosten), weekmenu-compactie,
   widget-tint, middot, plant-tijdlijn (Groot/notitiekaart/door-wie), Verzorgingskaart-Collapsible.
 
+**Catalogus: toevoegen-knop boven het toetsenbord (2026-06-27).** Bij een zoekterm zónder
+resultaten duwde de grote lege-staat-illustratie de "voeg '<term>' toe"-knop achter het
+toetsenbord. De knop is nu dé actie van die lege staat en staat bovenaan (direct onder de
+zoekbalk), met de illustratie eronder; de footer-knop blijft alleen als er wél resultaten zijn.
+Plus `keyboardDismissMode="on-drag"`. ([`app/catalog.js`](app/catalog.js); PR #80.)
+
 **Jaar-heatmap scrollt naar vandaag (2026-06-27).** De jaar-heatmap in de Inzichten-module
 (`YearActivity` → [`YearHeatmapView`](lib/YearHeatmapView.js)) opende altijd helemaal links op
 1 januari, waardoor "vandaag" buiten beeld viel. Nu scrollt de horizontale `ScrollView` na de
