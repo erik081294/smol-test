@@ -30,7 +30,9 @@ Eén pad, drie stappen — niet per module opnieuw uitgevonden:
 2. **Hook** bovenop [`useCollection`](../lib/useCollection.js) — die levert gratis:
    huishouden-gescopet laden, realtime-subscription, cache-seed en optimistische CRUD
    met foutafhandeling via [`db.js`](../lib/db.js). Een "rijke" module (planten,
-   voertuigen) breidt dit uit; hij vervangt het niet.
+   voertuigen) breidt dit uit; hij vervangt het niet. Geef ook `module: '<key>'` mee
+   zodat de datalaag-gating (ARCH-3) de tabel niet laadt als de module uit staat —
+   de meta-test [`tests/moduleGating.test.js`](../tests/moduleGating.test.js) bewaakt dat.
 3. **Migratie** met `public.enable_module_rls('<table>')` zodat de tabel het
    standaard zichtbaarheidscontract krijgt ([`zichtbaarheid.md`](./zichtbaarheid.md)).
 
@@ -90,7 +92,8 @@ if (!ok) return; // errors gezet + haptische foutpuls
    `usePantry`); overzichten horen via een capability-interface elke ingeschakelde
    module om z'n samenvatting te vragen (ARCH-2, gepland).
 4. **De datalaag respecteert `effectiveModules()`** — laad geen data van een
-   uitgezette module (ARCH-3, gepland).
+   uitgezette module (ARCH-3, **afgerond**): data-hooks gaten via de gedeelde
+   [`useGatedHouseholdId`](../lib/household.js)-primitive; een meta-test bewaakt dekking.
 
 ## Guardrail-routekaart
 
@@ -101,5 +104,5 @@ Volledige onderbouwing: de architectuur-review (sessie 2026-06-26). Actuele stat
 |----|-----------|------|
 | **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; **alle 8 editors gemigreerd** (uitgave/recept/voertuig/vaste-last/plant/huisdier/taak). **Afgerond + device-smoke-getest 2026-06-26** → archief. |
 | **ARCH-2** | Capability-interface voor overzichten | Vandaag/Notificaties vragen modules om hun samenvatting i.p.v. zusterhooks te importeren. |
-| **ARCH-3** | Module-gating in de datalaag | Hooks/schermen respecteren `effectiveModules()`. |
+| **ARCH-3** | Module-gating in de datalaag | Data-hooks gaten via de gedeelde `useGatedHouseholdId`-primitive (`isModuleEnabled`); cross-cutting tabellen (tasks/products/tags/zones) bewust uitgezonderd; meta-test-wachter. **Afgerond** → archief. |
 | **ARCH-4** | Bestandsgrootte-hotspots splitsen | [`i18n.js`](../lib/i18n.js)/[`ui.js`](../lib/ui.js) per domein-namespace. Puur opruimen. |

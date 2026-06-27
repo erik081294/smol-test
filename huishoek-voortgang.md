@@ -545,3 +545,22 @@ automatisch voor elke (ook toekomstige) widget; native gedrag ongewijzigd. **Tra
 desktop-web verliest het muis-slepen (bewust, t.b.v. robuustheid; reorderen kan daar via de
 pijlen). `WidgetGrid.js` is een React-component → buiten de mutatie-groepen. **Verificatie:**
 `npm test` 766 pass / 0 fail, `typecheck` + ESLint groen. **Rest:** rooktest op mobiel web.
+
+**ARCH-3 — module-gating in de datalaag (2026-06-27).** Data-hooks laden niet langer data van
+een uitgezette module. Aanpak bewust schuldenvrij gehouden (n.a.v. de vraag "hoe houden we hier
+geen tech debt aan over"): (1) **één bron van waarheid** — pure [`isModuleEnabled`](lib/modules.js)
+(waar `effectiveModules` nu zelf op leunt) + één gedeelde React-primitive
+[`useGatedHouseholdId`](lib/household.js) die de actieve household-id tot null afknijpt als de
+module uit staat, waardoor élk laad-/realtime-pad vanzelf no-op't. Gebruikt door
+[`useCollection`](lib/useCollection.js) (nieuwe `module`-optie, doorgewired naar groceries/
+plants/pets/vehicles/pantry/recipes/shared_resources/recurring_expenses + de plant/pet-sub-
+tabellen) én de custom hooks `useMealPlan`('maaltijden') en `useExpenses`('kosten') — géén
+gekopieerde gate-logica. (2) **Bewuste uitzonderingen** voor cross-cutting tabellen
+(tasks/products/tags/zones) i.p.v. stille omissie. (3) **Meta-test-wachter**
+[`tests/moduleGating.test.js`](tests/moduleGating.test.js): faalt als een nieuwe `useCollection`-
+tabel niet gegate is én niet op de uitzonderingslijst staat, en checkt dat elke gate naar een
+bestaande toggle-bare module wijst. Default-pad (alles aan) is gedragsneutraal. **Verificatie:**
+`npm test` 776 pass / 0 fail (+10: 7 units op `isModuleEnabled` + 3 meta-test), `typecheck` groen,
+mutatie-ratchet `modules` **89,1 %** (≥ baseline 88,5 %). Backlog §6 → archief; architectuurcontract
+([`docs/architectuur.md`](docs/architectuur.md)) bijgewerkt. **Rest:** rooktest op toestel (module
+uitzetten → data/overzichten stoppen met laden).
