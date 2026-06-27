@@ -531,3 +531,17 @@ pure, geteste helpers in [`lib/yearHeatmap.js`](lib/yearHeatmap.js) (`todayColum
 geklemd op het geldige scroll-bereik) zodat de view dun blijft; +8 unit-tests (grenswaarden
 col 0/−1, smalle viewport, rechts-uitlijning, eind-clamp). **Verificatie:** `npm test` 766 pass /
 0 fail (23 skip), `typecheck` groen, mutatie-ratchet `yearHeatmap` **88,7 %** (≥ floor 87,8 %).
+
+**Vandaag-widgetgrid scrollt weer op mobiel web (2026-06-27).** Op mobiel web kon je de
+Vandaag-pagina niet scrollen zodra je vinger op een widget startte (op native werkte dit
+wel). Oorzaak: elke widget zit in een RNGH-`GestureDetector` (long-press → vinger-drag, UX-25,
+in béíde modi); op web zet `react-native-gesture-handler` `touch-action: none` op dat element
+om pointer-events te ontvangen, waardoor de browser de pagina niet meer scrollt vanaf die
+widget. Fix in [`lib/widgets/WidgetGrid.js`](lib/widgets/WidgetGrid.js): de vinger-drag is nu
+`Platform`-gated op native (`DRAG_ENABLED`); op web rendert de cel zónder `GestureDetector`
+(geen touch-action-blokkade → scroll + tik onaangetast) en loopt herschikken via de al-
+bestaande toegankelijke controlebalk (vooruit/terug-pijlen in bewerkmodus). Eén gate, geldt
+automatisch voor elke (ook toekomstige) widget; native gedrag ongewijzigd. **Trade-off:** ook
+desktop-web verliest het muis-slepen (bewust, t.b.v. robuustheid; reorderen kan daar via de
+pijlen). `WidgetGrid.js` is een React-component → buiten de mutatie-groepen. **Verificatie:**
+`npm test` 766 pass / 0 fail, `typecheck` + ESLint groen. **Rest:** rooktest op mobiel web.
