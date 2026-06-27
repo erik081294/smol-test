@@ -166,6 +166,25 @@ export default function Catalog() {
     <CatalogRow entry={entry} count={countFor(entry)} onSetCount={onSetCount} onPrune={onPrune} />
   ), [countFor, onSetCount, onPrune]);
 
+  // De "voeg '<zoekterm>' toe"-knop. Bij een zoekterm zónder resultaten is dit dé actie,
+  // dus dan zetten we 'm bovenáán de lege staat (direct onder de zoekbalk, altijd boven
+  // het toetsenbord). Zijn er wél resultaten, dan blijft 'ie als footer onder de lijst.
+  const addCustomButton = q ? (
+    <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md,
+        paddingVertical: space.md, paddingHorizontal: space.md, borderRadius: radius.md,
+        borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
+        backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
+      })}>
+      <Icon name="add" size={18} color={colors.forest} weight="bold" />
+      <View style={{ flex: 1 }}>
+        <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+        <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
+      </View>
+    </Pressable>
+  ) : null;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ModalHeader title={t('catalog.title')} onClose={() => router.back()} backLabel={backLabelFor('catalog')} />
@@ -200,6 +219,7 @@ export default function Catalog() {
         keyExtractor={(entry) => entry.key}
         contentContainerStyle={{ paddingHorizontal: screenPadding, paddingTop: space.xs, paddingBottom: space.xxl }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         stickySectionHeadersEnabled={false}
         initialNumToRender={12}
         maxToRenderPerBatch={12}
@@ -215,27 +235,20 @@ export default function Catalog() {
         )}
         ListEmptyComponent={
           q ? (
-            <Empty illustration="groceries" title={t('catalog.empty.title')} subtitle={t('catalog.empty.subtitle')} />
+            // Knop bovenáán (boven het toetsenbord), de illustratie als context eronder.
+            <View>
+              {addCustomButton}
+              <Empty illustration="groceries" title={t('catalog.empty.title')} subtitle={t('catalog.empty.subtitle')} />
+            </View>
           ) : category === RECENT_KEY ? (
             <Empty illustration="groceries" title={t('catalog.recent.empty.title')} subtitle={t('catalog.recent.empty.subtitle')} />
           ) : null
         }
         ListFooterComponent={
-          q ? (
-            <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
-              style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md,
-                paddingVertical: space.md, paddingHorizontal: space.md, borderRadius: radius.md,
-                borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed',
-                backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
-              })}>
-              <Icon name="add" size={18} color={colors.forest} weight="bold" />
-              <View style={{ flex: 1 }}>
-                <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
-                <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
-              </View>
-            </Pressable>
-          ) : null
+          // Alleen onder de lijst tonen als er résultaten zijn; bij nul resultaten leeft de
+          // knop in de lege staat (anders valt 'ie onder de grote illustratie, achter het
+          // toetsenbord).
+          q && sections.length ? addCustomButton : null
         }
       />
     </SafeAreaView>

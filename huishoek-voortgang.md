@@ -521,3 +521,13 @@ uitvoeringsstatus in [`docs/design-review-2026-06-26.md`](docs/design-review-202
 - **Verificatie.** `typecheck` + **780 unit-tests** + volledige ESLint groen; geen mutatie-geteste
   module geraakt. **Live op moto g72** bevestigd: explainer (Keuken+Kosten), weekmenu-compactie,
   widget-tint, middot, plant-tijdlijn (Groot/notitiekaart/door-wie), Verzorgingskaart-Collapsible.
+
+**Jaar-heatmap scrollt naar vandaag (2026-06-27).** De jaar-heatmap in de Inzichten-module
+(`YearActivity` → [`YearHeatmapView`](lib/YearHeatmapView.js)) opende altijd helemaal links op
+1 januari, waardoor "vandaag" buiten beeld viel. Nu scrollt de horizontale `ScrollView` na de
+eerste meting (`onLayout`) naar de week van vandaag, rechts uitgelijnd met wat aanloop ervóór.
+Voor een afgelopen/toekomstig jaar (geen today-cel) blijft 'ie links staan. De rekenlaag zit als
+pure, geteste helpers in [`lib/yearHeatmap.js`](lib/yearHeatmap.js) (`todayColumn` + `heatmapScrollX`,
+geklemd op het geldige scroll-bereik) zodat de view dun blijft; +8 unit-tests (grenswaarden
+col 0/−1, smalle viewport, rechts-uitlijning, eind-clamp). **Verificatie:** `npm test` 766 pass /
+0 fail (23 skip), `typecheck` groen, mutatie-ratchet `yearHeatmap` **88,7 %** (≥ floor 87,8 %).

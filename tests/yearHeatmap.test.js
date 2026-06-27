@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   localDayKey, countsByDay, levelFor, yearGrid, yearSummary,
+  todayColumn, heatmapScrollX,
 } from '../lib/yearHeatmap.js';
 
 const at = (y, m, d, h = 12) => new Date(y, m, d, h, 0).toISOString();
@@ -165,4 +166,69 @@ test('yearSummary: leeg jaar -> veilige nullen', () => {
   assert.equal(s.longestStreak, 0);
   assert.equal(s.currentStreak, 0);
   assert.equal(s.busiestWeekday, null);
+});
+
+test('todayColumn: kolom-index van de vandaag-cel in het lopende jaar', () => {
+  const grid = yearGrid(2026, new Map(), { today: new Date(2026, 5, 15) });
+  const col = todayColumn(grid);
+  assert.ok(col > 0);
+  // De gevonden kolom bevat écht de today-cel, en geen andere kolom doet dat.
+  assert.equal(grid.weeks[col].some((c) => c.isToday), true);
+  const withToday = grid.weeks.filter((wk) => wk.some((c) => c.isToday)).length;
+  assert.equal(withToday, 1);
+});
+
+test('todayColumn: vandaag in de eerste week -> kolom 0 (geen -1-verwarring)', () => {
+  // 1 jan 2026 = donderdag, valt in kolom 0; "vandaag" daar moet 0 teruggeven.
+  const grid = yearGrid(2026, new Map(), { today: new Date(2026, 0, 1) });
+  assert.equal(todayColumn(grid), 0);
+});
+
+test('todayColumn: -1 voor een afgelopen/toekomstig jaar en lege invoer', () => {
+  const past = yearGrid(2025, new Map(), { today: new Date(2026, 5, 15) });
+  const future = yearGrid(2027, new Map(), { today: new Date(2026, 5, 15) });
+  assert.equal(todayColumn(past), -1);
+  assert.equal(todayColumn(future), -1);
+  assert.equal(todayColumn(undefined), -1);
+  assert.equal(todayColumn({}), -1);
+});
+
+test('heatmapScrollX: 0 als er geen today-kolom is of de viewport ongemeten is', () => {
+  const base = { gridWidth: 1000, colWidth: 17, labelWidth: 26, padRight: 24 };
+  assert.equal(heatmapScrollX({ col: -1, viewportWidth: 300, ...base }), 0);
+  assert.equal(heatmapScrollX({ col: 10, viewportWidth: 0, ...base }), 0);
+});
+
+test('heatmapScrollX: today vroeg in het jaar -> 0 (al links in beeld)', () => {
+  // Rechterrand van kolom 1 (= 26 + 2*17 + 24 = 84) past binnen een 300-brede viewport
+  // → desired negatief → geklemd op 0.
+  const x = heatmapScrollX({ col: 1, viewportWidth: 300, gridWidth: 1000, colWidth: 17, labelWidth: 26, padRight: 24 });
+  assert.equal(x, 0);
+});
+
+test('heatmapScrollX: kolom 0 bij een smalle viewport -> tóch scrollen (col<0-grens)', () => {
+  // Kolom 0 is geen "geen today" (dat is −1): bij een viewport die smaller is dan
+  // label+kolom+lucht moet 'ie wél scrollen. desired = 26 + 1*17 + 24 − 40 = 27.
+  const x = heatmapScrollX({ col: 0, viewportWidth: 40, gridWidth: 1000, colWidth: 17, labelWidth: 26, padRight: 24 });
+  assert.equal(x, 27);
+});
+
+test('heatmapScrollX: geen today (−1) scrollt nooit, ook niet bij een smalle viewport', () => {
+  // Zonder de col<0-guard zou de smalle viewport hier 10px scrollen; dat mag niet.
+  const x = heatmapScrollX({ col: -1, viewportWidth: 40, gridWidth: 1000, colWidth: 17, labelWidth: 26, padRight: 24 });
+  assert.equal(x, 0);
+});
+
+test('heatmapScrollX: today in het midden -> kolom rechts uitgelijnd met lucht', () => {
+  // desired = labelWidth + (col+1)*colWidth + padRight − viewportWidth
+  //         = 26 + 26*17 + 24 − 300 = 26 + 442 + 24 − 300 = 192.
+  const x = heatmapScrollX({ col: 25, viewportWidth: 300, gridWidth: 1000, colWidth: 17, labelWidth: 26, padRight: 24 });
+  assert.equal(x, 192);
+});
+
+test('heatmapScrollX: nooit voorbij het einde — geklemd op contentbreedte − viewport', () => {
+  // contentWidth = 26 + 900 + 24 = 950; maxScroll = 950 − 300 = 650.
+  // desired voor een late kolom zou hoger zijn, maar wordt op 650 geklemd.
+  const x = heatmapScrollX({ col: 60, viewportWidth: 300, gridWidth: 900, colWidth: 17, labelWidth: 26, padRight: 24 });
+  assert.equal(x, 650);
 });
