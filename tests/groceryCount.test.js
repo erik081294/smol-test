@@ -22,6 +22,15 @@ test('countOf: matcht op genormaliseerde naam (hoofdletters/ruis)', () => {
   assert.equal(countOf([{ name: 'Halfvolle melk 1L', quantity: '3', checked: false }], 'HALFVOLLE MELK'), 3);
 });
 
+test('countOf: telt álle open regels van hetzelfde product op (niet alleen de eerste)', () => {
+  const items = [
+    { name: 'Melk', quantity: '2 pak', checked: false },
+    { name: 'melk', quantity: '1', checked: false },   // zelfde genormaliseerde naam, andere bron
+    { name: 'Melk', quantity: '5', checked: true },    // afgevinkt → telt niet mee
+  ];
+  assert.equal(countOf(items, 'MELK'), 3); // 2 + 1, de afgevinkte 5 telt niet
+});
+
 test('countOf: lege/null invoer → 0', () => {
   assert.equal(countOf(null, 'melk'), 0);
   assert.equal(countOf([], 'melk'), 0);

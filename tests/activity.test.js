@@ -72,6 +72,16 @@ test('buildFeed: ander event ertussen breekt de groep (chronologie blijft)', () 
   assert.equal(feed.every((f) => !f.count), true); // geen enkele groep > 1
 });
 
+test('buildFeed: gelijke timestamps krijgen een stabiele id-tie-break (deterministisch)', () => {
+  const at = ago(5 * MIN);
+  const e1 = { id: 'a', type: 'task_completed', at, actorName: 'Tim', taskTitle: 'X' };
+  const e2 = { id: 'b', type: 'task_completed', at, actorName: 'Ann', taskTitle: 'Y' };
+  // Beide invoervolgordes leveren exact dezelfde feed-volgorde (id desc bij gelijk tijdstip);
+  // zonder de tie-break zou de uitkomst van de invoervolgorde afhangen.
+  assert.deepEqual(buildFeed([e1, e2], NOW).map((f) => f.id), ['b', 'a']);
+  assert.deepEqual(buildFeed([e2, e1], NOW).map((f) => f.id), ['b', 'a']);
+});
+
 test('formatActivity: uitgave-event → NL-regel met bedrag (subject)', () => {
   const item = formatActivity(
     { id: 'e1', type: 'expense_added', at: ago(2 * MIN), actorName: 'Ann', subject: 'Boodschappen', amountText: '€ 12,50' },
