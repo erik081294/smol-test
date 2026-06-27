@@ -28,7 +28,7 @@ const RECENT_CAP = 24;
 // "Eerder gekozen"-rijen verwijder je nu door naar LINKS te vegen (de app-brede conventie:
 // links = verwijderen), i.p.v. een vaste × naast de stepper — dat ontruimt de rij en houdt
 // de stepper de enige knop. De veegactie is óók als accessibility-actie beschikbaar (SwipeRow).
-const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, onPrune }) {
+const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, onPrune, onEdit }) {
   const onList = count >= 1;
   const row = (
     <View style={{
@@ -36,11 +36,17 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
       backgroundColor: colors.bg,
       borderBottomWidth: 1, borderBottomColor: colors.line,
     }}>
-      <ProductImageView item={entry.image} size={40} />
-      <View style={{ flex: 1 }}>
-        <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
-        {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
-      </View>
+      {/* Tik op het product (beeld + naam) → producteditor (BOO-13). De stepper ernaast
+          blijft de toevoeg-knop, dus de twee acties botsen niet. */}
+      <Pressable onPress={() => onEdit(entry)} accessibilityRole="button"
+        accessibilityLabel={entry.name} accessibilityHint={t('catalog.edit.hint')}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flex: 1 }}>
+        <ProductImageView item={entry.image} size={40} />
+        <View style={{ flex: 1 }}>
+          <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
+          {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
+        </View>
+      </Pressable>
       <Stepper value={count} onChange={(v) => onSetCount(entry, v)} min={0} max={99}
         accessibilityLabel={t('catalog.qty.for', { name: entry.name })} />
     </View>
@@ -93,7 +99,7 @@ export default function Catalog() {
       const cat = itemByName(p.name);
       return {
         key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
-        image: { emoji: cat?.emoji, category: p.category || cat?.category }, isRecent: true, product: p,
+        image: { emoji: p.emoji ?? cat?.emoji, category: p.category || cat?.category }, isRecent: true, product: p,
       };
     }), [products, prunedIds]);
 
@@ -144,11 +150,30 @@ export default function Catalog() {
       onAction: () => { animateNextLayout(); setPrunedIds((s) => { const next = new Set(s); next.delete(id); return next; }); setHidden(id, false).catch(() => {}); },
     });
   };
+  // Open de producteditor (BOO-13). Een bestaand huishoud-product bewerken we direct; een
+  // bundel-/zoek-item (nog niet in de huishoud-catalogus) maken we eerst aan ("opslaan"),
+  // dán bewerken — zo kun je élk catalogusproduct aankleden.
+  const openEditorImpl = async (entry) => {
+    let id = entry.product?.id ?? null;
+    if (!id) {
+      const p = await ensureProduct({
+        name: entry.item?.name ?? entry.name,
+        category: entry.item?.category,
+        defaultUnit: entry.unit,
+        emoji: entry.item?.emoji ?? entry.image?.emoji,
+      }).catch((e) => { dialog.alert({ title: t('catalog.error.add'), body: e.message }); return null; });
+      id = p?.id ?? null;
+    }
+    if (id) router.push({ pathname: '/product/edit', params: { id } });
+  };
+
   const setRef = useRef(setImpl);
   const pruneRef = useRef(pruneImpl);
-  useEffect(() => { setRef.current = setImpl; pruneRef.current = pruneImpl; });
+  const editRef = useRef(openEditorImpl);
+  useEffect(() => { setRef.current = setImpl; pruneRef.current = pruneImpl; editRef.current = openEditorImpl; });
   const onSetCount = useCallback((entry, n) => setRef.current(entry, n), []);
   const onPrune = useCallback((entry) => pruneRef.current(entry), []);
+  const onEdit = useCallback((entry) => editRef.current(entry), []);
 
   const addCustom = () => {
     const name = q;
@@ -157,14 +182,25 @@ export default function Catalog() {
     // "toegevoegd"-toast vóór de netwerkcall, gevolgd door een fout-dialog bij falen.
     setQuery('');
     ensureProduct({ name })
-      .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
-      .then(() => toast.show({ message: t('catalog.added', { name }) }))
+      .then(async (p) => {
+        await setCount(name, 1, { productId: p?.id ?? null });
+        toast.show({ message: t('catalog.added', { name }) });
+        // "Even aankleden?" (BOO-13) — niet opdringerig: één optionele vraag, daarna door.
+        if (p?.id && await dialog.confirm({
+          title: t('catalog.enrich.title', { name }),
+          body: t('catalog.enrich.body'),
+          confirmLabel: t('catalog.enrich.confirm'),
+          cancelLabel: t('catalog.enrich.cancel'),
+        })) {
+          router.push({ pathname: '/product/edit', params: { id: p.id } });
+        }
+      })
       .catch((e) => dialog.alert({ title: t('catalog.error.add'), body: e.message }));
   };
 
   const renderItem = useCallback(({ item: entry }) => (
-    <CatalogRow entry={entry} count={countFor(entry)} onSetCount={onSetCount} onPrune={onPrune} />
-  ), [countFor, onSetCount, onPrune]);
+    <CatalogRow entry={entry} count={countFor(entry)} onSetCount={onSetCount} onPrune={onPrune} onEdit={onEdit} />
+  ), [countFor, onSetCount, onPrune, onEdit]);
 
   // De "voeg '<zoekterm>' toe"-knop. Bij een zoekterm zónder resultaten is dit dé actie,
   // dus dan zetten we 'm bovenáán de lege staat (direct onder de zoekbalk, altijd boven
