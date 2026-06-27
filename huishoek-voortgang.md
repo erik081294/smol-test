@@ -579,3 +579,20 @@ Een nieuwe herinnering-bron toevoegen = een hook bijzetten in de capability + pu
 **Verificatie:** `npm test` 776 pass / 0 fail, `typecheck` + ESLint groen (rules-of-hooks oké).
 Hiermee is de ARCH-fundament-reeks op ARCH-4 (i18n/ui-splitsing) na rond. **Rest:** rooktest op
 toestel (notificaties blijven plannen zoals voorheen).
+
+**BOO-13 — producteditor + "opslaan in catalogus?"-prompt (2026-06-27).** Eriks eigen wens
+gebouwd. Migratie `0061` (`products.emoji`, nullable) **live aangebracht via MCP apply_migration**
+(db push is kapot in dit project) + als repo-bestand vastgelegd; additief, is_member-RLS dekt 'm.
+Producteditor [`app/product/edit.js`](app/product/edit.js) op de gedeelde entity-editor
+([`useEntityForm`](lib/useEntityForm.js) + [`Editor`](lib/ui.js)-wrapper): naam, schap
+([`CATEGORIES`](lib/groceryCatalog.js)), standaard-eenheid en **emoji** ([`EmojiPicker`](lib/ui.js),
+opnieuw tikken = wissen → terugval op schap-emoji). [`useProducts`](lib/useProducts.js) kreeg
+`updateProduct` (+ emoji-passthrough in `addProduct`/`ensureProduct`) dat naar de gedeelde
+`products`-rij schrijft → **huishouden-breed**. Twee entry-points in de Catalogus: (1) tik op een
+product → editor (een bundel-/zoek-item wordt eerst aangemaakt = "opslaan", dán bewerken, dus
+de editor geldt voor álle catalogusproducten); (2) na een nieuw item toevoegen een niet-
+opdringerige "even aankleden?"-prompt → editor. Een bewerkte emoji verschijnt in "Eerder gekozen"
+([`resolveProductImage`](lib/productImage.js) leest `products.emoji`). **Verificatie:** `npm test`
+776 pass / 0 fail, `typecheck` + ESLint groen; geen pure-logica-module geraakt (mutatie n.v.t.).
+**Rest:** device-rooktest; **foto-upload** als afbeelding (bucket + `photoPicker`) bewust als
+vervolg-increment — nu is het visueel een emoji.
