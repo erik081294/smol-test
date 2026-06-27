@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Modal, Platform } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -8,7 +8,7 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
@@ -131,38 +131,32 @@ export default function Kosten() {
         <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
       ) : null}
 
-      {/* Terugkerende uitgaven beheren */}
-      <Modal visible={recurringOpen} animationType="slide" onRequestClose={() => setRecurringOpen(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-          <ModalHeader title={t('recurring.title')} onClose={() => setRecurringOpen(false)} />
-          <FlatList
-            data={templates}
-            keyExtractor={(tpl) => tpl.id}
-            contentContainerStyle={{ padding: space.lg }}
-            renderItem={({ item }) => (
-              <ItemRow
-                title={item.description}
-                titleColor={item.active ? undefined : colors.inkFaint}
-                meta={
-                  <Text style={type.caption}>
-                    {formatCents(item.amount_cents)} · {t('recur.' + item.recur_freq + '.one')}
-                    {' · '}{t('recurring.next', { date: format(parseISO(item.next_date), 'd MMM', { locale: dateLocale() }) })}
-                  </Text>
-                }
-                chevron
-                onPress={() => { setRecurringOpen(false); router.push(`/recurring-expense/${item.id}`); }}
-              />
-            )}
-            ListEmptyComponent={
-              <Empty icon="repeat" title={t('recurring.empty.title')} subtitle={t('recurring.empty.subtitle')} />
-            }
-            ListFooterComponent={
-              <Button title={t('recurring.new')} icon="add" variant="soft" style={{ marginTop: space.md }}
-                onPress={() => { setRecurringOpen(false); router.push('/recurring-expense/new'); }} />
-            }
-          />
-        </SafeAreaView>
-      </Modal>
+      {/* Terugkerende uitgaven beheren (UX-22: gedeelde BottomSheet — sluitbaar via
+          veeg-omlaag, backdrop-tik én kruisje, conform het sheet-contract). */}
+      <BottomSheet visible={recurringOpen} onClose={() => setRecurringOpen(false)} maxHeight="85%">
+        <ModalHeader title={t('recurring.title')} onClose={() => setRecurringOpen(false)} />
+        <SheetScrollView contentContainerStyle={{ padding: space.lg }}>
+          {templates.length === 0 ? (
+            <Empty icon="repeat" title={t('recurring.empty.title')} subtitle={t('recurring.empty.subtitle')} />
+          ) : templates.map((item) => (
+            <ItemRow
+              key={item.id}
+              title={item.description}
+              titleColor={item.active ? undefined : colors.inkFaint}
+              meta={
+                <Text style={type.caption}>
+                  {formatCents(item.amount_cents)} · {t('recur.' + item.recur_freq + '.one')}
+                  {' · '}{t('recurring.next', { date: format(parseISO(item.next_date), 'd MMM', { locale: dateLocale() }) })}
+                </Text>
+              }
+              chevron
+              onPress={() => { setRecurringOpen(false); router.push(`/recurring-expense/${item.id}`); }}
+            />
+          ))}
+          <Button title={t('recurring.new')} icon="add" variant="soft" style={{ marginTop: space.md }}
+            onPress={() => { setRecurringOpen(false); router.push('/recurring-expense/new'); }} />
+        </SheetScrollView>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

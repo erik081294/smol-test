@@ -3,9 +3,11 @@ import { FlatList, View, Text, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
+import { useActivity } from '../../lib/useActivity';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
-import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
+import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton, Collapsible } from '../../lib/ui';
+import { Icon } from '../../lib/icons';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
 
@@ -41,14 +43,17 @@ function PhotoStrip({ photos }) {
 function PostCard({ post, author, onPress }) {
   const body = (post.body ?? '').trim();
   const name = author?.display_name ?? 'Lid';
+  const pinned = post.pinned_at != null;
   return (
-    <Card onPress={onPress} accessibilityLabel={`${name}: ${body || t('widget.timeline.photo')}`} style={{ marginBottom: space.md }}>
+    <Card onPress={onPress} accessibilityLabel={`${pinned ? `${t('timeline.pinned')}. ` : ''}${name}: ${body || t('widget.timeline.photo')}`} style={{ marginBottom: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         <Avatar emoji={author?.avatar_emoji} name={name} />
         <View style={{ flex: 1 }}>
           <Text style={type.title} numberOfLines={1}>{name}</Text>
           <Text style={type.caption}>{relativeTime(post.created_at)}</Text>
         </View>
+        {/* Gepind-indicator (TML-2): klein pin-icoon rechtsboven op de kaart. */}
+        {pinned ? <Icon name="pinboard" size={16} color={colors.forest} /> : null}
       </View>
       {body ? <Text style={[type.body, { marginTop: space.sm }]} numberOfLines={6}>{body}</Text> : null}
       <PhotoStrip photos={post.photos} />
@@ -56,9 +61,24 @@ function PostCard({ post, author, onPress }) {
   );
 }
 
+// Eén regel in de samenvouwbare "Activiteit"-laag (TML-5): systeem-events (taak afgevinkt,
+// uitgave/boodschap toegevoegd) als rustige caption-rij met icoon + relatieve tijd.
+function ActivityRow({ item }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs }}>
+      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={item.icon} size={15} color={colors.inkSoft} />
+      </View>
+      <Text style={[type.caption, { flex: 1, color: colors.ink }]} numberOfLines={2}>{item.text}</Text>
+      <Text style={[type.caption, { color: colors.inkFaint }]}>{item.when}</Text>
+    </View>
+  );
+}
+
 export default function Tijdlijn() {
   const router = useRouter();
   const { posts, loading, reload, loadMore, hasMore, members } = useTimeline();
+  const { feed: activity } = useActivity();
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
     [members],
@@ -94,6 +114,11 @@ export default function Tijdlijn() {
             onAction={() => router.push('/tijdlijn/compose')}
           />
         )}
+        ListFooterComponent={activity.length ? (
+          <Collapsible label={t('timeline.activity')} summary={t('timeline.activity.summary')} style={{ marginTop: space.md }}>
+            {activity.map((a) => <ActivityRow key={a.id} item={a} />)}
+          </Collapsible>
+        ) : null}
       />
       {/* Lege-staat dedupe (DESIGN.md principe 4): de Empty-CTA draagt de primaire
           actie bij een leeg prikbord; de FAB komt pas terug zodra er berichten zijn. */}

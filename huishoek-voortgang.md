@@ -630,3 +630,21 @@ met een eigen "Eenheid"-label; de **hoeveelheid** een eigen "Hoeveelheid"-label;
 is nu de duidelijke primary-CTA onderaan een composer-kaartje. **Verificatie:** `npm test` 776
 pass / 0 fail, `typecheck` + ESLint groen. **Rest:** device-rooktest van de nieuwe flow. Hoort bij
 de Keuken-UX (vgl. UXR-5).
+
+**Grote werksessie — groep A (geen migratie) (2026-06-27).** Vier backlog-items in één PR:
+- **TML-2 (berichten pinnen):** `orderTimeline` pinde al (getest); toegevoegd `useTimeline.setPinned`
+  (`pinned_at`=nu/null) + pin/ontpin-knop op het detail + "Gepind"-indicator in feed/detail.
+- **TML-5 (systeem-events-laag):** [`lib/activity.js`](lib/activity.js)-FORMATTERS verbreed
+  (`expense_added`/`grocery_added`, generieke `subject`-grouping, back-compat `taskTitle`);
+  [`useActivity`](lib/useActivity.js) → multi-bron fan-out (taken+uitgaven+boodschappen, RLS +
+  realtime); toggle-bare "Activiteit"-`Collapsible` onder de tijdlijn-berichten. Mutatie-ratchet
+  `activity` 87,5% (≥ baseline 86,5%).
+- **UX-22 (sheets):** de avoidKeyboard+veeg/backdrop/kruisje-contract bleek al gedekt op álle
+  invoer-sheets (gedeelde `BottomSheet`); de laatste losse overlay (kosten "terugkerend") omgezet
+  naar `BottomSheet`. Resterende `Modal`s zijn bewuste full-screen presentaties.
+- **BOO-10 (bon-entry-point):** nieuwe bonnenlijst [`app/purchases.js`](app/purchases.js) (winkel ·
+  datum · #producten · totaal) → tik = `/purchase/<id>` (de tot nu onbereikbare Bewerken-tak);
+  bereikbaar via de "Bonnen"-link op Boodschappen.
+
+**Verificatie:** `npm test` 785 pass / 0 fail, `typecheck` + ESLint groen. TML-2/TML-5 → archief;
+UX-22/BOO-10 → 🔧 (device-rooktest rest). **Rest:** device-rooktest van de vier flows.

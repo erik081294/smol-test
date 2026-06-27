@@ -234,12 +234,14 @@ export default function Boodschappen() {
         /* Niet aan het typen: heldere ingang naar de catalogus + rustige bon-link. */
         <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
           <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
-          <Pressable onPress={() => router.push('/purchase/new')} hitSlop={8}
-            accessibilityRole="button" accessibilityLabel={t('groceries.receipt')}
+          {/* Bonnen-hub (BOO-10): naar de lijst met bestaande bonnen; een bon invoeren
+              kan vanaf daar of vanuit de lege staat. */}
+          <Pressable onPress={() => router.push('/purchases')} hitSlop={8}
+            accessibilityRole="button" accessibilityLabel={t('groceries.receipts')}
             style={{ alignSelf: 'center', paddingVertical: space.xs, marginTop: space.xs }}>
             <Row gap={4} align="center">
               <Icon name="receipt" size={14} color={colors.inkFaint} />
-              <Text style={[type.caption, { color: colors.inkSoft }]}>{t('groceries.receipt')}</Text>
+              <Text style={[type.caption, { color: colors.inkSoft }]}>{t('groceries.receipts')}</Text>
             </Row>
           </Pressable>
         </View>
