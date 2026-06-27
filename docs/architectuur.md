@@ -105,7 +105,7 @@ Volledige onderbouwing: de architectuur-review (sessie 2026-06-26). Actuele stat
 
 | ID | Guardrail | Kern |
 |----|-----------|------|
-| **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; **7 van de 9 editors gemigreerd** (uitgave/recept/voertuig/vaste-last/plant/huisdier/taak). **Nog niet:** [`app/resource/[id].js`](../app/resource/[id].js) en [`app/purchase/[id].js`](../app/purchase/[id].js) rollen nog eigen validatie/errorstate met de hand (review 2026-06-27) — restpunt vóór archivering. Device-smoke-getest 2026-06-26. |
+| **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; **8 van de 9 editors gebruiken de gedeelde form-laag** (de 7 field-form-editors uitgave/recept/voertuig/vaste-last/plant/huisdier/taak + [`app/purchase/[id].js`](../app/purchase/[id].js) incrementeel, 2026-06-27). **[`app/resource/[id].js`](../app/resource/[id].js) bewust niet:** dat is een kalender/reserverings-scherm (geen required-field-form) — z'n validatie is een cross-veld-tijdcheck in modals, niet de gedupliceerde required-field-validatie die ARCH-1 viseert. Device-smoke-getest 2026-06-26. |
 | **ARCH-2** | Capability-interface voor overzichten | `useNotifications` consumeert `useReminderSources` (capability-laag) i.p.v. `useTasks`/`useMealPlan`/`usePantry` direct; spiegelt het widget-registry. **Afgerond** → archief. |
 | **ARCH-3** | Module-gating in de datalaag | Data-hooks gaten via de gedeelde `useGatedHouseholdId`-primitive (`isModuleEnabled`); cross-cutting tabellen (tasks/products/tags/zones) bewust uitgezonderd; meta-test-wachter. **Afgerond** → archief. |
 | **ARCH-4** | Bestandsgrootte-hotspots splitsen | [`i18n.js`](../lib/i18n.js)/[`ui.js`](../lib/ui.js) per domein-namespace. Puur opruimen. |
