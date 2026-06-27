@@ -109,6 +109,11 @@ Basis (gedeelde realtime lijst) is af. De verrijking is het meest ambitieuze ond
 - **Aankoopfrequentie leren**: de app merkt dat je ~elke 5 dagen melk koopt en stelt
   voor het op de lijst te zetten voordat het op is. Begint als simpele "je koopt dit
   meestal rond nu"-suggestie, geen zware voorspelling.
+- **Producteditor & "opslaan in catalogus?"-prompt**: voeg je een item toe dat nog niet
+  in de catalogus staat, dan biedt de app aan het op te slaan zodat het hele huishouden
+  het voortaan sneller terugvindt. Ja → een producteditor (naam, afbeelding, emoji,
+  categorie, eenheid, …) die ook voor bestaande catalogusproducten werkt; aanpassingen
+  gelden huishouden-breed. Zie BOO-13.
 
 > **Realistische aanpak voor de scan.** Bonnetjes-OCR is lastig: elke keten heeft een
 > andere bonopmaak. Drie groeitrappen, oplopend in kwaliteit en kosten:
