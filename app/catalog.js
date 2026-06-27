@@ -41,7 +41,7 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
       <Pressable onPress={() => onEdit(entry)} accessibilityRole="button"
         accessibilityLabel={entry.name} accessibilityHint={t('catalog.edit.hint')}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flex: 1 }}>
-        <ProductImageView item={entry.image} size={40} />
+        <ProductImageView item={entry.image} imagePath={entry.photoPath} size={40} />
         <View style={{ flex: 1 }}>
           <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
           {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
@@ -99,7 +99,8 @@ export default function Catalog() {
       const cat = itemByName(p.name);
       return {
         key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
-        image: { emoji: p.emoji ?? cat?.emoji, category: p.category || cat?.category }, isRecent: true, product: p,
+        image: { emoji: p.emoji ?? cat?.emoji, category: p.category || cat?.category },
+        photoPath: p.photo_path ?? null, isRecent: true, product: p,
       };
     }), [products, prunedIds]);
 
