@@ -11,6 +11,16 @@ const atLeast = (fg, bg, min, label) => {
   assert.ok(r >= min, `${label}: contrast ${r.toFixed(2)} < ${min}`);
 };
 
+test('contrastRatio: exacte WCAG-uitersten — zwart/wit = 21, symmetrisch, gelijk = 1', () => {
+  const approx = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
+  // Zwart (lum 0) op wit (lum 1): (1 + 0.05) / (0 + 0.05) = 21 — pint beide +0.05-constanten.
+  approx(contrastRatio('#000000', '#ffffff'), 21);
+  approx(contrastRatio('#ffffff', '#000000'), 21); // symmetrisch (Math.max/Math.min-keuze)
+  // Gelijke kleur → ratio exact 1 (zou NaN worden als een +0.05 wegviel: 0/0).
+  assert.equal(contrastRatio('#000000', '#000000'), 1);
+  assert.equal(contrastRatio('#ffffff', '#ffffff'), 1);
+});
+
 for (const [theme, c] of [['licht', lightColors], ['donker', darkColors]]) {
   test(`contrast (${theme}): primaire/secundaire tekst haalt AA op bg én surface`, () => {
     for (const surf of [c.bg, c.surface]) {

@@ -1,8 +1,10 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-22).** Alle migraties `0001`–`0036` zijn live (**DB op `0036`**),
-> geverifieerd via `list_migrations` (36 versies; `0035` = `plant_diary_note`, `0036` = `home_layout`,
-> beide toegepast op 2026-06-22). De kern-RLS + RPC's zijn
+> **Status (bijgewerkt 2026-06-27).** De live DB staat op **`0066`** (`module_insert_creator_check` —
+> insert-policy dwingt nu `creator = auth.uid()` af, zie [`0066`](supabase/migrations/0066_module_insert_creator_check.sql)),
+> geverifieerd via `list_migrations` op 2026-06-27 (66 versies). **Lees de live migratiestand altijd via
+> `list_migrations` (MCP) of `supabase migration list` — vertrouw dit ingetypte nummer niet als er sindsdien
+> migraties bij kunnen zijn gekomen** (CLAUDE.md: "lees geen hardgecodeerd nummer uit een doc"). De kern-RLS + RPC's zijn
 > bewezen via **`docs/rls-connector-check.sql`** (13/13, zonder secrets). **Nog open:** de
 > volledige JS-RLS-suite met secrets (18 stuks skippen zonder secrets), de PLT-1 trap 2 flip-on
 > via `docs/notify-setup.md`, en de 2-account-rooktest in Stap 3 onderaan. De canonieke status
@@ -30,8 +32,9 @@
 ```bash
 NODE_BIN="$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" | tail -1)/bin"
 
-# 1. Nieuwe migratie(s) live pushen (idempotent; slaat reeds-toegepaste over).
-PATH="/opt/homebrew/bin:$PATH" supabase db push
+# 1. Nieuwe migratie(s) live zetten. LET OP: `supabase db push` is in dit project KAPOT
+#    (history diverged). Zet nieuwe migraties live via de MCP-tool `apply_migration`
+#    (zie CLAUDE.md) — plak de SQL van de nieuwe migratie erin; idempotent t.o.v. reeds-toegepaste.
 
 # 2. Volledige suite incl. RLS-integratietests tegen de live DB. Leest alle drie de
 #    secrets uit .env; mapt de EXPO_PUBLIC_*-namen naar de namen die de test verwacht.
@@ -74,6 +77,10 @@ Project: `huishoek`, ref `nayqbzekpdyigvfcroxd` (eu-central-1). Al gekoppeld
 ---
 
 ## Stap 1 — Migraties pushen
+
+> ⚠️ **`supabase db push` is in dit project KAPOT** (history diverged). Zet nieuwe migraties
+> live via de MCP-tool **`apply_migration`** (zie CLAUDE.md) — plak de SQL van de nieuwe migratie
+> erin. De CLI-`db push`-stappen hieronder zijn historisch (DB stond toen op `0003`) en falen op deze repo.
 
 > De CLI op deze machine is **niet ingelogd** (gecontroleerd: "Access token not
 > provided"). Daarom eerst inloggen. `supabase login` opent je browser — dat is

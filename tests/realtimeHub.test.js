@@ -108,6 +108,23 @@ test('hub: kanalen zijn per key (huishouden) gescheiden', () => {
   assert.equal(live(channels, []).length, 2);
 });
 
+test('hub: teardownAll sloopt alle kanalen en wist de staat (logout-hygiëne)', () => {
+  const { hub, channels, removed, flush } = setup();
+  const un = hub.subscribe('h1', [{ table: 'tasks', cb: () => {} }]);
+  hub.subscribe('h2', [{ table: 'groceries', cb: () => {} }]);
+  flush();
+  assert.equal(live(channels, removed).length, 2); // twee huishoud-kanalen open
+  hub.teardownAll();
+  assert.equal(live(channels, removed).length, 0); // alles afgebroken
+  assert.equal(removed.length, 2);
+  // Een nog-lopende per-hook-unsub erna is een veilige no-op (staat is al gewist).
+  assert.doesNotThrow(un);
+  // En een nieuwe subscribe bouwt vers op.
+  hub.subscribe('h1', [{ table: 'tasks', cb: () => {} }]);
+  flush();
+  assert.equal(live(channels, removed).length, 1);
+});
+
 test('hub: lege/falsy invoer is een veilige no-op', () => {
   const { hub, channels, flush } = setup();
   const un = hub.subscribe(null, [{ table: 'tasks', cb: () => {} }]);
