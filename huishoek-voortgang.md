@@ -663,3 +663,22 @@ UX-22/BOO-10 → 🔧 (device-rooktest rest). **Rest:** device-rooktest van de v
 
 **Verificatie:** `npm test` 787 pass / 0 fail, `typecheck` + ESLint groen, mutatie `petCare` 68%.
 VTG-3/HUI-2 → 🔧. **Rest:** device-rooktest (kenteken wijzigen → velden verversen; "Anders"-soort).
+
+**Grote werksessie — groep C (perf/security/fundament) (2026-06-27).**
+- **INF-10 B5 (security):** `pg_trgm` uit het `public`-schema → `extensions` (migr. `0064`). De
+  gin_trgm_ops-opclass + de catalogus-trgm-index verhuisden mee; `search_catalog` kreeg
+  `extensions` in z'n `search_path` zodat de `%`-operator + `similarity()` resolven. **Live +
+  geverifieerd:** pg_trgm in `extensions`, index intact, `search_catalog('melk')` → 5 treffers.
+- **PERF-8 (perf):** de index (`0045`), het `usePurchases`-venster en de reminder-debounce
+  bestonden al; toegevoegd: server-side koopfrequentie-RPC `product_purchase_dates` (migr.
+  `0065`, SECURITY INVOKER, **live**+geverifieerd) → [`useProductFrequencies`](lib/useProducts.js)
+  groepeert niet meer alle bonregels client-side.
+- **ARCH-4 (fundament):** **bewust uitgesteld.** Een gedragsneutrale split van i18n.js (~600 keys)
+  + ui.js (componenten), samen 1200+ regels, is niet hier runtime te verifiëren (een gemiste
+  key/export breekt pas op toestel/web). Past niet bij de stabiliteits-prioriteit zonder
+  draaiende app; hoort in een dedicated sessie mét rooktest + key-set-guard-test (de
+  `registerDict()`-naad staat klaar).
+
+**Verificatie:** `npm test` 787 pass / 0 fail, `typecheck` + ESLint groen; beide migraties live
+geverifieerd via SQL. INF-10 B5 → ✅ (in INF-10-rij); PERF-8 → 🔧. **Rest:** device-rooktest van de
+"misschien weer nodig"-suggesties; ARCH-4 in een aparte sessie.
