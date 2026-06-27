@@ -28,8 +28,9 @@ export default function PostDetail() {
   const router = useRouter();
   const toast = useToast();
   const { id } = useLocalSearchParams();
-  const { posts, loading, deletePost, members } = useTimeline();
+  const { posts, loading, deletePost, setPinned, members } = useTimeline();
   const post = posts.find((p) => p.id === id);
+  const pinned = post?.pinned_at != null;
   const author = post ? (members ?? []).find((m) => m.id === post.author_id) : null;
 
   // Verwijderen met ongedaan-maken (zelfde patroon als de uitgaven-editor): het bericht
@@ -62,12 +63,15 @@ export default function PostDetail() {
             <Avatar emoji={author?.avatar_emoji} name={author?.display_name} size={44} />
             <View style={{ flex: 1 }}>
               <Text style={type.title}>{author?.display_name ?? 'Lid'}</Text>
-              <Text style={type.caption}>{relativeTime(post.created_at)}</Text>
+              <Text style={type.caption}>{relativeTime(post.created_at)}{pinned ? ` · ${t('timeline.pinned')}` : ''}</Text>
             </View>
           </View>
           {post.body ? <Text style={[type.body, { marginTop: space.md }]}>{post.body}</Text> : null}
           {(post.photos ?? []).map((ph) => <BigPhoto key={ph.id} path={ph.photo_path} />)}
-          <View style={{ marginTop: space.xl }}>
+          <View style={{ marginTop: space.xl, gap: space.sm }}>
+            {/* Pin/ontpin (TML-2): gepinde berichten staan bovenaan de feed. */}
+            <Button title={pinned ? t('timeline.unpin') : t('timeline.pin')} icon="pinboard" variant="soft"
+              onPress={() => setPinned(id, !pinned).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }))} />
             <Button title={t('timeline.delete')} icon="delete" variant="ghost" onPress={onDelete} />
           </View>
         </ScrollView>
