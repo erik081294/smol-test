@@ -2,9 +2,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  PET_TYPES, PET_TYPE_KEYS, petType, careTemplates, defaultCareKeys, buildCareTasks, ageLabel,
+  PET_TYPES, PET_TYPE_KEYS, petType, speciesLabel, careTemplates, defaultCareKeys, buildCareTasks, ageLabel,
 } from '../lib/petCare.js';
 import { RECUR_VALUES } from '../lib/constants.js';
+
+test('PET_TYPES: vaste set met label + emoji (dekking tegen drift)', () => {
+  assert.deepEqual(PET_TYPES, [
+    { key: 'hond', label: 'Hond', emoji: '🐕' },
+    { key: 'kat', label: 'Kat', emoji: '🐈' },
+    { key: 'konijn', label: 'Konijn', emoji: '🐇' },
+    { key: 'knaagdier', label: 'Knaagdier', emoji: '🐹' },
+    { key: 'vogel', label: 'Vogel', emoji: '🐦' },
+    { key: 'vis', label: 'Vis', emoji: '🐠' },
+    { key: 'reptiel', label: 'Reptiel', emoji: '🦎' },
+    { key: 'anders', label: 'Anders', emoji: '🐾' },
+  ]);
+  assert.deepEqual(PET_TYPE_KEYS, ['hond', 'kat', 'konijn', 'knaagdier', 'vogel', 'vis', 'reptiel', 'anders']);
+  assert.equal(petType('hond').emoji, '🐕');
+});
+
+test('speciesLabel: vast type → vaste naam; "anders" + eigen label → het label', () => {
+  assert.equal(speciesLabel({ type: 'hond' }), 'Hond');
+  assert.equal(speciesLabel({ type: 'anders', species_label: 'Bidsprinkhaan' }), 'Bidsprinkhaan');
+  assert.equal(speciesLabel({ type: 'anders' }), 'Anders');
+  assert.equal(speciesLabel({ type: 'anders', species_label: '   ' }), 'Anders');
+  assert.equal(speciesLabel({ type: 'hond', species_label: 'Wolf' }), 'Hond');
+  assert.equal(speciesLabel({}), 'Anders');
+  assert.equal(speciesLabel(), 'Anders');
+});
 
 test('PET_TYPES: unieke keys en "anders" als terugval', () => {
   const keys = PET_TYPES.map((t) => t.key);
