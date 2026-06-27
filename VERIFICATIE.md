@@ -1,7 +1,8 @@
 # Verificatie-runbook — Fase 1 modules tegen live Supabase
 
-> **Status (bijgewerkt 2026-06-27).** De live DB staat op **`0065`** (`0065_product_purchase_dates_rpc`),
-> geverifieerd via `list_migrations` op 2026-06-27 (65 versies). **Lees de live migratiestand altijd via
+> **Status (bijgewerkt 2026-06-27).** De live DB staat op **`0066`** (`module_insert_creator_check` —
+> insert-policy dwingt nu `creator = auth.uid()` af, zie [`0066`](supabase/migrations/0066_module_insert_creator_check.sql)),
+> geverifieerd via `list_migrations` op 2026-06-27 (66 versies). **Lees de live migratiestand altijd via
 > `list_migrations` (MCP) of `supabase migration list` — vertrouw dit ingetypte nummer niet als er sindsdien
 > migraties bij kunnen zijn gekomen** (CLAUDE.md: "lees geen hardgecodeerd nummer uit een doc"). De kern-RLS + RPC's zijn
 > bewezen via **`docs/rls-connector-check.sql`** (13/13, zonder secrets). **Nog open:** de

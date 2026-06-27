@@ -317,3 +317,27 @@ drielaags fail-closed rate-limiting, private storage-buckets met signed URLs, de
 **Live-geverifieerde feiten:** 42 tabellen RLS-aan · migraties t/m `0065` · scan-receipt ACTIVE v3 ·
 CI `main` groen (2026-06-27) · mutatie-baseline gecommit (83.1%). Rate-limiting fail-closed,
 `can_view`-logica en private storage-buckets statisch+live als correct bevonden (geen bevinding).
+
+---
+
+## Opvolging (2026-06-27)
+
+Verwerkt op branch `claude/multi-agent-code-review-ra2dbp` (typecheck + suite + mutatie-ratchet groen per commit):
+
+| Bevinding | Status |
+|-----------|--------|
+| Agent 6 P1 — `strictNullChecks` inert | ✅ flag expliciet aan + 26 null-signalen type-only gedicht (8 modules) |
+| Agent 7 P1 — `VERIFICATIE.md` 29 migraties achter + `db push` | ✅ bijgewerkt (DB `0066`, `apply_migration`-route) |
+| Agent 3 P1 — `vehicleCosts` geld-logica niet exact getest | ✅ exacte centen vastgepind (afschrijving/venster/interval) |
+| Agent 1 P2 — `activity` instabiele feed-sort | ✅ deterministische id-tie-break + test |
+| Agent 1 P2 — `groceryCount` telt één regel | ✅ telt alle open regels (filter+reduce) + test |
+| Agent 3 P2 — `contrast` alleen `>=`-drempels | ✅ exacte WCAG-uitersten (21/1/symmetrie) |
+| Agent 2 P2 — insert-policy zonder `created_by = auth.uid()` | ✅ **live** via migratie `0066` (7 tabellen + helper + `default auth.uid()`) |
+| Agent 5 P2 (was P0) — geen realtime-teardown bij logout | ✅ `realtimeHub.teardownAll()` + wired in `signOut()` + test |
+| Agent 5 P2 — `useCollection.create` ongeguard `user.id` | ✅ guard toegevoegd |
+| Agent 4 P2 — ARCH-1 "alle 8" + GROUPS-pad | ✅ docs gecorrigeerd (7/9 editors; `mutation-groups.mjs`) |
+| Agent 7 P2 — §6 INF-11 stale + 729/775 | ✅ INF-11 → ✅, pass-getal geharmoniseerd |
+
+**Nog open (jouw keuze / lopend werk):** CORS-allowlist op scan-receipt (vereist app-origins) ·
+leaked-password-protection (Auth-dashboard) · VTG-2/4-statusflips (device-verificatie) ·
+resource/purchase → `useEntityForm` · resterende feature-hook P2's + test-versterking (volgende ronde).
