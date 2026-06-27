@@ -701,3 +701,30 @@ geverifieerd via SQL. INF-10 B5 → ✅ (in INF-10-rij); PERF-8 → 🔧. **Rest
 **Verificatie:** `npm test` 788 pass / 0 fail, `typecheck` + ESLint groen. **Enig resterend
 bouwwerk:** ARCH-4 (bewust uitgesteld). De rest is af of bewust afgesloten; alleen device-
 rooktests blijven (jouw kant).
+
+**Multi-agent code review + opvolging (2026-06-27).** Zeven parallelle review-agents over de hele
+codebase ([`docs/reviews/2026-06-27-multi-agent-review.md`](docs/reviews/2026-06-27-multi-agent-review.md));
+de kernbevindingen meteen verwerkt en gemerged (PR #94/#95):
+- **Security — RLS `0066` live** (`module_insert_creator_check`): de module-insert-policy dwingt nu
+  `creator = auth.uid()` af (tasks/groceries/plants/pets/vehicles/shared_resources/timeline_posts),
+  `enable_module_rls` bijgewerkt voor nieuwe tabellen, + `default auth.uid()` op de creator-kolommen als
+  vangnet. Dicht attributie-spoofing (een gespoofte `created_by` voedde `can_view`). Alle 7 client-
+  insertpaden zetten de creator al op self → geen create-flow breekt. Live geverifieerd (`pg_policies`).
+- **Type-laag echt strikt:** `strictNullChecks` stond door `strict:false` feitelijk uit in
+  `tsconfig.check.json` — nu expliciet aan; ~26 opgedoken null-signalen type-only gedicht (JSDoc/`@type`) in
+  8 modules (buyFrequency/decisions/offDelta/groceryCatalog/plantTimeline/vehicleTimeline/yearHeatmap/notify).
+- **Realtime-hygiëne:** `realtimeHub.teardownAll()` + aangeroepen in `auth.signOut()` (geen events van het
+  vorige account na re-login op één toestel); `useCollection.create`-guard tegen een `user.id`-deref in een
+  auth-race; `useExpenses.deleteExpense` optimistisch + rollback (geen herverschijning na de pending-undo).
+- **ARCH-1 8/9:** `app/purchase/[id].js` incrementeel naar `useEntityForm`; `app/resource/[id].js` blijft
+  bewust eigen (kalender/reserverings-scherm, geen field-form).
+- **Test-versterking (alleen tests):** activity deterministische id-tie-break, groceryCount telt álle open
+  regels, contrast/vehicleCosts/recurringExpense/petCare exacte grenzen; een latente ratchet-daling in
+  **vehicleSharing** (timeout-geïnflateerde baseline 41/52) echt gedicht met NaN-pad-tests → 84,6% (44/52).
+- **Docs:** VERIFICATIE.md (DB 0036→0066, `apply_migration` i.p.v. kapotte `db push`), architectuur.md
+  (ARCH-1 + GROUPS-pad), CLAUDE.md (GROUPS-pad), §6 729↔775 geharmoniseerd.
+
+**Verificatie:** `npm test` 793 pass / 0 fail / 23 skip, `typecheck` + ESLint groen, mutatie-ratchet groen,
+RLS `0066` live-geverifieerd (`list_migrations` + `pg_policies`). **Bewust open (jouw kant):** CORS-allowlist
+op scan-receipt, leaked-password-toggle, en de uitgestelde feature-hook P2's (useNotifications-herplan,
+useActivity-gating, useCollection-rollback).
