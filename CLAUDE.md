@@ -32,7 +32,8 @@ de merge op de mutatie-ratchet zakte — dat voorkomen we hiermee.)
 
 1. **Raakte je een gemuteerde module? Draai de mutatie-ratchet en dicht 'm tot groen.**
    Gemuteerd = elk bronbestand in de `GROUPS`-lijst in
-   [`scripts/mutation.mjs`](scripts/mutation.mjs) (de `lib/*.js` met een unit-test).
+   [`scripts/mutation-groups.mjs`](scripts/mutation-groups.mjs) (de `lib/*.js` met een unit-test;
+   `scripts/mutation.mjs` her-exporteert die lijst en is de runner).
    ```bash
    node scripts/mutation-check.mjs --since=origin/main   # alleen je gewijzigde modules, ~1-2 min
    ```
