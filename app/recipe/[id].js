@@ -336,15 +336,26 @@ function RecipeEditor() {
                 ))}
               </View>
             ) : null}
-            <Row gap={space.md} style={{ marginBottom: space.sm }} align="center">
-              <QtyControl value={ingQty} onChange={setIngQty} accessibilityLabel={t('pantry.field.quantity')} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {UNITS.map((u) => <Chip key={u} label={u} active={ingUnit === u} onPress={() => setIngUnit(u)} />)}
-              </ScrollView>
-            </Row>
-            <Button title={editingKey ? t('recipe.ingredient.edit') : t('recipe.ingredient.add')}
-              icon={editingKey ? 'check' : 'add'} variant="soft" disabled={!ingName.trim()}
-              onPress={addIng} style={{ marginBottom: space.lg }} />
+            {/* Hoeveelheid + eenheid + toevoegen verschijnen pas zodra er een naam staat
+                (progressieve onthulling). Zo concurreert de hoeveelheid-stepper niet meer
+                met de toevoeg-knop (de twee +'jes stonden eerst pal naast elkaar) en krijgen
+                de eenheden de volle breedte i.p.v. een krappe horizontale scroll. */}
+            {ingName.trim() ? (
+              <View style={{
+                backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line,
+                padding: space.md, marginBottom: space.lg,
+              }}>
+                <Text style={[type.label, { color: colors.inkSoft, marginBottom: space.xs }]}>{t('recipe.ingredient.amount')}</Text>
+                <QtyControl value={ingQty} onChange={setIngQty} accessibilityLabel={t('recipe.ingredient.amount')} />
+                <Text style={[type.label, { color: colors.inkSoft, marginTop: space.md, marginBottom: space.xs }]}>{t('recipe.ingredient.unit')}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                  {UNITS.map((u) => <Chip key={u} label={u} active={ingUnit === u} onPress={() => setIngUnit(u)} />)}
+                </View>
+                <Button title={editingKey ? t('recipe.ingredient.edit') : t('recipe.ingredient.add')}
+                  icon={editingKey ? 'check' : 'add'} variant="primary"
+                  onPress={addIng} style={{ marginTop: space.md }} />
+              </View>
+            ) : null}
           </View>
 
           <Field label={t('recipe.field.instructions')} value={instructions} onChangeText={setInstructions}

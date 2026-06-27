@@ -617,3 +617,16 @@ kreeg een foto-kiezer met preview + verwijderen; "Eerder gekozen" in de Catalogu
 **Verificatie:** `npm test` 776 pass / 0 fail, `typecheck` + ESLint groen; geen pure-logica-module
 geraakt. **Rest:** device-rooktest (upload + signed-URL-render op toestel) — security-RLS spiegelt
 de live-geverifieerde recepten-bucket.
+
+**Recepteneditor — ingrediënt-invoer herontworpen (2026-06-27).** Device-feedback (Erik) op de
+MLT-4-editor: de hoeveelheid-`+` stond pal boven "+ Ingrediënt toevoegen" (twee concurrerende
+`+`'jes → je drukt de verkeerde), de eenheden zaten in een krappe horizontale scroll (alleen
+"stuk" + half "g" zichtbaar), en de toevoeg-actie was een fletse `soft`-knop terwijl de groene
+unit-chip de aandacht trok. Herontworpen in [`app/recipe/[id].js`](app/recipe/%5Bid%5D.js) naar
+een top-recepten-app-patroon: **progressieve onthulling** — hoeveelheid + eenheid + toevoegen
+verschijnen pas zodra er een ingrediënt-naam staat (de stepper concurreert dus niet meer met de
+toevoeg-knop); de **eenheden krijgen de volle breedte** als wrappende chips (allemaal zichtbaar)
+met een eigen "Eenheid"-label; de **hoeveelheid** een eigen "Hoeveelheid"-label; en **Toevoegen**
+is nu de duidelijke primary-CTA onderaan een composer-kaartje. **Verificatie:** `npm test` 776
+pass / 0 fail, `typecheck` + ESLint groen. **Rest:** device-rooktest van de nieuwe flow. Hoort bij
+de Keuken-UX (vgl. UXR-5).
