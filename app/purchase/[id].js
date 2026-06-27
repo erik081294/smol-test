@@ -15,6 +15,8 @@ import { useToast } from '../../lib/toast';
 import { Field, Button, Chip, Stepper, Row, IconButton, ModalHeader, Banner, Editor, DateStepper, T } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
+import { useEntityForm } from '../../lib/useEntityForm';
+import { when } from '../../lib/formValidation';
 import { t, dateLocale } from '../../lib/i18n';
 
 const UNITS = ['stuk', 'pak', 'kg', 'g', 'l', 'ml'];
@@ -45,8 +47,9 @@ export default function PurchaseEditor() {
   const [date, setDate] = useState(new Date());
   const [lines, setLines] = useState([emptyLine()]);
   const [totalText, setTotalText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
+  // Gedeelde form-ruggengraat (ARCH-1, incrementele adoptie): alleen errors/busy/validate.
+  // De dynamische regel-state (lines/scan/matching) blijft bewust lokaal hieronder.
+  const { errors, busy, setBusy, validate, clearError } = useEntityForm();
   const [scanning, setScanning] = useState(false);
 
   const updateLine = (i, patch) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -128,14 +131,14 @@ export default function PurchaseEditor() {
       priceText: it.unit_price_cents != null ? (it.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
       productId: it.product_id ?? null,
     })));
-    setError(null);
+    clearError('lines');
     setEditing(true);
   };
 
   const save = async () => {
+    // Minstens één regel met een naam. validate() zet de fout op `lines` + de haptische puls.
+    if (!validate([when('lines', (v) => v.lines.some((l) => l.name.trim()), t('purchase.error.noLines'))], { lines })) return;
     const filled = lines.filter((l) => l.name.trim());
-    if (!filled.length) { setError(t('purchase.error.noLines')); haptics.error(); return; }
-    setError(null);
     setBusy(true);
     try {
       const items = filled.map((l) => {
@@ -302,7 +305,7 @@ export default function PurchaseEditor() {
             ) : null}
           </View>
 
-          {error ? <T variant="caption" color={colors.danger}>{error}</T> : null}
+          {errors.lines ? <T variant="caption" color={colors.danger}>{errors.lines}</T> : null}
           <View style={{ height: space.lg }} />
     </Editor>
   );

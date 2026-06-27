@@ -26,6 +26,12 @@ test('dueRun: cap voorkomt een stortvloed', () => {
   assert.equal(occurrences.length, 12);
 });
 
+test('dueRun: cap=1 levert exact één occurrence (scherpe `< cap`-grens)', () => {
+  const now = new Date(2030, 0, 1);
+  const { occurrences } = dueRun({ next_date: '2020-01-01', recur_freq: 'monthly', recur_interval: 1 }, now, 1);
+  assert.equal(occurrences.length, 1);
+});
+
 test('dueRun: niets verschuldigd bij een toekomstige next_date', () => {
   const now = new Date(2026, 5, 18);
   const { occurrences, nextDate } = dueRun(
