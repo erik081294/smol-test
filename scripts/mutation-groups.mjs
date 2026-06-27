@@ -105,7 +105,9 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 //     geen lib-module om te muteren.
 //   - codeEquivalence: test op de gedrags-equivalentie-helper van de ratchet zelf
 //     (scripts/codeEquivalence.mjs), geen lib-module om te muteren.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence'];
+//   - moduleGating: meta-test (ARCH-3) die de bron van de data-hooks scant op een
+//     module-gate; bewaakt een patroon, geen muteerbare lib-module.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {

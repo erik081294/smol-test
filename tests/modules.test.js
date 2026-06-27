@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MODULES, DATA_MODULES, TOGGLEABLE_MODULES, getModule,
-  effectiveModules, availableModules, MODULE_GROUPS,
+  effectiveModules, availableModules, isModuleEnabled, MODULE_GROUPS,
 } from '../lib/modules.js';
 
 const KINDS = new Set(['overview', 'data', 'admin']);
@@ -123,6 +123,40 @@ test('effectiveModules: huishouden-uitzetting wint van de gebruiker', () => {
   // de module is weg. (En andersom blijft 'ie weg.)
   const keys = effectiveModules({ householdDisabled: ['boodschappen'], userDisabled: [] }).map((m) => m.key);
   assert.ok(!keys.includes('boodschappen'));
+});
+
+test('isModuleEnabled: kern is altijd aan, ook met uitzettingen', () => {
+  assert.equal(isModuleEnabled('vandaag'), true);
+  assert.equal(isModuleEnabled('vandaag', { householdDisabled: ['vandaag'], userDisabled: ['vandaag'] }), true);
+});
+
+test('isModuleEnabled: onbekende module → false (er valt niets te laden)', () => {
+  assert.equal(isModuleEnabled('bestaat-niet'), false);
+});
+
+test('isModuleEnabled: toggle-bare module is aan zonder uitzettingen', () => {
+  assert.equal(isModuleEnabled('boodschappen'), true);
+  assert.equal(isModuleEnabled('boodschappen', {}), true);
+});
+
+test('isModuleEnabled: huishouden-uitzetting zet uit (ook zonder gebruiker-uitzetting)', () => {
+  assert.equal(isModuleEnabled('boodschappen', { householdDisabled: ['boodschappen'], userDisabled: [] }), false);
+});
+
+test('isModuleEnabled: gebruiker-uitzetting zet uit (ook zonder huishouden-uitzetting)', () => {
+  assert.equal(isModuleEnabled('boodschappen', { householdDisabled: [], userDisabled: ['boodschappen'] }), false);
+});
+
+test('isModuleEnabled: een uitzetting van een ándere module raakt deze niet', () => {
+  assert.equal(isModuleEnabled('boodschappen', { householdDisabled: ['planten'], userDisabled: ['taken'] }), true);
+});
+
+test('isModuleEnabled: effectiveModules is precies de set ingeschakelde modules', () => {
+  const overrides = { householdDisabled: ['planten'], userDisabled: ['kosten'] };
+  assert.deepEqual(
+    effectiveModules(overrides).map((m) => m.key),
+    MODULES.filter((m) => isModuleEnabled(m.key, overrides)).map((m) => m.key),
+  );
 });
 
 test('availableModules: toont kern + wat het huishouden niet heeft uitgezet', () => {
