@@ -157,6 +157,13 @@ npx --yes supabase@latest db push
       composer-kaartje verschijnt (Hoeveelheid-stepper + Eenheid-chips op volle breedte +
       primary "Toevoegen"); controleer dat de twee `+`'jes niet meer verwarren, dat alle
       eenheden zichtbaar zijn, en dat toevoegen/bewerken werkt. ([`app/recipe/[id].js`](app/recipe/%5Bid%5D.js))
+- [ ] **Werksessie 2026-06-27 (A/B) — losse flows:**
+      **TML-2** bericht pinnen → staat bovenaan + "Gepind"-indicator; ontpinnen.
+      **TML-5** "Activiteit"-sectie onderaan de tijdlijn (taak/uitgave/boodschap-events) klapt open/dicht.
+      **UX-22** kosten "terugkerend" opent als bottom-sheet (veeg-omlaag + backdrop sluiten).
+      **BOO-10** Boodschappen → "Bonnen" → lijst → tik een bon → bewerken/opslaan.
+      **VTG-3** voertuig: kenteken **wijzigen** ververst merk/model/bouwjaar/APK (niet alleen lege velden).
+      **HUI-2** huisdier soort "Anders" → "Anders, namelijk…"-veld → opslaan → detail toont het label.
 - [ ] **MLT-3** — recept-omslagfoto kiezen/uploaden/tonen.
       **◐ Device 2026-06-26 (moto):** *tonen* ✓ ("Pasta pest" toont z'n cover) en de Galerij-picker
       **opent** (systeem-`com.google.android.photopicker`). Het daadwerkelijke kiezen/uploaden bewust

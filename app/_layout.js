@@ -84,6 +84,7 @@ function Gate({ themeMode }) {
         <Stack.Screen name="purchase" options={{ presentation: 'modal' }} />
         <Stack.Screen name="product" options={{ presentation: 'modal' }} />
         <Stack.Screen name="catalog" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="purchases" options={{ presentation: 'modal' }} />
         <Stack.Screen name="recipe" options={{ presentation: 'modal' }} />
         <Stack.Screen name="herinneringen" options={{ presentation: 'modal' }} />
         <Stack.Screen name="beeldstijl" options={{ presentation: 'modal' }} />
