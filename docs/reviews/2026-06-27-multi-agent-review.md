@@ -314,7 +314,7 @@ drielaags fail-closed rate-limiting, private storage-buckets met signed URLs, de
   optimistische rollback naar `prev` (r.137,149,166) kan een verse realtime-patch overschrijven **bevestigd**.
   Beide zijn smalle race-vensters met self-heal → P2, niet P1.
 
-**Live-geverifieerde feiten:** 42 tabellen RLS-aan · migraties t/m `0065` · scan-receipt ACTIVE v3 ·
+**Live-geverifieerde feiten:** 42 tabellen RLS-aan · migraties t/m `0066` · scan-receipt ACTIVE v3 ·
 CI `main` groen (2026-06-27) · mutatie-baseline gecommit (83.1%). Rate-limiting fail-closed,
 `can_view`-logica en private storage-buckets statisch+live als correct bevonden (geen bevinding).
 
