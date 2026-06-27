@@ -564,3 +564,18 @@ bestaande toggle-bare module wijst. Default-pad (alles aan) is gedragsneutraal. 
 mutatie-ratchet `modules` **89,1 %** (≥ baseline 88,5 %). Backlog §6 → archief; architectuurcontract
 ([`docs/architectuur.md`](docs/architectuur.md)) bijgewerkt. **Rest:** rooktest op toestel (module
 uitzetten → data/overzichten stoppen met laden).
+
+**ARCH-2 — capability-interface voor overzichten (2026-06-27).** De laatste hook-naar-hook-
+koppeling weg: [`useNotifications`](lib/useNotifications.js) importeerde `useTasks`/`useMealPlan`/
+`usePantry` direct. Nieuw: capability-laag [`useReminderSources`](lib/useReminderSources.js) die de
+bron-data ({tasks,meals,pantry}) voor de pure [`allReminders`](lib/notifications.js) samenbrengt;
+useNotifications consumeert die capability i.p.v. de modules zelf te kennen. Spiegelt het
+widget-registry-patroon ([`lib/widgets/registry.js`](lib/widgets/registry.js)), waar elke widget
+zelf z'n module-data ophaalt. **Gedragsbehoudend** (zelfde data → identieke `allReminders`-input
+en effect-deps) en leunt op de ARCH-3-gating, zodat een uitgezette module vanzelf niets bijdraagt.
+Een nieuwe herinnering-bron toevoegen = een hook bijzetten in de capability + pure logica in
+`notifications.js`, niet useNotifications aanpassen. Architectuurcontract guardrail #3 bijgewerkt
+(intra-domein-compositie zoals `useRecurringExpenses`→`useExpenses` blijft toegestaan).
+**Verificatie:** `npm test` 776 pass / 0 fail, `typecheck` + ESLint groen (rules-of-hooks oké).
+Hiermee is de ARCH-fundament-reeks op ARCH-4 (i18n/ui-splitsing) na rond. **Rest:** rooktest op
+toestel (notificaties blijven plannen zoals voorheen).

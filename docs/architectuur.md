@@ -87,10 +87,13 @@ if (!ok) return; // errors gezet + haptische foutpuls
    Geen rekenwerk in een scherm of hook dat niet getest kan worden.
 2. **Een nieuwe editor gebruikt `useEntityForm` + `formValidation`-regels.** Geen nieuw
    met-de-hand-validatieblok.
-3. **Geen hook importeert een zusterhook.** Vandaag doet alleen
-   [`useNotifications`](../lib/useNotifications.js) dat (→ `useTasks`/`useMealPlan`/
-   `usePantry`); overzichten horen via een capability-interface elke ingeschakelde
-   module om z'n samenvatting te vragen (ARCH-2, gepland).
+3. **Een overzicht/feature-hook reikt niet ad-hoc in zuster-modules** — dat loopt via een
+   capability-laag (ARCH-2, **afgerond**). [`useNotifications`](../lib/useNotifications.js)
+   haalt z'n bron-data nu uit [`useReminderSources`](../lib/useReminderSources.js) i.p.v.
+   `useTasks`/`useMealPlan`/`usePantry` direct te importeren — net zoals het
+   widget-registry ([`lib/widgets/registry.js`](../lib/widgets/registry.js)) de modules
+   voor het Vandaag-launchpad samenstelt. (Compositie bínnen één domein — bv.
+   `useRecurringExpenses` → `useExpenses`, beide *kosten* — blijft prima.)
 4. **De datalaag respecteert `effectiveModules()`** — laad geen data van een
    uitgezette module (ARCH-3, **afgerond**): data-hooks gaten via de gedeelde
    [`useGatedHouseholdId`](../lib/household.js)-primitive; een meta-test bewaakt dekking.
@@ -103,6 +106,6 @@ Volledige onderbouwing: de architectuur-review (sessie 2026-06-26). Actuele stat
 | ID | Guardrail | Kern |
 |----|-----------|------|
 | **ARCH-1** | Gedeelde entity-editor | `formValidation` + `useEntityForm`; **alle 8 editors gemigreerd** (uitgave/recept/voertuig/vaste-last/plant/huisdier/taak). **Afgerond + device-smoke-getest 2026-06-26** → archief. |
-| **ARCH-2** | Capability-interface voor overzichten | Vandaag/Notificaties vragen modules om hun samenvatting i.p.v. zusterhooks te importeren. |
+| **ARCH-2** | Capability-interface voor overzichten | `useNotifications` consumeert `useReminderSources` (capability-laag) i.p.v. `useTasks`/`useMealPlan`/`usePantry` direct; spiegelt het widget-registry. **Afgerond** → archief. |
 | **ARCH-3** | Module-gating in de datalaag | Data-hooks gaten via de gedeelde `useGatedHouseholdId`-primitive (`isModuleEnabled`); cross-cutting tabellen (tasks/products/tags/zones) bewust uitgezonderd; meta-test-wachter. **Afgerond** → archief. |
 | **ARCH-4** | Bestandsgrootte-hotspots splitsen | [`i18n.js`](../lib/i18n.js)/[`ui.js`](../lib/ui.js) per domein-namespace. Puur opruimen. |
