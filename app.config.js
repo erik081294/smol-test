@@ -1,7 +1,18 @@
 // Dynamische config: leest Supabase-keys uit de omgeving (.env) bij build/start.
+//
+// APP_VARIANT (gezet per EAS build-profiel) geeft niet-productie builds een eigen
+// app-naam én applicationId/bundleId, zodat ze náást de productie-app op één toestel
+// kunnen staan. Zonder variant → de "echte" Huishoek (productie / lokale dev-default).
+const VARIANT = process.env.APP_VARIANT;
+const VARIANT_META = {
+  preview: { suffix: '.preview', label: ' (preview)' },
+  development: { suffix: '.dev', label: ' (dev)' },
+};
+const { suffix = '', label = '' } = VARIANT_META[VARIANT] ?? {};
+
 export default ({ config }) => ({
   ...config,
-  name: 'Huishoek',
+  name: `Huishoek${label}`,
   slug: 'huishoek',
   owner: 'evdns-team',
   scheme: 'huishoek',
@@ -12,13 +23,13 @@ export default ({ config }) => ({
   splash: { backgroundColor: '#0E3A2F' },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'app.huishoek',
+    bundleIdentifier: `app.huishoek${suffix}`,
     // Universal Links: een huishoek.app/join/<token>-link opent de app i.p.v. de browser.
     // Apple verifieert dit tegen /.well-known/apple-app-site-association op huishoek.app.
     associatedDomains: ['applinks:huishoek.app'],
   },
   android: {
-    package: 'app.huishoek',
+    package: `app.huishoek${suffix}`,
     adaptiveIcon: { backgroundColor: '#0E3A2F' },
     // Android App Links: zelfde handoff, geverifieerd tegen /.well-known/assetlinks.json
     // (autoVerify). Alleen het /join-pad — de rest van het web blijft in de browser.
