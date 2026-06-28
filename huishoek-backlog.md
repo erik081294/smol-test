@@ -34,10 +34,12 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 >
 > **Nieuw (2026-06-28) — toestelfeedback-ronde Boodschappen + losse wensen.** Gebouwd (🔧/◐,
 > device-rooktest open): Boodschappen-UX (BOO-15 zoekbalk-herfocus, BOO-16 wis-knop, BOO-17
-> afvink/verwijder-feedback, BOO-14 compactere kop — eerste stap), INF-13 (`emailRedirectTo`
-> → huishoek.app; dashboard-config rest), FND-5 (multi-huishouden bleek al gebouwd → feedback
-> bij wisselen toegevoegd), PLT-10 (camera-web-guard; swipe/BottomSheet-web nog open). UXR-9
-> klaargezet als [plan 20](docs/plans/20-schoonmaak-teardown.md). Detail in §6 + voortgangslog.
+> afvink/verwijder-feedback, BOO-14 compactere kop — eerste stap), FND-5 (multi-huishouden
+> bleek al gebouwd → feedback bij wisselen toegevoegd), PLT-10 (camera-web-guard;
+> swipe/BottomSheet-web nog open). **INF-13 ✅ → archief** (`emailRedirectTo` in code +
+> dashboard Site URL/allowlist door de eigenaar gefixt; onderzoek toonde dat de localhost-link
+> de activatie niet blokkeerde). UXR-9 klaargezet als [plan 20](docs/plans/20-schoonmaak-teardown.md).
+> Detail in §6 + voortgangslog.
 
 ---
 
@@ -462,7 +464,6 @@ Fase 3 / nieuwe modules / verkennend). Inspanning is een T-shirt-maat (S/M/L).
 | SEC-5 | Security | `notify`-payload valideren vóór deploy | Next | Should | S | 🔧 | PLT-1 | **GEBOUWD (code+units, ratchet 80,2%):** `notify/core.js` recipientId-guard + `clampBody`; titel al server-side getemplatet. **Gate op PLT-1-deploy.** M4, [plan 17](docs/plans/17-security-remediatie.md). |
 | SEC-6 | Security | Service-role-key uit de app-`.env` | Next | Should | S | ⏳ | — | Handmatige hygiëne (sleutel nodig voor live RLS-tests, staat in gitignored `.env`): uit de app-`.env` halen, ad-hoc in de shell injecteren, periodiek roteren (SECURITY.md). M5, [plan 17](docs/plans/17-security-remediatie.md). |
 | SEC-7 | Security | Supply-chain & CI-hygiëne | Next | Could | S | ◐ | — | **L3 GEBOUWD:** SSRF-allowlist in `refresh-off-delta.mjs`. **L2 uitgesteld:** 14 moderate (build-time Expo, 0 high) → meenemen bij de volgende SDK-bump. [plan 17](docs/plans/17-security-remediatie.md). |
-| INF-13 | Platform | Auth: e-mailbevestiging linkt op productie naar huishoek.app (nu localhost) | Next | Should | S | ◐ | — | **Code-deel gebouwd (2026-06-28):** [`auth.signUp`](lib/auth.js) geeft nu `emailRedirectTo: WEB_BASE_URL` (`https://huishoek.app`, hergebruikt de single-source uit `invites.js`) mee i.p.v. te leunen op de dashboard-default. **Rest (jouw Supabase-dashboard, kan ik niet vanaf hier):** productie **Site URL** + **redirect-allowlist** op `https://huishoek.app` zetten zodat de bevestigingslink daar landt (en niet op localhost). Sluit op de web-host van PLT-7. **Onderzoek 2026-06-28 (Supabase `huishoek`):** de localhost-link **blokkeert de activatie niet** — de bevestigingslink raakt eerst Supabase's `/auth/v1/verify` (zet `email_confirmed_at`) en redirect dáárna pas naar de Site URL (localhost = gebroken landingspagina). Geverifieerd: de invitee was **wél bevestigd** (`email_confirmed_at` ~20s na de mail) en e-mailbevestiging is **afgedwongen** (216 users, 0 onbevestigd, 0 onbevestigd-én-ingelogd). Het is dus puur een cosmetische/landingspagina-bug, geen toegangs-/security-gat. |
 | PERF-1 | Platform | Query-vensters & bulk-RPC | Next | Could | M | 🔧 | INF-8 | **Aggregaat-RPC af (migr. `0037`, live):** `household_*_totals` (SECURITY INVOKER → RLS scopet). **Rest:** P-H4 bulk-RPC bon→voorraad. |
 | PERF-4 | Platform/perf | Render hot-path: TaskRow + Home-widgets memoïseren | Next | Should | M | 🔧 | — | **Gebouwd** ([`lib/TaskRow.js`](lib/TaskRow.js) + [`lib/widgets/registry.js`](lib/widgets/registry.js) gememoiseerd, `useMemo` per widget-samenvatting). Code-geverifieerd 2026-06-25; **device:** widget-grid/lijsten renderen soepel, niet onder afvink-stress gemeten. [plan 16](docs/plans/16-performance-audit.md). |
 | PERF-5 | Platform/perf | Voorraad "plaats"-modus terug onder virtualisatie | Next | Should | S | 🔧 | — | **Gebouwd** ([`voorraad.js`](app/(tabs)/voorraad.js#L100): één `SectionList` + `React.memo`-rij voor beide views i.p.v. alles in `ListHeaderComponent`). Code-geverifieerd 2026-06-25; **device:** scherm + "Op urgentie/bewaarplaats"-toggle renderen ✓, maar voorraad is leeg → gevulde `SectionList` niet observeerbaar zonder data. [plan 16](docs/plans/16-performance-audit.md). |
