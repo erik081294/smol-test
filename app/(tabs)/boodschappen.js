@@ -17,6 +17,7 @@ import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, Modu
 import { Icon } from '../../lib/icons';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
+import * as haptics from '../../lib/haptics';
 import { t } from '../../lib/i18n';
 
 const SEARCH_LIMIT = 5;
@@ -67,6 +68,7 @@ export default function Boodschappen() {
   const [hiddenIds, setHiddenIds] = useState([]);
   const [counts, setCounts] = useState({});       // optimistische override voor de zoekrijen
   const [searchTop, setSearchTop] = useState(0);   // y onder de toevoegbalk (voor de dropdown)
+  const inputRef = useRef(null);                   // BOO-15/16: gericht legen + herfocussen
 
   const q = text.trim();
 
@@ -113,6 +115,9 @@ export default function Boodschappen() {
   }, [products, freqByProduct, openProductIds, q]);
 
   const dismissSearch = () => { setText(''); Keyboard.dismiss(); };
+  // BOO-15/16: na een keuze (of de wis-knop) het veld legen én de focus teruggeven,
+  // zodat je meteen het volgende item kunt typen — i.p.v. het toetsenbord laten wegvallen.
+  const clearAndRefocus = () => { setText(''); inputRef.current?.focus(); };
 
   const countForCatalog = (item) => counts[item.key] ?? countOf(items, item.name);
   const setCatalogCount = (item, n) => {
@@ -130,7 +135,7 @@ export default function Boodschappen() {
   const addCustom = () => {
     if (!q) return;
     const name = q;
-    dismissSearch();
+    clearAndRefocus();
     ensureProduct({ name })
       .then((p) => setCount(name, 1, { productId: p?.id ?? null }))
       .then(() => toast.show({ message: t('catalog.added', { name }) }))
@@ -141,8 +146,15 @@ export default function Boodschappen() {
     if (!q) return;
     const nq = normalize(q); // PERF-6: query één keer normaliseren i.p.v. per resultaat
     const exact = searchResults.find((r) => normalize(r.name) === nq);
-    if (exact) { setCatalogCount(exact, (countForCatalog(exact) || 0) + 1); setText(''); }
+    if (exact) { setCatalogCount(exact, (countForCatalog(exact) || 0) + 1); clearAndRefocus(); }
     else addCustom();
+  };
+
+  // BOO-15: tik op een zoekresultaat = toevoegen + balk legen + herfocussen. De stepper
+  // in de rij blijft voor het fijn-regelen van het aantal (die laat de balk juist staan).
+  const pickCatalog = (item) => {
+    setCatalogCount(item, (countForCatalog(item) || 0) + 1);
+    clearAndRefocus();
   };
 
   const addLinked = (product) => {
@@ -154,6 +166,7 @@ export default function Boodschappen() {
 
   // ── Stabiele rij-handlers (useEvent): zo blijft GroceryRow's memo intact.
   const removeWithUndo = (item) => {
+    haptics.tapLight(); // BOO-17: voelbare bevestiging bij verwijderen (≠ afvinken)
     animateNextLayout();
     setHiddenIds((h) => [...h, item.id]);
     toast.show({
@@ -168,8 +181,15 @@ export default function Boodschappen() {
     });
   };
   const toggleImpl = async (item) => {
+    const checking = !item.checked; // BOO-17: alleen het áfvinken viert, niet het terugzetten
     animateNextLayout();
-    try { await toggleItem(item); } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
+    try {
+      await toggleItem(item);
+      if (checking) {
+        haptics.success();
+        toast.show({ message: t('groceries.checkedFeedback', { name: item.name }), duration: 1500 });
+      }
+    } catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
   };
   // 0 = verwijderen (mét undo), ≥1 = aantal bijwerken. Afvinken gaat via swipe/tik.
   const changeCountImpl = (item, n) => {
@@ -214,37 +234,45 @@ export default function Boodschappen() {
       {/* Toevoegbalk — typen zoekt direct in de catalogus (dropdown hieronder). */}
       <View onLayout={(e) => setSearchTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
         style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.lg, marginBottom: space.sm, gap: space.sm }}>
-        <TextInput
-          value={text} onChangeText={setText} onSubmitEditing={submitTyped}
-          returnKeyType="done" blurOnSubmit={false}
-          placeholder={t('groceries.placeholder')}
-          placeholderTextColor={colors.inkFaint}
-          accessibilityLabel={t('groceries.addLabel')}
-          style={{
-            flex: 1, minHeight: touchTarget, backgroundColor: colors.surface, borderRadius: radius.md,
-            borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md,
-            paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
-          }}
-        />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <TextInput
+            ref={inputRef}
+            value={text} onChangeText={setText} onSubmitEditing={submitTyped}
+            returnKeyType="done" blurOnSubmit={false}
+            placeholder={t('groceries.placeholder')}
+            placeholderTextColor={colors.inkFaint}
+            accessibilityLabel={t('groceries.addLabel')}
+            style={{
+              minHeight: touchTarget, backgroundColor: colors.surface, borderRadius: radius.md,
+              borderWidth: 1.5, borderColor: colors.line, paddingHorizontal: space.md,
+              // BOO-16: ruimte rechts vrijhouden voor de wis-knop zodra er tekst staat.
+              paddingRight: text ? touchTarget : space.md,
+              paddingVertical: Platform.OS === 'ios' ? space.md : space.sm, fontSize: 16, color: colors.ink,
+            }}
+          />
+          {/* BOO-16: snelle wis-knop — één tik leegt het veld en houdt de focus. */}
+          {text ? (
+            <IconButton icon="close" size={18} accessibilityLabel={t('common.clear')} tint={colors.inkFaint}
+              onPress={clearAndRefocus}
+              style={{ position: 'absolute', right: 0, width: touchTarget, height: touchTarget }} />
+          ) : null}
+        </View>
         <IconButton icon="add" accessibilityLabel={t('common.add')} tint={colors.forest}
           onPress={submitTyped} style={{ backgroundColor: colors.ocher }} />
       </View>
 
       {!q ? (
-        /* Niet aan het typen: heldere ingang naar de catalogus + rustige bon-link. */
-        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
-          <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
-          {/* Bonnen-hub (BOO-10): naar de lijst met bestaande bonnen; een bon invoeren
-              kan vanaf daar of vanuit de lege staat. */}
-          <Pressable onPress={() => router.push('/purchases')} hitSlop={8}
-            accessibilityRole="button" accessibilityLabel={t('groceries.receipts')}
-            style={{ alignSelf: 'center', paddingVertical: space.xs, marginTop: space.xs }}>
-            <Row gap={4} align="center">
-              <Icon name="receipt" size={14} color={colors.inkFaint} />
-              <Text style={[type.caption, { color: colors.inkSoft }]}>{t('groceries.receipts')}</Text>
-            </Row>
-          </Pressable>
-        </View>
+        /* Niet aan het typen: catalogus + bonnen op één compacte rij (BOO-14: minder
+           chrome boven de lijst). Beide blijven duidelijk benoemd en bereikbaar. */
+        <Row gap={space.sm} style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button title={t('catalog.open')} icon="catalog" variant="soft" onPress={() => router.push('/catalog')} />
+          </View>
+          {/* Bonnen-hub (BOO-10): naar de lijst met bestaande bonnen. */}
+          <View style={{ flex: 1 }}>
+            <Button title={t('groceries.receipts')} icon="receipt" variant="ghost" onPress={() => router.push('/purchases')} />
+          </View>
+        </Row>
       ) : null}
 
       {/* "Misschien weer nodig" — alleen als je niet typt */}
@@ -331,8 +359,13 @@ export default function Boodschappen() {
               const cnt = countForCatalog(item);
               return (
                 <View key={item.key} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.xs }}>
-                  <ProductImageView item={item} size={34} />
-                  <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontWeight: '700' } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                  {/* BOO-15: tik op product (beeld + naam) = +1 en de balk legen/herfocussen. */}
+                  <Pressable onPress={() => pickCatalog(item)} accessibilityRole="button"
+                    accessibilityLabel={t('catalog.add', { name: item.name })}
+                    style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, opacity: pressed ? 0.6 : 1 })}>
+                    <ProductImageView item={item} size={34} />
+                    <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontWeight: '700' } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                  </Pressable>
                   <Stepper compact value={cnt} min={0} max={99} onChange={(v) => setCatalogCount(item, v)}
                     accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
                 </View>
