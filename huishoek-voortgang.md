@@ -728,3 +728,41 @@ de kernbevindingen meteen verwerkt en gemerged (PR #94/#95):
 RLS `0066` live-geverifieerd (`list_migrations` + `pg_policies`). **Bewust open (jouw kant):** CORS-allowlist
 op scan-receipt, leaked-password-toggle, en de uitgestelde feature-hook P2's (useNotifications-herplan,
 useActivity-gating, useCollection-rollback).
+
+---
+
+**Toestelfeedback-ronde Boodschappen + losse wensen (2026-06-28).** Naar aanleiding van
+gebruik op toestel een batch UX-fixes en backlog-uitbreidingen; branch
+`claude/boodschappen-module-feedback-tysgq4`.
+
+- **Boodschappen (BOO-14/15/16/17)** — `app/(tabs)/boodschappen.js`:
+  - **BOO-15:** tik op een zoekresultaat (`pickCatalog`) voegt +1 toe en `clearAndRefocus()`
+    leegt het veld + geeft de focus terug aan de balk (sluit de dropdown, balk had al
+    `blurOnSubmit={false}`); submit/`addCustom` idem. De rij-`Stepper` blijft voor aantallen.
+  - **BOO-16:** wis-knop (`close`-icoon) in de zoekbalk, zichtbaar zodra er tekst staat → één
+    tik leegt en houdt focus. Nieuwe i18n-key `common.clear`.
+  - **BOO-17:** afvinken geeft `haptics.success()` + korte bevestigingstoast
+    (`groceries.checkedFeedback`, alleen bij áfvinken); verwijderen `haptics.tapLight()` náást
+    de undo-toast — afvinken ≠ verwijderen.
+  - **BOO-14 (eerste stap):** "Catalogus openen"-knop + losse bonnen-link samengevoegd tot één
+    compacte rij; rest van de herindeling staat klaar voor UXR-9.
+- **INF-13** — `lib/auth.js` `signUp` geeft nu `emailRedirectTo: WEB_BASE_URL` (`huishoek.app`,
+  single-source uit `invites.js`) mee. **Open (jouw Supabase-dashboard):** Site URL +
+  redirect-allowlist op `https://huishoek.app`.
+- **FND-5** — statuscorrectie: multi-huishouden was al gebouwd (`household_members` many-to-many,
+  `useHousehold` laadt alle huishoudens + switcher in `huishouden.js`). Toegevoegd: feedback-toast
+  bij wisselen (`household.switched`) + no-op-guard op het actieve huishouden.
+- **PLT-10 (camera-deel)** — `lib/photoPicker.js` `offerImagePicker` laat de camera-rij weg op web
+  (onbetrouwbaar via `expo-image-picker`) en stuurt op `kind` i.p.v. een vaste index. `SwipeRow`
+  was al web-geguard; de swipe-crash zit vermoedelijk in `BottomSheet`'s gesture-laag — bewust niet
+  blind gewijzigd (app-breed, web-run nodig).
+- **UXR-9 / SCH-4** — teardown Schoonmaak klaargezet: `docs/plans/20-schoonmaak-teardown.md`
+  (huidige stand code-geverifieerd, SCH-4-wensen, open beslissingen) + geregistreerd in de plan-index.
+- **PLA-10** — verkend: care-taken zijn al bewerkbaar via de taak-editor; per-plant grip op één plek
+  + pauzeren is ontwerp-werk → UXR-6.
+- **Backlog §6** bijgewerkt: BOO-15/16/17 + FND-5 → 🔧, BOO-14/INF-13/PLT-10 → ◐, plus nieuwe rijen
+  FND-5/SCH-4/PLA-10/PLT-10/INF-13/UXR-9 en de eerdere BOO-14..17 (deze branch voegde §6-rijen toe).
+
+**Verificatie:** `npm test` 793 pass / 0 fail / 23 skip, `typecheck` groen, mutatie-ratchet groen
+(alleen `i18n` gewijzigd: 73,5%, geen daling). UI-wijzigingen zijn **niet op toestel/web** geverifieerd
+(geen device/web in deze omgeving) → de gebouwde items staan op 🔧/◐ met "device-rooktest" als rest.

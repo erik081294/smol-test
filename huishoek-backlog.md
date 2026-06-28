@@ -31,6 +31,13 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 > verificatie-blok in plan 15. De actuele open/te-verifiëren
 > punten staan in de tabel (§6); het volledige chronologische verloop in
 > [`huishoek-voortgang.md`](huishoek-voortgang.md).
+>
+> **Nieuw (2026-06-28) — toestelfeedback-ronde Boodschappen + losse wensen.** Gebouwd (🔧/◐,
+> device-rooktest open): Boodschappen-UX (BOO-15 zoekbalk-herfocus, BOO-16 wis-knop, BOO-17
+> afvink/verwijder-feedback, BOO-14 compactere kop — eerste stap), INF-13 (`emailRedirectTo`
+> → huishoek.app; dashboard-config rest), FND-5 (multi-huishouden bleek al gebouwd → feedback
+> bij wisselen toegevoegd), PLT-10 (camera-web-guard; swipe/BottomSheet-web nog open). UXR-9
+> klaargezet als [plan 20](docs/plans/20-schoonmaak-teardown.md). Detail in §6 + voortgangslog.
 
 ---
 
