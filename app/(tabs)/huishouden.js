@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
+import { useToast } from '../../lib/toast';
 import {
   Card, Button, Avatar, Field, Checkbox, Badge, EmojiPicker,
   ScreenHeader, SectionHeader, ItemRow, ModalHeader, IconButton,
@@ -23,8 +24,18 @@ export default function HuishoudenTab() {
           invites, createInvite, revokeInvite,
           householdDisabled, userDisabled, setHouseholdModule, setUserModule } = useHousehold();
   const { profile, signOut } = useAuth();
+  const toast = useToast();
   const router = useRouter();
   const isOwner = active?.role === 'owner';
+
+  // FND-5: actief huishouden wisselen. De datalaag herlaadt reactief (useCollection
+  // her-sleutelt op activeId, realtime her-subscribet); hier alleen feedback + een
+  // no-op-guard zodat opnieuw tikken op het actieve huishouden niets doet.
+  const switchHousehold = (h) => {
+    if (h.id === active?.id) return;
+    selectHousehold(h.id);
+    toast.show({ message: t('household.switched', { name: h.name }) });
+  };
 
   const toggleHouseholdModule = (key, enabled) =>
     setHouseholdModule(key, enabled).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
@@ -266,7 +277,7 @@ export default function HuishoudenTab() {
                 leading={<Avatar emoji={h.emoji} />}
                 title={h.name}
                 trailing={h.id === active?.id ? <Icon name="check" size={20} color={colors.done} weight="bold" /> : null}
-                onPress={() => selectHousehold(h.id)}
+                onPress={() => switchHousehold(h)}
               />
             ))}
           </>
