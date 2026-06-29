@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CLEANING_TEMPLATES, getCleaningTemplate, planTemplate, firstDueDate,
+  CLEANING_TEMPLATES, getCleaningTemplate, planTemplate, firstDueDate, buildCustomSchedule,
 } from '../lib/cleaningTemplates.js';
 
 test('elk sjabloon heeft een unieke key en minstens één ruimte', () => {
@@ -130,4 +130,56 @@ test('planTemplate: recur_weekdays alleen bij wekelijks; veilig zonder weekdagen
   assert.equal(tasks.find((x) => x.title === 'Maandelijks met dagen').recur_weekdays, null);
   // wekelijks zonder veld → null en geen crash
   assert.equal(tasks.find((x) => x.title === 'Wekelijks zonder dagen-veld').recur_weekdays, null);
+});
+
+// === buildCustomSchedule (SCH-4) — zelf samengesteld rooster ===
+
+test('buildCustomSchedule: zelfde vorm als planTemplate (zones + taken)', () => {
+  const rooms = [
+    { zone: 'Badkamer', emoji: '🛁', title: 'Schrobben', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [6] },
+    { zone: 'Keuken', emoji: '🍳', title: 'Dweilen', recur_freq: 'weekly', recur_interval: 2, recur_weekdays: [] },
+  ];
+  const { zonesToCreate, tasks } = buildCustomSchedule(rooms, { startDate: new Date(2026, 5, 1) });
+  assert.equal(zonesToCreate.length, 2);
+  assert.equal(tasks.length, 2);
+  assert.equal(tasks[0].category, 'huishouden');
+  assert.equal(tasks[0].visibility, 'household');
+  assert.deepEqual(tasks[0].recur_weekdays, [6]);
+  assert.equal(tasks[1].recur_interval, 2);
+  assert.equal(tasks[1].recur_weekdays, null); // weekly maar lege weekdagen → null
+});
+
+test('buildCustomSchedule: ontbrekende titel valt terug op "<zone> schoonmaken"', () => {
+  const { tasks } = buildCustomSchedule(
+    [{ zone: '  Zolder  ', recur_freq: 'monthly' }],
+    { startDate: new Date(2026, 5, 1) },
+  );
+  assert.equal(tasks[0].title, 'Zolder schoonmaken'); // getrimd
+});
+
+test('buildCustomSchedule: lege/spatie-only zonenaam valt weg', () => {
+  const { zonesToCreate, tasks } = buildCustomSchedule(
+    [
+      { zone: 'Keuken', title: 'Dweilen', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [1] },
+      { zone: '   ', title: 'Niks', recur_freq: 'weekly' },
+    ],
+    { startDate: new Date(2026, 5, 1) },
+  );
+  assert.equal(zonesToCreate.length, 1);
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].zone_name, 'Keuken');
+});
+
+test('buildCustomSchedule: respecteert bestaande zones (case-insensitief)', () => {
+  const { zonesToCreate } = buildCustomSchedule(
+    [{ zone: 'Keuken', title: 'Dweilen', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [1] }],
+    { existingZones: [{ name: '  keuken ' }], startDate: new Date(2026, 5, 1) },
+  );
+  assert.deepEqual(zonesToCreate, []);
+});
+
+test('buildCustomSchedule: leeg/ontbrekend rooster → lege uitkomst, geen crash', () => {
+  assert.deepEqual(buildCustomSchedule([], {}), { zonesToCreate: [], tasks: [] });
+  assert.deepEqual(buildCustomSchedule(undefined, {}), { zonesToCreate: [], tasks: [] });
+  assert.deepEqual(buildCustomSchedule(), { zonesToCreate: [], tasks: [] });
 });

@@ -161,8 +161,15 @@ Zodat elke actie op een voorspelbare plek staat:
   wis-plek) i.p.v. er een niet-destructieve actie op te hangen; zo wist links-vegen
   nergens het ene scherm en doet het op het andere iets anders. Voor screenreaders zijn
   de veegacties ook als `accessibilityActions` beschikbaar (A11Y-1).
-- **Secundair/navigatie → header-rechts `IconButton`(s)** (zoeken, bibliotheek,
-  terugkerend). Houd het bij maximaal een handvol.
+- **Kop-rechts = uitleg + gelabelde acties, nooit verstopte navigatie (UX-42).** De
+  `ScreenHeader`-`right`-slot van een module draagt precies één ding: de
+  `ModuleHelpButton` (de rustige ⓘ "hoe werkt dit?"-ingang). Module-specifieke
+  vervolgnavigatie (Inzichten, Tijdlijn, Klusbibliotheek, Terugkerend) hangt **niet**
+  als losse, cryptische icoonknop rechtsboven, maar als **gelabelde `actions`** onderin
+  diezelfde help-drawer (`<ModuleHelpButton actions={[{ label, icon, onPress }]} />`) —
+  een naam zegt wat een icoon verzwijgt. Zo betekent rechtsboven overal hetzelfde en is
+  er geen raad-werk. Een echte primaire "voeg toe"-actie blijft de `FAB`; een flow-actie
+  ("Rooster bekijken", "Boodschappen aanvullen") staat als `Button` ín de inhoud.
 - **Een flow-actie die geen "aanmaken" is** (bijv. "Boodschappen aanvullen") →
   volle-breedte `Button` aan het eind van de inhoud.
 - **Detailschermen krijgen een `ModalHeader`** (titel + sluiten), geen losse back-knop.

@@ -766,3 +766,35 @@ gebruik op toestel een batch UX-fixes en backlog-uitbreidingen; branch
 **Verificatie:** `npm test` 793 pass / 0 fail / 23 skip, `typecheck` groen, mutatie-ratchet groen
 (alleen `i18n` gewijzigd: 73,5%, geen daling). UI-wijzigingen zijn **niet op toestel/web** geverifieerd
 (geen device/web in deze omgeving) → de gebouwde items staan op 🔧/◐ met "device-rooktest" als rest.
+
+---
+
+**Drie-sporen-werksessie (2026-06-29).** Schoonmaak (UXR-9/SCH-4), Boodschappen-UI (BOO-14/UX-42)
+en Zorg (PLA-10/UXR-6) in één sessie, met de definition-of-done bewaakt.
+
+- **SCH-4 (Schoonmaak) — gebouwd.** Pure [`buildCustomSchedule`](lib/cleaningTemplates.js) (deelt de
+  kern `buildSchedule` met `planTemplate`) → een **zelf samengesteld rooster** (zones + cadans) naast
+  de vaste sjablonen, in de opstel-sheet van [`schoonmaak.js`](app/(tabs)/schoonmaak.js) met een
+  modus-toggle. Twee duidelijke ingangen: per-zone "Taak toevoegen" (losse taak) vs. "Rooster
+  opstellen" (heel schema), plus "Rooster bekijken" → **deeplink** `/(tabs)/taken?cleaning=1&scope=week`.
+  Nieuwe zone-as in [`applyTaskFilters`](lib/agenda.js) (`cleaningOnly`/`zoneId`) + `activeFilterCount`,
+  route-param-parsing en een "Schoonmaak"-filtersectie in [`taken.js`](app/(tabs)/taken.js).
+- **BOO-14 (Boodschappen) — stap 2.** "Misschien weer nodig" is nu **inklapbaar** (standaard
+  ingeklapt, kop toont het aantal, edge-to-edge kaarten-rail blijft) → minder chrome boven de lijst.
+- **UX-42 (kop opschonen) — gecodificeerd.** Inventarisatie bevestigt dat álle tab-kop-`right`-slots
+  nu alleen de `ModuleHelpButton` dragen (secundaire navigatie als gelabelde `actions` in de drawer);
+  het kop-contract staat nu expliciet in [`DESIGN.md`](DESIGN.md). Open ontwerpvraag (drawer-
+  ontdekbaarheid) blijft device/UXR-werk.
+- **PLA-10 (Zorg) — eerste stap + statuscorrectie.** Verzorgingstaken waren vanaf het detail **niet
+  te openen** (geen `onPress` → `taskHref` routeerde terug naar ditzélfde detail = dode tik). Nu openen
+  de taakrijen de taak-editor op [`app/plant/[id].js`](app/plant/%5Bid%5D.js) én
+  [`app/pet/[id].js`](app/pet/%5Bid%5D.js) (parity); de plant kreeg "Taak toevoegen" → `/task/new?plant=<id>`
+  met een `plant`-passthrough in de [taak-editor](app/task/%5Bid%5D.js) (`plant_id` in de payload).
+- **Teardowns klaargezet:** [plan 21](docs/plans/21-zorg-teardown.md) (UXR-6, Zorg) toegevoegd en in de
+  plan-index opgenomen; plan 20 (UXR-9) is met deze sessie uitgevoerd.
+
+**Verificatie:** `npm test` **802 pass / 0 fail / 23 skip**; `typecheck` groen; mutatie-ratchet **boven
+baseline** — `agenda` 92,5% (baseline 89,8%), `cleaningTemplates` 76,0% (baseline 73,3%). Nieuwe units in
+`tests/agenda.test.js` (zone/cleaning-as) en `tests/cleaningTemplates.test.js` (`buildCustomSchedule`).
+UI niet op toestel/web geverifieerd (geen device in deze omgeving) → gebouwde items op 🔧 met
+"device-rooktest" als rest.

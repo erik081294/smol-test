@@ -68,6 +68,7 @@ export default function Boodschappen() {
   const [hiddenIds, setHiddenIds] = useState([]);
   const [counts, setCounts] = useState({});       // optimistische override voor de zoekrijen
   const [searchTop, setSearchTop] = useState(0);   // y onder de toevoegbalk (voor de dropdown)
+  const [suggestOpen, setSuggestOpen] = useState(false); // BOO-14: "Misschien weer nodig" ingeklapt
   const inputRef = useRef(null);                   // BOO-15/16: gericht legen + herfocussen
 
   const q = text.trim();
@@ -275,14 +276,25 @@ export default function Boodschappen() {
         </Row>
       ) : null}
 
-      {/* "Misschien weer nodig" — alleen als je niet typt */}
+      {/* "Misschien weer nodig" — inklapbaar (BOO-14: minder chrome boven de lijst).
+          Standaard ingeklapt zodat de lijst zelf de schermruimte krijgt; de kop toont
+          het aantal en klapt op één tik uit. Alleen als je niet typt (dueSuggestions
+          is leeg bij een zoekquery). */}
       {dueSuggestions.length > 0 ? (
         <View style={{ marginBottom: space.sm }}>
-          <View style={{ paddingHorizontal: space.lg }}>
-            <SectionHeader title={t('groceries.again.section')} count={dueSuggestions.length} />
-          </View>
+          <Pressable onPress={() => { animateNextLayout(); setSuggestOpen((o) => !o); }}
+            accessibilityRole="button" accessibilityState={{ expanded: suggestOpen }}
+            accessibilityLabel={t('groceries.again.section')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, minHeight: touchTarget }}>
+            <Text style={[type.label, { flex: 1, color: colors.inkSoft }]}>
+              {t('groceries.again.section')} · {dueSuggestions.length}
+            </Text>
+            <Icon name="chevron" size={20} color={colors.inkFaint}
+              style={{ transform: [{ rotate: suggestOpen ? '90deg' : '0deg' }] }} />
+          </Pressable>
+          {suggestOpen ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}>
+            contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm, paddingTop: space.xs }}>
             {dueSuggestions.map(({ product, est }) => (
               <Pressable key={product.id} onPress={() => addLinked(product)} accessibilityRole="button"
                 accessibilityLabel={t('groceries.again.add', { name: product.name })}
@@ -301,6 +313,7 @@ export default function Boodschappen() {
               </Pressable>
             ))}
           </ScrollView>
+          ) : null}
         </View>
       ) : null}
 

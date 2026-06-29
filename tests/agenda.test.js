@@ -158,11 +158,44 @@ test('countBy: telt per categorie', () => {
   assert.deepEqual(countBy(sample, (t) => t.category), { klus: 2, plant: 1 });
 });
 
+// === Schoonmaak-as (SCH-4) ===
+// Een schoonmaaktaak = een taak met een zone_id. cleaningOnly houdt het hele
+// rooster over; zoneId knijpt verder in op één zone.
+const zoneSample = [
+  { id: '1', category: 'huishouden', zone_id: 'z1', completed_at: null },
+  { id: '2', category: 'huishouden', zone_id: 'z2', completed_at: null },
+  { id: '3', category: 'afspraak', zone_id: null, completed_at: null },
+  { id: '4', category: 'huishouden', zone_id: null, completed_at: null },
+];
+
+test('applyTaskFilters: cleaningOnly houdt alleen zone-gebonden taken over', () => {
+  const r = applyTaskFilters(zoneSample, { cleaningOnly: true });
+  assert.deepEqual(r.map((t) => t.id), ['1', '2']);
+});
+
+test('applyTaskFilters: cleaningOnly=false (default) laat alles staan', () => {
+  const r = applyTaskFilters(zoneSample, {});
+  assert.deepEqual(r.map((t) => t.id), ['1', '2', '3', '4']);
+});
+
+test('applyTaskFilters: zoneId knijpt in op precies één zone', () => {
+  const r = applyTaskFilters(zoneSample, { zoneId: 'z1' });
+  assert.deepEqual(r.map((t) => t.id), ['1']);
+});
+
+test('applyTaskFilters: zoneId negeert taken zonder zone (null !== zoneId)', () => {
+  const r = applyTaskFilters(zoneSample, { zoneId: 'z9' });
+  assert.deepEqual(r.map((t) => t.id), []);
+});
+
 test('activeFilterCount: telt niet-default assen', () => {
   assert.equal(activeFilterCount({}), 0);
   assert.equal(activeFilterCount({ status: 'done' }), 1);
   assert.equal(activeFilterCount({ categories: ['klus'], assignees: ['a'] }), 2);
   assert.equal(activeFilterCount({ categories: ['klus'], subgroupId: 'sg1', status: 'all' }), 3);
+  assert.equal(activeFilterCount({ cleaningOnly: true }), 1);
+  assert.equal(activeFilterCount({ zoneId: 'z1' }), 1);
+  assert.equal(activeFilterCount({ cleaningOnly: false, zoneId: null }), 0);
 });
 
 // --- Aanvullende randgevallen (mutatietest-analyse 2026-06-22).

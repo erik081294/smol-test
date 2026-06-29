@@ -40,7 +40,7 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // (bij Hele-huishouden) assigned_to blijven behouden, ook al tonen we ze niet.
 export default function TaskEditor() {
   const dialog = useDialog();
-  const { id, date, zone } = useLocalSearchParams();
+  const { id, date, zone, plant } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
   const toast = useToast();
@@ -52,9 +52,11 @@ export default function TaskEditor() {
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false); // beschrijving pas op verzoek (UX-38)
-  // Vanuit een zone toegevoegd (Schoonmaak) ⇒ 'huishouden'; anders een gewone afspraak.
-  const [category, setCategory] = useState(zone ? 'huishouden' : 'afspraak');
+  // Vanuit een zone toegevoegd (Schoonmaak) ⇒ 'huishouden'; vanuit een plant
+  // (PLA-10: "verzorgingstaak toevoegen") ⇒ 'plant'; anders een gewone afspraak.
+  const [category, setCategory] = useState(plant ? 'plant' : zone ? 'huishouden' : 'afspraak');
   const [zoneId, setZoneId] = useState(zone ?? null);            // passthrough (UX-34)
+  const [plantId, setPlantId] = useState(plant ?? null);         // passthrough (PLA-10)
   const [assignedTo, setAssignedTo] = useState(null);            // passthrough (Hele-huishouden)
   // Datum staat standaard op vandaag (UX-36); een afspraak hoort op de kalender.
   const [dueDate, setDueDate] = useState(date ? new Date(date + 'T00:00:00') : (isNew ? new Date() : null));
@@ -89,6 +91,7 @@ export default function TaskEditor() {
       setShowNotes(!!(data.notes ?? '').trim());
       setCategory(data.category);
       setZoneId(data.zone_id ?? null);
+      setPlantId(data.plant_id ?? null);
       setAssignedTo(data.assigned_to);
       setDueDate(data.due_date ? new Date(data.due_date + 'T00:00:00') : null);
       setFreq(data.recur_freq);
@@ -167,6 +170,7 @@ export default function TaskEditor() {
       notes: notes.trim() || null,
       category,
       zone_id: zoneId,
+      plant_id: plantId,
       assigned_to: assigned,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       recur_freq: freq,

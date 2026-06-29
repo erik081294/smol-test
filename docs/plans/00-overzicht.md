@@ -36,6 +36,7 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 18 | [Verbeterplan UX/a11y/correctheid/perf](./18-ux-verbeterplan.md) | A11Y-1/2, UX-43/44, PERF-9, INF-11, BOO-12 | Kwaliteit/UX (4-agent-audit) | Nee |
 | 19 | [Tijdlijn / Prikbord](./19-tijdlijn-prikbord.md) | TML-1 t/m TML-8 | Nieuwe module (upgrade van PLT-6) | Ja |
 | 20 | [Teardown Schoonmaak](./20-schoonmaak-teardown.md) | UXR-9, SCH-4 | UX-teardown-voorbereiding | Nee |
+| 21 | [Teardown Zorg-modules](./21-zorg-teardown.md) | UXR-6, PLA-10 | UX-teardown-voorbereiding | Nee |
 
 > **Build-historie staat hier niet.** Welke ronde wanneer is gebouwd/gemerged — de keuken-loop
 > (09/05/04), de no-device-ronde (10–13), het performance-pakket en de consolidatie van de drie

@@ -276,10 +276,23 @@ export default function PlantScreen() {
             </View>
           </Collapsible>
 
-          <Text style={[type.label, { marginTop: 20, marginBottom: 8 }]}>{t('plant.careTasks')}</Text>
+          {/* Verzorgingstaken (PLA-10): per-plant grip op één plek. Een taakrij opent
+              de taak-editor (interval/frequentie/weekdagen/einde aanpassen of pauzeren) —
+              vóór PLA-10 viel 'ie via taskHref terug op deze plant zelf (dode tik). De
+              "Taak toevoegen"-knop maakt een eigen verzorgingstaak voor deze plant. */}
+          <Row justify="space-between" align="center" style={{ marginTop: 20, marginBottom: 8 }}>
+            <Text style={type.label}>{t('plant.careTasks')}</Text>
+            <Pressable onPress={() => router.push(`/task/new?plant=${plant.id}`)} hitSlop={8} accessibilityRole="button"
+              accessibilityLabel={t('plant.careTask.add')}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
+              <Icon name="add" size={16} color={colors.forest} />
+              <Text style={[type.caption, { color: colors.forest }]}>{t('plant.careTask.add')}</Text>
+            </Pressable>
+          </Row>
           {plantTasks.length === 0
             ? <Text style={[type.caption]}>{t('plant.noTasks')}</Text>
-            : plantTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle} />)}
+            : plantTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle}
+                onPress={() => router.push(`/task/${task.id}`)} />)}
 
           {/* Tijdlijn: foto's én losse notities over tijd, nieuwste eerst — een
               rustige verticale rail om de groei terug te bladeren. Een foto voeg je
