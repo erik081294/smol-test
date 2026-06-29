@@ -12,11 +12,12 @@ import { supabase } from '../../lib/supabase';
 import { mutate } from '../../lib/db';
 import { TaskRow } from '../../lib/TaskRow';
 import { FairnessBars } from '../../lib/FairnessBars';
-import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ModuleHelpButton, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Empty, Card, Button, Chip, Row, ScreenHeader, SectionHeader, ModuleHelpButton, ListSkeleton, BottomSheet, SheetScrollView, SegmentedControl } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { visibilityPayload } from '../../lib/visibility';
-import { CLEANING_TEMPLATES, planTemplate } from '../../lib/cleaningTemplates';
+import { RECUR } from '../../lib/constants';
+import { CLEANING_TEMPLATES, getCleaningTemplate, planTemplate, buildCustomSchedule } from '../../lib/cleaningTemplates';
 import { tally, tallyFromCounts, sinceDate, PERIODS } from '../../lib/fairness';
 import { t, plural } from '../../lib/i18n';
 
@@ -26,6 +27,16 @@ const FAIRNESS_PERIODS = [
   { key: 'ALL', labelKey: 'cleaning.period.all', days: PERIODS.ALL },
 ];
 
+// Cadans-keuzes voor de zelf-samengestelde rooster-builder (SCH-4). Bewust een kleine,
+// herkenbare set bovenop de bestaande recurrence-velden; weekdag-fijnregelen blijft voor
+// de taak-editor (daar kan het al volledig).
+const CADENCES = [
+  { key: 'weekly', labelKey: 'cleaning.cadence.weekly', freq: RECUR.WEEKLY, interval: 1 },
+  { key: 'biweekly', labelKey: 'cleaning.cadence.biweekly', freq: RECUR.WEEKLY, interval: 2 },
+  { key: 'monthly', labelKey: 'cleaning.cadence.monthly', freq: RECUR.MONTHLY, interval: 1 },
+];
+const norm = (s) => (s ?? '').trim().toLowerCase();
+
 export default function Schoonmaak() {
   const dialog = useDialog();
   const { tasks, loading, reload, completeTask, uncompleteTask } = useTasks();
@@ -34,7 +45,10 @@ export default function Schoonmaak() {
   const { members, activeId } = useHousehold();
   const { user } = useAuth();
   const router = useRouter();
-  const [picker, setPicker] = useState(null); // het gekozen sjabloon in de preview
+  const [setupOpen, setSetupOpen] = useState(false);      // de "Rooster opstellen"-sheet
+  const [setupMode, setSetupMode] = useState('template'); // 'template' | 'custom'
+  const [tplKey, setTplKey] = useState(CLEANING_TEMPLATES[0].key); // gekozen sjabloon
+  const [customRooms, setCustomRooms] = useState({});     // norm(zone) -> { zone, emoji, freq, interval }
   const [busy, setBusy] = useState(false);
   const [period, setPeriod] = useState('WEEK'); // eerlijkheidsoverzicht-periode
 
@@ -63,16 +77,52 @@ export default function Schoonmaak() {
 
   const toggle = (t) => (t.completed_at ? uncompleteTask(t.id) : completeTask(t));
 
-  const preview = useMemo(
-    () => (picker ? planTemplate(picker, { existingZones: zones, startDate: new Date() }) : null),
-    [picker, zones]
-  );
+  const openSetup = () => { setSetupMode('template'); setTplKey(CLEANING_TEMPLATES[0].key); setCustomRooms({}); setSetupOpen(true); };
+  // "Rooster bekijken" (SCH-4): deeplink naar Taken, voorgefilterd op alle schoonmaaktaken
+  // (week-scope) — hergebruikt de bestaande Taken-weergaven i.p.v. een eigen rooster-view.
+  const viewSchedule = () => router.push('/(tabs)/taken?cleaning=1&scope=week');
 
-  const applyTemplate = async () => {
-    if (!picker) return;
+  // De zones die je in de custom-builder kunt kiezen: de sjabloon-zones (vertrouwd) plus
+  // de zones die het huishouden al heeft, ontdubbeld op genormaliseerde naam.
+  const zoneOptions = useMemo(() => {
+    const m = new Map();
+    for (const tpl of CLEANING_TEMPLATES) for (const r of tpl.rooms) {
+      if (!m.has(norm(r.zone))) m.set(norm(r.zone), { zone: r.zone, emoji: r.emoji });
+    }
+    for (const z of zones) {
+      if (!m.has(norm(z.name))) m.set(norm(z.name), { zone: z.name, emoji: z.emoji ?? '🧹' });
+    }
+    return [...m.values()];
+  }, [zones]);
+
+  // De door de gebruiker gekozen kamers → het rooster-payload-formaat van buildCustomSchedule.
+  const customRoomList = useMemo(() => Object.values(customRooms).map((r) => ({
+    zone: r.zone, emoji: r.emoji, recur_freq: r.freq, recur_interval: r.interval, recur_weekdays: null,
+  })), [customRooms]);
+
+  const toggleCustomZone = (opt) => setCustomRooms((m) => {
+    const key = norm(opt.zone);
+    if (m[key]) { const { [key]: _omit, ...rest } = m; return rest; }
+    return { ...m, [key]: { zone: opt.zone, emoji: opt.emoji, freq: RECUR.WEEKLY, interval: 1 } };
+  });
+  const setCustomCadence = (opt, cad) => setCustomRooms((m) => ({
+    ...m, [norm(opt.zone)]: { ...m[norm(opt.zone)], freq: cad.freq, interval: cad.interval },
+  }));
+
+  const preview = useMemo(() => {
+    const opts = { existingZones: zones, startDate: new Date() };
+    return setupMode === 'custom'
+      ? buildCustomSchedule(customRoomList, opts)
+      : planTemplate(getCleaningTemplate(tplKey), opts);
+  }, [setupMode, tplKey, customRoomList, zones]);
+
+  const canConfirm = setupMode === 'template' || customRoomList.length > 0;
+
+  const applySchedule = async () => {
+    if (!canConfirm) return;
     setBusy(true);
     try {
-      const plan = planTemplate(picker, { existingZones: zones, startDate: new Date() });
+      const plan = preview;
       let created = [];
       if (plan.zonesToCreate.length) {
         created = await mutate(
@@ -85,21 +135,22 @@ export default function Schoonmaak() {
       const byName = new Map();
       for (const z of [...zones, ...(created ?? [])]) byName.set(z.name.trim().toLowerCase(), z.id);
 
-      const rows = plan.tasks.map((t) => ({
+      const rows = plan.tasks.map((tk) => ({
         household_id: activeId,
         created_by: user.id,
-        title: t.title,
-        category: t.category,
-        zone_id: byName.get(t.zone_name.trim().toLowerCase()) ?? null,
-        due_date: t.due_date,
-        recur_freq: t.recur_freq,
-        recur_interval: t.recur_interval,
-        recur_weekdays: t.recur_weekdays,
-        ...visibilityPayload({ visibility: t.visibility }),
+        title: tk.title,
+        category: tk.category,
+        zone_id: byName.get(tk.zone_name.trim().toLowerCase()) ?? null,
+        due_date: tk.due_date,
+        recur_freq: tk.recur_freq,
+        recur_interval: tk.recur_interval,
+        recur_weekdays: tk.recur_weekdays,
+        ...visibilityPayload({ visibility: tk.visibility }),
       }));
       await mutate(supabase.from('tasks').insert(rows), { context: 'schoonmaaktaken aanmaken' });
 
-      setPicker(null);
+      setSetupOpen(false);
+      setCustomRooms({});
       reloadZones();
       reload();
     } catch (e) {
@@ -166,9 +217,17 @@ export default function Schoonmaak() {
           );
         }}
         ListFooterComponent={zones.length > 0 ? (
-          <Button title={t('cleaning.setup')} variant="accent" icon="add"
-            onPress={() => setPicker(CLEANING_TEMPLATES[0])}
-            style={{ marginTop: space.sm }} />
+          // Twee duidelijke ingangen (SCH-4): het hele rooster bekíjken (deeplink naar
+          // Taken, week/maand) of een rooster opstellen/uitbreiden. De losse "Taak
+          // toevoegen" zit per zone hierboven — zo blijven losse taak en rooster gescheiden.
+          <Row gap={space.sm} style={{ marginTop: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button title={t('cleaning.schedule.view')} variant="soft" icon="agenda" onPress={viewSchedule} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button title={t('cleaning.schedule.setup')} variant="accent" icon="add" onPress={openSetup} />
+            </View>
+          </Row>
         ) : null}
         ListEmptyComponent={
           loading && zones.length === 0 ? (
@@ -176,47 +235,86 @@ export default function Schoonmaak() {
           ) : !loading && zones.length === 0 ? (
             <Empty illustration="cleaning" title={t('cleaning.empty.title')}
               subtitle={t('cleaning.empty.subtitle')}
-              actionTitle={t('cleaning.setup')} onAction={() => setPicker(CLEANING_TEMPLATES[0])} />
+              actionTitle={t('cleaning.schedule.setup')} onAction={openSetup} />
           ) : null
         }
       />
 
-      {/* Sjabloon-preview (UX-22: gedeelde BottomSheet). */}
-      <BottomSheet visible={!!picker} onClose={() => setPicker(null)} maxHeight="85%">
+      {/* Rooster opstellen (UX-22: gedeelde BottomSheet). Twee modi: een vast sjabloon
+          kiezen, of zelf zones + cadans samenstellen (SCH-4). Beide leveren hetzelfde
+          preview + dezelfde insert-flow op. */}
+      <BottomSheet visible={setupOpen} onClose={() => setSetupOpen(false)} maxHeight="85%">
         <SheetScrollView contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.xs, paddingBottom: space.lg }}>
-          <Text style={[type.h2, { marginBottom: space.sm }]}>{t('cleaning.setup')}</Text>
+          <Text style={[type.h2, { marginBottom: space.sm }]}>{t('cleaning.schedule.setup')}</Text>
 
-          {/* Sjabloonkeuze */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
-            {CLEANING_TEMPLATES.map((tpl) => (
-              <Chip key={tpl.key} label={tpl.label} active={picker?.key === tpl.key} onPress={() => setPicker(tpl)} />
-            ))}
-          </ScrollView>
+          <SegmentedControl
+            value={setupMode} onChange={setSetupMode}
+            options={[
+              { value: 'template', label: t('cleaning.setup.mode.template') },
+              { value: 'custom', label: t('cleaning.setup.mode.custom') },
+            ]}
+            style={{ marginBottom: space.md }} />
 
-          {picker && (
-            <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>{picker.description}</Text>
+          {setupMode === 'template' ? (
+            <>
+              {/* Sjabloonkeuze */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.md }}>
+                {CLEANING_TEMPLATES.map((tpl) => (
+                  <Chip key={tpl.key} label={tpl.label} active={tplKey === tpl.key} onPress={() => setTplKey(tpl.key)} />
+                ))}
+              </ScrollView>
+              <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>
+                {getCleaningTemplate(tplKey)?.description}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.sm }]}>{t('cleaning.setup.custom.intro')}</Text>
+              {zoneOptions.map((opt) => {
+                const sel = customRooms[norm(opt.zone)];
+                return (
+                  <View key={opt.zone} style={{ paddingVertical: space.xs, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                    <Chip label={`${opt.emoji} ${opt.zone}`} active={!!sel} onPress={() => toggleCustomZone(opt)} />
+                    {sel ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: space.xs, marginLeft: space.sm }}>
+                        {CADENCES.map((cad) => (
+                          <Chip key={cad.key} label={t(cad.labelKey)}
+                            active={sel.freq === cad.freq && sel.interval === cad.interval}
+                            onPress={() => setCustomCadence(opt, cad)} />
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+              {customRoomList.length === 0 ? (
+                <Text style={[type.caption, { marginTop: space.sm }]}>{t('cleaning.setup.custom.empty')}</Text>
+              ) : null}
+            </>
           )}
 
-          {preview?.tasks.map((pt, i) => (
-            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
-              paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
-              <Text style={type.body}>{pt.zone_name} · {pt.title}</Text>
-              <Text style={type.caption}>{recurrenceLabel(pt)}</Text>
+          {/* Gedeelde preview van wat er aangemaakt wordt. */}
+          {canConfirm && preview.tasks.length > 0 ? (
+            <View style={{ marginTop: space.sm }}>
+              {preview.tasks.map((pt, i) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between',
+                  paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                  <Text style={type.body}>{pt.zone_name} · {pt.title}</Text>
+                  <Text style={type.caption}>{recurrenceLabel(pt)}</Text>
+                </View>
+              ))}
+              <Text style={[type.caption, { marginTop: space.sm }]}>
+                {plural(preview.tasks.length, 'cleaning.preview.tasks.one', 'cleaning.preview.tasks.other')}
+                {preview.zonesToCreate.length
+                  ? t('cleaning.preview.newZones', { n: preview.zonesToCreate.length })
+                  : t('cleaning.preview.existingZones')}
+              </Text>
             </View>
-          ))}
-
-          {preview && (
-            <Text style={[type.caption, { marginTop: space.sm }]}>
-              {plural(preview.tasks.length, 'cleaning.preview.tasks.one', 'cleaning.preview.tasks.other')}
-              {preview.zonesToCreate.length
-                ? t('cleaning.preview.newZones', { n: preview.zonesToCreate.length })
-                : t('cleaning.preview.existingZones')}
-            </Text>
-          )}
+          ) : null}
 
           <Row gap={space.sm} style={{ marginTop: space.md }}>
-            <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setPicker(null)} /></View>
-            <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} onPress={applyTemplate} /></View>
+            <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setSetupOpen(false)} /></View>
+            <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} disabled={!canConfirm} onPress={applySchedule} /></View>
           </Row>
         </SheetScrollView>
       </BottomSheet>

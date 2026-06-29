@@ -4,10 +4,11 @@ import { View, Text, ScrollView, SectionList, Pressable, Platform, useWindowDime
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format, addDays, addMonths, addYears } from 'date-fns';
 import { useTasks } from '../../lib/useTasks';
 import { useTags } from '../../lib/useTags';
+import { useZones } from '../../lib/useZones';
 import { useAuth } from '../../lib/auth';
 import { useHousehold } from '../../lib/household';
 import { TaskRow } from '../../lib/TaskRow';
@@ -31,7 +32,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
 
-const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open', audience: 'all' };
+const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open', audience: 'all', cleaningOnly: false, zoneId: null };
 
 // Eerste letter als hoofdletter (NL-datum/maandnamen komen lowercase uit date-fns).
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -67,8 +68,10 @@ export default function Taken() {
   const { tasks, loading, error, reload, addTask, completeTask, uncompleteTask, deleteTask, deleteTasks, updateTask } = useTasks();
   const { members, subgroups } = useHousehold();
   const { tags } = useTags();
+  const { zones } = useZones();
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const toast = useToast();
   const dialog = useDialog();
   const [hiddenIds, setHiddenIds] = useState([]);
@@ -82,6 +85,16 @@ export default function Taken() {
 
   const addFromLibrary = (chore) => addTask(choreToTask(chore, { startDate: new Date() }));
 
+  // Deeplink vanaf Schoonmaak (SCH-4): "Rooster bekijken" opent Taken voorgefilterd op
+  // alle schoonmaaktaken (cleaning=1) of één zone (zone=<id>), eventueel met een scope.
+  // Eén keer toepassen per param-waarde, zodat de gebruiker daarna vrij kan filteren.
+  useEffect(() => {
+    if (params.cleaning === '1') setFilters((f) => ({ ...f, cleaningOnly: true, zoneId: null }));
+    if (params.zone) setFilters((f) => ({ ...f, zoneId: String(params.zone), cleaningOnly: false }));
+    const sc = params.scope ? String(params.scope) : null;
+    if (sc && ['dag', 'week', 'maand', 'jaar'].includes(sc)) setScope(sc);
+  }, [params.cleaning, params.zone, params.scope]);
+
   // Filter-as-object naar de pure helper (assignee single-select → array van 0/1).
   const filterArg = useMemo(() => ({
     categories: filters.categories,
@@ -90,6 +103,8 @@ export default function Taken() {
     tagIds: filters.tagIds,
     status: filters.status,
     audience: filters.audience,
+    cleaningOnly: filters.cleaningOnly,
+    zoneId: filters.zoneId,
     viewerId: user?.id ?? null,
   }), [filters, user]);
 
@@ -282,6 +297,13 @@ export default function Taken() {
   if (filters.status !== 'open') {
     activeChips.push({ key: 'status', label: filters.status === 'done' ? t('tasks.filter.done') : t('tasks.filter.status.all'), onRemove: () => setFilters((f) => ({ ...f, status: 'open' })) });
   }
+  if (filters.cleaningOnly) {
+    activeChips.push({ key: 'cleaning', label: t('tasks.filter.cleaning'), onRemove: () => setFilters((f) => ({ ...f, cleaningOnly: false })) });
+  }
+  if (filters.zoneId) {
+    const z = zones.find((zo) => zo.id === filters.zoneId);
+    activeChips.push({ key: 'zone', label: z ? `${z.emoji} ${z.name}` : t('tasks.filter.cleaning'), onRemove: () => setFilters((f) => ({ ...f, zoneId: null })) });
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -430,7 +452,7 @@ export default function Taken() {
       <TaskFilterSheet
         visible={filterOpen} onClose={() => setFilterOpen(false)}
         filters={filters} setFilters={setFilters}
-        members={members} subgroups={subgroups} tags={tags} tasks={tasks} filterArg={filterArg}
+        members={members} subgroups={subgroups} tags={tags} zones={zones} tasks={tasks} filterArg={filterArg}
       />
 
       <Celebrate show={celebrate} message={t('tasks.allDoneToday')} onDone={() => setCelebrate(false)} />
@@ -441,7 +463,7 @@ export default function Taken() {
 // Bottom-sheet met gegroepeerde filterkeuzes (categorie/persoon/groep/status).
 // Filters werken live; de sheet is enkel de editor. Categorie toont per-categorie
 // tellers (countBy) op de huidige selectie minus de categorie-as.
-function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tags = [], tasks, filterArg }) {
+function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgroups, tags = [], zones = [], tasks, filterArg }) {
   const catCounts = useMemo(
     () => countBy(applyTaskFilters(tasks, { ...filterArg, categories: [] }), (tk) => tk.category),
     [tasks, filterArg],
@@ -509,6 +531,22 @@ function TaskFilterSheet({ visible, onClose, filters, setFilters, members, subgr
               onPress={() => setFilters((f) => ({ ...f, status: v }))} />
           ))}
         </View>
+
+        {/* Schoonmaak (SCH-4): "Alle schoonmaak" = elke zone-gebonden taak (het rooster);
+            een losse zone knijpt verder in. De twee sluiten elkaar uit (zone is specifieker). */}
+        {zones.length > 0 ? (
+          <>
+            <Text style={[type.label, { marginBottom: space.sm }]}>{t('tasks.filter.cleaning')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.lg }}>
+              <Chip icon="cleaning" label={t('tasks.filter.cleaning.all')} active={filters.cleaningOnly && !filters.zoneId}
+                onPress={() => setFilters((f) => ({ ...f, cleaningOnly: !f.cleaningOnly, zoneId: null }))} />
+              {zones.map((z) => (
+                <Chip key={z.id} label={`${z.emoji} ${z.name}`} active={filters.zoneId === z.id}
+                  onPress={() => setFilters((f) => ({ ...f, zoneId: f.zoneId === z.id ? null : z.id, cleaningOnly: false }))} />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <Row gap={space.sm}>
           <View style={{ flex: 1 }}>
