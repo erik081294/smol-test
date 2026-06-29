@@ -359,7 +359,11 @@ export default function PetScreen() {
                 left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(task) }}
                 right={{ icon: 'agenda', label: t('tasks.snooze'), color: colors.forest, onTrigger: () => snoozeTaskWithUndo(task) }}
               >
-                <TaskRow task={task} members={members} onToggle={toggle} />
+                {/* Tik opent de taak-editor (PLA-10-parity): interval/frequentie aanpassen
+                    of pauzeren. Zonder onPress viel 'ie via taskHref terug op dit huisdier
+                    zelf (dode tik). */}
+                <TaskRow task={task} members={members} onToggle={toggle}
+                  onPress={() => router.push(`/task/${task.id}`)} />
               </SwipeRow>
             ))}
 
