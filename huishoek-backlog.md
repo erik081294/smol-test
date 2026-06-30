@@ -32,11 +32,11 @@ afgerond werk en build-historie staan elders, zodat de actieve lijst scanbaar bl
 > punten staan in de tabel (§6); het volledige chronologische verloop in
 > [`huishoek-voortgang.md`](huishoek-voortgang.md).
 >
-> **Nieuw (2026-06-28) — toestelfeedback-ronde Boodschappen + losse wensen.** Gebouwd (🔧/◐,
-> device-rooktest open): Boodschappen-UX (BOO-15 zoekbalk-herfocus, BOO-16 wis-knop, BOO-17
-> afvink/verwijder-feedback, BOO-14 compactere kop — eerste stap), FND-5 (multi-huishouden
-> bleek al gebouwd → feedback bij wisselen toegevoegd), PLT-10 (camera-web-guard;
-> swipe/BottomSheet-web nog open). **INF-13 ✅ → archief** (`emailRedirectTo` in code +
+> **Nieuw (2026-06-28) — toestelfeedback-ronde Boodschappen + losse wensen.** Gebouwd: Boodschappen-UX
+> (BOO-15 zoekbalk-herfocus, BOO-16 wis-knop, BOO-17 afvink/verwijder-feedback, BOO-14 compactere kop
+> — eerste stap) — **alle vier device-bevestigd 2026-06-30** (BOO-15/16/17 → ✅/archief; BOO-14 stap 1 ✓,
+> stap 2 data-gated). FND-5 (multi-huishouden bleek al gebouwd → feedback bij wisselen toegevoegd) en
+> PLT-10 (camera-web-guard; swipe/BottomSheet-web nog open) **wachten nog op device-rooktest.** **INF-13 ✅ → archief** (`emailRedirectTo` in code +
 > dashboard Site URL/allowlist door de eigenaar gefixt; onderzoek toonde dat de localhost-link
 > de activatie niet blokkeerde). UXR-9 klaargezet als [plan 20](docs/plans/20-schoonmaak-teardown.md).
 > Detail in §6 + voortgangslog.
