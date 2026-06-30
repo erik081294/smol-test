@@ -359,7 +359,11 @@ export default function Boodschappen() {
       {/* Zoek-dropdown als een overlay onder de balk; tik ernaast (de backdrop) sluit 'm. */}
       {q ? (
         <View style={[StyleSheet.absoluteFill, { top: searchTop, zIndex: 20 }]}>
-          <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={t('common.close')} onPress={dismissSearch} />
+          {/* Subtiele scrim (UXR-10 #9): dimt de lege-staat-illustratie/lijst tijdens het
+              zoeken zodat de dropdown rustig bovenop ligt i.p.v. de illustratie er onscherp
+              doorheen. Tikken sluit de dropdown. */}
+          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.15)' }]}
+            accessibilityLabel={t('common.close')} onPress={dismissSearch} />
           <View style={{
             marginHorizontal: space.lg, backgroundColor: colors.surface, borderRadius: radius.md,
             borderWidth: 1, borderColor: colors.line, paddingHorizontal: space.md, paddingVertical: space.xs,

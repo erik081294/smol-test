@@ -40,6 +40,7 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 
 | Document | Datum | Waarover |
 |----------|-------|----------|
+| [`ux-review-rooktest-2026-06-30.md`](./ux-review-rooktest-2026-06-30.md) | 2026-06-30 | Onafhankelijke UX/product-review van de drie-sporen-rooktest (SCH-4/PLA-10/BOO-14..17) — 14 geprioriteerde punten. Opvolging: backlog §6 **UXR-10**. |
 | [`design-review-2026-06-26.md`](./design-review-2026-06-26.md) | 2026-06-26 | Design-review per scherm (rooktest-screenshots) + getierd verbeterplan (quick wins → herontwerpen). |
 | [`launch-readiness-2026-06-26.md`](./launch-readiness-2026-06-26.md) | 2026-06-26 | Launch-readiness review (5 parallelle agents) richting ~10.000 gebruikers. |
 | [`test-effectiviteit-2026-06-22.md`](./test-effectiviteit-2026-06-22.md) | 2026-06-22 | Mutatietest-rapport — cijfers per module (achtergrond bij `mutatietesten.md`). |

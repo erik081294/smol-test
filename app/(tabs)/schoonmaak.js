@@ -109,12 +109,21 @@ export default function Schoonmaak() {
     ...m, [norm(opt.zone)]: { ...m[norm(opt.zone)], freq: cad.freq, interval: cad.interval },
   }));
 
+  // De al bestaande, nog-openstaande schoonmaaktaken ({ zone, title }) → zodat een
+  // rooster bovenop bestaande taken geen dúbbele taak aanmaakt (UXR-10 #8).
+  const existingCleaningTasks = useMemo(() => {
+    const zoneName = new Map(zones.map((z) => [z.id, z.name]));
+    return tasks
+      .filter((t) => t.zone_id && !t.completed_at)
+      .map((t) => ({ zone: zoneName.get(t.zone_id) ?? '', title: t.title }));
+  }, [tasks, zones]);
+
   const preview = useMemo(() => {
-    const opts = { existingZones: zones, startDate: new Date() };
+    const opts = { existingZones: zones, existingTasks: existingCleaningTasks, startDate: new Date() };
     return setupMode === 'custom'
       ? buildCustomSchedule(customRoomList, opts)
       : planTemplate(getCleaningTemplate(tplKey), opts);
-  }, [setupMode, tplKey, customRoomList, zones]);
+  }, [setupMode, tplKey, customRoomList, zones, existingCleaningTasks]);
 
   const canConfirm = setupMode === 'template' || customRoomList.length > 0;
 
@@ -225,7 +234,10 @@ export default function Schoonmaak() {
               <Button title={t('cleaning.schedule.view')} variant="soft" icon="agenda" onPress={viewSchedule} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button title={t('cleaning.schedule.setup')} variant="accent" icon="add" onPress={openSetup} />
+              {/* Primaire actie = forest (UXR-10): dezelfde kleur als de "Opzetten"-knop in de
+                  opstel-sheet, zodat de primaire actie niet ocher→forest omslaat binnen één flow.
+                  Ocher blijft voor de FAB/highlights. */}
+              <Button title={t('cleaning.schedule.setup')} icon="add" onPress={openSetup} />
             </View>
           </Row>
         ) : null}
@@ -312,9 +324,15 @@ export default function Schoonmaak() {
             </View>
           ) : null}
 
+          {/* Alles al aanwezig (UXR-10 #8): maak de dedup zichtbaar i.p.v. een stille
+              no-op-"Opzetten" — toon dat er niets toe te voegen valt. */}
+          {canConfirm && preview.tasks.length === 0 ? (
+            <Text style={[type.caption, { marginTop: space.sm, color: colors.inkSoft }]}>{t('cleaning.preview.allExist')}</Text>
+          ) : null}
+
           <Row gap={space.sm} style={{ marginTop: space.md }}>
             <View style={{ flex: 1 }}><Button title={t('common.cancelLong')} variant="ghost" onPress={() => setSetupOpen(false)} /></View>
-            <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} disabled={!canConfirm} onPress={applySchedule} /></View>
+            <View style={{ flex: 1 }}><Button title={t('cleaning.confirm')} loading={busy} disabled={!canConfirm || preview.tasks.length === 0} onPress={applySchedule} /></View>
           </Row>
         </SheetScrollView>
       </BottomSheet>
