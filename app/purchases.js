@@ -8,7 +8,7 @@ import { backLabelFor } from '../lib/navMeta';
 import { formatCents } from '../lib/expenses';
 import { ModalHeader, ItemRow, Empty, Button, ListSkeleton } from '../lib/ui';
 import { colors, type, space } from '../lib/theme';
-import { dateLocale, t } from '../lib/i18n';
+import { dateLocale, t, plural } from '../lib/i18n';
 
 // Bonnenlijst (BOO-10): het ontbrekende entry-point naar bestaande bonnen. Vanuit
 // Boodschappen → hier → tik een bon → app/purchase/[id] (de read-only "Bewerken"-tak,
@@ -32,7 +32,7 @@ export default function Purchases() {
               meta={(
                 <Text style={type.caption}>
                   {item.purchased_on ? format(parseISO(item.purchased_on), 'd MMM yyyy', { locale: dateLocale() }) : ''}
-                  {n ? ` · ${t('purchases.items', { n })}` : ''}
+                  {n ? ` · ${plural(n, 'purchases.items.one', 'purchases.items.other')}` : ''}
                   {item.total_cents != null ? ` · ${formatCents(item.total_cents)}` : ''}
                 </Text>
               )}

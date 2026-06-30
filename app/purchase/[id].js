@@ -176,7 +176,7 @@ export default function PurchaseEditor() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
         <ModalHeader title={existing.store || t('purchase.untitled')} onClose={() => router.back()}
-          onConfirm={startEditing} confirmLabel={t('common.edit')} />
+          onConfirm={startEditing} confirmLabel={t('common.edit')} cancelLabel={t('common.close')} />
         <ScrollView contentContainerStyle={{ padding: space.lg }}>
           <Text style={[type.body, { color: colors.inkSoft, marginBottom: space.lg }]}>
             {format(parseISO(existing.purchased_on), 'd MMMM yyyy', { locale: dateLocale() })}
@@ -187,7 +187,9 @@ export default function PurchaseEditor() {
               <View style={{ flex: 1 }}>
                 <Text style={type.body}>{it.name}</Text>
                 <Text style={type.caption}>
-                  {it.quantity} {it.unit}{nameOf(it.product_id) ? ` · ${nameOf(it.product_id)}` : ''}
+                  {/* Toon de gekoppelde productnaam alleen als die afwijkt van de regelnaam —
+                      anders staat dezelfde naam dubbel (titel + meta). UXR-11 (visual #10). */}
+                  {it.quantity} {it.unit}{nameOf(it.product_id) && nameOf(it.product_id) !== it.name ? ` · ${nameOf(it.product_id)}` : ''}
                 </Text>
               </View>
               {it.unit_price_cents != null ? <Text style={type.body}>{formatCents(it.unit_price_cents)}</Text> : null}

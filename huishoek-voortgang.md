@@ -864,3 +864,22 @@ review-punten dichtgezet → **UXR-10 ✅ → archief**. Nieuw gebouwd + device-
 **Verificatie:** typecheck + lint (0 errors) + `npm test` **805 pass / 0 fail / 23 skip**; ratchet
 `cleaningTemplates` 76,3%. Gewijzigd: `cleaningTemplates.js`, `FairnessBars.js`, `schoonmaak.js`,
 `boodschappen.js`, `i18n.js`, `DESIGN.md` + `tests/cleaningTemplates.test.js`.
+
+**Device-rooktest ronde 2 + twee UX/visual-reviews → UXR-11 (2026-06-30).** Verdere openstaande
+device-tests op de moto, tot het toestel halverwege werd losgekoppeld. **Device-bevestigd → ✅/archief:**
+**VTG-1..4** (voertuig-lijst + editor/detail met RDW-verrijking, kosten-uitsplitsing + onderhoudshistorie,
+"Delen via Samen" + prijs/km, log-formulier — de log-write is bewezen door de bestaande historie-entry; een
+verse write lukte niet via adb-injectie, geen app-bug) en **BOO-10** (bonnenlijst → lees-detail → editor
+renderen volledig). **BOO-13** ingang (Catalogus → tik op product → producteditor) + render bevestigd; de
+rest (opslaan/foto/prompt/onderkant) niet bereikt door de afkoppeling. Daarna twee **onafhankelijke
+subagents** (UX/interactie + puur visueel) de screenshots laten beoordelen →
+[`docs/ux-review-modules-2026-06-30.md`](docs/ux-review-modules-2026-06-30.md) +
+[`docs/visual-design-review-2026-06-30.md`](docs/visual-design-review-2026-06-30.md). **Elke bevinding tegen
+de code gelegd** (geen aannames) → geprioriteerd [`docs/verbeterplan-modules-2026-06-30.md`](docs/verbeterplan-modules-2026-06-30.md).
+**Reeds gefixt:** "1 producten"-meervoud (`purchases.items.one/other` + `plural`), bon-leesdetail-kop
+"Annuleer"→"Sluiten" (`cancelLabel`), dubbele productnaam in de bon-regel (toon `· naam` alleen als ≠
+regelnaam). **Beslissingen/groter werk** (B1 "Opslaan"/"Bewaar" app-breed, B2 "Splitsen"-ocher, C1 voertuig
+opent direct de editor i.p.v. lees-detail, C2 catalogusrij-affordance, …) staan in UXR-11/het verbeterplan.
+**Non-issues code-geverifieerd:** stepper-`−` dimt al op 0; bon read/edit-splitsing is correct. **Nog
+device-rooktest (toestel weg):** UX-22, UX-42, FND-5, HUI-2, BOO-13-rest. typecheck + lint + `npm test`
+**805 pass / 0 fail / 23 skip**.

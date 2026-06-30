@@ -40,6 +40,9 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 
 | Document | Datum | Waarover |
 |----------|-------|----------|
+| [`verbeterplan-modules-2026-06-30.md`](./verbeterplan-modules-2026-06-30.md) | 2026-06-30 | **Verbeterplan** Voertuigen/Bonnen/Catalogus — bevindingen uit de twee reviews hieronder, élk tegen de code geverifieerd (gefixt / beslissing / groter werk / non-issue). Opvolging: §6 **UXR-11**. |
+| [`ux-review-modules-2026-06-30.md`](./ux-review-modules-2026-06-30.md) | 2026-06-30 | Onafhankelijke UX/interactie-review (subagent) van Voertuigen/Bonnen/Catalogus-screenshots — 12 punten, [zeker]/[aanname]-getagd. |
+| [`visual-design-review-2026-06-30.md`](./visual-design-review-2026-06-30.md) | 2026-06-30 | Onafhankelijke puur-visuele review (subagent) van dezelfde modules — kleur-rolzuiverheid, hiërarchie, consistentie. |
 | [`ux-review-rooktest-2026-06-30.md`](./ux-review-rooktest-2026-06-30.md) | 2026-06-30 | Onafhankelijke UX/product-review van de drie-sporen-rooktest (SCH-4/PLA-10/BOO-14..17) — 14 geprioriteerde punten. Opvolging: backlog §6 **UXR-10**. |
 | [`design-review-2026-06-26.md`](./design-review-2026-06-26.md) | 2026-06-26 | Design-review per scherm (rooktest-screenshots) + getierd verbeterplan (quick wins → herontwerpen). |
 | [`launch-readiness-2026-06-26.md`](./launch-readiness-2026-06-26.md) | 2026-06-26 | Launch-readiness review (5 parallelle agents) richting ~10.000 gebruikers. |
