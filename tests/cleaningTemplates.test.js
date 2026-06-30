@@ -57,6 +57,47 @@ test('planTemplate: bestaande zones worden niet opnieuw aangemaakt (case-insensi
   assert.ok(names.includes('algemeen'));
 });
 
+test('UXR-10 #8: een al bestaande taak (zelfde zone + titel) wordt niet dubbel aangemaakt', () => {
+  const t = {
+    key: 'x', label: 'x', rooms: [
+      { zone: 'Badkamer', title: 'Badkamer schoonmaken', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [6] },
+      { zone: 'Keuken', title: 'Keuken dweilen', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [0] },
+    ],
+  };
+  const { tasks } = planTemplate(t, {
+    existingTasks: [{ zone: '  badkamer ', title: 'BADKAMER schoonmaken' }], // genormaliseerd → match
+    startDate: new Date(2026, 5, 1),
+  });
+  const titles = tasks.map((x) => x.title);
+  assert.deepEqual(titles, ['Keuken dweilen'], 'de bestaande Badkamer-taak valt weg, Keuken blijft');
+});
+
+test('UXR-10 #8: dezelfde titel in een ándere zone wordt wél aangemaakt', () => {
+  const t = {
+    key: 'x', label: 'x', rooms: [
+      { zone: 'Woonkamer', title: 'Stofzuigen', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [3] },
+    ],
+  };
+  const { tasks } = planTemplate(t, {
+    existingTasks: [{ zone: 'Slaapkamer', title: 'Stofzuigen' }], // andere zone → geen dedup
+    startDate: new Date(2026, 5, 1),
+  });
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].zone_name, 'Woonkamer');
+});
+
+test('UXR-10 #8: dubbele (zone+titel) binnen één bouw levert één taak', () => {
+  const t = {
+    key: 'x', label: 'x', rooms: [
+      { zone: 'Toilet', title: 'Toilet schoonmaken', recur_freq: 'weekly', recur_interval: 1, recur_weekdays: [6] },
+      { zone: 'toilet', title: 'toilet schoonmaken', recur_freq: 'monthly', recur_interval: 1, recur_weekdays: [] },
+    ],
+  };
+  const { tasks } = planTemplate(t, { startDate: new Date(2026, 5, 1) });
+  assert.equal(tasks.length, 1, 'identieke zone+titel → één taak (de eerste wint)');
+  assert.equal(tasks[0].recur_freq, 'weekly');
+});
+
 test('firstDueDate: wekelijks met weekdag pakt de eerste passende dag', () => {
   // 1 juni 2026 is maandag (getDay 1). Vraag om zaterdag (6) -> 6 juni 2026.
   assert.equal(firstDueDate(new Date(2026, 5, 1), 'weekly', [6]), '2026-06-06');

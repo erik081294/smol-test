@@ -145,8 +145,13 @@ Zodat elke actie op een voorspelbare plek staat:
   *Uitzondering:* Boodschappen gebruikt een inline invoerbalk voor razendsnel
   achter-elkaar toevoegen — dat is bewust.
 - **Bevestigen in een editor/sheet → `ModalHeader` met `onConfirm`** (Annuleer ·
-  titel · Bewaar, altijd in de kop en dus bereikbaar zonder te scrollen).
-  **Nooit óók een Bewaar-knop onderaan** — één bevestigplek per scherm.
+  titel · Bewaar, altijd in de kop en dus bereikbaar zonder te scrollen). Een
+  **editor** (lang, scrollend formulier) **mag de primaire actie óók onderaan
+  herhalen** als één gelabelde `Button` ("Toevoegen"/"Opslaan") ná het laatste veld
+  — dezelfde `save`, een sterkere afsluit-affordance (**UX-39**, bewust: de kale
+  rechtsboven-knop alleen is zwakke UX). Het blijft **één bevestig-*actie*** (kop en
+  voet roepen hetzelfde aan): nooit een tweede, *andere* bevestiging. Een korte
+  **sheet** zonder scroll houdt het bij alleen de kop.
 - **Verwijderen → onderaan**, als `Button variant="ghost"`/`danger`, los van de
   bevestiging. Destructief hoort niet naast Bewaar.
 - **Veeg-acties op lijstrijen → `SwipeRow`** (`lib/ui.js`, op `ReanimatedSwipeable`):
@@ -181,9 +186,10 @@ Zodat elke actie op een voorspelbare plek staat:
 
 Elke aanmaak-/bewerk-editor gebruikt het `Editor`-omhulsel uit `lib/ui.js`
 (veilige rand + toetsenbord-ontwijking + **vaste** `ModalHeader` + scrollend
-inhoudsvlak). Daarmee blijft de Bewaar-knop altijd in beeld en is "één
-bevestigplek" structureel geborgd — bouw geen eigen `SafeAreaView`/`ScrollView`/
-`ModalHeader`-combinatie meer per scherm.
+inhoudsvlak). Daarmee blijft de kop-`Bewaar` altijd in beeld; de editor mág de
+primaire actie ook als gelabelde `Button` ná het laatste veld herhalen (**UX-39**,
+dezelfde `save`) — kop en voet zijn één bevestig-actie, geen tweede pad. Bouw geen
+eigen `SafeAreaView`/`ScrollView`/`ModalHeader`-combinatie meer per scherm.
 
 Velden staan in een vaste, voorspelbare volgorde — de denkstap van de gebruiker:
 

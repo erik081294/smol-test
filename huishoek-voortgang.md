@@ -798,3 +798,69 @@ baseline** — `agenda` 92,5% (baseline 89,8%), `cleaningTemplates` 76,0% (basel
 `tests/agenda.test.js` (zone/cleaning-as) en `tests/cleaningTemplates.test.js` (`buildCustomSchedule`).
 UI niet op toestel/web geverifieerd (geen device in deze omgeving) → gebouwde items op 🔧 met
 "device-rooktest" als rest.
+
+**Device-rooktest drie sporen + onafhankelijke UX-review (2026-06-30).** De vorige sessie liet de drie
+sporen op 🔧/◐ met "device-rooktest" als rest. Op de moto (live dev-client, branch `main`, scheme-deeplinks
++ uiautomator-driving) de hele batch doorlopen:
+
+- **SCH-4 (Schoonmaak) ✅ → archief.** "Rooster opstellen" → modus **Zelf samenstellen**: zone Toilet +
+  cadans → live preview update (Elke week → Elke maand); "Opzetten" → de taak verschijnt in de Toilet-zone
+  ("Vandaag · Elke maand"). "Rooster bekijken" → deeplink opent **Taken** met Week-scope + actief
+  "Schoonmaak ×"-filter, toont enkel schoonmaaktaken. Testdata teruggedraaid (swipe-delete + undo-toast).
+- **PLA-10 (Planten) — plant-zijde bevestigd (blijft 🔧).** Een verzorgingstaak op het plant-detail opent nu
+  de taak-editor (de dode tik is weg); "+ Taak toevoegen" → opgeslagen taak verschijnt mét plant-koppeling
+  onder Verzorgingstaken. Huisdier-parity ongetest (geen huisdier in testhuishouden). Plan-21-beslissingen
+  blijven open. Testtaak verwijderd.
+- **BOO-15/16/17 (Boodschappen) ✅ → archief.** Zoekresultaat kiezen → +1 + veld leeg + focus behouden
+  (BOO-15); wis-knop (×) idem (BOO-16); afvinken = groene banner "Alles afgevinkt! 🎉" vs. verwijderen =
+  donkere undo-toast — visueel distinct (BOO-17). Testitem opgeruimd.
+- **BOO-14 — stap 1 bevestigd (blijft ◐).** Compacte "Catalogus \| Bonnen"-rij staat; stap 2 (inklapbare
+  "Misschien weer nodig") is code-bevestigd maar niet op toestel reproduceerbaar — de sectie is data-gated
+  op aankoopfrequentie (`dueScore ≥ 1`), die het testhuishouden niet heeft. Bewust géén aankoophistorie op
+  de live gedeelde DB gefabriceerd.
+
+**Onafhankelijke UX-review.** Een UX Design Review-subagent (los van de rooktest-sessie) beoordeelde de
+screenshots tegen `DESIGN.md` + de eerdere design-review → [`docs/ux-review-rooktest-2026-06-30.md`](docs/ux-review-rooktest-2026-06-30.md)
+(14 punten, geprioriteerd). Drie "hoog": taak-editor nieuw-modus heeft twee bevestigplekken (kop-`Bewaar`
++ onderknop — DESIGN.md-schending), labelloze rode bulk-prullenbak in de Afgevinkt-sectie (destructief, geen
+undo/label), en de catalogus-dropdown-stepper-op-0 (toevoeg-actie niet ontdekbaar). Opvolging als **UXR-10**
+in §6; SCH-4/BOO-15/16/17 → ✅/archief, PLA-10/BOO-14-noten bijgewerkt. Geen code gewijzigd deze sessie
+(verificatie/doc-reconciliatie).
+
+**UXR-10-opvolging — de drie "hoog" geverifieerd + midden-punten gebouwd (2026-06-30, vervolg).** Op
+verzoek de review-punten opgepakt. **De drie "hoog" bleken grotendeels screenshot-artefacten** (tegen de
+code gelegd): (1) "twee bevestigplekken" = het bewuste **UX-39**-patroon (onderknop in álle editors/beide
+modi). **Erik wil de onderknop houden (fijne UX)** → `DESIGN.md` verzoend met UX-39 i.p.v. de code te
+slopen. (2) bulk-prullenbak heeft al `accessibilityLabel` + undo-toast (`onClearChecked`). (3) catalogus-
+dropdown-rij is al tap-to-add (`pickCatalog`). **Midden-punten wél gebouwd + device-bevestigd (moto):**
+schoonmaak-footer "Rooster opstellen" ocher→**forest** (gelijk aan de sheet-"Opzetten"); "Rooster bekijken"
+→ **"In takenlijst tonen"**; herhaal-blok jargon "(dan vervalt het wekeninterval)" → **"Op vaste dagen?"**
++ een **plain-language summary-kaart** ("Elke week" / live "Wekelijks: za", auto-doorrol als stille helper
+eronder) — geïnspireerd op Google/Apple Calendar (plain-language bevestiging + progressive disclosure). Het
+either/or-model blijft bewust (de recurrence-engine negeert het interval bij weekdagen, dus interval+dagen
+combineren kan de engine niet — de editor klopt dus). De review-punten #6 (weekdag/interval conditioneel) en
+#7 ("Voor wie" per modus) bleken al correct geïmplementeerd (`showInterval`, value-dependent
+`VisibilityPicker`). **Verificatie:** typecheck + lint (0 errors) + `npm test` **802 pass / 0 fail / 23
+skip**; geen pure-logica geraakt (i18n string-only, `StringLiteral` uit de ratchet) → geen ratchet-run
+nodig. **Rest in UXR-10:** dubbele taaknamen (#8) + lage punten.
+
+**UXR-10 volledig afgerond — resterende punten gebouwd (2026-06-30, vervolg).** Op verzoek alle 14
+review-punten dichtgezet → **UXR-10 ✅ → archief**. Nieuw gebouwd + device-bevestigd (moto):
+- **#8 dubbele taaknamen (de échte flow-bug).** `buildSchedule` ([`cleaningTemplates.js`](lib/cleaningTemplates.js))
+  dedupte alleen zónes, maar maakte een taak voor élke room → een rooster bovenop bestaande taken gaf
+  dúbbele ("Badkamer schoonmaken" ×2). Nu een `existingTasks`-optie: taken worden gededupt op (zone+titel,
+  genormaliseerd) tegen de bestaande open taken; [`schoonmaak.js`](app/(tabs)/schoonmaak.js) voedt die uit
+  `tasks`+`zones`. +3 units, ratchet `cleaningTemplates` **76,3%** (≥ baseline 76,0%). Sluit-de-lus: als
+  álles al bestaat → "Deze taken staan er al"-melding + "Opzetten" disabled (geen stille no-op).
+- **#9 dropdown-scrim** — de zoek-dropdown op Boodschappen ligt nu op een subtiele scrim i.p.v. de
+  lege-staat-illustratie er onscherp doorheen.
+- **#10 leaderboard 0** — `FairnessBars` toont **"nog niets"** i.p.v. een kale "0" naast een lege balk
+  (die als laad-skeleton las).
+- **Non-issues (code-geverifieerd):** #6 (`showInterval` verbergt het interval al bij vaste dagen), #7
+  (value-dependent `VisibilityPicker`), #11 (touch-targets al 48dp via `touchTarget`/hitSlop).
+- **Bewust gelaten (laag, met rationale):** #12 "Bonnen" (de `receipt`-icon disambigueert; "Kassabonnen"
+  kapt af in de halve-breedte-knop), #13 sectie-emoji-grootte (bewuste DESIGN.md-keuze: emoji als talvrij
+  icoon).
+**Verificatie:** typecheck + lint (0 errors) + `npm test` **805 pass / 0 fail / 23 skip**; ratchet
+`cleaningTemplates` 76,3%. Gewijzigd: `cleaningTemplates.js`, `FairnessBars.js`, `schoonmaak.js`,
+`boodschappen.js`, `i18n.js`, `DESIGN.md` + `tests/cleaningTemplates.test.js`.

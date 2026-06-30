@@ -316,13 +316,20 @@ export default function TaskEditor() {
                 </>
               ) : null}
 
-              <Row gap={space.xs} align="center" style={{ marginTop: 10 }}>
-                <Icon name="repeat" size={14} color={colors.inkSoft} />
-                <Text style={[type.caption, { flex: 1 }]}>
-                  {recurrenceLabel({ recur_freq: freq, recur_interval: interval, recur_weekdays: weekdays })}
-                  {'  ·  '}{t('task.recur.autoNext')}
-                </Text>
-              </Row>
+              {/* Plain-language samenvatting als anker (UXR-10, à la Google/Apple Calendar):
+                  toon de regel in gewone taal ("Elke week op za") als rustige bevestiging van
+                  "dit krijg je", met de auto-doorrol als stillere helper eronder — i.p.v. één
+                  drukke caption-regel. Het model zelf is bewust simpel (interval óf vaste dagen,
+                  spiegelt wat de recurrence-engine kan). */}
+              <View style={{ marginTop: 12, padding: space.sm, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}>
+                <Row gap={space.xs} align="center">
+                  <Icon name="repeat" size={15} color={colors.forest} />
+                  <Text style={[type.label, { flex: 1, color: colors.ink }]}>
+                    {recurrenceLabel({ recur_freq: freq, recur_interval: interval, recur_weekdays: weekdays })}
+                  </Text>
+                </Row>
+                <Text style={[type.caption, { marginTop: 2 }]}>{t('task.recur.autoNext')}</Text>
+              </View>
 
               {/* Herhaal-einde — subtiele extra optie (UX, batch 2): standaard verborgen
                   achter een tekstlink (net als "Beschrijving toevoegen"), zodat een
