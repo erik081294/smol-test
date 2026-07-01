@@ -916,3 +916,20 @@ gebruikt nu `speciesLabel`; (3) **een nieuw huishouden aanmaken lukte niet** —
 niet meer weg en [`onboarding.js`](app/onboarding.js) navigeert zélf de app in na een geslaagde create.
 Alle testdata (producten/huisdier/huishouden) na afloop uit de live DB verwijderd. typecheck + lint +
 `npm test` **810 pass / 0 fail / 23 skip**.
+
+---
+
+**2026-06-30 — Sentry-triage: eerste echte productiecrash gevonden + gefixt (INF-4 / PLT-10).**
+Sentry (INF-4) bleek **live in productie** en had zijn eerste echte fout gevangen — **HUISHOEK-1**:
+`findNodeHandle is not supported on web`, op `huishoek.app/welcome` (Chrome iOS), `release Huishoek@1.0.0`,
+env `production`, mét onze `context: render`-tag uit de `ErrorBoundary`. Oorzaak = onze eigen code: de
+gedeelde `DialogHost` ([`lib/dialog.js`](lib/dialog.js)) zette bij het openen de screenreader-focus via
+`findNodeHandle(primaryRef.current)` — react-native-web ondersteunt dat niet (gooit), dus **élke**
+`dialog.alert/confirm/menu` crashte op web-mobile (de welcome-signup-alert was de trigger). **Fix:** de
+focus-`useEffect` slaat web over (`Platform.OS === 'web'`); `setAccessibilityFocus` doet daar toch niets,
+native gedrag ongewijzigd. Dit is de **derde** web-mobile-crash onder PLT-10 (na camera-guard + de nog open
+`BottomSheet`-gesture). Tevens de dangling **ruisfilter** in [`lib/monitoring.js`](lib/monitoring.js) geland
+(`ignoreErrors: /\.at is not a function/` — scanbots/pre-ES2022-engines op de web-build). Docs:
+`notify-setup.md` stap 1 gecorrigeerd (`supabase db push` is kapot; migraties al live). **Verificatie:**
+`npm test` **805 pass / 0 fail / 23 skip** + `npx eslint .` **0 errors**. `dialog.js`/`monitoring.js` vallen
+niet onder de mutatie-/type-ratchet (React-schil). Commit-ref `Fixes HUISHOEK-1` (auto-close bij merge).
