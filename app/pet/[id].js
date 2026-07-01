@@ -26,6 +26,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { recurrenceLabel, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { useToast } from '../../lib/toast';
@@ -114,7 +115,7 @@ export default function PetScreen() {
   const chooseKind = (key) => { setField('petKind', key); setCare(initCareState(key)); };
 
   const toggleShareWith = (pid) =>
-    setValues((v) => ({ ...v, shareWith: v.shareWith.includes(pid) ? v.shareWith.filter((x) => x !== pid) : [...v.shareWith, pid] }));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 

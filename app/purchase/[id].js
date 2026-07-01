@@ -17,6 +17,7 @@ import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { when } from '../../lib/formValidation';
+import { addItem, removeAt, updateAt } from '../../lib/listField';
 import { t, dateLocale } from '../../lib/i18n';
 
 const UNITS = ['stuk', 'pak', 'kg', 'g', 'l', 'ml'];
@@ -63,9 +64,9 @@ export default function PurchaseEditor() {
   const { store, date, lines, totalText } = values;
   const [scanning, setScanning] = useState(false);
 
-  const updateLine = (i, patch) => setValues((v) => ({ ...v, lines: v.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)) }));
-  const addLine = () => setValues((v) => ({ ...v, lines: [...v.lines, emptyLine()] }));
-  const removeLine = (i) => setValues((v) => ({ ...v, lines: v.lines.length === 1 ? v.lines : v.lines.filter((_, idx) => idx !== i) }));
+  const updateLine = (i, patch) => setValues((v) => ({ ...v, lines: updateAt(v.lines, i, patch) }));
+  const addLine = () => setValues((v) => ({ ...v, lines: addItem(v.lines, emptyLine()) }));
+  const removeLine = (i) => setValues((v) => ({ ...v, lines: v.lines.length === 1 ? v.lines : removeAt(v.lines, i) }));
 
   // Lopend totaal uit de regels (in centen).
   const runningCents = useMemo(

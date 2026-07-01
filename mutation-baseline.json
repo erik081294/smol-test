@@ -87,6 +87,11 @@
       "total": 71,
       "score": 93
     },
+    "lib/listField.js": {
+      "killed": 29,
+      "total": 29,
+      "score": 100
+    },
     "lib/mealPlan.js": {
       "killed": 69,
       "total": 75,

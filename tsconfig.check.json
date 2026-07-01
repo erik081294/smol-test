@@ -49,6 +49,7 @@
     "lib/i18n.js",
     "lib/insights.js",
     "lib/invites.js",
+    "lib/listField.js",
     "lib/mealPlan.js",
     "lib/modules.js",
     "lib/navMeta.js",

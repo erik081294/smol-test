@@ -993,4 +993,18 @@ onBlur-live-validatie + scroll-naar-eerste-fout:
   discard-guard; **purchase** houdt z'n regel-machinerie (`<DynamicList>` is een aparte stap).
 - Groen: `npm test` 820 pass / 0 fail / 23 skip · typecheck · `eslint .` 0 err · mutatie-ratchet ongewijzigd
   (alleen `app/*` + `lib/ui.js`, geen `GROUPS`-module geraakt). **Device-verificatie open** (toestel bezet door
-  Maestro) → ARCH-5 blijft 🔧. **Rest van plan 22:** `<DynamicList>` (bon/recept) + gedeeld foto-/loading-veld.
+  Maestro) → ARCH-5 blijft 🔧. Gemerged als **PR #108**.
+
+---
+
+**2026-07-01 — Gedeelde array-helpers `lib/listField.js` (plan 22 step 2, DRY-hardening).**
+Step 2 van [plan 22](docs/plans/22-formulier-fundament.md) was "één `<DynamicList>` voor bon + recept". Bij
+inspectie bleek dat een geforceerde abstractie: bon-regels zijn inline-bewerkbare, **index**-gebaseerde kaarten;
+recept-ingrediënten een **key**-gebaseerde composer + weergave-lijst (met live-mutatie bij bestaand). Wél echt
+gedeeld — en ~16× hand-gekopieerd — is de array-*logica*. Nieuw pure module **[`lib/listField.js`](lib/listField.js)**:
+`toggleValue` (het `includes ? filter : [...]`-idioom), `addItem`, `removeAt`, `updateAt` — onveranderlijk,
+`@ts-check`, unit-getest (**mutatie 100%**, 29/29), opgenomen in `GROUPS` + `tsconfig.check.json` + baseline.
+Geadopteerd in **task/expense/plant/pet/vehicle/recurring-expense** (toggle-selecties: shareWith/weekdagen/
+deelnemers/labels) en **purchase** (bon-regellijst-ops). Gedragsneutraal. Groen: `npm test` 840 pass / 0 fail,
+typecheck, `eslint .` 0 err, ratchet `listField` 100%. **Rest van plan 22:** alleen nog het gedeelde foto-/
+loading-veld (lagere prioriteit) + device-verificatie van de editors (ARCH-5 🔧).

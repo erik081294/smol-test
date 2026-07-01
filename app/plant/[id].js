@@ -23,6 +23,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { careCard } from '../../lib/plantCare';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -75,7 +76,7 @@ export default function PlantScreen() {
   ];
 
   const toggleShareWith = (pid) =>
-    setValues((v) => ({ ...v, shareWith: v.shareWith.includes(pid) ? v.shareWith.filter((x) => x !== pid) : [...v.shareWith, pid] }));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   // Nieuwe-plant-flow: asset bewaren tot opslaan. Foto kiezen via de gedeelde
   // picker (`lib/photoPicker.js`, STR-4) — één codepad voor alle modules/platforms.
