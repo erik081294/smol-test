@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { offerImagePicker } from '../../lib/photoPicker';
+import { useEntityPhoto } from '../../lib/useEntityPhoto';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import * as haptics from '../../lib/haptics';
@@ -109,9 +110,10 @@ export default function PlantScreen() {
     supabase.from('plants').select('*').eq('id', id).single()
       .then(({ data }) => { if (!data) router.back(); else setPlant(data); });
   }, [id]);
-  // Hooks vóór de early-return (regels-volgorde): toonbare URL + busy-state + dagboek.
-  const [photoNonce, setPhotoNonce] = useState(0);
-  const [photoBusy, setPhotoBusy] = useState(false);
+  // Hooks vóór de early-return (regels-volgorde): toonbare URL + gedeelde foto-flow + dagboek.
+  const { busy: photoBusy, nonce: photoNonce, pick: pickPhoto, refresh: refreshPhoto } = useEntityPhoto({
+    onError: (e) => dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.uploadError') }),
+  });
   const detailPhotoUrl = usePlantPhotoUrl(plant?.photo_path, photoNonce);
   const { photos: diary, reload: reloadDiary } = usePlantDiary(plant?.id);
 
@@ -143,16 +145,10 @@ export default function PlantScreen() {
   };
 
   // Foto toevoegen aan een bestaande plant: dagboekfoto + meteen de nieuwe omslag.
-  const changePhoto = () => offerImagePicker(async (asset) => {
-    setPhotoBusy(true);
-    try {
-      const path = await addPlantPhoto({ householdId: activeId, plantId: plant.id, userId: user.id, asset });
-      setPlant((p) => ({ ...p, photo_path: path }));
-      setPhotoNonce((n) => n + 1); // verse signed URL
-      reloadDiary();
-    } catch (e) {
-      dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.uploadError') });
-    } finally { setPhotoBusy(false); }
+  const changePhoto = () => pickPhoto(async (asset) => {
+    const path = await addPlantPhoto({ householdId: activeId, plantId: plant.id, userId: user.id, asset });
+    setPlant((p) => ({ ...p, photo_path: path }));
+    reloadDiary();
   });
 
   const saveNote = async () => {
@@ -176,7 +172,7 @@ export default function PlantScreen() {
     try {
       const newCover = await deletePlantPhoto({ photo: ph, plant });
       setPlant((p) => ({ ...p, photo_path: newCover }));
-      setPhotoNonce((n) => n + 1);
+      refreshPhoto();
       reloadDiary();
     } catch (e) {
       dialog.alert({ title: t('plant.photo.title'), body: e.message ?? t('plant.photo.deleteError') });
