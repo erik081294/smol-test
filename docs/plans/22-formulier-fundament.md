@@ -57,5 +57,15 @@ Elk als eigen stap, hergebruikt het fundament:
    hardware-back; `Editor` gebruikt 'm nu ook). Gedragsneutraal in payload/regels/deep-links. Groen: `npm test`
    820 pass / 0 fail, typecheck, `eslint .` 0 err, mutatie-ratchet ongewijzigd. **Device-rooktest van de 7
    editors open** (toestel bezet door de Maestro-automatisering) → ARCH-5 blijft 🔧.
-2. `<DynamicList>` — gedeelde dynamische regellijst voor bon + recept (nu elk hand-gebouwd). *(open)*
-3. Gedeeld foto-veld + loading/skeleton-helpers (plant/voertuig/recept/product). *(open)*
+2. ✅ **Gedaan (2026-07-01) — als gedeelde lijst-*logica*, niet als één UI-component.**
+   Bij nadere inspectie verschillen bon en recept fundamenteel van interactiemodel: de **bon**-regels
+   zijn inline-bewerkbare, index-gebaseerde kaarten (naam/aantal/eenheid/prijs + catalogus-koppeling),
+   terwijl **recept**-ingrediënten een *key*-gebaseerde composer + los weergave-lijstje zijn (met
+   suggesties, live-mutatie bij een bestaand recept). Eén gedeelde `<DynamicList>`-component zou een
+   geforceerde abstractie zijn. Wél gedeeld — en het echte duplicaat — is de **array-*logica***: het
+   `includes ? filter : [...]`-toggle-idioom (~9× over de editors) en de map/filter/spread-regelops.
+   Die staan nu in het pure, geteste [`lib/listField.js`](../../lib/listField.js)
+   (`toggleValue`/`addItem`/`removeAt`/`updateAt` — onveranderlijk, mutatie **100%**, in GROUPS +
+   `tsconfig.check.json` + baseline) en zijn geadopteerd in task/expense/plant/pet/vehicle/recurring-expense
+   (toggle) en purchase (regellijst). Gedragsneutraal.
+3. Gedeeld foto-veld + loading/skeleton-helpers (plant/voertuig/recept/product). *(open — lagere prioriteit)*
