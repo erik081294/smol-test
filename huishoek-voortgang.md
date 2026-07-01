@@ -949,8 +949,8 @@ de doc. **Inhoudelijke correcties (stale → waar):**
   **geen BottomSheet/gesture-crash** waargenomen → die crash is een onbevestigde hypothese, niet blind fixen.
 - **INF-3** — kalibratie van de Maestro-flows loopt (2026-07-01).
 
-**Naar ✅ (device-/live-bevestigd; gereed, te verplaatsen naar het archief als losse opruimstap):**
-FND-5 + HUI-2 (stonden al ✅), **MLT-4** (keuken-redesign gemerged PR #67–69 + device-loop 2026-06-26),
+**Naar ✅ → verplaatst naar [`huishoek-backlog-archief.md`](huishoek-backlog-archief.md) (device-/live-bevestigd):**
+FND-5 + HUI-2 (stonden al ✅; HUI kreeg een eigen archief-sectie), **MLT-4** (keuken-redesign gemerged PR #67–69 + device-loop 2026-06-26),
 **BOO-13** (producteditor-rest device-bevestigd 2026-07-01), **UX-22** (sheets/keyboard + 3 sluit-routes
 device-bevestigd), **SEC-5** (payload-validatie draait live mee in de gedeployede `notify`). VTG-1..4 en BOO-10
 waren al door #105 gearchiveerd. **Bron-principe bevestigd:** verifieer status tegen live/code/PR's, niet tegen
