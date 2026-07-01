@@ -68,4 +68,16 @@ Elk als eigen stap, hergebruikt het fundament:
    (`toggleValue`/`addItem`/`removeAt`/`updateAt` — onveranderlijk, mutatie **100%**, in GROUPS +
    `tsconfig.check.json` + baseline) en zijn geadopteerd in task/expense/plant/pet/vehicle/recurring-expense
    (toggle) en purchase (regellijst). Gedragsneutraal.
-3. Gedeeld foto-veld + loading/skeleton-helpers (plant/voertuig/recept/product). *(open — lagere prioriteit)*
+3. ✅ **Gedaan (2026-07-01) — als gedeelde foto-*flow-hook*.** De bestaand-entiteit-foto-flow
+   (kies → upload → busy + verse signed URL via `nonce++` → herlaad → foutdialoog) stond ~3× gekopieerd
+   in plant/huisdier/recept (+ de nonce-bump bij verwijderen). Geëxtraheerd naar
+   [`lib/useEntityPhoto.js`](../../lib/useEntityPhoto.js) (`{ busy, nonce, pick, refresh }`): de hook doet
+   de busy/nonce/picker/try-catch-mechaniek, het scherm geeft de module-specifieke uploader + foutmelding mee.
+   Geadopteerd in `plant`/`pet`/`recipe` (JSX + de triviale nieuw-flow blijven per scherm). Een gedeeld
+   *visueel* veld bleek geen goede fit (elk scherm heeft een eigen vorm: 88px-cirkel vs. 160px-cover); de
+   winst zit in de flow-logica. Device-geverifieerd: recipe/plant/pet-detail + de editors renderen schoon
+   (geen error-boundary), volledige `npm run rooktest` groen. Skeleton-helpers: niet nodig gebleken (de
+   schermen tonen al een `ActivityIndicator`/placeholder tijdens laden).
+
+**Plan 22 is hiermee afgerond** (step 1 full-mode-editors + step 2 lijst-logica + step 3 foto-flow); de
+ARCH-5-verificatie (flow `05-editor-guard`) bewaakt het fundament reproduceerbaar op toestel.

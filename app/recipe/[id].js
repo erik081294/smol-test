@@ -8,6 +8,7 @@ import { mutate } from '../../lib/db';
 import { useRecipes, useRecipe, addRecipePhoto, useRecipePhotoUrl } from '../../lib/useRecipes';
 import { useProducts } from '../../lib/useProducts';
 import { offerImagePicker } from '../../lib/photoPicker';
+import { useEntityPhoto } from '../../lib/useEntityPhoto';
 import {
   ModalHeader, Field, Stepper, ItemRow, IconButton, Row, Chip, SectionHeader, Editor, Button,
   Badge, ListSkeleton, Empty,
@@ -104,10 +105,11 @@ function RecipeEditor() {
   const rules = [requiredText('title', t('recipe.error.title'))];
   const [loaded, setLoaded] = useState(isNew);
   // Omslagfoto (MLT-3): nieuw recept bewaart het asset tot opslaan; bestaand recept
-  // uploadt meteen. `photoNonce` forceert een verse signed URL na vervangen.
+  // uploadt meteen via de gedeelde foto-flow (busy + verse signed URL). Zie useEntityPhoto.
   const [photoAsset, setPhotoAsset] = useState(null);
-  const [photoNonce, setPhotoNonce] = useState(0);
-  const [photoBusy, setPhotoBusy] = useState(false);
+  const { busy: photoBusy, nonce: photoNonce, pick: pickPhoto } = useEntityPhoto({
+    onError: (e) => dialog.alert({ title: t('common.failed'), body: e.message }),
+  });
   const coverUrl = useRecipePhotoUrl(recipe?.photo_path, photoNonce);
 
   const choosePhoto = () => {
@@ -115,12 +117,7 @@ function RecipeEditor() {
       offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
       return;
     }
-    offerImagePicker(async (asset) => {
-      setPhotoBusy(true);
-      try { await addRecipePhoto({ householdId: activeId, recipeId: id, asset }); await reload(); setPhotoNonce((n) => n + 1); }
-      catch (e) { dialog.alert({ title: t('common.failed'), body: e.message }); }
-      finally { setPhotoBusy(false); }
-    });
+    pickPhoto(async (asset) => { await addRecipePhoto({ householdId: activeId, recipeId: id, asset }); await reload(); });
   };
 
   // Lokale ingrediënten voor een NIEUW recept (live voor een bestaand recept).

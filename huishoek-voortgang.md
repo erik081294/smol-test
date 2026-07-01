@@ -1034,3 +1034,17 @@ op de moto: groen** — crash-sweep (15 schermen) schoon, flows 01–05 pass, lo
 toestel. De rooktest telt nu 5 behavior-flows en bewaakt het fundament voortaan. **Consolidatie:** de INF-3-
 kalibratie (flows + `scripts/rooktest.sh`/`rooktest-cleanup.mjs`) is met de forms-code op één branch
 samengevoegd → één `npm run rooktest` dekt beide.
+
+---
+
+**2026-07-01 — Gedeelde foto-flow-hook `useEntityPhoto` (plan 22 step 3 → plan 22 afgerond).**
+De bestaand-entiteit-foto-flow (kies → upload → busy + verse signed URL via `nonce++` → herlaad →
+foutdialoog) stond ~3× gekopieerd in plant/huisdier/recept (+ de nonce-bump bij verwijderen). Geëxtraheerd
+naar [`lib/useEntityPhoto.js`](lib/useEntityPhoto.js) (`{ busy, nonce, pick, refresh }`): de hook draait de
+busy/nonce/picker/try-catch-mechaniek, het scherm geeft de module-specifieke uploader (`addPlantPhoto` +
+`setPlant` + `reloadDiary`, enz.) en de foutmelding mee. Geadopteerd in plant/pet/recipe; de eigen JSX (elk
+scherm heeft een eigen foto-vorm) en de triviale nieuw-flow blijven per scherm — een gedeeld *visueel* veld
+was geen goede fit. **Device-geverifieerd:** recipe/plant/pet-detail (waar de hook z'n `busy`/`pick`/`refresh`
+gebruikt) + de editors renderen schoon (geen error-boundary), volledige `npm run rooktest` groen, logcat
+schoon. `npm test` 840 pass, typecheck, `eslint .` 0 err. Hiermee is **plan 22 afgerond** (step 1 full-mode +
+step 2 lijst-logica + step 3 foto-flow).

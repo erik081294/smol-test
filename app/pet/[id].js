@@ -29,6 +29,7 @@ import { requiredText, when, runRules, firstErrorField } from '../../lib/formVal
 import { toggleValue } from '../../lib/listField';
 import { recurrenceLabel, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { offerImagePicker } from '../../lib/photoPicker';
+import { useEntityPhoto } from '../../lib/useEntityPhoto';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
@@ -156,8 +157,9 @@ export default function PetScreen() {
       .then(({ data }) => { if (!data) router.back(); else setPet(data); });
   }, [id]);
 
-  const [photoNonce, setPhotoNonce] = useState(0);
-  const [photoBusy, setPhotoBusy] = useState(false);
+  const { busy: photoBusy, nonce: photoNonce, pick: pickPhoto, refresh: refreshPhoto } = useEntityPhoto({
+    onError: (e) => dialog.alert({ title: t('pet.photo.title'), body: e.message ?? t('pet.photo.uploadError') }),
+  });
   const detailPhotoUrl = usePetPhotoUrl(pet?.photo_path, photoNonce);
   const { entries: log, reload: reloadLog } = usePetLog(pet?.id);
 
@@ -195,16 +197,10 @@ export default function PetScreen() {
     } finally { setComposeBusy(false); }
   };
 
-  const changePhoto = () => offerImagePicker(async (asset) => {
-    setPhotoBusy(true);
-    try {
-      const path = await addPetPhoto({ householdId: activeId, petId: pet.id, userId: user.id, asset });
-      setPet((p) => ({ ...p, photo_path: path }));
-      setPhotoNonce((n) => n + 1);
-      reloadLog();
-    } catch (e) {
-      dialog.alert({ title: t('pet.photo.title'), body: e.message ?? t('pet.photo.uploadError') });
-    } finally { setPhotoBusy(false); }
+  const changePhoto = () => pickPhoto(async (asset) => {
+    const path = await addPetPhoto({ householdId: activeId, petId: pet.id, userId: user.id, asset });
+    setPet((p) => ({ ...p, photo_path: path }));
+    reloadLog();
   });
 
   const saveNote = async () => {
@@ -226,7 +222,7 @@ export default function PetScreen() {
     try {
       const newCover = await deletePetLog({ entry, pet });
       setPet((p) => ({ ...p, photo_path: newCover }));
-      setPhotoNonce((n) => n + 1);
+      refreshPhoto();
       reloadLog();
     } catch (e) {
       dialog.alert({ title: t('pet.photo.title'), body: e.message ?? t('pet.photo.deleteError') });
