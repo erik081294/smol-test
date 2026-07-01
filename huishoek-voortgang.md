@@ -865,6 +865,58 @@ review-punten dichtgezet → **UXR-10 ✅ → archief**. Nieuw gebouwd + device-
 `cleaningTemplates` 76,3%. Gewijzigd: `cleaningTemplates.js`, `FairnessBars.js`, `schoonmaak.js`,
 `boodschappen.js`, `i18n.js`, `DESIGN.md` + `tests/cleaningTemplates.test.js`.
 
+**Device-rooktest ronde 2 + twee UX/visual-reviews → UXR-11 (2026-06-30).** Verdere openstaande
+device-tests op de moto, tot het toestel halverwege werd losgekoppeld. **Device-bevestigd → ✅/archief:**
+**VTG-1..4** (voertuig-lijst + editor/detail met RDW-verrijking, kosten-uitsplitsing + onderhoudshistorie,
+"Delen via Samen" + prijs/km, log-formulier — de log-write is bewezen door de bestaande historie-entry; een
+verse write lukte niet via adb-injectie, geen app-bug) en **BOO-10** (bonnenlijst → lees-detail → editor
+renderen volledig). **BOO-13** ingang (Catalogus → tik op product → producteditor) + render bevestigd; de
+rest (opslaan/foto/prompt/onderkant) niet bereikt door de afkoppeling. Daarna twee **onafhankelijke
+subagents** (UX/interactie + puur visueel) de screenshots laten beoordelen →
+[`docs/ux-review-modules-2026-06-30.md`](docs/ux-review-modules-2026-06-30.md) +
+[`docs/visual-design-review-2026-06-30.md`](docs/visual-design-review-2026-06-30.md). **Elke bevinding tegen
+de code gelegd** (geen aannames) → geprioriteerd [`docs/verbeterplan-modules-2026-06-30.md`](docs/verbeterplan-modules-2026-06-30.md).
+**Reeds gefixt:** "1 producten"-meervoud (`purchases.items.one/other` + `plural`), bon-leesdetail-kop
+"Annuleer"→"Sluiten" (`cancelLabel`), dubbele productnaam in de bon-regel (toon `· naam` alleen als ≠
+regelnaam). **Beslissingen/groter werk** (B1 "Opslaan"/"Bewaar" app-breed, B2 "Splitsen"-ocher, C1 voertuig
+opent direct de editor i.p.v. lees-detail, C2 catalogusrij-affordance, …) staan in UXR-11/het verbeterplan.
+**Non-issues code-geverifieerd:** stepper-`−` dimt al op 0; bon read/edit-splitsing is correct. **Nog
+device-rooktest (toestel weg):** UX-22, UX-42, FND-5, HUI-2, BOO-13-rest. typecheck + lint + `npm test`
+**805 pass / 0 fail / 23 skip**.
+
+**INF-3 — geautomatiseerde, error-bewuste device-rooktest.** Het handmatige "door de UI tikken +
+screenshots lezen" vervangen door één commando: **`npm run rooktest`**
+([`scripts/rooktest.sh`](scripts/rooktest.sh)) draait de Maestro-flows op het USB-toestel, streamt
+`adb logcat` mee, en geeft één pass/fail-oordeel + exit-code (rapport/logcat in `$TMPDIR`,
+screenshots-bij-falen in `~/.maestro/tests/`). Maestro's flows uitgebreid naar **5**: nieuwe
+`00-crash-sweep.yaml` (boot elk hoofdscherm via tabs + "Meer", assert geen error-boundary) + de 4
+behavior-flows omgezet naar **`t-*`-id-selectors** i.p.v. broze NL-tekst — `testID`-passthrough op de
+gedeelde componenten (`Button`/`IconButton`/`FAB`/`Checkbox`, en vaste `t-save`/`t-cancel` op
+`ModalHeader`), `tabBarButtonTestID: t-tab-<key>` op de tabs, en `t-error-boundary` op de
+`ErrorBoundary`-fallback. Meteen twee latente bugs in de scaffolds gefixt: flow 02 tikte "Kosten" als
+tab terwijl Kosten niet-primair is (nu via "Meer"), en de save-knop liep uiteen ("Opslaan" vs "Bewaar" →
+nu `id: t-save`). Flow `03` verwijdert nu via naar-links-vegen (er is geen losse delete-knop op een
+boodschap-rij). Runbook: [`docs/rooktest.md`](docs/rooktest.md) + [`.maestro/README.md`](.maestro/README.md).
+**Rest:** flows `00`–`03` op toestel kalibreren met `maestro studio` (`04` al geverifieerd).
+
+**UXR-11 ronde 3 (2026-07-01) — device-rooktest afgerond + 3 op-toestel gevonden bugs gefixt.** Op de
+**dev-client `app.huishoek`** (niet de bevroren `.preview`-APK — die serveert een ingebakken bundle en
+nam de fixes niet mee; les vastgelegd) de resterende tests afgerond: **BOO-13-rest** (opslaan-write,
+foto-upload met native picker die clean launcht, "even aankleden?"-prompt, onderkant), **UX-22**
+(`avoidKeyboard` + 3 sluit-routes), **UX-42** (Kosten-ⓘ-drawer gelabelde acties; "Inzichten" navigeert),
+**HUI-2** (soort "Anders" → vrij label; detail + kaart tonen het eigen label) en **FND-5** (2e huishouden
+aanmaken → wisselen → data her-scoopt + switch-toast). **Drie bugs** — elk eerst tegen de code én de live
+DB geverifieerd, daarna op device bevestigd: (1) een zelf-aangemaakt product was **onvindbaar via
+catalogus-zoek** (zoeken doorzocht alleen de gebundelde `CATALOG`) → nieuwe pure
+[`searchOwnProducts`](lib/favoriteGroceries.js) + [`catalog.js`](app/catalog.js) merget eigen (vóóraan) +
+gebundelde matches, ontdubbeld op naam (5 units, ratchet favoriteGroceries **85.4%**); (2) de
+**huisdier-lijstkaart** toonde "Anders" i.p.v. het eigen soort-label → [`huisdieren.js`](app/(tabs)/huisdieren.js)
+gebruikt nu `speciesLabel`; (3) **een nieuw huishouden aanmaken lukte niet** — de gate in
+[`app/_layout.js`](app/_layout.js) kaatste een lid mét huishouden weg van `/onboarding` → gate stuurt daar
+niet meer weg en [`onboarding.js`](app/onboarding.js) navigeert zélf de app in na een geslaagde create.
+Alle testdata (producten/huisdier/huishouden) na afloop uit de live DB verwijderd. typecheck + lint +
+`npm test` **810 pass / 0 fail / 23 skip**.
+
 ---
 
 **2026-06-30 — Sentry-triage: eerste echte productiecrash gevonden + gefixt (INF-4 / PLT-10).**

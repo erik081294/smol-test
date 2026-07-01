@@ -238,6 +238,7 @@ export default function Boodschappen() {
         <View style={{ flex: 1, justifyContent: 'center' }}>
           <TextInput
             ref={inputRef}
+            testID="t-grocery-add"
             value={text} onChangeText={setText} onSubmitEditing={submitTyped}
             returnKeyType="done" blurOnSubmit={false}
             placeholder={t('groceries.placeholder')}

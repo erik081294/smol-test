@@ -10,6 +10,7 @@
     "export:web": "expo export --platform web",
     "deploy:web": "expo export --platform web && npx wrangler pages deploy dist --project-name=huishoek",
     "device": "bash scripts/dev-device.sh",
+    "rooktest": "bash scripts/rooktest.sh",
     "test": "node --import ./tests/register.mjs --test tests/*.test.js",
     "test:mutation": "node scripts/mutation.mjs",
     "test:mutation:check": "node scripts/mutation-check.mjs",

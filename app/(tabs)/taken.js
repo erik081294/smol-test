@@ -439,7 +439,7 @@ export default function Taken() {
         </Animated.View>
       </GestureDetector>
 
-      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')}
+      <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} testID="t-fab-task"
         onPress={() => router.push(scope === 'dag' ? `/task/new?date=${dateKey(cursor)}` : '/task/new')} />
 
       <ChoreLibrarySheet visible={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={addFromLibrary} />

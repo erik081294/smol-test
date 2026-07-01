@@ -21,6 +21,9 @@ Begin hier; ga niet op je geheugen af — de code beweegt sneller dan losse docs
 - **Migratie-/RLS-runbook:** [`VERIFICATIE.md`](VERIFICATIE.md). Live migratiestand: `supabase migration list`
   (lees geen hardgecodeerd nummer uit een doc). **`supabase db push` is in dit project kapot**
   (history diverged) → nieuwe migraties via MCP `apply_migration`.
+- **Device-rooktest (snel & geautomatiseerd):** [`docs/rooktest.md`](docs/rooktest.md) —
+  `npm run rooktest` draait de Maestro-flows op het USB-toestel + vangt logcat af en geeft één
+  pass/fail-oordeel (i.p.v. handmatig tikken + screenshots lezen). Flows in [`.maestro/`](.maestro/).
 - **Design-systeem:** [`DESIGN.md`](DESIGN.md). **Overige naslag/how-to & gedateerde reviews:**
   [`docs/README.md`](docs/README.md).
 

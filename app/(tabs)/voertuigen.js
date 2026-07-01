@@ -82,7 +82,7 @@ export default function Voertuigen() {
       {/* Lege-staat dedupe (DESIGN.md principe 4): de Empty-CTA draagt de primaire
           actie bij een lege lijst; de FAB verschijnt pas zodra er voertuigen zijn. */}
       {vehicles.length > 0 ? (
-        <FAB label={t('fab.vehicle')} accessibilityLabel={t('vehicle.add')} onPress={() => router.push('/vehicle/new')} />
+        <FAB label={t('fab.vehicle')} accessibilityLabel={t('vehicle.add')} testID="t-fab-vehicle" onPress={() => router.push('/vehicle/new')} />
       ) : null}
     </SafeAreaView>
   );

@@ -56,8 +56,12 @@ function Gate({ themeMode }) {
       if (group !== 'onboarding') router.replace('/onboarding');
       return;
     }
-    // route === 'app' -> naar de app als we nog in auth/onboarding/root zitten
-    if (group === '(auth)' || group === 'onboarding' || group === undefined) {
+    // route === 'app' -> naar de app als we nog in auth/root zitten. NIET vanuit 'onboarding':
+    // een lid met een huishouden mag dat scherm bewust openen om een TWEEDE huishouden aan te
+    // maken of toe te treden (FND-5). Zou de gate 'onboarding' hier wegkaatsen, dan is dat scherm
+    // onbereikbaar voor bestaande leden (de "Nieuw of aansluiten"-knop deed dan niets). Onboarding
+    // navigeert zélf de app in na een succesvolle create — óók voor het eerste huishouden.
+    if (group === '(auth)' || group === undefined) {
       router.replace('/(tabs)/vandaag');
     }
   }, [route, segments]);

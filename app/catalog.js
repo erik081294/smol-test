@@ -8,7 +8,8 @@ import { useProducts } from '../lib/useProducts';
 import { useToast } from '../lib/toast';
 import { backLabelFor } from '../lib/navMeta';
 import { CATEGORIES, catalogByCategory, searchCatalog, itemByName } from '../lib/groceryCatalog';
-import { recentProducts } from '../lib/favoriteGroceries';
+import { normalize } from '../lib/productMatch';
+import { recentProducts, searchOwnProducts } from '../lib/favoriteGroceries';
 import { countOf } from '../lib/groceryCount';
 import { ProductImageView } from '../lib/ProductImageView';
 import { ModalHeader, Empty, Chip, Stepper, SwipeRow } from '../lib/ui';
@@ -20,6 +21,18 @@ import { t } from '../lib/i18n';
 
 const RECENT_KEY = '__recent__';
 const RECENT_CAP = 24;
+
+// Een huishoud-product → catalogus-rij-entry. Gedeeld door "Eerder gekozen" én de zoek-
+// resultaten, zodat een eigen product overal met dezelfde id/emoji/foto/eenheid verschijnt
+// (en de stepper/editor op de echte rij werken, niet op een duplicaat).
+function productEntry(p) {
+  const cat = itemByName(p.name);
+  return {
+    key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
+    image: { emoji: p.emoji ?? cat?.emoji, category: p.category || cat?.category },
+    photoPath: p.photo_path ?? null, isRecent: true, product: p,
+  };
+}
 
 // Eén catalogus-/eerder-gekozen-rij. De stepper IS het mechaniek: zijn waarde is het
 // aantal dat op de boodschappenlijst staat (0 = er niet op). 0→n zet het op de lijst,
@@ -95,18 +108,22 @@ export default function Catalog() {
 
   const recentEntries = useMemo(() => recentProducts(products, { n: RECENT_CAP })
     .filter((p) => !prunedIds.has(p.id))
-    .map((p) => {
-      const cat = itemByName(p.name);
-      return {
-        key: `r:${p.id}`, name: p.name, unit: cat?.unit || p.default_unit || '',
-        image: { emoji: p.emoji ?? cat?.emoji, category: p.category || cat?.category },
-        photoPath: p.photo_path ?? null, isRecent: true, product: p,
-      };
-    }), [products, prunedIds]);
+    .map(productEntry), [products, prunedIds]);
 
   const sections = useMemo(() => {
     if (q) {
-      const results = searchCatalog(q).map((it) => shelf.byKey.get(it.key)).filter(Boolean);
+      // Zoek óók de EIGEN huishoud-producten, niet alleen de gebundelde catalogus (BOO-13):
+      // anders vind je een zelf-aangemaakt product niet terug en maak je een duplicaat. Eigen
+      // producten (met echte id/foto/eenheid) vóóraan; gebundelde matches erachter, ontdubbeld
+      // op naam zodat het huishoud-product wint van zijn gebundelde naamgenoot.
+      const own = searchOwnProducts(products, { query: q, n: RECENT_CAP })
+        .filter((p) => !prunedIds.has(p.id))
+        .map(productEntry);
+      const ownNames = new Set(own.map((e) => normalize(e.name)));
+      const bundled = searchCatalog(q)
+        .map((it) => shelf.byKey.get(it.key)).filter(Boolean)
+        .filter((e) => !ownNames.has(normalize(e.name)));
+      const results = [...own, ...bundled];
       return results.length ? [{ key: 'results', title: null, data: results }] : [];
     }
     const recentSection = { key: RECENT_KEY, title: `🕘  ${t('catalog.recent')}`, data: recentEntries };

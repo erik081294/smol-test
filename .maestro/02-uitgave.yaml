@@ -1,16 +1,24 @@
 # Kritieke flow 2: uitgave toevoegen, gelijk gesplitst → terug in het overzicht.
 # Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+# Kosten is een niet-primaire module (geen eigen tab-knop) → open 'm via "Meer".
 appId: app.huishoek
 ---
-- launchApp
-- tapOn: "Kosten"                # tab (expenses.title)
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
 - tapOn:
-    accessibilityText: "Uitgave toevoegen"   # FAB (expense.add)
+    id: "t-tab-meer"
+- tapOn: "Kosten"                        # module-rij in het Meer-overzicht
+- tapOn:
+    id: "t-fab-expense"                  # FAB "Uitgave toevoegen"
 - assertVisible: "Nieuwe uitgave"
-- tapOn: "Omschrijving"          # expense.field.description
+- tapOn:
+    id: "t-field-description"            # expense.field.description
 - inputText: "E2E rooktest etentje"
-- tapOn: "Bedrag (€)"            # expense.field.amount
-- inputText: "2400"             # 24,00 in centen-parser; pas aan op het echte invoerformaat
-- tapOn: "Gelijk"                # splitsing gelijk (expense.split.equal)
-- tapOn: "Uitgave opslaan"       # expense.save
+- tapOn:
+    id: "t-field-amount"                 # expense.field.amount
+- inputText: "24,00"                     # pas aan op het echte invoerformaat als de parser afwijkt
+- tapOn: "Gelijk"                        # splitsing gelijk (expense.split.equal, chip)
+- tapOn:
+    id: "t-save"                         # ModalHeader bevestigen
 - assertVisible: "E2E rooktest etentje"
+- assertNotVisible:
+    id: "t-error-boundary"

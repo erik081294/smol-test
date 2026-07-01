@@ -128,7 +128,7 @@ export default function Kosten() {
       {/* Lege-staat dedupe (DESIGN.md principe 4): bij een lege lijst draagt de
           Empty-CTA de primaire actie; de FAB komt terug zodra er uitgaven zijn. */}
       {filtered.length > 0 ? (
-        <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} onPress={() => router.push('/expense/new')} />
+        <FAB label={t('fab.expense')} accessibilityLabel={t('expense.add')} testID="t-fab-expense" onPress={() => router.push('/expense/new')} />
       ) : null}
 
       {/* Terugkerende uitgaven beheren (UX-22: gedeelde BottomSheet — sluitbaar via

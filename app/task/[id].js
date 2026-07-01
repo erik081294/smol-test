@@ -221,7 +221,7 @@ export default function TaskEditor() {
       busy={busy}
       dirty={dirty}
     >
-      <Field label={t('task.field.title')} value={title}
+      <Field label={t('task.field.title')} value={title} testID="t-field-title"
         onChangeText={(v) => { setTitle(v); clearErr('title'); }}
         placeholder={t('task.field.title.placeholder')} autoFocus={isNew} error={errors.title} />
 
