@@ -22,10 +22,10 @@
   (migratie `0023`), zodat een herhaalde webhook-fire geen dubbele melding geeft.
 
 ### Flip-on (eenmalig, vereist Supabase-toegang — connector/CLI/dashboard)
-1. **Migraties pushen** zodat `push_tokens` (0018) én `push_deliveries` (0023) live staan:
-   ```
-   supabase db push
-   ```
+1. **Migraties live?** `push_tokens` (0018) én `push_deliveries` (0023) staan **al live**
+   (geverifieerd 2026-06-30 via MCP `list_migrations`; DB op `0066`). Niets te doen.
+   > **Let op:** `supabase db push` is in dit project **kapot** (history diverged) — gebruik
+   > nooit `db push`; nieuwe migraties gaan via MCP `apply_migration` (zie `VERIFICATIE.md`).
 2. **Webhook-secret zetten** (gedeeld geheim tussen de webhook en de functie —
    **verplicht**: de functie weigert te draaien (`500`) zonder dit secret, want met
    `verify_jwt=false` is dit de enige authenticatie):
