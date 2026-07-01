@@ -33,6 +33,8 @@ export const GROUPS = [
   { test: 'i18n', srcs: ['lib/i18n.js'], exclude: ['StringLiteral'] },
   { test: 'insights', srcs: ['lib/insights.js'] },
   { test: 'invites', srcs: ['lib/invites.js'] },
+  // Gedeelde array-helpers van de editors (toggle-selectie + dynamische regellijst, ARCH-1).
+  { test: 'listField', srcs: ['lib/listField.js'] },
   { test: 'mealPlan', srcs: ['lib/mealPlan.js'] },
   { test: 'modules', srcs: ['lib/modules.js'] },
   { test: 'navMeta', srcs: ['lib/navMeta.js'] },

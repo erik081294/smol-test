@@ -16,6 +16,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import {
   SPLIT, computeShares, exactSharesValid, formatCents, parseAmountToCents,
 } from '../../lib/expenses';
@@ -140,9 +141,9 @@ export default function ExpenseEditor() {
   const exactRemaining = amountCents - participants.reduce((a, p) => a + (p.amountCents ?? 0), 0);
 
   const toggleMember = (pid) =>
-    setValues((v) => ({ ...v, selected: v.selected.includes(pid) ? v.selected.filter((x) => x !== pid) : [...v.selected, pid] }));
+    setValues((v) => ({ ...v, selected: toggleValue(v.selected, pid) }));
   const toggleShareWith = (pid) =>
-    setValues((v) => ({ ...v, shareWith: v.shareWith.includes(pid) ? v.shareWith.filter((x) => x !== pid) : [...v.shareWith, pid] }));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   // Eén bron van waarheid voor de waarden die de regels lezen; de validatie zelf draait
   // door de pure runRules (lib/formValidation.js, ratchet-bewaakt). Gedeeld door de submit

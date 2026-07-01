@@ -18,6 +18,7 @@ import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader, ItemRo
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { VISIBILITY } from '../../lib/constants';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -319,7 +320,7 @@ export default function VehicleEditor() {
           collapsible
           visibility={visibility} onChangeVisibility={(v) => setField('visibility', v)}
           shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => setField('shareSubgroupId', v)}
-          shareWith={shareWith} onToggleMember={(mid) => setValues((v) => ({ ...v, shareWith: v.shareWith.includes(mid) ? v.shareWith.filter((x) => x !== mid) : [...v.shareWith, mid] }))}
+          shareWith={shareWith} onToggleMember={(mid) => setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, mid) }))}
           subgroups={subgroups} members={members} />
 
         {/* Delen via de Samen-module (VTG-4) — voor een auto standaard aan. */}

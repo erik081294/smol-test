@@ -20,6 +20,7 @@ import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityPayload, visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { dateLocale, t, plural } from '../../lib/i18n';
@@ -134,7 +135,7 @@ export default function TaskEditor() {
   }, [id]);
 
   const toggleWeekday = (d) =>
-    setValues((v) => ({ ...v, weekdays: v.weekdays.includes(d) ? v.weekdays.filter((x) => x !== d) : [...v.weekdays, d] }));
+    setValues((v) => ({ ...v, weekdays: toggleValue(v.weekdays, d) }));
 
   // Herhaal-toggle: aan → standaard wekelijks; uit → eenmalig (weekdagen + einde leeg).
   const toggleRecurring = () => {
@@ -157,7 +158,7 @@ export default function TaskEditor() {
   const showInterval = freq && !(freq === RECUR.WEEKLY && weekdays.length > 0);
 
   const toggleShareWith = (pid) =>
-    setValues((v) => ({ ...v, shareWith: v.shareWith.includes(pid) ? v.shareWith.filter((x) => x !== pid) : [...v.shareWith, pid] }));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   const save = async () => {
     if (!validate(rules)) {
@@ -249,7 +250,7 @@ export default function TaskEditor() {
       {/* Labels — zelfgemaakte, gekleurde tags voor maximale flexibiliteit (UX-41).
           Lang indrukken verwijdert een label; het is huishouden-breed, dus eerst bevestigen. */}
       <TagPicker tags={tags} selectedIds={tagIds} onCreate={addTag}
-        onToggle={(tid) => setValues((v) => ({ ...v, tagIds: v.tagIds.includes(tid) ? v.tagIds.filter((x) => x !== tid) : [...v.tagIds, tid] }))}
+        onToggle={(tid) => setValues((v) => ({ ...v, tagIds: toggleValue(v.tagIds, tid) }))}
         onDelete={async (tag) => {
           const ok = await dialog.confirm({
             title: t('task.tags.delete.title', { name: tag.name }),
