@@ -936,6 +936,27 @@ niet onder de mutatie-/type-ratchet (React-schil). Commit-ref `Fixes HUISHOEK-1`
 
 ---
 
+**2026-07-01 — Formulier-fundament: useEntityForm full-mode + Taken-pilot (ARCH-5).**
+Aanleiding: invoer voelt als "eindeloze formuliertjes overal — niet verfijnd". De bouwstenen zijn
+goed; de compositie schuurde (7 editors in incrementeel-mode met ~20 losse useState + handmatige
+snapshot-dirty, validatie pas bij opslaan, verborgen sub-forms). Gekozen: **fundament eerst, bewezen
+via een diepe pilot op de zwaarste editor (Taken)** → [plan 22](docs/plans/22-formulier-fundament.md).
+Gebouwd (gedragsneutraal, additief):
+- **`lib/formValidation.js`**: pure `firstErrorField` + `isDirty` (+9 unit-tests; ratchet **91,5%**).
+- **`lib/useEntityForm.js`** full-mode: `dirty` (optionele serialize), `reset` (baseline na async load),
+  `validateField` (onBlur live-validatie). Incrementeel-mode van de andere 7 editors ongewijzigd.
+- **`lib/ui.js`**: `useErrorScroll` (scroll-naar-eerste-fout) + `RevealLink` (één onthul-affordance);
+  `Field` forwardt `onBlur` al.
+- **`app/task/[id].js`** herbouwd: ~20 useState → hook-values, snapshot-dirty → hook-`dirty` + `reset`,
+  onthul-links → `RevealLink`, live-titelvalidatie + scroll-naar-fout. **Identiek** save()-payload,
+  deep-links (`date`/`zone`/`plant`), verwijder-met-undo, teksten.
+**Verificatie:** `npm test` **820 pass / 0 fail / 23 skip**, `npm run typecheck` schoon, `npx eslint .`
+**0 errors**, mutatie-ratchet `formValidation` 91,5%. In een geïsoleerde git-worktree gebouwd (parallel
+aan de Maestro-rooktest-tab). **Rest:** device-rooktest Taken + de uitrol (6 editors, `<DynamicList>`,
+foto-/loading-veld) uit plan 22.
+
+---
+
 **2026-07-01 — Backlog §6-reconciliatie (status tegen de bron).** De §6 liep achter op de code/live-stand;
 elk item hieronder is tegen de **bron** geverifieerd (live web/Supabase/Sentry/code + merged PR's), niet tegen
 de doc. **Inhoudelijke correcties (stale → waar):**
