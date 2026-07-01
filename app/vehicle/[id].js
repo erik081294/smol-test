@@ -14,7 +14,7 @@ import { CarGlyph } from '../../lib/CarGlyph';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { parseRatePerKm, formatRatePerKm } from '../../lib/vehicleSharing';
 import { formatCents, parseAmountToCents } from '../../lib/expenses';
-import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader, ItemRow } from '../../lib/ui';
+import { ModalHeader, Field, Checkbox, Button, Row, Stack, SectionHeader, ItemRow, useDiscardGuard } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText } from '../../lib/formValidation';
@@ -59,24 +59,37 @@ export default function VehicleEditor() {
   // Vaste lasten/onderhoud herladen zodra de editor terugkrijgt (na een sub-editor).
   useFocusEffect(useCallback(() => { reloadRecurring(); reloadLog(); }, [reloadRecurring, reloadLog]));
 
-  const [name, setName] = useState(existing?.name ?? '');
-  const [plate, setPlate] = useState(existing?.license_plate ?? '');
-  const [make, setMake] = useState(existing?.make ?? '');
-  const [model, setModel] = useState(existing?.model ?? '');
-  const [vehicleType, setVehicleType] = useState(existing?.vehicle_type ?? '');
-  const [year, setYear] = useState(existing?.year != null ? String(existing.year) : '');
-  const [mileage, setMileage] = useState(existing?.mileage != null ? String(existing.mileage) : '');
-  const [notes, setNotes] = useState(existing?.notes ?? '');
-
-  const [visibility, setVisibility] = useState(existing?.visibility ?? VISIBILITY.HOUSEHOLD);
-  const [shareSubgroupId, setShareSubgroupId] = useState(existing?.share_subgroup_id ?? null);
-  const [shareWith, setShareWith] = useState(existing?.share_with ?? []);
-
-  // Delen via de Samen-module (VTG-4). Voor een auto staat dit standaard aan; bij een
-  // bestaand voertuig weerspiegelt het of er al een gekoppelde resource is.
-  const [shared, setShared] = useState(isNew ? true : existing?.resource_id != null);
-  // Prijs per km (V4): tarief dat de eigenaar rekent bij delen. Leeg = gratis.
-  const [priceKm, setPriceKm] = useState(existing?.price_per_km_cents != null ? formatRatePerKm(existing.price_per_km_cents) : '');
+  // Gedeelde formulier-ruggengraat (ARCH-1) in full-mode: de hook beheert de voertuigvelden,
+  // plus dirty (discard-guard, via een genormaliseerde serialize) en onBlur-live-validatie.
+  // Dit scherm gebruikt z'n eigen ModalHeader (geen `Editor`), dus de discard-guard hangt
+  // via `useDiscardGuard` aan de sluit-actie (incl. Android hardware-back). De onderhouds-
+  // checklist (Set, alleen-nieuw) en het log-subformulier blijven bewust lokaal.
+  // "Delen via de Samen-module" (VTG-4) staat voor een auto standaard aan; bij een bestaand
+  // voertuig weerspiegelt het of er al een gekoppelde resource is. priceKm (V4): leeg = gratis.
+  const serialize = (v) => JSON.stringify({
+    name: v.name.trim(), plate: normalizePlate(v.plate), make: v.make.trim(), model: v.model.trim(),
+    vehicleType: v.vehicleType.trim(), year: toInt(v.year), mileage: toInt(v.mileage), notes: v.notes.trim(),
+    visibility: v.visibility, shareSubgroupId: v.shareSubgroupId, shareWith: [...v.shareWith].sort(),
+    shared: v.shared, priceKm: parseRatePerKm(v.priceKm),
+  });
+  const form = useEntityForm({
+    name: existing?.name ?? '', plate: existing?.license_plate ?? '',
+    make: existing?.make ?? '', model: existing?.model ?? '', vehicleType: existing?.vehicle_type ?? '',
+    year: existing?.year != null ? String(existing.year) : '',
+    mileage: existing?.mileage != null ? String(existing.mileage) : '',
+    notes: existing?.notes ?? '',
+    visibility: existing?.visibility ?? VISIBILITY.HOUSEHOLD,
+    shareSubgroupId: existing?.share_subgroup_id ?? null,
+    shareWith: existing?.share_with ?? [],
+    shared: isNew ? true : existing?.resource_id != null,
+    priceKm: existing?.price_per_km_cents != null ? formatRatePerKm(existing.price_per_km_cents) : '',
+  }, { serialize });
+  const { values, setField, setValues, dirty, errors, busy, setBusy, validate, validateField } = form;
+  const {
+    name, plate, make, model, vehicleType, year, mileage, notes,
+    visibility, shareSubgroupId, shareWith, shared, priceKm,
+  } = values;
+  const requestClose = useDiscardGuard(dirty, useCallback(() => router.back(), [router]));
 
   // RDW-kentekenlookup (VTG-3): niet-blokkerend en debounced. Faalt de RDW (offline/
   // onbekend/timeout), dan gebeurt er stil niets.
@@ -102,17 +115,18 @@ export default function VehicleEditor() {
         const changed = normalizePlate(plate) !== appliedPlate.current;
         if (changed) {
           // Andere auto → afgeleide velden overschrijven met de nieuwe RDW-data.
-          setMake(r.make || '');
-          setModel(r.model || '');
-          setVehicleType(r.vehicleType || '');
-          if (r.firstRegistration) setYear(r.firstRegistration.slice(0, 4));
+          setValues((v) => ({
+            ...v, make: r.make || '', model: r.model || '', vehicleType: r.vehicleType || '',
+            ...(r.firstRegistration ? { year: r.firstRegistration.slice(0, 4) } : {}),
+          }));
           appliedPlate.current = normalizePlate(plate);
         } else {
           // Zelfde auto (bij openen) → alleen lege velden aanvullen, niets overschrijven.
-          setMake((m) => m || r.make || '');
-          setModel((m) => m || r.model || '');
-          setVehicleType((tp) => tp || r.vehicleType || '');
-          if (r.firstRegistration) setYear((y) => y || r.firstRegistration.slice(0, 4));
+          setValues((v) => ({
+            ...v, make: v.make || r.make || '', model: v.model || r.model || '',
+            vehicleType: v.vehicleType || r.vehicleType || '',
+            ...(r.firstRegistration ? { year: v.year || r.firstRegistration.slice(0, 4) } : {}),
+          }));
         }
         setRdw(r); // verrijking (kleur/carrosserie/APK/…) wint altijd van de oude waarde
         setLookupState('found');
@@ -142,12 +156,8 @@ export default function VehicleEditor() {
     return next;
   });
 
-  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
-  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
-  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
-
   const save = async () => {
-    if (!validate([requiredText('name', t('vehicle.error.name'))], { name })) return;
+    if (!validate([requiredText('name', t('vehicle.error.name'))])) return;
     setBusy(true);
     const payload = {
       name, make, model, vehicleType, year: toInt(year), licensePlate: plate, mileage: toInt(mileage), notes,
@@ -235,13 +245,14 @@ export default function VehicleEditor() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ModalHeader title={isNew ? t('vehicle.new') : (existing?.name ?? t('vehicle.add'))}
-        onClose={() => router.back()} onConfirm={save} busy={busy} confirmLabel={t('common.save')} />
+        onClose={requestClose} onConfirm={save} busy={busy} confirmLabel={t('common.save')} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
         keyboardShouldPersistTaps="handled">
 
-        <Field label={t('vehicle.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+        <Field label={t('vehicle.field.name')} value={name} onChangeText={(v) => setField('name', v)}
+          onBlur={() => validateField([requiredText('name', t('vehicle.error.name'))], 'name')}
           placeholder={t('vehicle.field.name.placeholder')} autoFocus={isNew} error={errors.name} />
-        <Field label={t('vehicle.field.plate')} value={plate} onChangeText={setPlate}
+        <Field label={t('vehicle.field.plate')} value={plate} onChangeText={(v) => setField('plate', v)}
           placeholder={t('vehicle.field.plate.placeholder')} autoCapitalize="characters"
           helper={lookupState === 'busy' ? t('vehicle.rdw.busy')
             : lookupState === 'found' ? t('vehicle.rdw.found')
@@ -249,19 +260,19 @@ export default function VehicleEditor() {
 
         <Row gap={space.md}>
           <View style={{ flex: 1 }}>
-            <Field label={t('vehicle.field.make')} value={make} onChangeText={setMake} />
+            <Field label={t('vehicle.field.make')} value={make} onChangeText={(v) => setField('make', v)} />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label={t('vehicle.field.model')} value={model} onChangeText={setModel} />
+            <Field label={t('vehicle.field.model')} value={model} onChangeText={(v) => setField('model', v)} />
           </View>
         </Row>
         <Row gap={space.md}>
           <View style={{ flex: 1 }}>
-            <Field label={t('vehicle.field.year')} value={year} onChangeText={setYear}
+            <Field label={t('vehicle.field.year')} value={year} onChangeText={(v) => setField('year', v)}
               placeholder="2018" keyboardType="number-pad" />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label={t('vehicle.field.mileage')} value={mileage} onChangeText={setMileage}
+            <Field label={t('vehicle.field.mileage')} value={mileage} onChangeText={(v) => setField('mileage', v)}
               placeholder="120000" keyboardType="number-pad" />
           </View>
         </Row>
@@ -306,14 +317,14 @@ export default function VehicleEditor() {
 
         <VisibilityPicker
           collapsible
-          visibility={visibility} onChangeVisibility={setVisibility}
-          shareSubgroupId={shareSubgroupId} onChangeSubgroup={setShareSubgroupId}
-          shareWith={shareWith} onToggleMember={(mid) => setShareWith((w) => w.includes(mid) ? w.filter((x) => x !== mid) : [...w, mid])}
+          visibility={visibility} onChangeVisibility={(v) => setField('visibility', v)}
+          shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => setField('shareSubgroupId', v)}
+          shareWith={shareWith} onToggleMember={(mid) => setValues((v) => ({ ...v, shareWith: v.shareWith.includes(mid) ? v.shareWith.filter((x) => x !== mid) : [...v.shareWith, mid] }))}
           subgroups={subgroups} members={members} />
 
         {/* Delen via de Samen-module (VTG-4) — voor een auto standaard aan. */}
         <Row gap={space.sm} align="center" style={{ marginBottom: shared ? space.md : space.lg }}>
-          <Checkbox checked={shared} onPress={() => setShared((v) => !v)} accessibilityLabel={t('vehicle.share.label')} />
+          <Checkbox checked={shared} onPress={() => setField('shared', !shared)} accessibilityLabel={t('vehicle.share.label')} />
           <View style={{ flex: 1 }}>
             <Text style={type.body}>{t('vehicle.share.label')}</Text>
             <Text style={type.caption}>{t('vehicle.share.hint')}</Text>
@@ -321,12 +332,12 @@ export default function VehicleEditor() {
         </Row>
         {/* Prijs per km (V4): leeg = gratis (reserveren mag, geen kosten). */}
         {shared ? (
-          <Field label={t('vehicle.share.pricePerKm')} value={priceKm} onChangeText={setPriceKm}
+          <Field label={t('vehicle.share.pricePerKm')} value={priceKm} onChangeText={(v) => setField('priceKm', v)}
             placeholder="0,00" keyboardType="decimal-pad" helper={t('vehicle.share.pricePerKm.hint')}
             style={{ marginBottom: space.lg }} />
         ) : null}
 
-        <Field label={t('vehicle.field.notes')} value={notes} onChangeText={setNotes} multiline />
+        <Field label={t('vehicle.field.notes')} value={notes} onChangeText={(v) => setField('notes', v)} multiline />
 
         {/* Kostenoverzicht (V3) — vaste lasten + onderhoud + afschrijving-schatting. */}
         {!isNew ? (

@@ -86,15 +86,22 @@ function RecipeEditor() {
   const { recipe, ingredients, loading, reload, addIngredient, updateIngredient, removeIngredient } = useRecipe(isNew ? null : id);
   const { suggestFor } = useProducts();
 
-  const [title, setTitle] = useState('');
-  const [servings, setServings] = useState(2);
-  const [instructions, setInstructions] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
-  const [mealMoment, setMealMoment] = useState(null);
-  const [dishType, setDishType] = useState(null);
-  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
-  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
-  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
+  // Gedeelde formulier-ruggengraat (ARCH-1) in full-mode: de hook beheert de tekst-/keuze-
+  // velden, plus dirty (discard-guard, via een genormaliseerde serialize) en onBlur-live-
+  // validatie via de pure regels. Ingrediënten en de omslagfoto van een BESTAAND recept
+  // slaan live op (buiten de form-dirty); voor een NIEUW recept tellen een gekozen foto of
+  // concept-ingrediënten wél mee voor de discard-guard (zie `dirty` onder).
+  const serialize = (v) => JSON.stringify({
+    title: v.title.trim(), servings: v.servings,
+    instructions: v.instructions.trim(), sourceUrl: v.sourceUrl.trim(),
+    mealMoment: v.mealMoment, dishType: v.dishType,
+  });
+  const form = useEntityForm({
+    title: '', servings: 2, instructions: '', sourceUrl: '', mealMoment: null, dishType: null,
+  }, { serialize });
+  const { values, setField, reset, dirty: fieldsDirty, errors, busy, setBusy, validate, validateField } = form;
+  const { title, servings, instructions, sourceUrl, mealMoment, dishType } = values;
+  const rules = [requiredText('title', t('recipe.error.title'))];
   const [loaded, setLoaded] = useState(isNew);
   // Omslagfoto (MLT-3): nieuw recept bewaart het asset tot opslaan; bestaand recept
   // uploadt meteen. `photoNonce` forceert een verse signed URL na vervangen.
@@ -129,13 +136,13 @@ function RecipeEditor() {
 
   React.useEffect(() => {
     if (isNew || !recipe) return;
-    setTitle(recipe.title ?? '');
-    setServings(recipe.servings ?? 2);
-    setInstructions(recipe.instructions ?? '');
-    setSourceUrl(recipe.source_url ?? '');
-    setMealMoment(recipe.meal_moment ?? null);
-    setDishType(recipe.dish_type ?? null);
+    reset({
+      title: recipe.title ?? '', servings: recipe.servings ?? 2,
+      instructions: recipe.instructions ?? '', sourceUrl: recipe.source_url ?? '',
+      mealMoment: recipe.meal_moment ?? null, dishType: recipe.dish_type ?? null,
+    });
     setLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, recipe]);
 
   const shownIngredients = isNew ? draft : ingredients;
@@ -206,7 +213,7 @@ function RecipeEditor() {
   };
 
   const save = async () => {
-    if (!validate([requiredText('title', t('recipe.error.title'))], { title })) return;
+    if (!validate(rules)) return;
     setBusy(true);
     try {
       if (isNew) {
@@ -248,6 +255,7 @@ function RecipeEditor() {
       title={isNew ? t('recipe.new') : t('recipe.edit')}
       onClose={() => router.back()} onConfirm={save} busy={busy}
       confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
+      dirty={fieldsDirty || (isNew && (!!photoAsset || draft.length > 0))}
     >
           {/* Omslagfoto (MLT-3) */}
           <Pressable onPress={choosePhoto} disabled={photoBusy} accessibilityRole="button"
@@ -268,11 +276,12 @@ function RecipeEditor() {
           </Pressable>
 
           <Field label={t('recipe.field.title')} value={title}
-            onChangeText={(x) => { setTitle(x); clearErr('title'); }}
+            onChangeText={(x) => setField('title', x)}
+            onBlur={() => validateField(rules, 'title')}
             placeholder={t('recipe.field.title.placeholder')} autoFocus={isNew} error={errors.title} />
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recipe.field.servings')}</Text>
-          <Stepper value={servings} onChange={setServings} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
+          <Stepper value={servings} onChange={(n) => setField('servings', n)} min={1} max={20} accessibilityLabel={t('recipe.field.servings')} />
 
           {/* Categorisering (MLT): twee onafhankelijke assen, zodat de recepten-catalogus
               doorzoekbaar/filterbaar wordt. Nogmaals tikken = deselecteren (terug naar leeg). */}
@@ -281,14 +290,14 @@ function RecipeEditor() {
           <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
             {MEAL_MOMENTS.map((m) => (
               <Chip key={m.key} label={`${m.emoji} ${m.label}`} active={mealMoment === m.key}
-                onPress={() => setMealMoment((cur) => (cur === m.key ? null : m.key))} />
+                onPress={() => setField('mealMoment', mealMoment === m.key ? null : m.key)} />
             ))}
           </Row>
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('recipe.field.dishType')}</Text>
           <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
             {DISH_TYPES.map((d) => (
               <Chip key={d.key} label={`${d.emoji} ${d.label}`} active={dishType === d.key}
-                onPress={() => setDishType((cur) => (cur === d.key ? null : d.key))} />
+                onPress={() => setField('dishType', dishType === d.key ? null : d.key)} />
             ))}
           </Row>
 
@@ -358,10 +367,10 @@ function RecipeEditor() {
             ) : null}
           </View>
 
-          <Field label={t('recipe.field.instructions')} value={instructions} onChangeText={setInstructions}
+          <Field label={t('recipe.field.instructions')} value={instructions} onChangeText={(x) => setField('instructions', x)}
             placeholder={t('recipe.field.instructions')} multiline numberOfLines={4}
             style={{ minHeight: 90 }} />
-          <Field label={t('recipe.field.source')} value={sourceUrl} onChangeText={setSourceUrl}
+          <Field label={t('recipe.field.source')} value={sourceUrl} onChangeText={(x) => setField('sourceUrl', x)}
             placeholder="https://…" autoCapitalize="none" keyboardType="url" />
 
           <View style={{ height: space.xxl }} />
