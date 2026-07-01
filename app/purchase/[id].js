@@ -17,10 +17,15 @@ import { colors, radius, type, space } from '../../lib/theme';
 import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { when } from '../../lib/formValidation';
+import { addItem, removeAt, updateAt } from '../../lib/listField';
 import { t, dateLocale } from '../../lib/i18n';
 
 const UNITS = ['stuk', 'pak', 'kg', 'g', 'l', 'ml'];
 const emptyLine = () => ({ name: '', quantity: 1, unit: 'stuk', priceText: '', productId: null });
+
+// Genormaliseerde weergave van een regel voor de dirty-vergelijking: cosmetische
+// verschillen (spaties, komma vs. punt) tellen niet als 'gewijzigd'.
+const normLine = (l) => [l.name.trim(), l.quantity || 0, l.unit, parseAmountToCents(l.priceText) ?? 0, l.productId ?? null];
 
 export default function PurchaseEditor() {
   const dialog = useDialog();
@@ -43,18 +48,25 @@ export default function PurchaseEditor() {
   useEffect(() => { if (!isNew) loadExisting(); }, [isNew, loadExisting]);
 
   // ----- Nieuwe bon: formulier -----
-  const [store, setStore] = useState('');
-  const [date, setDate] = useState(new Date());
-  const [lines, setLines] = useState([emptyLine()]);
-  const [totalText, setTotalText] = useState('');
-  // Gedeelde form-ruggengraat (ARCH-1, incrementele adoptie): alleen errors/busy/validate.
-  // De dynamische regel-state (lines/scan/matching) blijft bewust lokaal hieronder.
-  const { errors, busy, setBusy, validate, clearError } = useEntityForm();
+  // Gedeelde form-ruggengraat (ARCH-1) in full-mode: de hook beheert winkel/datum/regels/
+  // totaal, plus dirty (discard-guard) via een genormaliseerde serialize. De dynamische
+  // regel-machinerie (scan/matching) blijft lokaal; `<DynamicList>` is een aparte stap (plan 22).
+  const serialize = (v) => JSON.stringify({
+    store: v.store.trim(),
+    date: v.date ? format(v.date, 'yyyy-MM-dd') : null,
+    totalCents: parseAmountToCents(v.totalText) ?? null,
+    lines: v.lines.map(normLine),
+  });
+  const form = useEntityForm({
+    store: '', date: new Date(), lines: [emptyLine()], totalText: '',
+  }, { serialize });
+  const { values, setField, setValues, reset, dirty, errors, busy, setBusy, validate } = form;
+  const { store, date, lines, totalText } = values;
   const [scanning, setScanning] = useState(false);
 
-  const updateLine = (i, patch) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((ls) => [...ls, emptyLine()]);
-  const removeLine = (i) => setLines((ls) => (ls.length === 1 ? ls : ls.filter((_, idx) => idx !== i)));
+  const updateLine = (i, patch) => setValues((v) => ({ ...v, lines: updateAt(v.lines, i, patch) }));
+  const addLine = () => setValues((v) => ({ ...v, lines: addItem(v.lines, emptyLine()) }));
+  const removeLine = (i) => setValues((v) => ({ ...v, lines: v.lines.length === 1 ? v.lines : removeAt(v.lines, i) }));
 
   // Lopend totaal uit de regels (in centen).
   const runningCents = useMemo(
@@ -82,11 +94,6 @@ export default function PurchaseEditor() {
   // Het resultaat vult de bewerkbare editor; de gebruiker controleert/corrigeert
   // (totaal-controle + per-regel matching) vóór opslaan. Geen waarheid, een vliegende start.
   const applyScan = (data) => {
-    if (data.store) setStore(data.store);
-    if (data.purchased_on) {
-      const d = parseISO(data.purchased_on);
-      if (!Number.isNaN(d.getTime())) setDate(d);
-    }
     const scanned = (data.items ?? []).map((i) => ({
       name: i.name,
       quantity: i.quantity || 1,
@@ -94,7 +101,13 @@ export default function PurchaseEditor() {
       priceText: i.unit_price_cents != null ? (i.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
       productId: null,
     }));
-    setLines(scanned.length ? scanned : [emptyLine()]);
+    const d = data.purchased_on ? parseISO(data.purchased_on) : null;
+    setValues((v) => ({
+      ...v,
+      store: data.store || v.store,
+      date: d && !Number.isNaN(d.getTime()) ? d : v.date,
+      lines: scanned.length ? scanned : [emptyLine()],
+    }));
   };
 
   const runScan = async (asset) => {
@@ -119,19 +132,21 @@ export default function PurchaseEditor() {
   // camera/bibliotheek-actiesheet → genormaliseerd asset → OCR-scan. Eén codepad.
   const onScanPress = () => offerImagePicker((asset) => runScan(asset), { quality: 0.5 });
 
-  // Vul de form met de bestaande bon en schakel naar bewerk-modus.
+  // Vul de form met de bestaande bon en schakel naar bewerk-modus → nieuw ijkpunt (reset),
+  // zodat een onbewerkte bon niet meteen als 'gewijzigd' telt (discard-guard).
   const startEditing = () => {
-    setStore(existing.store ?? '');
-    setDate(existing.purchased_on ? parseISO(existing.purchased_on) : new Date());
-    setTotalText(existing.total_cents != null ? (existing.total_cents / 100).toFixed(2).replace('.', ',') : '');
-    setLines((existing.purchase_items ?? []).map((it) => ({
-      name: it.name,
-      quantity: Number(it.quantity) || 1,
-      unit: UNITS.includes(it.unit) ? it.unit : 'stuk',
-      priceText: it.unit_price_cents != null ? (it.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
-      productId: it.product_id ?? null,
-    })));
-    clearError('lines');
+    reset({
+      store: existing.store ?? '',
+      date: existing.purchased_on ? parseISO(existing.purchased_on) : new Date(),
+      totalText: existing.total_cents != null ? (existing.total_cents / 100).toFixed(2).replace('.', ',') : '',
+      lines: (existing.purchase_items ?? []).map((it) => ({
+        name: it.name,
+        quantity: Number(it.quantity) || 1,
+        unit: UNITS.includes(it.unit) ? it.unit : 'stuk',
+        priceText: it.unit_price_cents != null ? (it.unit_price_cents / 100).toFixed(2).replace('.', ',') : '',
+        productId: it.product_id ?? null,
+      })),
+    });
     setEditing(true);
   };
 
@@ -229,19 +244,19 @@ export default function PurchaseEditor() {
   return (
     <Editor title={isNew ? t('purchase.new') : t('purchase.edit')}
       onClose={() => { if (editing) setEditing(false); else router.back(); }}
-      onConfirm={save} busy={busy}
+      onConfirm={save} busy={busy} dirty={dirty}
       contentContainerStyle={{ paddingBottom: 60 }}>
           {/* Bonscan: vult winkel/datum/regels in één keer; daarna controleren. */}
           <Button title={t('purchase.scan')} icon="receipt" variant="soft" onPress={onScanPress}
             loading={scanning} style={{ marginBottom: space.md }} />
           <Text style={[type.caption, { marginBottom: space.lg, textAlign: 'center' }]}>{t('purchase.scan.hint')}</Text>
 
-          <Field label={t('purchase.field.store')} value={store} onChangeText={setStore}
+          <Field label={t('purchase.field.store')} value={store} onChangeText={(v) => setField('store', v)}
             placeholder={t('purchase.field.store.placeholder')} />
 
           {/* Datum */}
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('purchase.field.date')}</Text>
-          <DateStepper date={date} onChange={setDate} style={{ marginBottom: space.lg }} />
+          <DateStepper date={date} onChange={(d) => setField('date', d)} style={{ marginBottom: space.lg }} />
 
           {/* Regels */}
           <Text style={[type.label, { marginBottom: space.sm }]}>{t('purchase.field.lines')}</Text>
@@ -299,7 +314,7 @@ export default function PurchaseEditor() {
 
           {/* Totaal-controle */}
           <View style={{ marginTop: space.lg }}>
-            <Field label={t('purchase.field.total')} value={totalText} onChangeText={setTotalText}
+            <Field label={t('purchase.field.total')} value={totalText} onChangeText={(v) => setField('totalText', v)}
               placeholder={t('purchase.field.total.placeholder')} keyboardType="decimal-pad"
               helper={t('purchase.runningTotal', { amount: formatCents(runningCents) })} />
             {totalMismatch ? (

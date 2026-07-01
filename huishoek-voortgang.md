@@ -943,3 +943,78 @@ native gedrag ongewijzigd. Dit is de **derde** web-mobile-crash onder PLT-10 (na
 `notify-setup.md` stap 1 gecorrigeerd (`supabase db push` is kapot; migraties al live). **Verificatie:**
 `npm test` **805 pass / 0 fail / 23 skip** + `npx eslint .` **0 errors**. `dialog.js`/`monitoring.js` vallen
 niet onder de mutatie-/type-ratchet (React-schil). Commit-ref `Fixes HUISHOEK-1` (auto-close bij merge).
+
+---
+
+**2026-07-01 — Formulier-fundament: useEntityForm full-mode + Taken-pilot (ARCH-5).**
+Aanleiding: invoer voelt als "eindeloze formuliertjes overal — niet verfijnd". De bouwstenen zijn
+goed; de compositie schuurde (7 editors in incrementeel-mode met ~20 losse useState + handmatige
+snapshot-dirty, validatie pas bij opslaan, verborgen sub-forms). Gekozen: **fundament eerst, bewezen
+via een diepe pilot op de zwaarste editor (Taken)** → [plan 22](docs/plans/22-formulier-fundament.md).
+Gebouwd (gedragsneutraal, additief):
+- **`lib/formValidation.js`**: pure `firstErrorField` + `isDirty` (+9 unit-tests; ratchet **91,5%**).
+- **`lib/useEntityForm.js`** full-mode: `dirty` (optionele serialize), `reset` (baseline na async load),
+  `validateField` (onBlur live-validatie). Incrementeel-mode van de andere 7 editors ongewijzigd.
+- **`lib/ui.js`**: `useErrorScroll` (scroll-naar-eerste-fout) + `RevealLink` (één onthul-affordance);
+  `Field` forwardt `onBlur` al.
+- **`app/task/[id].js`** herbouwd: ~20 useState → hook-values, snapshot-dirty → hook-`dirty` + `reset`,
+  onthul-links → `RevealLink`, live-titelvalidatie + scroll-naar-fout. **Identiek** save()-payload,
+  deep-links (`date`/`zone`/`plant`), verwijder-met-undo, teksten.
+**Verificatie:** `npm test` **820 pass / 0 fail / 23 skip**, `npm run typecheck` schoon, `npx eslint .`
+**0 errors**, mutatie-ratchet `formValidation` 91,5%. In een geïsoleerde git-worktree gebouwd (parallel
+aan de Maestro-rooktest-tab). **Rest:** device-rooktest Taken + de uitrol (6 editors, `<DynamicList>`,
+foto-/loading-veld) uit plan 22.
+
+---
+
+**2026-07-01 — Backlog §6-reconciliatie (status tegen de bron).** De §6 liep achter op de code/live-stand;
+elk item hieronder is tegen de **bron** geverifieerd (live web/Supabase/Sentry/code + merged PR's), niet tegen
+de doc. **Inhoudelijke correcties (stale → waar):**
+- **PLT-7** — web-build is **LIVE op Cloudflare Pages** (`huishoek.app` serveert de SPA; `/`, `/welcome`,
+  `/join/<token>` → HTTP 200). §6 zei "CF-auth/deploy nog open" (stale). Rest = echte store-links + web/device
+  join-rooktest.
+- **PLT-1** — notify-**flip-on is gedaan** (edge-function v1 ACTIVE, `NOTIFY_WEBHOOK_SECRET` gezet, DB-webhook op
+  `tasks` live; auth geverifieerd 200/401). §6 zei "Rest = flip-on (secret/deploy/webhook)". Rest = alléén de
+  2-toestel-aflevertest.
+- **PLT-10** — Sentry toont in **90 dagen 0 issues** behalve de gefixte HUISHOEK-1; ondanks live web-verkeer
+  **geen BottomSheet/gesture-crash** waargenomen → die crash is een onbevestigde hypothese, niet blind fixen.
+- **INF-3** — kalibratie van de Maestro-flows loopt (2026-07-01).
+
+**Naar ✅ → verplaatst naar [`huishoek-backlog-archief.md`](huishoek-backlog-archief.md) (device-/live-bevestigd):**
+FND-5 + HUI-2 (stonden al ✅; HUI kreeg een eigen archief-sectie), **MLT-4** (keuken-redesign gemerged PR #67–69 + device-loop 2026-06-26),
+**BOO-13** (producteditor-rest device-bevestigd 2026-07-01), **UX-22** (sheets/keyboard + 3 sluit-routes
+device-bevestigd), **SEC-5** (payload-validatie draait live mee in de gedeployede `notify`). VTG-1..4 en BOO-10
+waren al door #105 gearchiveerd. **Bron-principe bevestigd:** verifieer status tegen live/code/PR's, niet tegen
+de doc — dit haalde vier "nog te doen"-claims onderuit die al af waren.
+
+---
+
+**2026-07-01 — Formulier-uitrol: de 6 overige editors op full-mode (ARCH-5, staart van [plan 22](docs/plans/22-formulier-fundament.md)).**
+Na de Taken-pilot de overige incrementeel-editors op het fundament herbouwd, gedragsneutraal in
+payload/regels/deep-links; nieuw is de **discard-guard** (die editors hadden er nog geen) + de
+onBlur-live-validatie + scroll-naar-eerste-fout:
+- **expense** (uitgave), **purchase** (bon), **recipe** (recept), **plant**, **vehicle** (voertuig), **pet** (huisdier)
+  — elk ~15–26 losse `useState` → hook-`values` + `dirty` (genormaliseerde serialize) + `validateField` (onBlur).
+- **`lib/ui.js`**: de discard-guard van de `Editor` geëxtraheerd naar een herbruikbare
+  **`useDiscardGuard(dirty, onClose)`** (incl. Android hardware-back), zodat **vehicle** — dat z'n eigen
+  `ModalHeader` gebruikt i.p.v. `Editor` — dezelfde bescherming krijgt. `Editor` gebruikt 'm nu ook (DRY).
+- Editor-specifieke keuzes: bij **plant** delen de nieuw-Editor en de bewerk-sheet dezelfde hook-state
+  (`reset()` in `openEdit`); bij **recipe/plant/pet** telt een gekozen (nog niet opgeslagen) foto mee voor de
+  discard-guard; **purchase** houdt z'n regel-machinerie (`<DynamicList>` is een aparte stap).
+- Groen: `npm test` 820 pass / 0 fail / 23 skip · typecheck · `eslint .` 0 err · mutatie-ratchet ongewijzigd
+  (alleen `app/*` + `lib/ui.js`, geen `GROUPS`-module geraakt). **Device-verificatie open** (toestel bezet door
+  Maestro) → ARCH-5 blijft 🔧. Gemerged als **PR #108**.
+
+---
+
+**2026-07-01 — Gedeelde array-helpers `lib/listField.js` (plan 22 step 2, DRY-hardening).**
+Step 2 van [plan 22](docs/plans/22-formulier-fundament.md) was "één `<DynamicList>` voor bon + recept". Bij
+inspectie bleek dat een geforceerde abstractie: bon-regels zijn inline-bewerkbare, **index**-gebaseerde kaarten;
+recept-ingrediënten een **key**-gebaseerde composer + weergave-lijst (met live-mutatie bij bestaand). Wél echt
+gedeeld — en ~16× hand-gekopieerd — is de array-*logica*. Nieuw pure module **[`lib/listField.js`](lib/listField.js)**:
+`toggleValue` (het `includes ? filter : [...]`-idioom), `addItem`, `removeAt`, `updateAt` — onveranderlijk,
+`@ts-check`, unit-getest (**mutatie 100%**, 29/29), opgenomen in `GROUPS` + `tsconfig.check.json` + baseline.
+Geadopteerd in **task/expense/plant/pet/vehicle/recurring-expense** (toggle-selecties: shareWith/weekdagen/
+deelnemers/labels) en **purchase** (bon-regellijst-ops). Gedragsneutraal. Groen: `npm test` 840 pass / 0 fail,
+typecheck, `eslint .` 0 err, ratchet `listField` 100%. **Rest van plan 22:** alleen nog het gedeelde foto-/
+loading-veld (lagere prioriteit) + device-verificatie van de editors (ARCH-5 🔧).

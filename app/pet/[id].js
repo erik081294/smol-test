@@ -16,7 +16,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView, SwipeRow } from '../../lib/ui';
+import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet, Collapsible, SheetScrollView, SwipeRow, useErrorScroll } from '../../lib/ui';
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -25,7 +25,8 @@ import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
-import { requiredText, when } from '../../lib/formValidation';
+import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { recurrenceLabel, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { offerImagePicker } from '../../lib/photoPicker';
 import { useToast } from '../../lib/toast';
@@ -34,6 +35,9 @@ import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t, dateLocale } from '../../lib/i18n';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Prioriteit voor scroll-naar-eerste-fout (formulier-fundament): van boven naar onder.
+const FIELD_ORDER = ['name', 'birth', 'visibility'];
 
 // Verzorging-checklist-staat uit de soort-routine: { [key]: { on, interval } }.
 function initCareState(type) {
@@ -82,37 +86,44 @@ export default function PetScreen() {
   const { user } = useAuth();
 
   // ----- Nieuw huisdier: formulier -----
-  const [name, setName] = useState('');
-  const [petKind, setPetKind] = useState('hond');
-  const [speciesText, setSpeciesText] = useState(''); // vrij soort-label bij type 'anders' (HUI-2)
-  const [birthDate, setBirthDate] = useState('');
-  const [chipNumber, setChipNumber] = useState('');
-  const [vetName, setVetName] = useState('');
-  const [notes, setNotes] = useState('');
-  const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
-  const [shareSubgroupId, setShareSubgroupId] = useState(null);
-  const [shareWith, setShareWith] = useState([]);
+  // Gedeelde formulier-ruggengraat (ARCH-1) in full-mode: de hook beheert de velden, plus
+  // dirty (discard-guard, via een genormaliseerde serialize), onBlur-live-validatie en
+  // scroll-naar-eerste-fout. De verzorging-checklist (care) en de foto blijven lokaal.
+  const serialize = (v) => JSON.stringify({
+    name: v.name.trim(), petKind: v.petKind, speciesText: v.speciesText.trim(),
+    birthDate: v.birthDate.trim(), chipNumber: v.chipNumber.trim(), vetName: v.vetName.trim(),
+    notes: v.notes.trim(), visibility: v.visibility, shareSubgroupId: v.shareSubgroupId,
+    shareWith: [...v.shareWith].sort(),
+  });
+  const form = useEntityForm({
+    name: '', petKind: 'hond', speciesText: '', birthDate: '', chipNumber: '', vetName: '', notes: '',
+    visibility: VISIBILITY.HOUSEHOLD, shareSubgroupId: null, shareWith: [],
+  }, { serialize });
+  const { values, setField, setValues, dirty: fieldsDirty, errors, clearError: clearErr, busy, setBusy, validate, validateField } = form;
+  const { name, petKind, speciesText, birthDate, chipNumber, vetName, notes, visibility, shareSubgroupId, shareWith } = values;
   const [photoAsset, setPhotoAsset] = useState(null);
   const [care, setCare] = useState(() => initCareState('hond'));
-  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
-  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
-  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
+  const { scrollRef, register, scrollToField } = useErrorScroll();
+
+  const rules = [
+    requiredText('name', t('pet.error.name')),
+    when('birth', (v) => !v.birthDate || DATE_RE.test(v.birthDate.trim()), t('pet.error.birth')),
+    visibilityRule('visibility'),
+  ];
 
   // Soort kiezen → de voorgestelde verzorging-checklist meteen opnieuw opzetten.
-  const chooseKind = (key) => { setPetKind(key); setCare(initCareState(key)); };
+  const chooseKind = (key) => { setField('petKind', key); setCare(initCareState(key)); };
 
   const toggleShareWith = (pid) =>
-    setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
-    const ok = validate([
-      requiredText('name', t('pet.error.name')),
-      when('birth', (v) => !v.birthDate || DATE_RE.test(v.birthDate.trim()), t('pet.error.birth')),
-      visibilityRule('visibility'),
-    ], { name, birthDate, visibility, shareSubgroupId, shareWith });
-    if (!ok) return;
+    if (!validate(rules)) {
+      scrollToField(firstErrorField(runRules(values, rules), FIELD_ORDER));
+      return;
+    }
     setBusy(true);
     try {
       const careKeys = Object.entries(care).filter(([, v]) => v.on).map(([k]) => k);
@@ -477,7 +488,8 @@ export default function PetScreen() {
   );
 
   return (
-    <Editor title={t('pet.new')} onClose={() => router.back()} onConfirm={save} busy={busy}>
+    <Editor title={t('pet.new')} onClose={() => router.back()} onConfirm={save} busy={busy}
+      dirty={fieldsDirty || !!photoAsset} scrollRef={scrollRef}>
       {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
       <View style={{ alignItems: 'center', marginBottom: space.lg }}>
         <Pressable onPress={choosePhoto} accessibilityRole="button"
@@ -496,14 +508,17 @@ export default function PetScreen() {
         <Text style={type.caption}>{t('pet.photo.optional')}</Text>
       </View>
 
-      <Field label={t('pet.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
-        placeholder={t('pet.field.name.placeholder')} error={errors.name} />
+      <View onLayout={register('name')}>
+        <Field label={t('pet.field.name')} value={name} onChangeText={(v) => setField('name', v)}
+          onBlur={() => validateField(rules, 'name')}
+          placeholder={t('pet.field.name.placeholder')} error={errors.name} />
+      </View>
 
       <Text style={[type.label, { marginBottom: 6 }]}>{t('pet.field.type')}</Text>
       {kindEmojiGrid}
       {/* Eigen soort bij "Anders" (HUI-2): vrij label, optioneel. */}
       {petKind === 'anders' ? (
-        <Field label={t('pet.field.species')} value={speciesText} onChangeText={setSpeciesText}
+        <Field label={t('pet.field.species')} value={speciesText} onChangeText={(v) => setField('speciesText', v)}
           placeholder={t('pet.field.species.placeholder')} style={{ marginTop: -space.sm }} />
       ) : null}
 
@@ -520,25 +535,30 @@ export default function PetScreen() {
 
       {/* Optioneel: meer over je huisdier (geboortedatum, chip, dierenarts, notitie). */}
       <Collapsible label={t('pet.more')} summary={t('pet.more.summary')}>
-        <Field label={t('pet.field.birth')} value={birthDate} onChangeText={(v) => { setBirthDate(v); clearErr('birth'); }}
-          placeholder="2021-06-15" helper={t('pet.field.birth.helper')} error={errors.birth} />
-        <Field label={t('pet.field.chip')} value={chipNumber} onChangeText={setChipNumber}
+        <View onLayout={register('birth')}>
+          <Field label={t('pet.field.birth')} value={birthDate} onChangeText={(v) => { setField('birthDate', v); clearErr('birth'); }}
+            onBlur={() => validateField(rules, 'birth')}
+            placeholder="2021-06-15" helper={t('pet.field.birth.helper')} error={errors.birth} />
+        </View>
+        <Field label={t('pet.field.chip')} value={chipNumber} onChangeText={(v) => setField('chipNumber', v)}
           placeholder={t('pet.field.chip.placeholder')} />
-        <Field label={t('pet.field.vet')} value={vetName} onChangeText={setVetName}
+        <Field label={t('pet.field.vet')} value={vetName} onChangeText={(v) => setField('vetName', v)}
           placeholder={t('pet.field.vet.placeholder')} />
-        <Field label={t('pet.field.notes')} value={notes} onChangeText={setNotes} multiline
+        <Field label={t('pet.field.notes')} value={notes} onChangeText={(v) => setField('notes', v)} multiline
           placeholder={t('pet.field.notes.placeholder')} style={{ marginBottom: 0 }} />
       </Collapsible>
 
-      <VisibilityPicker
-        collapsible
-        visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
-        shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
-        shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
-        subgroups={subgroups} members={members} />
-      {errors.visibility ? (
-        <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
-      ) : null}
+      <View onLayout={register('visibility')}>
+        <VisibilityPicker
+          collapsible
+          visibility={visibility} onChangeVisibility={(v) => { setField('visibility', v); clearErr('visibility'); }}
+          shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setField('shareSubgroupId', v); clearErr('visibility'); }}
+          shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
+          subgroups={subgroups} members={members} />
+        {errors.visibility ? (
+          <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
+        ) : null}
+      </View>
     </Editor>
   );
 }

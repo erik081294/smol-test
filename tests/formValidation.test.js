@@ -3,7 +3,7 @@
 // (ARCH-1); ze hoort daarom strak vastgepind onder de mutatie-ratchet.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runRules, isValid, requiredText, positive, when } from '../lib/formValidation.js';
+import { runRules, isValid, requiredText, positive, when, firstErrorField, isDirty } from '../lib/formValidation.js';
 
 // --- runRules ---------------------------------------------------------------
 test('runRules: geen regels → leeg foutobject (geen fouten)', () => {
@@ -95,4 +95,56 @@ test('when: de foutsleutel mag verschillen van het gelezen veld', () => {
   // leest `selected`, maar legt de fout op `participants`.
   const rule = when('participants', (v) => (v.selected ?? []).length > 0, 'leeg');
   assert.equal(rule({ selected: [] }).field, 'participants');
+});
+
+// --- firstErrorField --------------------------------------------------------
+test('firstErrorField: geen fouten → null', () => {
+  assert.equal(firstErrorField({}, ['title', 'date']), null);
+});
+
+test('firstErrorField: zonder argumenten → null (default-params)', () => {
+  assert.equal(firstErrorField(), null);
+});
+
+test('firstErrorField: kiest het eerste veld uit de volgorde, niet uit errors-key-volgorde', () => {
+  const errors = { date: 'd', title: 't' }; // errors-insertievolgorde: date eerst
+  // De volgorde bepaalt de prioriteit: title staat vooraan → title wint.
+  assert.equal(firstErrorField(errors, ['title', 'date']), 'title');
+  // Omgekeerde volgorde → date wint (anders overleeft de volgorde-lus-mutant).
+  assert.equal(firstErrorField(errors, ['date', 'title']), 'date');
+});
+
+test('firstErrorField: een naar undefined gewiste fout telt niet mee', () => {
+  assert.equal(firstErrorField({ title: undefined, date: 'd' }, ['title', 'date']), 'date');
+});
+
+test('firstErrorField: lege volgorde → eerste sleutel met een fout uit errors', () => {
+  assert.equal(firstErrorField({ title: undefined, date: 'd' }, []), 'date');
+});
+
+test('firstErrorField: veld in de volgorde zonder fout wordt overgeslagen', () => {
+  assert.equal(firstErrorField({ date: 'd' }, ['title', 'date']), 'date');
+});
+
+// --- isDirty ----------------------------------------------------------------
+test('isDirty: gelijke waarden → niet gewijzigd (false)', () => {
+  assert.equal(isDirty({ a: 1, b: 'x' }, { a: 1, b: 'x' }), false);
+});
+
+test('isDirty: verschillende waarden → gewijzigd (true)', () => {
+  assert.equal(isDirty({ a: 1 }, { a: 2 }), true);
+});
+
+test('isDirty: default serialize is JSON.stringify (aanroep zonder derde arg)', () => {
+  // Datums serialiseren via JSON naar dezelfde ISO-string → niet gewijzigd.
+  const d1 = new Date('2026-07-01T00:00:00Z');
+  const d2 = new Date('2026-07-01T00:00:00Z');
+  assert.equal(isDirty({ due: d1 }, { due: d2 }), false);
+});
+
+test('isDirty: een genormaliseerde serialize negeert cosmetische verschillen', () => {
+  const norm = (v) => JSON.stringify({ title: String(v.title).trim() });
+  // "Afwas " vs "Afwas" is met de norm-serialize niet gewijzigd, maar met JSON wél.
+  assert.equal(isDirty({ title: 'Afwas ' }, { title: 'Afwas' }, norm), false);
+  assert.equal(isDirty({ title: 'Afwas ' }, { title: 'Afwas' }), true);
 });

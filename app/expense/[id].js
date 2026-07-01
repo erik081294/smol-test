@@ -9,13 +9,14 @@ import * as haptics from '../../lib/haptics';
 import { useExpenses } from '../../lib/useExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
-import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, Editor, DateStepper } from '../../lib/ui';
+import { Field, Button, Chip, Checkbox, Stepper, Row, AvatarSelect, Editor, DateStepper, useErrorScroll } from '../../lib/ui';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY, EXPENSE_CATEGORIES } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
-import { requiredText, when } from '../../lib/formValidation';
+import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import {
   SPLIT, computeShares, exactSharesValid, formatCents, parseAmountToCents,
 } from '../../lib/expenses';
@@ -29,6 +30,9 @@ const SPLIT_LABELS = {
   [SPLIT.EXACT]: 'expense.split.exact',
 };
 
+// Prioriteit voor scroll-naar-eerste-fout (formulier-fundament): van boven naar onder.
+const FIELD_ORDER = ['description', 'amount', 'paidBy', 'participants', 'exact', 'visibility'];
+
 export default function ExpenseEditor() {
   const dialog = useDialog();
   const { id, prefillDescription, prefillAmount, sourceType, sourceId } = useLocalSearchParams();
@@ -39,66 +43,87 @@ export default function ExpenseEditor() {
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
 
-  const [existing, setExisting] = useState(null);
   const [loaded, setLoaded] = useState(isNew);
 
-  // ----- Formulier-state -----
-  // Voorvullen vanuit een bron (KOS-3): bv. "Splitsen met huishouden" vanaf een bon.
-  const [description, setDescription] = useState(prefillDescription ?? '');
-  const [amountText, setAmountText] = useState(prefillAmount ?? '');
-  // Zinnige default-categorie op basis van de bron (bon → boodschappen, reservering → vervoer).
-  const [category, setCategory] = useState(
-    sourceType === 'purchase' ? 'boodschappen' : sourceType === 'reservation' ? 'vervoer' : 'overig'
-  );
-  const [paidBy, setPaidBy] = useState(user?.id ?? null);
-  const [spentOn, setSpentOn] = useState(new Date());
-  const [selected, setSelected] = useState(members.map((m) => m.id));
-  const [splitType, setSplitType] = useState(SPLIT.EQUAL);
-  const [weights, setWeights] = useState({}); // { id: number } voor 'shares'
-  const [exactText, setExactText] = useState({}); // { id: '12,50' } voor 'exact'
-  const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
-  const [shareSubgroupId, setShareSubgroupId] = useState(null);
-  const [shareWith, setShareWith] = useState([]);
-  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
-  // regels. De velden zelf houden we hier nog als losse state (incrementele migratie —
-  // zie docs/architectuur.md); een nieuwe editor laat de hook óók de values beheren.
-  const { errors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
+  // Gedeelde formulier-ruggengraat (ARCH-1) in full-mode: de hook beheert de waarden,
+  // de dirty-detectie (via een genormaliseerde serialize — getrimde tekst, bedrag als
+  // centen, datum als 'yyyy-MM-dd', deelnemer-sets gesorteerd zodat toggel-volgorde niet
+  // als 'gewijzigd' telt) en de live/submit-validatie via de pure regels.
+  // Voorvullen vanuit een bron (KOS-3): bv. "Splitsen met huishouden" vanaf een bon; een
+  // zinnige default-categorie op basis van de bron (bon → boodschappen, reservering → vervoer).
+  const serialize = (v) => JSON.stringify({
+    description: v.description.trim(),
+    amountCents: parseAmountToCents(v.amountText) ?? 0,
+    category: v.category,
+    paidBy: v.paidBy,
+    spentOn: v.spentOn ? format(v.spentOn, 'yyyy-MM-dd') : null,
+    selected: [...v.selected].sort(),
+    splitType: v.splitType,
+    weights: Object.entries(v.weights).sort(),
+    exactText: Object.entries(v.exactText).sort(),
+    visibility: v.visibility,
+    shareSubgroupId: v.shareSubgroupId,
+    shareWith: [...v.shareWith].sort(),
+  });
+  const form = useEntityForm({
+    description: prefillDescription ?? '',
+    amountText: prefillAmount ?? '',
+    category: sourceType === 'purchase' ? 'boodschappen' : sourceType === 'reservation' ? 'vervoer' : 'overig',
+    paidBy: user?.id ?? null,
+    spentOn: new Date(),
+    selected: members.map((m) => m.id),
+    splitType: SPLIT.EQUAL,
+    weights: {},   // { id: number } voor 'shares'
+    exactText: {}, // { id: '12,50' } voor 'exact'
+    visibility: VISIBILITY.HOUSEHOLD,
+    shareSubgroupId: null,
+    shareWith: [],
+  }, { serialize });
+  const { values, setField, setValues, reset, dirty, errors, clearError: clearErr, busy, setBusy, validate, validateField } = form;
+  const {
+    description, amountText, category, paidBy, spentOn, selected, splitType, weights, exactText,
+    visibility, shareSubgroupId, shareWith,
+  } = values;
+  const { scrollRef, register, scrollToField } = useErrorScroll();
 
-  // Selecteer standaard alle leden zodra ze geladen zijn.
+  // Nieuw formulier: zodra de leden geladen zijn, selecteer standaard iedereen én herbaseer
+  // (reset) — zo telt een vers, onaangeraakt formulier niet meteen als 'gewijzigd'.
   useEffect(() => {
-    if (isNew && members.length && selected.length === 0) setSelected(members.map((m) => m.id));
+    if (isNew && members.length && selected.length === 0) reset({ ...values, selected: members.map((m) => m.id) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members.length]);
 
-  // ----- Bestaande uitgave: laden en het formulier voorvullen (bewerkbaar) -----
+  // ----- Bestaande uitgave: laden en het formulier voorvullen (bewerkbaar) → nieuw ijkpunt -----
   useEffect(() => {
     if (isNew) return;
     supabase.from('expenses').select('*, expense_shares(profile_id, amount_cents)').eq('id', id).single()
       .then(({ data }) => {
         if (!data) { router.back(); return; }
-        setExisting(data);
-        setDescription(data.description ?? '');
-        setAmountText(data.amount_cents != null ? (data.amount_cents / 100).toFixed(2).replace('.', ',') : '');
-        setCategory(data.category ?? 'overig');
-        setPaidBy(data.paid_by);
-        setSpentOn(data.spent_on ? parseISO(data.spent_on) : new Date());
-        setVisibility(data.visibility ?? VISIBILITY.HOUSEHOLD);
-        setShareSubgroupId(data.share_subgroup_id ?? null);
-        setShareWith(data.share_with ?? []);
         const sh = data.expense_shares ?? [];
-        setSelected(sh.map((s) => s.profile_id));
         // Gewichten van een 'aandeel'-split worden niet bewaard en zijn na afronding
         // niet te reconstrueren uit de bedragen. Een opgeslagen aandeel- of exact-split
         // bewerken we daarom als exacte bedragen: de verdeling blijft exact behouden en
         // is volledig aanpasbaar. 'Gelijk' blijft gelijk (zelfde uitkomst).
-        if (data.split_type === SPLIT.EQUAL) {
-          setSplitType(SPLIT.EQUAL);
-        } else {
-          setSplitType(SPLIT.EXACT);
-          const ex = {}; sh.forEach((s) => { ex[s.profile_id] = (s.amount_cents / 100).toFixed(2).replace('.', ','); });
-          setExactText(ex);
-        }
+        const isEqual = data.split_type === SPLIT.EQUAL;
+        const exact = {};
+        if (!isEqual) sh.forEach((s) => { exact[s.profile_id] = (s.amount_cents / 100).toFixed(2).replace('.', ','); });
+        reset({
+          description: data.description ?? '',
+          amountText: data.amount_cents != null ? (data.amount_cents / 100).toFixed(2).replace('.', ',') : '',
+          category: data.category ?? 'overig',
+          paidBy: data.paid_by,
+          spentOn: data.spent_on ? parseISO(data.spent_on) : new Date(),
+          selected: sh.map((s) => s.profile_id),
+          splitType: isEqual ? SPLIT.EQUAL : SPLIT.EXACT,
+          weights: {},
+          exactText: exact,
+          visibility: data.visibility ?? VISIBILITY.HOUSEHOLD,
+          shareSubgroupId: data.share_subgroup_id ?? null,
+          shareWith: data.share_with ?? [],
+        });
         setLoaded(true);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const amountCents = parseAmountToCents(amountText) ?? 0;
@@ -116,29 +141,33 @@ export default function ExpenseEditor() {
   const exactRemaining = amountCents - participants.reduce((a, p) => a + (p.amountCents ?? 0), 0);
 
   const toggleMember = (pid) =>
-    setSelected((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
+    setValues((v) => ({ ...v, selected: toggleValue(v.selected, pid) }));
   const toggleShareWith = (pid) =>
-    setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
+
+  // Eén bron van waarheid voor de waarden die de regels lezen; de validatie zelf draait
+  // door de pure runRules (lib/formValidation.js, ratchet-bewaakt). Gedeeld door de submit
+  // (alle fouten) en de onBlur-live-check (alleen dat veld).
+  const subject = {
+    description, amountCents, paidBy, selected, splitType, participants,
+    visibility, shareSubgroupId, shareWith,
+  };
+  const rules = [
+    requiredText('description', t('expense.error.description')),
+    // Foutsleutel 'amount' (zo leest het bedragveld 'm), waarde uit 'amountCents'.
+    when('amount', (v) => v.amountCents > 0, t('expense.error.amount')),
+    when('paidBy', (v) => !!v.paidBy, t('expense.error.paidBy')),
+    when('participants', (v) => v.selected.length > 0, t('expense.error.participants')),
+    when('exact', (v) => v.splitType !== SPLIT.EXACT || exactSharesValid(v.amountCents, v.participants),
+      t('expense.error.exact', { amount: formatCents(exactRemaining) })),
+    visibilityRule('visibility'),
+  ];
 
   const save = async () => {
-    // Eén bron van waarheid voor de waarden die de regels lezen; de validatie zelf
-    // draait door de pure runRules (lib/formValidation.js, ratchet-bewaakt).
-    const subject = {
-      description, amountCents, paidBy, selected, splitType, participants,
-      visibility, shareSubgroupId, shareWith,
-    };
-    const ok = validate([
-      requiredText('description', t('expense.error.description')),
-      // Foutsleutel 'amount' (zo leest het bedragveld 'm), waarde uit 'amountCents'.
-      when('amount', (v) => v.amountCents > 0, t('expense.error.amount')),
-      when('paidBy', (v) => !!v.paidBy, t('expense.error.paidBy')),
-      when('participants', (v) => v.selected.length > 0, t('expense.error.participants')),
-      when('exact', (v) => v.splitType !== SPLIT.EXACT || exactSharesValid(v.amountCents, v.participants),
-        t('expense.error.exact', { amount: formatCents(exactRemaining) })),
-      visibilityRule('visibility'),
-    ], subject);
-    if (!ok) return; // validate() heeft de errors gezet + de haptische foutpuls gegeven
-
+    if (!validate(rules, subject)) {
+      scrollToField(firstErrorField(runRules(subject, rules), FIELD_ORDER));
+      return; // validate() heeft de errors gezet + de haptische foutpuls gegeven
+    }
     setBusy(true);
     try {
       if (isNew) {
@@ -168,7 +197,7 @@ export default function ExpenseEditor() {
     markPending(id);
     router.back();
     toast.show({
-      message: t('expense.deleted', { name: existing?.description ?? t('common.remove') }),
+      message: t('expense.deleted', { name: description.trim() || t('common.remove') }),
       actionLabel: t('common.undo'),
       onAction: () => unmarkPending(id),
       onExpire: async () => {
@@ -184,83 +213,94 @@ export default function ExpenseEditor() {
 
   // ---------- Uitgave aanmaken / bewerken (zelfde formulier) ----------
   return (
-    <Editor title={isNew ? t('expense.new') : t('expense.edit')} onClose={() => router.back()} onConfirm={save} busy={busy}>
-          <Field label={t('expense.field.description')} value={description} testID="t-field-description"
-            onChangeText={(v) => { setDescription(v); clearErr('description'); }}
-            placeholder={t('expense.field.description.placeholder')} error={errors.description} />
-          <Field label={t('expense.field.amount')} value={amountText} testID="t-field-amount"
-            onChangeText={(v) => { setAmountText(v); clearErr('amount'); }}
-            placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
+    <Editor title={isNew ? t('expense.new') : t('expense.edit')} onClose={() => router.back()} onConfirm={save}
+      busy={busy} dirty={dirty} scrollRef={scrollRef}>
+          <View onLayout={register('description')}>
+            <Field label={t('expense.field.description')} value={description} testID="t-field-description"
+              onChangeText={(v) => setField('description', v)}
+              onBlur={() => validateField(rules, 'description', subject)}
+              placeholder={t('expense.field.description.placeholder')} error={errors.description} />
+          </View>
+          <View onLayout={register('amount')}>
+            <Field label={t('expense.field.amount')} value={amountText} testID="t-field-amount"
+              onChangeText={(v) => setField('amountText', v)}
+              onBlur={() => validateField(rules, 'amount', subject)}
+              placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
+          </View>
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.category')}</Text>
           <Row gap={space.xs} wrap style={{ marginBottom: space.md }}>
             {EXPENSE_CATEGORIES.map((c) => (
-              <Chip key={c} label={t('category.' + c)} active={category === c} onPress={() => setCategory(c)} />
+              <Chip key={c} label={t('category.' + c)} active={category === c} onPress={() => setField('category', c)} />
             ))}
           </Row>
 
-          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
-          <AvatarSelect members={members} selectedId={paidBy}
-            onSelect={(id) => { setPaidBy(id); clearErr('paidBy'); }} style={{ marginBottom: space.md }} />
-          {errors.paidBy ? (
-            <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.paidBy}</Text>
-          ) : null}
+          <View onLayout={register('paidBy')}>
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.paidBy')}</Text>
+            <AvatarSelect members={members} selectedId={paidBy}
+              onSelect={(pid) => { setField('paidBy', pid); clearErr('paidBy'); }} style={{ marginBottom: space.md }} />
+            {errors.paidBy ? (
+              <Text style={[type.caption, { color: colors.danger, marginTop: -space.sm, marginBottom: space.sm }]}>{errors.paidBy}</Text>
+            ) : null}
+          </View>
 
           <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.split')}</Text>
           <View style={{ flexDirection: 'row', marginBottom: space.md }}>
             {Object.values(SPLIT).map((s) => (
-              <Chip key={s} label={t(SPLIT_LABELS[s])} active={splitType === s} onPress={() => setSplitType(s)} />
+              <Chip key={s} label={t(SPLIT_LABELS[s])} active={splitType === s} onPress={() => setField('splitType', s)} />
             ))}
           </View>
 
-          <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.participants')}</Text>
-          {errors.participants ? (
-            <Text style={[type.caption, { color: colors.danger, marginBottom: space.xs }]}>{errors.participants}</Text>
-          ) : null}
-          {members.map((m) => {
-            const on = selected.includes(m.id);
-            return (
-              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
-                borderBottomWidth: 1, borderBottomColor: colors.line }}>
-                <Checkbox checked={on} onPress={() => { toggleMember(m.id); clearErr('participants'); }}
-                  accessibilityLabel={`${m.display_name}${on ? t('expense.a11y.participant') : ''}`} />
-                <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
+          <View onLayout={register('participants')}>
+            <Text style={[type.label, { marginBottom: space.xs }]}>{t('expense.field.participants')}</Text>
+            {errors.participants ? (
+              <Text style={[type.caption, { color: colors.danger, marginBottom: space.xs }]}>{errors.participants}</Text>
+            ) : null}
+            {members.map((m) => {
+              const on = selected.includes(m.id);
+              return (
+                <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm,
+                  borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                  <Checkbox checked={on} onPress={() => { toggleMember(m.id); clearErr('participants'); }}
+                    accessibilityLabel={`${m.display_name}${on ? t('expense.a11y.participant') : ''}`} />
+                  <Text style={[type.body, { flex: 1 }]}>{m.avatar_emoji} {m.display_name}</Text>
 
-                {on && splitType === SPLIT.EQUAL && (
-                  <Text style={[type.body, { color: colors.inkSoft }]}>{formatCents(preview[m.id] ?? 0)}</Text>
-                )}
-                {on && splitType === SPLIT.SHARES && (
-                  <Row gap={space.sm}>
-                    <Stepper value={weights[m.id] ?? 1} onChange={(v) => setWeights((w) => ({ ...w, [m.id]: v }))}
-                      min={1} accessibilityLabel={t('expense.a11y.share', { name: m.display_name })} />
-                    <Text style={[type.caption, { width: 60, textAlign: 'right' }]}>{formatCents(preview[m.id] ?? 0)}</Text>
-                  </Row>
-                )}
-                {on && splitType === SPLIT.EXACT && (
-                  <TextInput value={exactText[m.id] ?? ''} onChangeText={(v) => setExactText((e) => ({ ...e, [m.id]: v }))}
-                    placeholder="0,00" keyboardType="decimal-pad" placeholderTextColor={colors.inkFaint}
-                    accessibilityLabel={t('expense.a11y.exact', { name: m.display_name })}
-                    style={{ width: 80, minHeight: 44, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.sm,
-                      paddingHorizontal: space.sm, paddingVertical: space.sm, textAlign: 'right', color: colors.ink }} />
-                )}
-              </View>
-            );
-          })}
+                  {on && splitType === SPLIT.EQUAL && (
+                    <Text style={[type.body, { color: colors.inkSoft }]}>{formatCents(preview[m.id] ?? 0)}</Text>
+                  )}
+                  {on && splitType === SPLIT.SHARES && (
+                    <Row gap={space.sm}>
+                      <Stepper value={weights[m.id] ?? 1} onChange={(v) => setValues((prev) => ({ ...prev, weights: { ...prev.weights, [m.id]: v } }))}
+                        min={1} accessibilityLabel={t('expense.a11y.share', { name: m.display_name })} />
+                      <Text style={[type.caption, { width: 60, textAlign: 'right' }]}>{formatCents(preview[m.id] ?? 0)}</Text>
+                    </Row>
+                  )}
+                  {on && splitType === SPLIT.EXACT && (
+                    <TextInput value={exactText[m.id] ?? ''} onChangeText={(v) => setValues((prev) => ({ ...prev, exactText: { ...prev.exactText, [m.id]: v } }))}
+                      placeholder="0,00" keyboardType="decimal-pad" placeholderTextColor={colors.inkFaint}
+                      accessibilityLabel={t('expense.a11y.exact', { name: m.display_name })}
+                      style={{ width: 80, minHeight: 44, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.sm,
+                        paddingHorizontal: space.sm, paddingVertical: space.sm, textAlign: 'right', color: colors.ink }} />
+                  )}
+                </View>
+              );
+            })}
 
-          {splitType === SPLIT.EXACT && (
-            <Text style={[type.caption, { marginTop: space.sm, color: exactRemaining === 0 ? colors.done : colors.danger }]}>
-              {exactRemaining === 0 ? t('expense.exact.balanced') : t('expense.exact.remaining', { amount: formatCents(exactRemaining) })}
-            </Text>
-          )}
+            {splitType === SPLIT.EXACT && (
+              <Text style={[type.caption, { marginTop: space.sm, color: exactRemaining === 0 ? colors.done : colors.danger }]}>
+                {exactRemaining === 0 ? t('expense.exact.balanced') : t('expense.exact.remaining', { amount: formatCents(exactRemaining) })}
+              </Text>
+            )}
+          </View>
 
           <Text style={[type.label, { marginBottom: space.xs, marginTop: space.md }]}>{t('expense.field.date')}</Text>
-          <DateStepper date={spentOn} onChange={setSpentOn} />
+          <DateStepper date={spentOn} onChange={(d) => setField('spentOn', d)} />
 
-          <View style={{ marginTop: space.lg }}>
+          <View style={{ marginTop: space.lg }} onLayout={register('visibility')}>
             <VisibilityPicker
               collapsible
-              visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
-              shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
+              visibility={visibility} onChangeVisibility={(v) => { setField('visibility', v); clearErr('visibility'); }}
+              shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setField('shareSubgroupId', v); clearErr('visibility'); }}
               shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
               subgroups={subgroups} members={members} />
             {errors.visibility ? (

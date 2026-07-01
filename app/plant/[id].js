@@ -13,7 +13,7 @@ import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { backLabelFor } from '../../lib/navMeta';
-import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView, SegmentedControl, Collapsible } from '../../lib/ui';
+import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScrollView, SegmentedControl, Collapsible, useErrorScroll } from '../../lib/ui';
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
@@ -22,7 +22,8 @@ import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
-import { requiredText, when } from '../../lib/formValidation';
+import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { careCard } from '../../lib/plantCare';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -30,6 +31,9 @@ import { markPending, unmarkPending } from '../../lib/pendingDeletes';
 import { t, dateLocale } from '../../lib/i18n';
 
 const LOCATIONS = ['Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Balkon', 'Tuin', 'Kantoor'];
+
+// Prioriteit voor scroll-naar-eerste-fout (formulier-fundament): van boven naar onder.
+const FIELD_ORDER = ['name', 'water', 'visibility'];
 
 export default function PlantScreen() {
   const { id } = useLocalSearchParams();
@@ -43,37 +47,46 @@ export default function PlantScreen() {
   const { subgroups, members, activeId } = useHousehold();
   const { user } = useAuth();
 
-  // ----- Nieuwe plant: formulier -----
-  const [name, setName] = useState('');
-  const [query, setQuery] = useState('');
-  const [speciesId, setSpeciesId] = useState(null);
-  const [location, setLocation] = useState(null);
-  const [waterDays, setWaterDays] = useState('7');
-  const [visibility, setVisibility] = useState(VISIBILITY.HOUSEHOLD);
-  const [shareSubgroupId, setShareSubgroupId] = useState(null);
-  const [shareWith, setShareWith] = useState([]);
+  // ----- Formulier-state -----
+  // Gedeelde formulier-ruggengraat (ARCH-1) in full-mode: de hook beheert de velden, plus
+  // dirty (discard-guard, via een genormaliseerde serialize) en onBlur-live-validatie. Deze
+  // state bedient zowel de nieuw-plant-Editor als de bewerk-sheet van een bestaande plant
+  // (via `reset` in openEdit). De omslagfoto (photoAsset) blijft lokaal — alleen nieuw-flow.
+  const serialize = (v) => JSON.stringify({
+    name: v.name.trim(), speciesId: v.speciesId, location: v.location, waterDays: v.waterDays,
+    visibility: v.visibility, shareSubgroupId: v.shareSubgroupId, shareWith: [...v.shareWith].sort(),
+  });
+  const form = useEntityForm({
+    name: '', query: '', speciesId: null, location: null, waterDays: '7',
+    visibility: VISIBILITY.HOUSEHOLD, shareSubgroupId: null, shareWith: [],
+  }, { serialize });
+  const { values, setField, setValues, reset, dirty: fieldsDirty, errors, clearError: clearErr, busy, setBusy, validate, validateField } = form;
+  const { name, query, speciesId, location, waterDays, visibility, shareSubgroupId, shareWith } = values;
   const [photoAsset, setPhotoAsset] = useState(null); // { uri, base64, ext } of null
-  // Gedeelde formulier-ruggengraat (ARCH-1): errors + busy + validatie via de pure
-  // regels (lib/formValidation.js). De velden blijven losse state (incrementele migratie).
-  const { errors, setErrors, clearError: clearErr, busy, setBusy, validate } = useEntityForm();
+  const { scrollRef, register, scrollToField } = useErrorScroll();
 
   const matches = useMemo(() => searchSpecies(species, query).slice(0, 8), [species, query]);
   const chosen = species.find((s) => s.id === speciesId) ?? null;
 
+  // De validatieregels — gedeeld door de submit (alle fouten) en de onBlur-live-check.
+  const rules = [
+    requiredText('name', t('plant.error.name')),
+    when('water', (v) => !!v.speciesId || parseInt(v.waterDays, 10) > 0, t('plant.error.water')),
+    visibilityRule('visibility'),
+  ];
+
   const toggleShareWith = (pid) =>
-    setShareWith((s) => (s.includes(pid) ? s.filter((x) => x !== pid) : [...s, pid]));
+    setValues((v) => ({ ...v, shareWith: toggleValue(v.shareWith, pid) }));
 
   // Nieuwe-plant-flow: asset bewaren tot opslaan. Foto kiezen via de gedeelde
   // picker (`lib/photoPicker.js`, STR-4) — één codepad voor alle modules/platforms.
   const choosePhoto = () => offerImagePicker(setPhotoAsset, { allowRemove: !!photoAsset, onRemove: () => setPhotoAsset(null) });
 
   const save = async () => {
-    const ok = validate([
-      requiredText('name', t('plant.error.name')),
-      when('water', (v) => !!v.speciesId || parseInt(v.waterDays, 10) > 0, t('plant.error.water')),
-      visibilityRule('visibility'),
-    ], { name, speciesId, waterDays, visibility, shareSubgroupId, shareWith });
-    if (!ok) return;
+    if (!validate(rules)) {
+      scrollToField(firstErrorField(runRules(values, rules), FIELD_ORDER));
+      return;
+    }
     setBusy(true);
     try {
       await addPlant({
@@ -184,15 +197,17 @@ export default function PlantScreen() {
   const [editing, setEditing] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const openEdit = () => {
-    setName(plant.name ?? '');
-    setSpeciesId(plant.species_id ?? null);
-    setQuery(species.find((s) => s.id === plant.species_id)?.common_name ?? '');
-    setLocation(plant.location ?? null);
-    setErrors({});
+    reset({
+      ...values,
+      name: plant.name ?? '',
+      speciesId: plant.species_id ?? null,
+      query: species.find((s) => s.id === plant.species_id)?.common_name ?? '',
+      location: plant.location ?? null,
+    });
     setEditing(true);
   };
   const saveEdit = async () => {
-    if (!validate([requiredText('name', t('plant.error.name'))], { name })) return;
+    if (!validate([requiredText('name', t('plant.error.name'))])) return;
     setEditBusy(true);
     try {
       const patch = { name: name.trim(), species_id: speciesId, location };
@@ -367,15 +382,15 @@ export default function PlantScreen() {
           <ModalHeader title={t('plant.edit')} onClose={() => setEditing(false)}
             onConfirm={saveEdit} busy={editBusy} />
           <SheetScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: space.lg }} keyboardShouldPersistTaps="handled">
-            <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+            <Field label={t('plant.field.name')} value={name} onChangeText={(v) => setField('name', v)} onBlur={() => validateField(rules, 'name')}
               placeholder={t('plant.field.name.placeholder')} error={errors.name} />
 
-            <Field label={t('plant.field.species')} value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
+            <Field label={t('plant.field.species')} value={query} onChangeText={(v) => setValues((p) => ({ ...p, query: v, speciesId: null }))}
               placeholder={t('plant.field.species.placeholder')} />
             {query.length > 0 && !speciesId && (
               <View style={{ marginBottom: space.md }}>
                 {matches.map((s) => (
-                  <Pressable key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); }}
+                  <Pressable key={s.id} onPress={() => setValues((p) => ({ ...p, speciesId: s.id, query: s.common_name }))}
                     accessibilityRole="button" accessibilityLabel={s.common_name}
                     style={({ pressed }) => ({ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line,
                       backgroundColor: pressed ? colors.surfaceAlt : 'transparent' })}>
@@ -400,7 +415,7 @@ export default function PlantScreen() {
             <Text style={[type.label, { marginBottom: 6 }]}>{t('plant.field.location')}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {LOCATIONS.map((loc) => (
-                <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(location === loc ? null : loc)} />
+                <Chip key={loc} label={loc} active={location === loc} onPress={() => setField('location', location === loc ? null : loc)} />
               ))}
             </View>
           </SheetScrollView>
@@ -411,7 +426,8 @@ export default function PlantScreen() {
 
   // ----- Nieuwe plant -----
   return (
-    <Editor title={t('plant.new')} onClose={() => router.back()} onConfirm={save} busy={busy}>
+    <Editor title={t('plant.new')} onClose={() => router.back()} onConfirm={save} busy={busy}
+      dirty={fieldsDirty || !!photoAsset} scrollRef={scrollRef}>
           {/* Foto kiezen (camera/bibliotheek) — preview totdat we opslaan. */}
           <View style={{ alignItems: 'center', marginBottom: space.lg }}>
             <Pressable onPress={choosePhoto} accessibilityRole="button"
@@ -430,15 +446,15 @@ export default function PlantScreen() {
             <Text style={type.caption}>{t('plant.photo.optional')}</Text>
           </View>
 
-          <Field label={t('plant.field.name')} value={name} onChangeText={(v) => { setName(v); clearErr('name'); }}
+          <Field label={t('plant.field.name')} value={name} onChangeText={(v) => setField('name', v)} onBlur={() => validateField(rules, 'name')}
             placeholder={t('plant.field.name.placeholder')} error={errors.name} />
 
-          <Field label={t('plant.field.species')} value={query} onChangeText={(v) => { setQuery(v); setSpeciesId(null); }}
+          <Field label={t('plant.field.species')} value={query} onChangeText={(v) => setValues((p) => ({ ...p, query: v, speciesId: null }))}
             placeholder={t('plant.field.species.placeholder')} />
           {query.length > 0 && !speciesId && (
             <View style={{ marginBottom: space.md }}>
               {matches.map((s) => (
-                <Pressable key={s.id} onPress={() => { setSpeciesId(s.id); setQuery(s.common_name); clearErr('water'); }}
+                <Pressable key={s.id} onPress={() => { setValues((p) => ({ ...p, speciesId: s.id, query: s.common_name })); clearErr('water'); }}
                   accessibilityRole="button" accessibilityLabel={s.common_name}
                   style={({ pressed }) => ({ paddingVertical: space.sm, borderBottomWidth: 1, borderBottomColor: colors.line,
                     backgroundColor: pressed ? colors.surfaceAlt : 'transparent' })}>
@@ -463,27 +479,32 @@ export default function PlantScreen() {
           )}
 
           {!speciesId && (
-            <Field label={t('plant.field.water')} value={waterDays}
-              onChangeText={(v) => { setWaterDays(v); clearErr('water'); }}
-              placeholder="7" keyboardType="number-pad" error={errors.water} />
+            <View onLayout={register('water')}>
+              <Field label={t('plant.field.water')} value={waterDays}
+                onChangeText={(v) => { setField('waterDays', v); clearErr('water'); }}
+                onBlur={() => validateField(rules, 'water')}
+                placeholder="7" keyboardType="number-pad" error={errors.water} />
+            </View>
           )}
 
           <Text style={[type.label, { marginBottom: 6 }]}>{t('plant.field.location')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {LOCATIONS.map((loc) => (
-              <Chip key={loc} label={loc} active={location === loc} onPress={() => setLocation(loc)} />
+              <Chip key={loc} label={loc} active={location === loc} onPress={() => setField('location', loc)} />
             ))}
           </View>
 
-          <VisibilityPicker
-            collapsible
-            visibility={visibility} onChangeVisibility={(v) => { setVisibility(v); clearErr('visibility'); }}
-            shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setShareSubgroupId(v); clearErr('visibility'); }}
-            shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
-            subgroups={subgroups} members={members} />
-          {errors.visibility ? (
-            <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
-          ) : null}
+          <View onLayout={register('visibility')}>
+            <VisibilityPicker
+              collapsible
+              visibility={visibility} onChangeVisibility={(v) => { setField('visibility', v); clearErr('visibility'); }}
+              shareSubgroupId={shareSubgroupId} onChangeSubgroup={(v) => { setField('shareSubgroupId', v); clearErr('visibility'); }}
+              shareWith={shareWith} onToggleMember={(p) => { toggleShareWith(p); clearErr('visibility'); }}
+              subgroups={subgroups} members={members} />
+            {errors.visibility ? (
+              <Text style={[type.caption, { color: colors.danger, marginTop: space.xs }]}>{errors.visibility}</Text>
+            ) : null}
+          </View>
     </Editor>
   );
 }

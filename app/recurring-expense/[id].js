@@ -14,6 +14,7 @@ import { parseAmountToCents, formatCents } from '../../lib/expenses';
 import { success, error as hapticError } from '../../lib/haptics';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when } from '../../lib/formValidation';
+import { toggleValue } from '../../lib/listField';
 import { RECUR } from '../../lib/constants';
 import { useToast } from '../../lib/toast';
 import { markPending, unmarkPending } from '../../lib/pendingDeletes';
@@ -65,7 +66,7 @@ export default function RecurringExpenseEditor() {
   }, [id]);
 
   const toggleParticipant = (pid) =>
-    setParticipants((p) => (p.includes(pid) ? p.filter((x) => x !== pid) : [...p, pid]));
+    setParticipants((p) => toggleValue(p, pid));
 
   const unitLabel = (n) => {
     if (freq === RECUR.DAILY) return n === 1 ? 'dag' : 'dagen';
