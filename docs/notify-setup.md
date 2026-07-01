@@ -42,6 +42,34 @@
    - Type **Supabase Edge Functions** → functie **`notify`**.
    - HTTP-header toevoegen: **`x-notify-secret`** = exact dezelfde waarde als bij stap 2.
 
+### FCM-credentials — verplicht voor Android-push (eenmalig, browser)
+
+Android-push loopt via **Firebase Cloud Messaging (FCM V1)**. Zonder dit haalt het toestel
+géén Expo-push-token op — logcat toont dan `FirebaseApp failed to initialize ... google-services
+was not applied` en `push_tokens` blijft leeg. Twee artefacten uit één Firebase-project zijn nodig;
+het aanmaken vereist een Google-login en kan dus alleen in de browser (~5–10 min):
+
+1. **Firebase-project** — [console.firebase.google.com](https://console.firebase.google.com) →
+   *Add project* (of een bestaand project). Analytics mag uit.
+2. **Android-app toevoegen** met package **`app.huishoek`** (en desgewenst een tweede app met
+   `app.huishoek.preview` voor het preview-profiel). Download het aangeboden **`google-services.json`**
+   en zet het in de **repo-root** (`./google-services.json`). Het is **gitignored**; `app.config.js`
+   haakt het automatisch in als het bestaat (`android.googleServicesFile`).
+3. **FCM V1 service-account-sleutel** — Firebase-console → ⚙️ *Project settings* → tab
+   **Service accounts** → **Generate new private key** → download het JSON-bestand (dit is de
+   **geheime** verzend-sleutel; zet 'm buiten de repo, bv. `~/fcm-service-account.json`).
+
+Lever die twee bestanden aan; de rest (sleutel uploaden bij EAS + de dev-build draaien) gaat via CLI:
+
+```bash
+# FCM V1-sleutel koppelen aan het EAS-project (interactief → kies "Google Service Account Key for FCM V1"):
+eas credentials --platform android
+# Dev-build mét google-services.json ingebakken:
+eas build --profile development --platform android
+```
+
+Na installatie van die build + permissie verlenen registreert het token vanzelf in `push_tokens`.
+
 ### Toesteltest (2 accounts, dev build)
 1. Twee accounts (A en B) in **hetzelfde huishouden**, elk op een **dev build** met
    notificatie-permissie verleend (zo staat per toestel een rij in `push_tokens`).
@@ -65,7 +93,9 @@ uniek op `(profile_id, token)` (`push_tokens` PK); dode tokens worden automatisc
   `NOTIFY_WEBHOOK_SECRET`. (Krijg je in plaats daarvan een JWT-fout, dan staat `verify_jwt`
   nog op `true` — controleer `supabase/config.toml` en herdeploy.)
 - **`skipped: "geen tokens"`** → de ontvanger heeft geen rij in `push_tokens`: permissie niet
-  verleend, geen dev build, of geen EAS `projectId`.
+  verleend, geen dev build, geen EAS `projectId`, of **FCM niet geconfigureerd** (zie de
+  FCM-sectie hierboven — dit is de meest voorkomende oorzaak; check logcat op `FirebaseApp failed
+  to initialize`).
 - **Niets gebeurt** → check de functie-logs (`supabase functions logs notify`) en of de webhook
   daadwerkelijk vuurt (Dashboard → Database → Webhooks → recent deliveries).
 

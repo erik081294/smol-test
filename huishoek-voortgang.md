@@ -1048,3 +1048,19 @@ was geen goede fit. **Device-geverifieerd:** recipe/plant/pet-detail (waar de ho
 gebruikt) + de editors renderen schoon (geen error-boundary), volledige `npm run rooktest` groen, logcat
 schoon. `npm test` 840 pass, typecheck, `eslint .` 0 err. Hiermee is **plan 22 afgerond** (step 1 full-mode +
 step 2 lijst-logica + step 3 foto-flow).
+
+**2026-07-01 — Push-notificaties: app-kant push-ready + FCM-poort in kaart (PLT-1).**
+De aflever-test van trap 2 (remote push) liep vast: op de lokale dev-client haalt
+`getExpoPushTokenAsync` géén token op (logcat: `FirebaseApp failed to initialize ... google-services
+was not applied`), dus `push_tokens` blijft leeg en de `notify`-functie meldt terecht
+`{"processed":1,"sent":0,"skipped":1}`. Via de Expo-API bevestigd: `androidFcm: null` voor beide
+varianten (`app.huishoek` + `.preview`) — er staan simpelweg nog geen FCM-credentials. De
+server-kant is verder end-to-end oké (geldig secret → 200, fout secret → 401). **Gedaan:** de
+app-kant push-ready gemaakt zonder bestaande builds te breken — `expo-notifications`-config-plugin +
+een *conditionele* `android.googleServicesFile`-hook in [`app.config.js`](app.config.js) (haakt
+`./google-services.json` alleen in als het bestaat; builds zonder het bestand evalueren identiek),
+en `google-services.json`/de FCM-sleutel gitignored. Runbook uitgebreid met een §FCM-credentials in
+[`docs/notify-setup.md`](docs/notify-setup.md). **Rest is een externe poort (Google-login, browser):**
+Firebase-project → `google-services.json` + FCM V1 service-account-sleutel → sleutel bij EAS uploaden
+(`eas credentials`) + dev-build (`eas build`) → dan de 2-toestel-aflevertest afvinken. `npm test` 840
+pass, `eslint .` 0 err, config evalueert schoon.
