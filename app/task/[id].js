@@ -232,7 +232,7 @@ export default function TaskEditor() {
       scrollRef={scrollRef}
     >
       <View onLayout={register('title')}>
-        <Field label={t('task.field.title')} value={title}
+        <Field label={t('task.field.title')} value={title} testID="t-field-title"
           onChangeText={(v) => setField('title', v)}
           onBlur={() => validateField(rules, 'title')}
           placeholder={t('task.field.title.placeholder')} autoFocus={isNew} error={errors.title} />

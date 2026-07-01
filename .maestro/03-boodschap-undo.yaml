@@ -11,14 +11,19 @@ appId: app.huishoek
     id: "t-grocery-add"                  # invoerveld (groceries.addLabel)
 - inputText: "E2E rooktest melk"
 - pressKey: Enter
-- assertVisible: "E2E rooktest melk"
+# Ruime wachttijd: de lijst herlaadt async na de DB-insert.
+- extendedWaitUntil:
+    visible: "E2E rooktest melk"
+    timeout: 15000
 # Verwijderen: naar links vegen = de destructieve actie (undo-toast verschijnt).
+# Tik "Ongedaan maken" DIRECT na de veeg (geen tussen-assert die een trage UI-dump kost),
+# anders is de toast al weg — zie de timing-notitie in 04-swipe.yaml.
 - swipe:
     from:
       text: "E2E rooktest melk"
     direction: LEFT
-- assertVisible: "Ongedaan maken"        # common.undo (undo-toast)
-- tapOn: "Ongedaan maken"
+- tapOn: "Ongedaan maken"                # common.undo (undo-toast) — STR-9
 - assertVisible: "E2E rooktest melk"     # item komt terug
+# Opruimen van de `E2E…`-rij gebeurt op DB-niveau door de runner (scripts/rooktest-cleanup.mjs).
 - assertNotVisible:
     id: "t-error-boundary"
