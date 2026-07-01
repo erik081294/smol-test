@@ -954,3 +954,25 @@ Gebouwd (gedragsneutraal, additief):
 **0 errors**, mutatie-ratchet `formValidation` 91,5%. In een geïsoleerde git-worktree gebouwd (parallel
 aan de Maestro-rooktest-tab). **Rest:** device-rooktest Taken + de uitrol (6 editors, `<DynamicList>`,
 foto-/loading-veld) uit plan 22.
+
+---
+
+**2026-07-01 — Backlog §6-reconciliatie (status tegen de bron).** De §6 liep achter op de code/live-stand;
+elk item hieronder is tegen de **bron** geverifieerd (live web/Supabase/Sentry/code + merged PR's), niet tegen
+de doc. **Inhoudelijke correcties (stale → waar):**
+- **PLT-7** — web-build is **LIVE op Cloudflare Pages** (`huishoek.app` serveert de SPA; `/`, `/welcome`,
+  `/join/<token>` → HTTP 200). §6 zei "CF-auth/deploy nog open" (stale). Rest = echte store-links + web/device
+  join-rooktest.
+- **PLT-1** — notify-**flip-on is gedaan** (edge-function v1 ACTIVE, `NOTIFY_WEBHOOK_SECRET` gezet, DB-webhook op
+  `tasks` live; auth geverifieerd 200/401). §6 zei "Rest = flip-on (secret/deploy/webhook)". Rest = alléén de
+  2-toestel-aflevertest.
+- **PLT-10** — Sentry toont in **90 dagen 0 issues** behalve de gefixte HUISHOEK-1; ondanks live web-verkeer
+  **geen BottomSheet/gesture-crash** waargenomen → die crash is een onbevestigde hypothese, niet blind fixen.
+- **INF-3** — kalibratie van de Maestro-flows loopt (2026-07-01).
+
+**Naar ✅ → verplaatst naar [`huishoek-backlog-archief.md`](huishoek-backlog-archief.md) (device-/live-bevestigd):**
+FND-5 + HUI-2 (stonden al ✅; HUI kreeg een eigen archief-sectie), **MLT-4** (keuken-redesign gemerged PR #67–69 + device-loop 2026-06-26),
+**BOO-13** (producteditor-rest device-bevestigd 2026-07-01), **UX-22** (sheets/keyboard + 3 sluit-routes
+device-bevestigd), **SEC-5** (payload-validatie draait live mee in de gedeployede `notify`). VTG-1..4 en BOO-10
+waren al door #105 gearchiveerd. **Bron-principe bevestigd:** verifieer status tegen live/code/PR's, niet tegen
+de doc — dit haalde vier "nog te doen"-claims onderuit die al af waren.
