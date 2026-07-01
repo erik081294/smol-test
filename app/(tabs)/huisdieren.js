@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePets, usePetPhotoUrl } from '../../lib/usePets';
-import { petType } from '../../lib/petCare';
+import { petType, speciesLabel } from '../../lib/petCare';
 import { Empty, FAB, ScreenHeader, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
@@ -31,7 +31,9 @@ function PetCard({ pet, next, onPress }) {
         </View>
         <View style={{ flex: 1, padding: space.md, justifyContent: 'center' }}>
           <Text style={type.title} numberOfLines={1}>{pet.name}</Text>
-          <Text style={type.caption} numberOfLines={1}>{tp.label}</Text>
+          {/* Eigen soort (type 'anders' + species_label) wint óók op de kaart, net als op het
+              detail — anders zag je "Anders" i.p.v. bv. "Bidsprinkhaan" (HUI-2). */}
+          <Text style={type.caption} numberOfLines={1}>{speciesLabel(pet)}</Text>
           {next ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.xs }}>
               <Icon name="huisdier" size={13} color={colors.forest} />

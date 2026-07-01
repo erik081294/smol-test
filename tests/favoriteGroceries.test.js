@@ -1,7 +1,7 @@
 // Units voor de pure "Vaste boodschappen"-groepering/sortering (lib/favoriteGroceries.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupFavorites, topFavorites, hiddenProducts, recentProducts } from '../lib/favoriteGroceries.js';
+import { groupFavorites, topFavorites, hiddenProducts, recentProducts, searchOwnProducts } from '../lib/favoriteGroceries.js';
 
 const categories = [
   { key: 'zuivel', label: 'Zuivel & eieren', emoji: '🥛', sort: 20 },
@@ -186,4 +186,42 @@ test('recentProducts: filtert op zoekterm (search-veld)', () => {
 
 test('recentProducts() zonder argumenten → lege lijst (default-param)', () => {
   assert.deepEqual(recentProducts(), []);
+});
+
+test('searchOwnProducts: vindt een eigen product ZONDER last_added_at (de bug)', () => {
+  // Kern van BOO-13: een zojuist aangemaakt product dat nog nooit gelijst is, moet tóch
+  // op naam vindbaar zijn — anders krijg je "Niets gevonden" en maak je een duplicaat.
+  const prods = [{ id: 'k', name: 'Kwarktest', search: 'kwarktest', times_added: 0, last_added_at: null }];
+  assert.deepEqual(searchOwnProducts(prods, { query: 'kwark' }).map((p) => p.id), ['k']);
+  assert.deepEqual(recentProducts(prods, { query: 'kwark' }).map((p) => p.id), []); // recent zou 'm missen
+});
+
+test('searchOwnProducts: verborgen producten vallen weg', () => {
+  const prods = [{ id: 'h', name: 'Boter', search: 'boter', hidden: true }];
+  assert.equal(searchOwnProducts(prods, { query: 'boter' }).length, 0);
+});
+
+test('searchOwnProducts: sorteert op gebruik → recentheid → naam', () => {
+  const same = '2026-06-20T10:00:00Z';
+  const prods = [
+    { id: 'b', name: 'Boter', search: 'boterham', times_added: 1, last_added_at: same },
+    { id: 'a', name: 'Appelstroop', search: 'appelstroop', times_added: 9, last_added_at: same },
+    { id: 'c', name: 'Chocopasta', search: 'chocopasta', times_added: 1, last_added_at: same },
+  ];
+  // query matcht alle drie via een gedeelde substring? Nee — filter op 'o': boterham/chocopasta/appelstroop
+  // bevatten allemaal een 'o'. Meest gekozen eerst (a), dan alfabetisch (b vóór c).
+  assert.deepEqual(searchOwnProducts(prods, { query: 'o' }).map((p) => p.id), ['a', 'b', 'c']);
+});
+
+test('searchOwnProducts: lege/ontbrekende query → lege lijst', () => {
+  const prods = [{ id: '1', name: 'Melk', search: 'melk' }];
+  assert.deepEqual(searchOwnProducts(prods, { query: '' }).map((p) => p.id), []);
+  assert.deepEqual(searchOwnProducts(prods).map((p) => p.id), []);
+  assert.deepEqual(searchOwnProducts(), []);
+});
+
+test('searchOwnProducts: respecteert de cap n', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({ id: String(i), name: `Pomp${i}`, search: `pomp${i}`, times_added: 1 }));
+  assert.equal(searchOwnProducts(many, { query: 'pomp', n: 5 }).length, 5);
+  assert.equal(searchOwnProducts(many, { query: 'pomp' }).length, 24); // default-cap
 });

@@ -17,7 +17,17 @@
 | **Bon-leesdetail-kop "Annuleer"** i.p.v. "Sluiten" | UX #7 | `purchase/[id].js:179` gaf `onConfirm` zonder `cancelLabel` → `ModalHeader`-default "Annuleer". Recept-leesdetail heeft géén onConfirm-kop → de bon was de uitzondering | `cancelLabel={t('common.close')}` → "Sluiten · APpie · Bewerken" |
 | **Bon-regel herhaalt de productnaam** (titel + meta) | Visual #10 | `purchase/[id].js:190` toonde altijd `· {productnaam}`, ook als die == regelnaam | Toon `· productnaam` alleen als die ≠ de regelnaam |
 
-`typecheck` + `eslint` (0 errors) + `npm test` **805 pass / 0 fail** groen.
+### Ronde 3 — device-rooktest 2026-07-01 (dev-client `app.huishoek`, live van metro)
+
+Twee **op-toestel gevonden** bugs, elk eerst tegen de code + de live DB geverifieerd, daarna gefixt en
+op de dev-client bevestigd:
+
+| Bevinding | Verificatie (code + device) | Fix |
+|---|---|---|
+| **Eigen (zelf-aangemaakt) product niet vindbaar via catalogus-zoek** — je maakt "Kwarktest" aan, zoekt 'm daarna → **"Niets gevonden"** + "toevoegen" (→ duplicaat) | `catalog.js` zocht alleen via `searchCatalog(q)` = de *gebundelde* `CATALOG`; huishoud-eigen producten zaten enkel in "Eerder gekozen" (zonder query). Op device gereproduceerd (Kwarktest zichtbaar in Eerder gekozen, onvindbaar via zoeken) én de exacte DB-rij (`search='kwarktest', hidden=false`) tegen de functie getest | Nieuwe pure [`searchOwnProducts`](../lib/favoriteGroceries.js) (eigen producten op naam, óók zónder `last_added_at`) + `catalog.js` merget eigen (vóóraan) + gebundelde matches, ontdubbeld op naam. **Op device bevestigd:** "Kwarktest" en prefix "Kwark" tonen nu het eigen product. 5 units + mutatie-ratchet favoriteGroceries **85.4%** (baseline 81.5%) |
+| **Huisdier-lijstkaart toont "Anders" i.p.v. het eigen soort-label** (detail toont het wél) | `huisdieren.js:34` gebruikte `petType(pet.type).label` (="Anders"); het detail gebruikt `speciesLabel(pet)` (="Bidsprinkhaan"). Reëel inconsistent — op device gezien (kaart "Anders" vs detail "Bidsprinkhaan") | Kaart gebruikt nu óók `speciesLabel(pet)` (al unit-getest). **Op device bevestigd:** kaart toont "Bidsprinkhaan" |
+
+`typecheck` + `eslint` (0 errors) + `npm test` **810 pass / 0 fail** groen.
 
 ## B. Beslissingen nodig (geverifieerd waar, maar woord-/ontwerpkeuze — niet unilateraal gewijzigd)
 
@@ -46,12 +56,31 @@
 | Bon read/edit-splitsing mogelijk niet correct (UX-vraag) | `purchase/[id].js:173` toont read-only bij `!editing` met "Bewerken" → editor. **Correct**, volgt recepten-patroon |
 | Datum-format verschilt per bon-scherm (UX #12) | Lijst (`d MMM yyyy`) / detail (`d MMMM yyyy`) / editor (`EEEE d MMMM`) — bewust per niveau; laag/optioneel |
 
-## E. Nog niet device-getest (toestel halverwege losgekoppeld) — blijven open in §6
+## E. Device-rooktest 2026-07-01 afgerond (dev-client `app.huishoek`)
 
-`UX-22` (sheets nooit onder het toetsenbord + 3 sluit-routes), `UX-42` (header-drawer-acties),
-`FND-5` (huishouden wisselen — vereist 2e huishouden), `HUI-2` (eigen diersoort — vereist een huisdier),
-en de **BOO-13-rest** (producteditor opslaan + foto-upload/signed-URL + "even aankleden?"-prompt; ingang
-en render zijn wél device-bevestigd).
+Alle in §E openstaande device-tests zijn op de live dev-client uitgevoerd:
+
+- **BOO-13-rest** ✅ — producteditor **opslaan** bewezen (categorie-round-trip → "'Koffie' bijgewerkt",
+  net-zero hersteld); **foto-upload** actiesheet → native Google-Foto's-picker launcht clean (geen
+  ActivityResultLauncher-crash) → annuleer-terugkeer; **"even aankleden?"-prompt** (Later/Aankleden) na
+  een nieuw product; **onderkant** = eenheid + emoji-picker. Testproducten daarna uit de DB verwijderd.
+- **UX-22** ✅ — voorraad-toevoegsheet: `avoidKeyboard` houdt alle velden boven het toetsenbord; alle
+  **3 sluit-routes** (backdrop-tik, veeg-omlaag, Annuleren) werken. Eén gedeelde `BottomSheet` → dekt het
+  contract.
+- **UX-42** ✅ — Kosten-ⓘ-drawer toont uitleg + **gelabelde acties** ("Inzichten"/"Terugkerende
+  uitgaven"); "Inzichten" navigeert daadwerkelijk (functioneel, niet decoratief).
+- **HUI-2** ✅ — soort "Anders" toont het vrije "Anders, namelijk…"-veld; opslaan schrijft
+  `species_label`; **detail én (na fix) de lijstkaart** tonen het eigen label ("Bidsprinkhaan").
+  Testhuisdier daarna verwijderd.
+- **FND-5** ✅ — na de create-fix (zie hieronder) is een 2e huishouden aangemaakt: de app landt in de app
+  met het nieuwe huishouden actief en **de data her-scoopt** (leeg); terugwisselen geeft de toast "Nu
+  actief: Vark's Huishouden" en her-scoopt terug. Testhuishouden daarna uit de DB verwijderd (cascade).
+
+## F. Op device gevonden **blokkerende bug** — huishouden aanmaken lukt niet (gefixt)
+
+| Bevinding | Verificatie (code + device) | Fix |
+|---|---|---|
+| **"Nieuw of aansluiten bij huishouden" doet niets** — een lid mét huishouden kan geen 2e huishouden aanmaken/toetreden | Op device gereproduceerd: de knop pusht naar `/onboarding`, maar de gate in [`app/_layout.js`](../app/_layout.js) kaatste een `route==='app'`-gebruiker meteen wég van `onboarding` (`router.replace('/(tabs)/vandaag')`) → het scherm flitste weg. Root-cause bevestigd in de redirect-useEffect | Gate stuurt niet meer weg vanuit `onboarding` (alleen `(auth)`/root); [`onboarding.js`](../app/onboarding.js) navigeert nu zélf de app in ná een geslaagde create — dekt zowel het eerste als een extra huishouden. **Op device bevestigd:** create werkt, landt in de app, nieuw huishouden actief |
 
 ## Device-bevestigd deze ronde (→ status §6)
 

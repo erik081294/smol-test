@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useHousehold } from '../lib/household';
 import { useAuth } from '../lib/auth';
 import { Button, Field, Card, EmojiPicker } from '../lib/ui';
@@ -9,6 +10,7 @@ import { colors, type, space } from '../lib/theme';
 import { t } from '../lib/i18n';
 
 export default function Onboarding() {
+  const router = useRouter();
   const { createHousehold } = useHousehold();
   const { signOut } = useAuth();
   const [name, setName] = useState('');
@@ -20,7 +22,13 @@ export default function Onboarding() {
     if (!name.trim()) { setErrors({ name: t('onboarding.error.name') }); return; }
     setErrors({});
     setBusy(true);
-    try { await createHousehold(name.trim(), emoji); }
+    try {
+      await createHousehold(name.trim(), emoji);
+      // Zelf de app in navigeren: de gate kaatst 'onboarding' niet meer weg voor een ingelogd
+      // lid (zodat een 2e huishouden aanmaken kán), dus moet onboarding dit na een geslaagde
+      // create zélf doen — geldt voor zowel het eerste als een extra huishouden.
+      router.replace('/(tabs)/vandaag');
+    }
     catch (e) { setErrors({ name: e.message }); }
     finally { setBusy(false); }
   };
