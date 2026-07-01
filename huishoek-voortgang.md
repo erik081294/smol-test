@@ -976,3 +976,21 @@ FND-5 + HUI-2 (stonden al ✅; HUI kreeg een eigen archief-sectie), **MLT-4** (k
 device-bevestigd), **SEC-5** (payload-validatie draait live mee in de gedeployede `notify`). VTG-1..4 en BOO-10
 waren al door #105 gearchiveerd. **Bron-principe bevestigd:** verifieer status tegen live/code/PR's, niet tegen
 de doc — dit haalde vier "nog te doen"-claims onderuit die al af waren.
+
+---
+
+**2026-07-01 — Formulier-uitrol: de 6 overige editors op full-mode (ARCH-5, staart van [plan 22](docs/plans/22-formulier-fundament.md)).**
+Na de Taken-pilot de overige incrementeel-editors op het fundament herbouwd, gedragsneutraal in
+payload/regels/deep-links; nieuw is de **discard-guard** (die editors hadden er nog geen) + de
+onBlur-live-validatie + scroll-naar-eerste-fout:
+- **expense** (uitgave), **purchase** (bon), **recipe** (recept), **plant**, **vehicle** (voertuig), **pet** (huisdier)
+  — elk ~15–26 losse `useState` → hook-`values` + `dirty` (genormaliseerde serialize) + `validateField` (onBlur).
+- **`lib/ui.js`**: de discard-guard van de `Editor` geëxtraheerd naar een herbruikbare
+  **`useDiscardGuard(dirty, onClose)`** (incl. Android hardware-back), zodat **vehicle** — dat z'n eigen
+  `ModalHeader` gebruikt i.p.v. `Editor` — dezelfde bescherming krijgt. `Editor` gebruikt 'm nu ook (DRY).
+- Editor-specifieke keuzes: bij **plant** delen de nieuw-Editor en de bewerk-sheet dezelfde hook-state
+  (`reset()` in `openEdit`); bij **recipe/plant/pet** telt een gekozen (nog niet opgeslagen) foto mee voor de
+  discard-guard; **purchase** houdt z'n regel-machinerie (`<DynamicList>` is een aparte stap).
+- Groen: `npm test` 820 pass / 0 fail / 23 skip · typecheck · `eslint .` 0 err · mutatie-ratchet ongewijzigd
+  (alleen `app/*` + `lib/ui.js`, geen `GROUPS`-module geraakt). **Device-verificatie open** (toestel bezet door
+  Maestro) → ARCH-5 blijft 🔧. **Rest van plan 22:** `<DynamicList>` (bon/recept) + gedeeld foto-/loading-veld.

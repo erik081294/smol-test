@@ -48,7 +48,14 @@ titel + scroll-naar-eerste-fout bij submit. **Onveranderd:** het `save()`-payloa
 ## Uitrol (staart — na de pilot)
 
 Elk als eigen stap, hergebruikt het fundament:
-1. Migreer de 6 overige incrementeel-editors naar full-mode + onBlur-live-validatie:
-   uitgave, recept, voertuig, huisdier, plant, bon.
-2. `<DynamicList>` — gedeelde dynamische regellijst voor bon + recept (nu elk hand-gebouwd).
-3. Gedeeld foto-veld + loading/skeleton-helpers (plant/voertuig/recept/product).
+1. ✅ **Gedaan (2026-07-01):** de 6 overige editors op full-mode + onBlur-live-validatie:
+   uitgave (`expense`), bon (`purchase`), recept (`recipe`), plant, voertuig (`vehicle`), huisdier (`pet`).
+   Elk ~15–26 losse `useState` → hook-`values` + `dirty` (genormaliseerde serialize) + `validateField`
+   (onBlur); waar de velden verspreid staan ook scroll-naar-eerste-fout. **Nieuw t.o.v. de oude editors:**
+   een discard-guard (die hadden ze nog niet). Voor **vehicle** (eigen `ModalHeader` i.p.v. `Editor`) is de
+   guard geëxtraheerd naar de herbruikbare **`useDiscardGuard(dirty, onClose)`** in `lib/ui.js` (incl. Android
+   hardware-back; `Editor` gebruikt 'm nu ook). Gedragsneutraal in payload/regels/deep-links. Groen: `npm test`
+   820 pass / 0 fail, typecheck, `eslint .` 0 err, mutatie-ratchet ongewijzigd. **Device-rooktest van de 7
+   editors open** (toestel bezet door de Maestro-automatisering) → ARCH-5 blijft 🔧.
+2. `<DynamicList>` — gedeelde dynamische regellijst voor bon + recept (nu elk hand-gebouwd). *(open)*
+3. Gedeeld foto-veld + loading/skeleton-helpers (plant/voertuig/recept/product). *(open)*
