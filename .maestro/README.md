@@ -52,8 +52,11 @@ razendsnel en zonder door "Meer" te tikken. Zie [`../docs/rooktest.md`](../docs/
 - `02-uitgave.yaml` — uitgave toevoegen (via "Meer" → Kosten), gelijk gesplitst → terug in het overzicht.
 - `03-boodschap-undo.yaml` — boodschap toevoegen → verwijderen (veeg links) → **ongedaan maken** (STR-9).
 - `04-swipe.yaml` — veeg links = verwijderen op een taak (bewijst de gesture via de "verwijderd"-toast).
+- `05-editor-guard.yaml` — het formulier-fundament (ARCH-5): leeg opslaan → inline fout; iets invullen →
+  sluiten vraagt om bevestiging (de **discard-guard**, nieuw); "Blijven" behoudt de invoer, "Sluiten zonder
+  opslaan" gooit weg → geen rij aangemaakt (self-cleanend). Verifieert het nieuwe full-mode-gedrag.
 
-Alle vier op toestel geverifieerd (moto g72, meermaals groen via `npm run rooktest`). De `E2E…`-rijen
+Alle vijf op toestel geverifieerd (moto g72, groen via `npm run rooktest`). De `E2E…`-rijen
 die ze aanmaken worden door de runner op DB-niveau opgeruimd (`scripts/rooktest-cleanup.mjs`) — geen
 UI-delete in de flows, want de app verwijdert undo-toast-gestuurd (timer) en dat vuurt na een
 editor-`router.back()` niet betrouwbaar af.

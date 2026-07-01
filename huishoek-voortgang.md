@@ -1018,3 +1018,19 @@ Geadopteerd in **task/expense/plant/pet/vehicle/recurring-expense** (toggle-sele
 deelnemers/labels) en **purchase** (bon-regellijst-ops). Gedragsneutraal. Groen: `npm test` 840 pass / 0 fail,
 typecheck, `eslint .` 0 err, ratchet `listField` 100%. **Rest van plan 22:** alleen nog het gedeelde foto-/
 loading-veld (lagere prioriteit) + device-verificatie van de editors (ARCH-5 🔧).
+
+---
+
+**2026-07-01 — Device-verificatie van het formulier-fundament + Maestro-flow (ARCH-5 + INF-3).**
+De nieuwe forms-gedragingen (inline validatie + de **discard-guard**, die de editors vóór deze ronde niet
+hadden) op toestel geverifieerd én reproduceerbaar vastgelegd. Nieuwe Maestro-flow
+[`.maestro/05-editor-guard.yaml`](.maestro/05-editor-guard.yaml): leeg opslaan → "Geef de taak een titel"
+(inline fout, geen crash); titel invullen → sluiten (`t-cancel`) toont de discard-dialoog; **Blijven** behoudt
+de invoer; **Sluiten zonder opslaan** gooit weg → terug in de lijst, geen taak aangemaakt (self-cleanend, geen
+E2E-residue). Daarvoor het task-titelveld een `testID="t-field-title"` gegeven (consistent met expense'
+`t-field-description`; het `Field`-component forwardt `testID` al via `...props`). **Volledige `npm run rooktest`
+op de moto: groen** — crash-sweep (15 schermen) schoon, flows 01–05 pass, logcat schoon. Samen met
+`02-uitgave` (expense-create) bewijst dit het gedeelde fundament (Editor/useEntityForm/useDiscardGuard) op
+toestel. De rooktest telt nu 5 behavior-flows en bewaakt het fundament voortaan. **Consolidatie:** de INF-3-
+kalibratie (flows + `scripts/rooktest.sh`/`rooktest-cleanup.mjs`) is met de forms-code op één branch
+samengevoegd → één `npm run rooktest` dekt beide.

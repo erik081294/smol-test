@@ -1,0 +1,43 @@
+# Kritieke flow 5: het formulier-fundament (ARCH-5) — onBlur/submit-validatie + de
+# discard-guard bij niet-bewaarde wijzigingen. Verifieert het NIEUWE gedrag van de
+# full-mode useEntityForm op de taak-editor (referentie-implementatie):
+#   1. leeg opslaan → inline foutmelding (geen crash);
+#   2. iets invullen → sluiten vraagt eerst om bevestiging (nieuw: de editors hadden
+#      hiervoor géén discard-guard); "Blijven" behoudt de invoer;
+#   3. "Sluiten zonder opslaan" gooit weg → terug in de lijst, niets aangemaakt.
+# Maakt géén blijvende rij aan (de discard-tak ruimt zichzelf op) — geen E2E-residue.
+# Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+appId: app.huishoek
+---
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
+- tapOn:
+    id: "t-tab-taken"
+- assertVisible: "Taken"
+- tapOn:
+    id: "t-fab-task"
+- assertVisible: "Nieuwe afspraak"
+
+# 1. Validatie: opslaan zonder titel → inline fout, editor blijft open.
+- tapOn:
+    id: "t-save"
+- assertVisible: "Geef de taak een titel"
+
+# 2. Discard-guard: vul de titel → sluiten vraagt om bevestiging.
+- tapOn:
+    id: "t-field-title"
+- inputText: "E2E guard taak"
+- tapOn:
+    id: "t-cancel"
+- assertVisible: "Niet-bewaarde wijzigingen"     # discard-dialoog (nieuw, full-mode)
+- tapOn: "Blijven"
+- assertVisible: "E2E guard taak"                # invoer behouden (niet weggegooid)
+
+# 3. Nu écht weggooien → terug in de lijst, niets opgeslagen.
+- tapOn:
+    id: "t-cancel"
+- assertVisible: "Niet-bewaarde wijzigingen"
+- tapOn: "Sluiten zonder opslaan"
+- assertVisible: "Taken"                         # terug op het lijst-scherm
+- assertNotVisible: "E2E guard taak"             # discard werkte: geen taak aangemaakt
+- assertNotVisible:
+    id: "t-error-boundary"
