@@ -1,17 +1,24 @@
-# Kritieke flow 3: boodschap toevoegen → verwijderen → ongedaan maken (STR-9 undo).
+# Kritieke flow 3: boodschap toevoegen → verwijderen (veeg links) → ongedaan maken (STR-9 undo).
 # Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+# Let op: een boodschap-rij heeft géén losse delete-knop — verwijderen gaat via naar-links
+# vegen (app-conventie, zie SwipeRow in lib/ui.js). Maestro's `swipe` triggert de gesture goed.
 appId: app.huishoek
 ---
-- launchApp
-- tapOn: "Boodschappen"          # tab (groceries.title)
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
 - tapOn:
-    accessibilityText: "Boodschap toevoegen"   # invoerveld (groceries.addLabel)
+    id: "t-tab-boodschappen"
+- tapOn:
+    id: "t-grocery-add"                  # invoerveld (groceries.addLabel)
 - inputText: "E2E rooktest melk"
 - pressKey: Enter
 - assertVisible: "E2E rooktest melk"
-# Verwijderen via de trailing delete-knop op de rij (accessibilityLabel bevat de naam).
-- tapOn:
-    accessibilityText: "'E2E rooktest melk' verwijderen"
-# Undo-toast verschijnt: tik "Ongedaan maken" → item komt terug (common.undo).
+# Verwijderen: naar links vegen = de destructieve actie (undo-toast verschijnt).
+- swipe:
+    from:
+      text: "E2E rooktest melk"
+    direction: LEFT
+- assertVisible: "Ongedaan maken"        # common.undo (undo-toast)
 - tapOn: "Ongedaan maken"
-- assertVisible: "E2E rooktest melk"
+- assertVisible: "E2E rooktest melk"     # item komt terug
+- assertNotVisible:
+    id: "t-error-boundary"

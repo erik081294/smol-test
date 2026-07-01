@@ -8,19 +8,21 @@
 # fling komt niet aan. Maestro `swipe` doet dit zelf goed.
 appId: app.huishoek
 ---
-- launchApp
-- tapOn: "Taken"                      # tab
-- assertVisible: "Taken"              # scherm-titel
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
+- tapOn:
+    id: "t-tab-taken"                    # tab
+- assertVisible: "Taken"                 # scherm-titel
 
 # Maak een verse taak om op te vegen (datum op vandaag).
 - tapOn:
-    accessibilityText: "Taak toevoegen"   # FAB (task.add)
+    id: "t-fab-task"                     # FAB (task.add)
 - assertVisible: "Nieuwe taak"
-- tapOn: "Wat moet er gebeuren?"      # titel-veld (task.field.title)
-- inputText: "E2E veeg taak"
-- tapOn: "Vandaag"                    # datum-chip, zodat de taak in de Dag-weergave staat
 - tapOn:
-    accessibilityText: "Bewaar"       # ModalHeader bevestigen (common.save)
+    id: "t-field-title"                  # titel-veld (task.field.title)
+- inputText: "E2E veeg taak"
+- tapOn: "Vandaag"                       # datum-chip, zodat de taak in de Dag-weergave staat
+- tapOn:
+    id: "t-save"                         # ModalHeader bevestigen (common.save)
 - assertVisible: "E2E veeg taak"
 
 # Rechts vegen = uitstellen → undo-toast "Uitgesteld naar …" (tasks.snoozed).
@@ -28,15 +30,17 @@ appId: app.huishoek
     from:
       text: "E2E veeg taak"
     direction: RIGHT
-- assertVisible: "Uitgesteld.*"       # tasks.snoozed (regex)
+- assertVisible: "Uitgesteld.*"          # tasks.snoozed (regex)
 
 # Links vegen = verwijderen → undo-toast "'E2E veeg taak' verwijderd" (tasks.deleted).
 - swipe:
     from:
       text: "E2E veeg taak"
     direction: LEFT
-- assertVisible: ".*verwijderd"       # tasks.deleted (regex)
+- assertVisible: ".*verwijderd"          # tasks.deleted (regex)
 
 # Ongedaan maken → de taak komt terug in de lijst.
-- tapOn: "Ongedaan maken"             # common.undo
+- tapOn: "Ongedaan maken"                # common.undo
 - assertVisible: "E2E veeg taak"
+- assertNotVisible:
+    id: "t-error-boundary"

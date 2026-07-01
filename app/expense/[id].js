@@ -185,10 +185,10 @@ export default function ExpenseEditor() {
   // ---------- Uitgave aanmaken / bewerken (zelfde formulier) ----------
   return (
     <Editor title={isNew ? t('expense.new') : t('expense.edit')} onClose={() => router.back()} onConfirm={save} busy={busy}>
-          <Field label={t('expense.field.description')} value={description}
+          <Field label={t('expense.field.description')} value={description} testID="t-field-description"
             onChangeText={(v) => { setDescription(v); clearErr('description'); }}
             placeholder={t('expense.field.description.placeholder')} error={errors.description} />
-          <Field label={t('expense.field.amount')} value={amountText}
+          <Field label={t('expense.field.amount')} value={amountText} testID="t-field-amount"
             onChangeText={(v) => { setAmountText(v); clearErr('amount'); }}
             placeholder="0,00" keyboardType="decimal-pad" error={errors.amount} />
 

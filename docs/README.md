@@ -27,6 +27,7 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 
 | Document | Waarover |
 |----------|----------|
+| [`rooktest.md`](./rooktest.md) | Geautomatiseerde device-rooktest — `npm run rooktest` (Maestro-flows + logcat-oordeel), zie ook [`../.maestro/README.md`](../.maestro/README.md). |
 | [`../VERIFICATIE.md`](../VERIFICATIE.md) | Migratie-/RLS-verificatie tegen live Supabase — herhaalrecept per nieuwe migratie. |
 | [`rls-connector-check.sql`](./rls-connector-check.sql) | RLS-/RPC-check zonder secrets (plak-en-run in de SQL Editor). |
 

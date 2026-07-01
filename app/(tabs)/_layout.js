@@ -75,10 +75,14 @@ export default function TabsLayout() {
       {MODULES.map((m) => (
         <Tabs.Screen key={m.key} name={m.route} options={{
           href: visible.has(m.key) && m.primary ? undefined : null,
+          // testID op de tab-knop zodat de rooktest 'm op id (t-tab-<key>) kan
+          // aantikken i.p.v. op de zichtbare NL-tekst (bestand tegen copy-wijzigingen).
+          tabBarButtonTestID: `t-tab-${m.key}`,
           tabBarIcon: ({ focused }) => <TabIcon icon={m.icon} label={m.label} focused={focused} /> }} />
       ))}
       <Tabs.Screen name={MORE_TAB.route} options={{
         href: hasMore ? undefined : null,
+        tabBarButtonTestID: `t-tab-${MORE_TAB.key}`,
         tabBarIcon: ({ focused }) => <TabIcon icon={MORE_TAB.icon} label={MORE_TAB.label} focused={focused} /> }} />
     </Tabs>
   );

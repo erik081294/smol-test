@@ -1,19 +1,26 @@
 # Kritieke flow 1: taak toevoegen → terug in de lijst → afvinken.
 # Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
+# Selectors op id (t-* uit lib/ui.js + app/(tabs)/_layout.js) waar we een control
+# aantikken; assertVisible blijft op de zichtbare inhoud (dat is wat we verifiëren).
 appId: app.huishoek
 ---
-- launchApp
-- tapOn: "Taken"                 # tab
-- assertVisible: "Taken"         # scherm-titel
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
 - tapOn:
-    accessibilityText: "Taak toevoegen"   # FAB (task.add)
+    id: "t-tab-taken"
+- assertVisible: "Taken"                 # scherm-titel
+- tapOn:
+    id: "t-fab-task"                     # FAB "Taak toevoegen"
 - assertVisible: "Nieuwe taak"
-- tapOn: "Wat moet er gebeuren?" # titel-veld (task.field.title)
+- tapOn:
+    id: "t-field-title"                  # titel-veld (task.field.title)
 - inputText: "E2E rooktest taak"
-- tapOn: "Opslaan"               # ModalHeader bevestigen (common.save)
+- tapOn:
+    id: "t-save"                         # ModalHeader bevestigen
 - assertVisible: "E2E rooktest taak"
-# Afvinken: tik de rij-checkbox (accessibilityLabel bevat de taaknaam).
+# Afvinken: tik de rij (checkbox-label bevat de taaknaam), filter naar afgerond.
 - tapOn:
     text: "E2E rooktest taak"
-- tapOn: "Afgerond"              # filter naar afgeronde taken (tasks.filter.done)
+- tapOn: "Afgerond"                      # filter naar afgeronde taken (tasks.filter.done)
 - assertVisible: "E2E rooktest taak"
+- assertNotVisible:
+    id: "t-error-boundary"
