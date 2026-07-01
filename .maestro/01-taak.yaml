@@ -1,7 +1,8 @@
 # Kritieke flow 1: taak toevoegen → terug in de lijst → afvinken.
 # Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
-# Selectors op id (t-* uit lib/ui.js + app/(tabs)/_layout.js) waar we een control
-# aantikken; assertVisible blijft op de zichtbare inhoud (dat is wat we verifiëren).
+# Selectors op id (t-* uit lib/ui.js + app/(tabs)/_layout.js) waar we een control aantikken;
+# assertVisible blijft op de zichtbare inhoud (dat is wat we verifiëren).
+# Opruimen van de `E2E…`-rij gebeurt op DB-niveau door de runner (scripts/rooktest-cleanup.mjs).
 appId: app.huishoek
 ---
 # Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
@@ -10,17 +11,22 @@ appId: app.huishoek
 - assertVisible: "Taken"                 # scherm-titel
 - tapOn:
     id: "t-fab-task"                     # FAB "Taak toevoegen"
-- assertVisible: "Nieuwe taak"
+- assertVisible: "Nieuwe afspraak"       # task.new (editor-titel)
 - tapOn:
     id: "t-field-title"                  # titel-veld (task.field.title)
 - inputText: "E2E rooktest taak"
 - tapOn:
     id: "t-save"                         # ModalHeader bevestigen
-- assertVisible: "E2E rooktest taak"
-# Afvinken: tik de rij (checkbox-label bevat de taaknaam), filter naar afgerond.
+# Ruime wachttijd: de lijst herlaadt async na de DB-insert; te vroeg asserten flaket.
+- extendedWaitUntil:
+    visible: "E2E rooktest taak"
+    timeout: 15000
+
+# Afvinken: tik de CHECKBOX (label "<titel>, niet afgevinkt"), niet de rij-tekst — die opent
+# de editor. De dagweergave verbergt afgevinkte taken, dus de robuuste assert is dat de OPEN
+# taak weg is uit de lijst (bewijst dat het afvinken doorkwam).
 - tapOn:
-    text: "E2E rooktest taak"
-- tapOn: "Afgerond"                      # filter naar afgeronde taken (tasks.filter.done)
-- assertVisible: "E2E rooktest taak"
+    text: "E2E rooktest taak, niet afgevinkt"
+- assertNotVisible: "E2E rooktest taak, niet afgevinkt"
 - assertNotVisible:
     id: "t-error-boundary"

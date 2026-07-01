@@ -884,20 +884,30 @@ opent direct de editor i.p.v. lees-detail, C2 catalogusrij-affordance, …) staa
 device-rooktest (toestel weg):** UX-22, UX-42, FND-5, HUI-2, BOO-13-rest. typecheck + lint + `npm test`
 **805 pass / 0 fail / 23 skip**.
 
-**INF-3 — geautomatiseerde, error-bewuste device-rooktest.** Het handmatige "door de UI tikken +
-screenshots lezen" vervangen door één commando: **`npm run rooktest`**
-([`scripts/rooktest.sh`](scripts/rooktest.sh)) draait de Maestro-flows op het USB-toestel, streamt
-`adb logcat` mee, en geeft één pass/fail-oordeel + exit-code (rapport/logcat in `$TMPDIR`,
-screenshots-bij-falen in `~/.maestro/tests/`). Maestro's flows uitgebreid naar **5**: nieuwe
-`00-crash-sweep.yaml` (boot elk hoofdscherm via tabs + "Meer", assert geen error-boundary) + de 4
-behavior-flows omgezet naar **`t-*`-id-selectors** i.p.v. broze NL-tekst — `testID`-passthrough op de
-gedeelde componenten (`Button`/`IconButton`/`FAB`/`Checkbox`, en vaste `t-save`/`t-cancel` op
-`ModalHeader`), `tabBarButtonTestID: t-tab-<key>` op de tabs, en `t-error-boundary` op de
-`ErrorBoundary`-fallback. Meteen twee latente bugs in de scaffolds gefixt: flow 02 tikte "Kosten" als
-tab terwijl Kosten niet-primair is (nu via "Meer"), en de save-knop liep uiteen ("Opslaan" vs "Bewaar" →
-nu `id: t-save`). Flow `03` verwijdert nu via naar-links-vegen (er is geen losse delete-knop op een
-boodschap-rij). Runbook: [`docs/rooktest.md`](docs/rooktest.md) + [`.maestro/README.md`](.maestro/README.md).
-**Rest:** flows `00`–`03` op toestel kalibreren met `maestro studio` (`04` al geverifieerd).
+**INF-3 — geautomatiseerde, error-bewuste device-rooktest (op toestel geverifieerd, moto g72).**
+Het handmatige "door de UI tikken + screenshots lezen" vervangen door één commando:
+**`npm run rooktest`** ([`scripts/rooktest.sh`](scripts/rooktest.sh)). Twee delen: (1) een
+**crash-sweep via deeplinks** — `huishoek://<route>` langs alle 15 hoofdschermen (~1,5s/route i.p.v.
+door "Meer" tikken) met een `uiautomator`-check dat de error-boundary níét verschijnt; (2) de **4
+Maestro behavior-flows** (taak/uitgave/boodschap/veeg). De runner streamt `adb logcat` mee, grep't op
+harde JS/native-fouten, en geeft één pass/fail-oordeel + exit-code (logcat/JUnit in `$TMPDIR`,
+screenshots-bij-falen in `~/.maestro/tests/`). Selectors op **`t-*`-id's** i.p.v. broze NL-tekst:
+`testID`-passthrough op de gedeelde componenten (`Button`/`IconButton`/`FAB`/`Checkbox`, vaste
+`t-save`/`t-cancel` op `ModalHeader`), `tabBarButtonTestID: t-tab-<key>` op de tabs, en
+`t-error-boundary` op de `ErrorBoundary`-fallback.
+**Op toestel opgelost onderweg:** Maestro's `launchApp` opent de dev-client-launcher i.p.v. de bundle
+(runner cold-laadt via Metro-deeplink en wacht op de tab-shell); de preview-build claimt het
+`huishoek://`-scheme mee (deeplink expliciet naar `-n app.huishoek/.MainActivity`); Maestro
+parallelliseert een map → flows sequentieel met deeplink-reset ertussen; stale scaffold-teksten
+("Nieuwe taak" → "Nieuwe afspraak", "Kosten" niet-primair → via "Meer", "Opslaan"/"Bewaar" → `t-save`);
+en de vluchtige undo-toast (undo-tik direct na de veeg; 04 self-cleanend zonder undo; ruime
+`extendedWaitUntil` na async DB-inserts). Maestro draait op Android Studio's JDK 17 (runner zet
+`JAVA_HOME` zelf). **Self-cleaning:** de runner ruimt de `E2E…`-testrijen aan het eind op DB-niveau op
+([`scripts/rooktest-cleanup.mjs`](scripts/rooktest-cleanup.mjs), service-key uit `.env`) — via de UI
+lukt dat niet betrouwbaar want de app verwijdert undo-toast-gestuurd (timer) en dat vuurt na een
+editor-`router.back()` niet af. De logcat-grep negeert de `uiautomator`-dump-conflicten met Maestro's
+accessibility-connectie (tooling-ruis, geen app-crash). Runbook: [`docs/rooktest.md`](docs/rooktest.md)
++ [`.maestro/README.md`](.maestro/README.md).
 
 **UXR-11 ronde 3 (2026-07-01) — device-rooktest afgerond + 3 op-toestel gevonden bugs gefixt.** Op de
 **dev-client `app.huishoek`** (niet de bevroren `.preview`-APK — die serveert een ingebakken bundle en

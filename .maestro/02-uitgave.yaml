@@ -1,6 +1,7 @@
 # Kritieke flow 2: uitgave toevoegen, gelijk gesplitst → terug in het overzicht.
 # Start op de tabbalk (ingelogd test-huishouden). Zie .maestro/README.md.
 # Kosten is een niet-primaire module (geen eigen tab-knop) → open 'm via "Meer".
+# Opruimen van de `E2E…`-rij gebeurt op DB-niveau door de runner (scripts/rooktest-cleanup.mjs).
 appId: app.huishoek
 ---
 # Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
@@ -19,6 +20,9 @@ appId: app.huishoek
 - tapOn: "Gelijk"                        # splitsing gelijk (expense.split.equal, chip)
 - tapOn:
     id: "t-save"                         # ModalHeader bevestigen
-- assertVisible: "E2E rooktest etentje"
+# Ruime wachttijd: het overzicht herlaadt async na de DB-insert.
+- extendedWaitUntil:
+    visible: "E2E rooktest etentje"
+    timeout: 15000
 - assertNotVisible:
     id: "t-error-boundary"

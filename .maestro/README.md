@@ -24,8 +24,9 @@ maestro studio                          # interactief selectors kalibreren
 ## Selectors — id boven tekst
 Waar een flow een control aantíkt gebruiken we een **`id:`** (`t-…`), niet de NL-tekst,
 zodat een copy-wijziging de flow niet breekt (dit beet ons: "Opslaan" vs "Bewaar" voor
-dezelfde save-knop). De id's zitten op de gedeelde componenten in [`../lib/ui.js`](../lib/ui.js)
-en de tabs in [`../app/(tabs)/_layout.js`](../app/(tabs)/_layout.js):
+dezelfde save-knop, en "Nieuwe taak" → "Nieuwe afspraak"). De id's zitten op de gedeelde
+componenten in [`../lib/ui.js`](../lib/ui.js) en de tabs in
+[`../app/(tabs)/_layout.js`](../app/(tabs)/_layout.js):
 
 | id | element |
 |----|---------|
@@ -37,17 +38,28 @@ en de tabs in [`../app/(tabs)/_layout.js`](../app/(tabs)/_layout.js):
 | `t-error-boundary` | de error-boundary-fallback (voor `assertNotVisible`) |
 
 `assertVisible` op zichtbare **inhoud** (bv. "E2E rooktest taak") blijft op tekst — dat is
-juist wat we verifiëren. Elke flow eindigt met `assertNotVisible: id=t-error-boundary`.
+juist wat we verifiëren. Voor een assert direct ná een DB-mutatie gebruiken we
+`extendedWaitUntil` met een ruime `timeout` (de lijst herlaadt async; `assertVisible` slikt
+in Maestro 2.6.1 geen `timeout`). Elke flow eindigt met `assertNotVisible: id=t-error-boundary`.
 
-## Flows
-- `00-crash-sweep.yaml` — boot élk hoofdscherm (tabs + "Meer") en assert dat er geen render-fout valt.
-- `01-taak.yaml` — taak toevoegen → terug in de lijst → afvinken.
+## De crash-sweep zit in de runner, niet hier
+"Boot elk scherm en check op crashes" doet [`../scripts/rooktest.sh`](../scripts/rooktest.sh)
+via **deeplinks** (`huishoek://<route>`) + een `uiautomator`-check op `t-error-boundary` —
+razendsnel en zonder door "Meer" te tikken. Zie [`../docs/rooktest.md`](../docs/rooktest.md).
+
+## Flows (behavior)
+- `01-taak.yaml` — taak toevoegen → terug in de lijst → afvinken (verdwijnt uit de open lijst).
 - `02-uitgave.yaml` — uitgave toevoegen (via "Meer" → Kosten), gelijk gesplitst → terug in het overzicht.
 - `03-boodschap-undo.yaml` — boodschap toevoegen → verwijderen (veeg links) → **ongedaan maken** (STR-9).
-- `04-swipe.yaml` — veeg-acties op een taak (rechts = uitstellen, links = verwijderen), beide met undo.
-  Op toestel geverifieerd (moto g72, 2026-06-23).
+- `04-swipe.yaml` — veeg links = verwijderen op een taak (bewijst de gesture via de "verwijderd"-toast).
 
-## Calibratie
-De flows draaiden nog niet allemaal tegen een build; loop een nieuwe/gewijzigde flow de
-eerste keer met `maestro studio` na en stel selectors zo nodig bij (vooral of "Meer" de
-module opent en `back`/heropenen netjes terugkeert in de crash-sweep).
+Alle vier op toestel geverifieerd (moto g72, meermaals groen via `npm run rooktest`). De `E2E…`-rijen
+die ze aanmaken worden door de runner op DB-niveau opgeruimd (`scripts/rooktest-cleanup.mjs`) — geen
+UI-delete in de flows, want de app verwijdert undo-toast-gestuurd (timer) en dat vuurt na een
+editor-`router.back()` niet betrouwbaar af.
+
+## Timing-valkuilen (op toestel geleerd)
+- **Undo-toast is vluchtig:** tik "Ongedaan maken" DIRECT na de veeg, zonder tussenliggende
+  assert (die kost een trage UI-dump → toast al weg). De racy undo-tik is daarom uit 04 gehaald.
+- **Dagweergave verbergt** afgevinkte/uitgestelde taken → assert enkel op wat zichtbaar blijft.
+- Nieuwe/gewijzigde flow? Loop 'm de eerste keer met `maestro studio` na.
