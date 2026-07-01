@@ -17,3 +17,8 @@ reports/
 # Map + README blijven in de repo (documentatie); de sleutelbestanden zelf niet.
 /credentials/*
 !/credentials/README.md
+
+# Firebase/FCM: google-services.json (per-project, build-time) + de FCM V1
+# service-account-sleutel (geheim, voor de push-verzendkant bij EAS). Niet committen.
+google-services.json
+fcm-service-account*.json

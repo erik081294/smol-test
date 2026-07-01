@@ -3,6 +3,8 @@
 // APP_VARIANT (gezet per EAS build-profiel) geeft niet-productie builds een eigen
 // app-naam én applicationId/bundleId, zodat ze náást de productie-app op één toestel
 // kunnen staan. Zonder variant → de "echte" Huishoek (productie / lokale dev-default).
+const fs = require('fs');
+
 const VARIANT = process.env.APP_VARIANT;
 const VARIANT_META = {
   preview: { suffix: '.preview', label: ' (preview)' },
@@ -31,6 +33,11 @@ export default ({ config }) => ({
   android: {
     package: `app.huishoek${suffix}`,
     adaptiveIcon: { backgroundColor: '#0E3A2F' },
+    // FCM: expo-notifications leest de Firebase-config (sender-id) hieruit bij de build,
+    // zodat het toestel een Expo-push-token kan ophalen. Alleen inhaken als het bestand er
+    // is (gitignored, per-project geheim) → builds zonder het bestand blijven werken; zet je
+    // het neer dan klikt push automatisch aan. Zonder dit: "FirebaseApp failed to initialize".
+    ...(fs.existsSync('./google-services.json') ? { googleServicesFile: './google-services.json' } : {}),
     // Android App Links: zelfde handoff, geverifieerd tegen /.well-known/assetlinks.json
     // (autoVerify). Alleen het /join-pad — de rest van het web blijft in de browser.
     intentFilters: [
@@ -56,6 +63,9 @@ export default ({ config }) => ({
     // org/project/url staan hier; de auth-token NOOIT hier (zou gecommit worden) → via de
     // SENTRY_AUTH_TOKEN-env op de EAS-build. url = EU-region (project leeft op de.sentry.io).
     ['@sentry/react-native', { organization: 'evdn', project: 'huishoek', url: 'https://de.sentry.io/' }],
+    // Config-plugin voor de native notificatie-setup (Android-kanaal/icoon-hook). Vereist voor
+    // een stabiele push-registratie op een dev/preview/production-build; harmloos in Expo Go.
+    'expo-notifications',
   ],
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
