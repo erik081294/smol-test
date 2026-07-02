@@ -5,6 +5,13 @@
 // kunnen staan. Zonder variant → de "echte" Huishoek (productie / lokale dev-default).
 const fs = require('fs');
 
+// FCM: pad naar google-services.json. Op een EAS-build levert de file-env `GOOGLE_SERVICES_JSON`
+// het bestand aan (het staat gitignored, dus niet in de repo-upload); lokaal valt het terug op
+// het bestand in de repo-root als dat er is. Ontbreekt allebei → niet zetten (build blijft werken).
+const googleServicesFile =
+  process.env.GOOGLE_SERVICES_JSON ??
+  (fs.existsSync('./google-services.json') ? './google-services.json' : undefined);
+
 const VARIANT = process.env.APP_VARIANT;
 const VARIANT_META = {
   preview: { suffix: '.preview', label: ' (preview)' },
@@ -35,9 +42,10 @@ export default ({ config }) => ({
     adaptiveIcon: { backgroundColor: '#0E3A2F' },
     // FCM: expo-notifications leest de Firebase-config (sender-id) hieruit bij de build,
     // zodat het toestel een Expo-push-token kan ophalen. Alleen inhaken als het bestand er
-    // is (gitignored, per-project geheim) → builds zonder het bestand blijven werken; zet je
-    // het neer dan klikt push automatisch aan. Zonder dit: "FirebaseApp failed to initialize".
-    ...(fs.existsSync('./google-services.json') ? { googleServicesFile: './google-services.json' } : {}),
+    // is (via de repo-root lokaal of de `GOOGLE_SERVICES_JSON`-file-env op EAS) → builds zonder
+    // het bestand blijven werken; is het er, dan klikt push aan. Zonder dit: "FirebaseApp failed
+    // to initialize".
+    ...(googleServicesFile ? { googleServicesFile } : {}),
     // Android App Links: zelfde handoff, geverifieerd tegen /.well-known/assetlinks.json
     // (autoVerify). Alleen het /join-pad — de rest van het web blijft in de browser.
     intentFilters: [

@@ -1064,3 +1064,20 @@ en `google-services.json`/de FCM-sleutel gitignored. Runbook uitgebreid met een 
 Firebase-project → `google-services.json` + FCM V1 service-account-sleutel → sleutel bij EAS uploaden
 (`eas credentials`) + dev-build (`eas build`) → dan de 2-toestel-aflevertest afvinken. `npm test` 840
 pass, `eslint .` 0 err, config evalueert schoon.
+
+**2026-07-02 — FCM ingericht + eerste push-ready EAS-build (PLT-1 / INF-5).**
+Vervolg op de FCM-poort van gisteren. Firebase-project `huishoek-62492` aangemaakt met een
+Android-app op package `app.huishoek`. **Verzendkant:** de FCM V1 service-account-sleutel
+geüpload naar EAS (via de Expo-API: `createGoogleServiceAccountKey` +
+`setGoogleServiceAccountKeyForFcmV1`) en gekoppeld aan `app.huishoek` — geverifieerd
+`googleServiceAccountKeyForFcmV1` gezet, `isLegacy: false`. **Build-kant:** `google-services.json`
+aangeleverd als **secret EAS file-env `GOOGLE_SERVICES_JSON`** (blijft uit git); [`app.config.js`](app.config.js)
+zet `android.googleServicesFile` op `process.env.GOOGLE_SERVICES_JSON` met lokale terugval, en het
+dev-profiel in [`eas.json`](eas.json) staat op `environment: development`. **Eerste EAS-dev-build
+gedraaid** (INF-5, build `241b0a4f`, `FINISHED`). De lokale *"won't be uploaded"*-waarschuwing is
+onschuldig: in de gedownloade APK zitten de FCM-resources van `huishoek-62492` gebakken
+(`google_app_id = 1:505126419485:android:…`, `gcm_defaultSenderId`) — de builder gebruikte de
+file-env dus wél. Zelfde project als de sleutel → end-to-end consistent. Runbook bijgewerkt in
+[`docs/notify-setup.md`](docs/notify-setup.md) §FCM-credentials. `npm test` 840 pass, `eslint .` 0 err.
+**Rest voor de PLT-1-tick:** APK op de moto installeren → permissie → token in `push_tokens` →
+alice wijst erik een taak toe → push moet landen (toestel was tijdens dit werk losgekoppeld).
