@@ -42,33 +42,38 @@
    - Type **Supabase Edge Functions** → functie **`notify`**.
    - HTTP-header toevoegen: **`x-notify-secret`** = exact dezelfde waarde als bij stap 2.
 
-### FCM-credentials — verplicht voor Android-push (eenmalig, browser)
+### FCM-credentials — Android-push (ingericht 2026-07-02)
 
-Android-push loopt via **Firebase Cloud Messaging (FCM V1)**. Zonder dit haalt het toestel
-géén Expo-push-token op — logcat toont dan `FirebaseApp failed to initialize ... google-services
-was not applied` en `push_tokens` blijft leeg. Twee artefacten uit één Firebase-project zijn nodig;
-het aanmaken vereist een Google-login en kan dus alleen in de browser (~5–10 min):
+Android-push loopt via **Firebase Cloud Messaging (FCM V1)**. Zonder dit haalt het toestel géén
+Expo-push-token op — logcat toont dan `FirebaseApp failed to initialize ... google-services was not
+applied` en `push_tokens` blijft leeg. Twee artefacten uit **één** Firebase-project (hier
+`huishoek-62492`) zijn nodig; die aanmaken vereist een Google-login (browser). **Dit is gedaan:**
 
-1. **Firebase-project** — [console.firebase.google.com](https://console.firebase.google.com) →
-   *Add project* (of een bestaand project). Analytics mag uit.
-2. **Android-app toevoegen** met package **`app.huishoek`** (en desgewenst een tweede app met
-   `app.huishoek.preview` voor het preview-profiel). Download het aangeboden **`google-services.json`**
-   en zet het in de **repo-root** (`./google-services.json`). Het is **gitignored**; `app.config.js`
-   haakt het automatisch in als het bestaat (`android.googleServicesFile`).
-3. **FCM V1 service-account-sleutel** — Firebase-console → ⚙️ *Project settings* → tab
-   **Service accounts** → **Generate new private key** → download het JSON-bestand (dit is de
-   **geheime** verzend-sleutel; zet 'm buiten de repo, bv. `~/fcm-service-account.json`).
+1. **Firebase-project** `huishoek-62492` met een **Android-app op package `app.huishoek`**.
+2. **`google-services.json`** (bevat de FCM-sender) — geleverd aan de EAS-build als **secret
+   file-env `GOOGLE_SERVICES_JSON`** (blijft uit git), niet gecommit:
+   ```bash
+   eas env:create development --name GOOGLE_SERVICES_JSON --type file \
+     --value ./google-services.json --visibility secret --scope project
+   ```
+   [`app.config.js`](../app.config.js) zet `android.googleServicesFile` op `process.env.GOOGLE_SERVICES_JSON`
+   (op de build) met een lokale terugval op `./google-services.json`. Het dev-profiel in
+   [`eas.json`](../eas.json) staat op `environment: development` zodat die env-var laadt.
+   > EAS logt lokaal *"…googleServicesFile… won't be uploaded"* — **onschuldig**: dat is de
+   > terugval-evaluatie op je eigen machine; de builder materialiseert de file-env wél. Geverifieerd
+   > in de APK (`google_app_id`/`gcm_defaultSenderId` van `huishoek-62492` zaten erin).
+3. **FCM V1 service-account-sleutel** (Firebase → ⚙️ *Project settings* → *Service accounts* →
+   *Generate new private key*) — **geüpload naar EAS en gekoppeld** aan `app.huishoek` als FCM V1
+   (`googleServiceAccountKeyForFcmV1`, `isLegacy: false`). De sleutel is geheim en blijft buiten de
+   repo. (Via de Expo-API gedaan; kan ook interactief met `eas credentials --platform android`.)
 
-Lever die twee bestanden aan; de rest (sleutel uploaden bij EAS + de dev-build draaien) gaat via CLI:
-
+**Dev-build met FCM** (levert een installeerbare APK):
 ```bash
-# FCM V1-sleutel koppelen aan het EAS-project (interactief → kies "Google Service Account Key for FCM V1"):
-eas credentials --platform android
-# Dev-build mét google-services.json ingebakken:
 eas build --profile development --platform android
 ```
-
-Na installatie van die build + permissie verlenen registreert het token vanzelf in `push_tokens`.
+Na installatie van die build + notificatie-permissie registreert het token vanzelf in `push_tokens`.
+> Zet je later het preview-profiel op push, herhaal dan stap 1–3 voor package **`app.huishoek.preview`**
+> (eigen Android-app in Firebase + eigen FCM V1-koppeling).
 
 ### Toesteltest (2 accounts, dev build)
 1. Twee accounts (A en B) in **hetzelfde huishouden**, elk op een **dev build** met
