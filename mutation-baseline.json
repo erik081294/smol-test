@@ -43,9 +43,24 @@
       "score": 73.3
     },
     "lib/dataCache.js": {
-      "killed": 15,
-      "total": 15,
+      "killed": 27,
+      "total": 27,
       "score": 100
+    },
+    "lib/dbResult.js": {
+      "killed": 19,
+      "total": 19,
+      "score": 100
+    },
+    "lib/entityDiary.js": {
+      "killed": 19,
+      "total": 19,
+      "score": 100
+    },
+    "lib/openFoodFacts.js": {
+      "killed": 49,
+      "total": 56,
+      "score": 87.5
     },
     "lib/decisions.js": {
       "killed": 67,

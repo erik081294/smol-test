@@ -27,7 +27,10 @@ export const GROUPS = [
   // worden ingespoten zodat de beslissing puur/testbaar blijft.
   { test: 'entityDiary', srcs: ['lib/entityDiary.js'] },
   // Pure kern onder lib/db.js (fout-vorm + fout≠leeg-discriminatie, P0-review 2026-07-02).
-  { test: 'dbResult', srcs: ['lib/dbResult.js'] },
+  // De survivors zijn uitsluitend StringLiteral-mutaties op de console.warn-logteksten
+  // (data-ruis, geen gedrag — zelfde redenering als i18n/groceryCatalog); de fout≠leeg-
+  // LOGICA wordt wél gemuteerd.
+  { test: 'dbResult', srcs: ['lib/dbResult.js'], exclude: ['StringLiteral'] },
   { test: 'decisions', srcs: ['lib/decisions.js'] },
   { test: 'expenses', srcs: ['lib/expenses.js'] },
   { test: 'fairness', srcs: ['lib/fairness.js'] },
