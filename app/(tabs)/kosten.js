@@ -8,12 +8,12 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
-import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton, BottomSheet, SheetScrollView, Banner } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
 export default function Kosten() {
-  const { expenses, loading, reload, exactTotals } = useExpenses();
+  const { expenses, loading, error, reload, exactTotals } = useExpenses();
   const { templates } = useRecurringExpenses(); // laadt + materialiseert verschuldigde occurrences
   const { members, subgroups } = useHousehold();
   const { user } = useAuth();
@@ -86,6 +86,20 @@ export default function Kosten() {
           ))}
         </Card>
       </View>
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen — vóór de lijst, zodat computeBalances([]) niet onterecht
+          "iedereen quitte" laat lijken bij een laadfout. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginTop: space.md }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.md, paddingBottom: 120 }}

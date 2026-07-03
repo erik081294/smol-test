@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PET_TYPES, PET_TYPE_KEYS, petType, speciesLabel, careTemplates, defaultCareKeys, buildCareTasks, ageLabel,
+  isCareTaskFor, presentCareKeys, diffCareSelection,
 } from '../lib/petCare.js';
 import { RECUR_VALUES } from '../lib/constants.js';
 
@@ -118,6 +119,76 @@ test('buildCareTasks: interval-override onder 1 wordt opgehoogd naar 1', () => {
 
 test('buildCareTasks: geen dier → geen taken', () => {
   assert.deepEqual(buildCareTasks(null, ['voeren']), []);
+});
+
+test('isCareTaskFor: matcht op de "<titel> — "-prefix (niet op losse substring)', () => {
+  const tpl = { title: 'Voeren' };
+  assert.equal(isCareTaskFor({ title: 'Voeren — Rex' }, tpl), true);
+  assert.equal(isCareTaskFor({ title: 'Voeren' }, tpl), false);        // geen "— naam"
+  assert.equal(isCareTaskFor({ title: 'Extra Voeren — Rex' }, tpl), false); // prefix, niet substring
+  assert.equal(isCareTaskFor({ title: 'Voeren en water — Rex' }, tpl), false);
+  assert.equal(isCareTaskFor({ title: null }, tpl), false);
+  assert.equal(isCareTaskFor({}, tpl), false);
+  assert.equal(isCareTaskFor(null, tpl), false);
+});
+
+test('presentCareKeys: precies de templates met een gekoppelde taak', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }, { key: 'uitlaten', title: 'Uitlaten' }, { key: 'nagels', title: 'Nagels knippen' }];
+  const tasks = [{ id: 't1', title: 'Voeren — Rex' }, { id: 't2', title: 'Nagels knippen — Rex' }];
+  assert.deepEqual(presentCareKeys(templates, tasks), ['voeren', 'nagels']);
+  assert.deepEqual(presentCareKeys(templates, []), []);
+});
+
+test('diffCareSelection: nieuw-aangevinkt → toevoegen met interval', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }, { key: 'nagels', title: 'Nagels knippen' }];
+  const tasks = []; // nog geen taken
+  const selection = { voeren: { on: true, interval: 2 }, nagels: { on: false, interval: 4 } };
+  assert.deepEqual(diffCareSelection(templates, tasks, selection), {
+    addKeys: ['voeren'], overrides: { voeren: 2 }, removeIds: [],
+  });
+});
+
+test('diffCareSelection: uitgevinkt wat er wél was → de gekoppelde taak-id\'s verwijderen', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }];
+  const tasks = [{ id: 't1', title: 'Voeren — Rex' }, { id: 't2', title: 'Voeren — Rex' }];
+  const selection = { voeren: { on: false, interval: 1 } };
+  assert.deepEqual(diffCareSelection(templates, tasks, selection), {
+    addKeys: [], overrides: {}, removeIds: ['t1', 't2'], // álle gekoppelde taken
+  });
+});
+
+test('diffCareSelection: aangevinkt dat al bestaat → geen wijziging (geen dubbele taak)', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }];
+  const tasks = [{ id: 't1', title: 'Voeren — Rex' }];
+  const selection = { voeren: { on: true, interval: 3 } };
+  assert.deepEqual(diffCareSelection(templates, tasks, selection), {
+    addKeys: [], overrides: {}, removeIds: [],
+  });
+});
+
+test('diffCareSelection: uitgevinkt dat er niet was → niets te doen', () => {
+  const templates = [{ key: 'nagels', title: 'Nagels knippen' }];
+  const selection = { nagels: { on: false, interval: 1 } };
+  assert.deepEqual(diffCareSelection(templates, [], selection), {
+    addKeys: [], overrides: {}, removeIds: [],
+  });
+});
+
+test('diffCareSelection: template zonder selectie-entry wordt overgeslagen', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }, { key: 'nagels', title: 'Nagels knippen' }];
+  const selection = { voeren: { on: true, interval: 1 } }; // 'nagels' ontbreekt
+  assert.deepEqual(diffCareSelection(templates, [], selection), {
+    addKeys: ['voeren'], overrides: { voeren: 1 }, removeIds: [],
+  });
+});
+
+test('diffCareSelection: gemengd — tegelijk toevoegen én verwijderen', () => {
+  const templates = [{ key: 'voeren', title: 'Voeren' }, { key: 'nagels', title: 'Nagels knippen' }];
+  const tasks = [{ id: 't1', title: 'Nagels knippen — Rex' }]; // nagels bestaat, voeren niet
+  const selection = { voeren: { on: true, interval: 5 }, nagels: { on: false, interval: 1 } };
+  assert.deepEqual(diffCareSelection(templates, tasks, selection), {
+    addKeys: ['voeren'], overrides: { voeren: 5 }, removeIds: ['t1'],
+  });
 });
 
 test('ageLabel: maanden, jaren en samengesteld', () => {

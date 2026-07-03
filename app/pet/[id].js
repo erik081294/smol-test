@@ -11,7 +11,7 @@ import * as haptics from '../../lib/haptics';
 import {
   usePets, usePetPhotoUrl, addPetPhoto, addPetLog, usePetLog, deletePetLog, updatePetLogNote,
 } from '../../lib/usePets';
-import { PET_TYPES, petType, speciesLabel, careTemplates, buildCareTasks, ageLabel } from '../../lib/petCare';
+import { PET_TYPES, petType, speciesLabel, careTemplates, buildCareTasks, ageLabel, presentCareKeys, diffCareSelection } from '../../lib/petCare';
 import { useTasks } from '../../lib/useTasks';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
@@ -233,7 +233,10 @@ export default function PetScreen() {
     if (!pet) return <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} />;
     const tp = petType(pet.type);
     const petTasks = tasks.filter((pt) => pt.pet_id === pet.id && !hiddenTaskIds.includes(pt.id));
-    const toggle = (task) => (task.completed_at ? uncompleteTask(task.id) : completeTask(task));
+    const failTask = (e) => dialog.alert({ title: t('common.failed'), body: e.message });
+    const toggle = (task) => Promise.resolve(
+      task.completed_at ? uncompleteTask(task.id) : completeTask(task)
+    ).catch(failTask);
 
     // Veeg-acties op verzorgingstaken (zelfde conventie als taken.js): links = verwijderen
     // (met undo-vangnet, pas bij toast-expiry echt weg), rechts = uitstellen (één dag vooruit).
@@ -254,21 +257,17 @@ export default function PetScreen() {
     const snoozeTaskWithUndo = (task) => {
       const prev = task.due_date ?? null;
       const next = snoozeDate(task, 1);
-      updateTask(task.id, { due_date: next });
+      Promise.resolve(updateTask(task.id, { due_date: next })).catch(failTask);
       toast.show({
         message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
         actionLabel: t('common.undo'),
-        onAction: () => updateTask(task.id, { due_date: prev }),
+        onAction: () => Promise.resolve(updateTask(task.id, { due_date: prev })).catch(failTask),
       });
     };
     const age = ageLabel(pet.birth_date);
 
     // Welke templates hebben al een gekoppelde taak (gematcht op titel-prefix)?
-    const presentKeys = new Set(
-      careTemplates(pet.type)
-        .filter((tpl) => petTasks.some((pt) => pt.title?.startsWith(`${tpl.title} — `)))
-        .map((tpl) => tpl.key)
-    );
+    const presentKeys = new Set(presentCareKeys(careTemplates(pet.type), petTasks));
     const openCareSheet = () => {
       const st = {};
       for (const tpl of careTemplates(pet.type)) {
@@ -283,17 +282,7 @@ export default function PetScreen() {
     const applyCare = async () => {
       setCareBusy(true);
       try {
-        const addKeys = [];
-        const overrides = {};
-        const removeIds = [];
-        for (const tpl of careTemplates(pet.type)) {
-          const st = careSheet[tpl.key];
-          const present = presentKeys.has(tpl.key);
-          if (st.on && !present) { addKeys.push(tpl.key); overrides[tpl.key] = st.interval; }
-          else if (!st.on && present) {
-            for (const pt of petTasks) if (pt.title?.startsWith(`${tpl.title} — `)) removeIds.push(pt.id);
-          }
-        }
+        const { addKeys, overrides, removeIds } = diffCareSelection(careTemplates(pet.type), petTasks, careSheet);
         if (addKeys.length) {
           const payloads = buildCareTasks(pet, addKeys, { overrides })
             .map((task) => ({ ...task, household_id: activeId, created_by: user.id }));

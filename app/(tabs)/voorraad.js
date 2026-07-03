@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, SectionList, RefreshControl, ScrollView, Platform } from 'react-native';
+import { View, Text, SectionList, RefreshControl, ScrollView, Platform, Pressable } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, addDays, parseISO } from 'date-fns';
@@ -81,7 +81,7 @@ const PantryRow = React.memo(function PantryRow({ item, onRemove, onEdit, onAdju
 
 export default function Voorraad() {
   const dialog = useDialog();
-  const { items, loading, reload, add, update, adjustQuantity, remove, removeMany } = usePantry();
+  const { items, loading, error, reload, add, update, adjustQuantity, remove, removeMany } = usePantry();
   const { suggestFor } = useProducts();
   const { add: addGrocery } = useGroceries();
   const toast = useToast();
@@ -182,6 +182,19 @@ export default function Voorraad() {
             <Button title={t('pantry.clearExpired', { n: expired.length })} variant="ghost" icon="delete"
               fullWidth={false} onPress={onClearExpired} style={{ marginTop: space.xs, alignSelf: 'flex-start' }} />
           ) : null}
+        </View>
+      ) : null}
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
         </View>
       ) : null}
 

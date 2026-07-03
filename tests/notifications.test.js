@@ -1,7 +1,7 @@
 // Units voor de pure notificatie-/herinneringslogica (lib/notifications.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { plannedReminders, dailySummary, reminderId, mealReminders, pantryAlerts, allReminders } from '../lib/notifications.js';
+import { plannedReminders, dailySummary, reminderId, mealReminders, pantryAlerts, allReminders, remindersSignature } from '../lib/notifications.js';
 
 const now = new Date('2026-06-18T08:00:00');
 const tasks = [
@@ -150,6 +150,19 @@ test('pantryAlerts: grens exact op soonDays telt mee; fireAt-tijd correct gepars
   assert.equal(pantryAlerts([{ name: 'X', best_before: '2026-06-18' }], { now: at8, time: '08:00', soonDays: 2 })[0].fireAt.getDate(), 19);
 });
 
+test('pantryAlerts: "morgen" schuift een kalenderdag over de DST-grens (wandklok blijft staan)', () => {
+  // Zomertijd-overgang: in America/Los_Angeles springt de klok 8 mrt 2026 02:00 → 03:00.
+  // now = 7 mrt 09:00 lokaal; 08:00 is vandaag al voorbij → melding hoort morgen 8 mrt 08:00.
+  // Met een vaste +86.400.000 ms zou 7 mrt 08:00 PST + 24u reële tijd op 8 mrt 09:00 PDT
+  // landen (een uur te laat). addDays behoudt de wandklok → 08:00.
+  const nowSpring = new Date('2026-03-07T09:00:00');
+  const r = pantryAlerts([{ name: 'X', best_before: '2026-03-07' }], { now: nowSpring, time: '08:00', soonDays: 2 });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].fireAt.getDate(), 8);
+  assert.equal(r[0].fireAt.getHours(), 8);   // niet 9 (DST-veilig)
+  assert.equal(r[0].fireAt.getMinutes(), 0);
+});
+
 test('allReminders: leadMinutes vervroegt, voltooide + grens-taken eruit, voorraad-pref-gate, échte sortering', () => {
   const data = {
     tasks: [
@@ -167,4 +180,32 @@ test('allReminders: leadMinutes vervroegt, voltooide + grens-taken eruit, voorra
   const taskR = r.find((x) => x.id === 'task:open:2026-06-18');
   assert.equal(taskR.fireAt.getHours(), 17);
   assert.equal(taskR.fireAt.getMinutes(), 30);
+});
+
+// --- remindersSignature (P1: sla herplannen over als de set inhoudelijk gelijk is) ---
+
+test('remindersSignature: gelijke inhoud → gelijke signatuur (ook bij nieuwe array-identiteit)', () => {
+  const a = [{ id: 'task:1:2026-06-20', fireAt: new Date('2026-06-20T09:00:00'), title: 'Afwas', body: 'x' }];
+  const b = [{ id: 'task:1:2026-06-20', fireAt: new Date('2026-06-20T09:00:00'), title: 'Afwas', body: 'x' }];
+  assert.notEqual(a, b); // andere referentie
+  assert.equal(remindersSignature(a), remindersSignature(b));
+});
+
+test('remindersSignature: andere tijd/titel/body → andere signatuur', () => {
+  const base = { id: 't1', fireAt: new Date('2026-06-20T09:00:00'), title: 'A', body: 'b' };
+  const sig = remindersSignature([base]);
+  assert.notEqual(sig, remindersSignature([{ ...base, fireAt: new Date('2026-06-20T10:00:00') }]));
+  assert.notEqual(sig, remindersSignature([{ ...base, title: 'B' }]));
+  assert.notEqual(sig, remindersSignature([{ ...base, body: 'c' }]));
+});
+
+test('remindersSignature: accepteert fireAt als ISO-string net als een Date', () => {
+  const asDate = [{ id: 't1', fireAt: new Date('2026-06-20T09:00:00'), title: 'A', body: 'b' }];
+  const asStr = [{ id: 't1', fireAt: '2026-06-20T09:00:00', title: 'A', body: 'b' }];
+  assert.equal(remindersSignature(asDate), remindersSignature(asStr));
+});
+
+test('remindersSignature: lege set → lege string (default-param)', () => {
+  assert.equal(remindersSignature(), '');
+  assert.equal(remindersSignature([]), '');
 });

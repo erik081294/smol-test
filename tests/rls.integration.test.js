@@ -596,6 +596,113 @@ test('RLS: reservering van een custom-resource alleen voor genoemde personen', o
   assert.equal(bobSees.data?.length ?? 0, 0, 'huisgenoot buiten de custom-share ziet de reservering NIET');
 });
 
+// --- Nieuwere moduletabellen (0038/0046/0047) die 0066 op de gedeelde RLS-helper wees:
+//     pets/vehicles/groceries volgen het standaard-zichtbaarheidscontract; pet_log/
+//     vehicle_log erven via can_view van hun parent (pet/vehicle). Eén huisgenoot-ziet/
+//     buitenstaander-geblokkeerd-scenario per tabel, exact naar het bestaande sjabloon.
+
+test('RLS: household-huisdier zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_pet');
+  const bob = await makeUser('bob_pet');     // huisgenoot
+  const eve = await makeUser('eve_pet');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Huisdierhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: pet, error } = await alice.client.from('pets')
+    .insert({ household_id: hh.id, name: 'Rex', type: 'hond', visibility: 'household', created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `huisdier: ${error?.message}`);
+
+  const bobSees = await bob.client.from('pets').select('id').eq('id', pet.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot moet het household-huisdier zien');
+  const eveSees = await eve.client.from('pets').select('id').eq('id', pet.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander mag het huisdier NIET zien');
+});
+
+test('RLS: household-voertuig zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_veh');
+  const bob = await makeUser('bob_veh');     // huisgenoot
+  const eve = await makeUser('eve_veh');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Voertuighuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: vehicle, error } = await alice.client.from('vehicles')
+    .insert({ household_id: hh.id, name: 'De bus', visibility: 'household', created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `voertuig: ${error?.message}`);
+
+  const bobSees = await bob.client.from('vehicles').select('id').eq('id', vehicle.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot moet het household-voertuig zien');
+  const eveSees = await eve.client.from('vehicles').select('id').eq('id', vehicle.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander mag het voertuig NIET zien');
+});
+
+test('RLS: household-boodschap zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_gro');
+  const bob = await makeUser('bob_gro');     // huisgenoot
+  const eve = await makeUser('eve_gro');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Boodschappenlijsthuis');
+  await addMember(alice, bob, hh.id);
+
+  // groceries gebruikt `added_by` als creator-kolom (0003/0066), niet created_by.
+  const { data: item, error } = await alice.client.from('groceries')
+    .insert({ household_id: hh.id, name: 'Melk', visibility: 'household', added_by: alice.id })
+    .select().single();
+  assert.ok(!error, `boodschap: ${error?.message}`);
+
+  const bobSees = await bob.client.from('groceries').select('id').eq('id', item.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot moet de household-boodschap zien');
+  const eveSees = await eve.client.from('groceries').select('id').eq('id', item.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander mag de boodschap NIET zien');
+});
+
+test('RLS: huisdier-logboek zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_petlog');
+  const bob = await makeUser('bob_petlog');     // huisgenoot
+  const eve = await makeUser('eve_petlog');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Huisdierlogboekhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: pet } = await alice.client.from('pets')
+    .insert({ household_id: hh.id, name: 'Miauw', type: 'kat', visibility: 'household', created_by: alice.id })
+    .select().single();
+  const { data: entry, error } = await alice.client.from('pet_log')
+    .insert({ household_id: hh.id, pet_id: pet.id, note: 'Dierenarts geweest', created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `pet_log: ${error?.message}`);
+
+  const bobSees = await bob.client.from('pet_log').select('id').eq('id', entry.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet het logboek (erft pet-zichtbaarheid)');
+  const eveSees = await eve.client.from('pet_log').select('id').eq('id', entry.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet het huisdier-logboek NIET');
+});
+
+test('RLS: voertuig-logboek zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {
+  const alice = await makeUser('alice_vehlog');
+  const bob = await makeUser('bob_vehlog');     // huisgenoot
+  const eve = await makeUser('eve_vehlog');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Voertuiglogboekhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: vehicle } = await alice.client.from('vehicles')
+    .insert({ household_id: hh.id, name: 'De auto', visibility: 'household', created_by: alice.id })
+    .select().single();
+  const { data: entry, error } = await alice.client.from('vehicle_log')
+    .insert({ household_id: hh.id, vehicle_id: vehicle.id, title: 'Grote beurt', note: 'Olie ververst', created_by: alice.id })
+    .select().single();
+  assert.ok(!error, `vehicle_log: ${error?.message}`);
+
+  const bobSees = await bob.client.from('vehicle_log').select('id').eq('id', entry.id);
+  assert.equal(bobSees.data?.length, 1, 'huisgenoot ziet het logboek (erft vehicle-zichtbaarheid)');
+  const eveSees = await eve.client.from('vehicle_log').select('id').eq('id', entry.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet het voertuig-logboek NIET');
+});
+
 // --- Kosten-inzichten: recurring_expenses (contract) + expenses.category (0019) ----
 
 test('RLS: terugkerende uitgave zichtbaar voor huisgenoot, niet voor buitenstaander', opts, async () => {

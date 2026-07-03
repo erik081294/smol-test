@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { useVehicles } from '../../lib/useVehicles';
-import { Empty, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ListSkeleton, Badge, Row } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ListSkeleton, Badge, Row, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { CarGlyph } from '../../lib/CarGlyph';
 import { colors, type, space } from '../../lib/theme';
@@ -18,7 +18,7 @@ function subtitleFor(v) {
 }
 
 export default function Voertuigen() {
-  const { vehicles, loading, reload } = useVehicles();
+  const { vehicles, loading, error, reload } = useVehicles();
   const { tasks } = useTasks();
   const router = useRouter();
 
@@ -36,6 +36,19 @@ export default function Voertuigen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('voertuigen.title')} subtitle={t('voertuigen.subtitle')}
         right={<ModuleHelpButton module="voertuigen" />} />
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginTop: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}

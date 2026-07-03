@@ -1,7 +1,7 @@
 // Units voor de pure voorraad-logica (lib/pantry.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { status, daysUntil, shoppingGap, sortByUrgency, PANTRY_STATUS } from '../lib/pantry.js';
+import { status, daysUntil, shoppingGap, sortByUrgency, PANTRY_STATUS, aggregatePurchaseItems, purchaseItemKey } from '../lib/pantry.js';
 
 const now = new Date(2026, 5, 18); // 18 jun 2026
 
@@ -104,4 +104,71 @@ test('sortByUrgency: gedateerd vóór ongedateerd, ongeacht de invoervolgorde', 
   const undated = { name: 'geen', quantity: 5 };
   assert.deepEqual(sortByUrgency([undated, dated], { now }).map((x) => x.name), ['wel', 'geen']);
   assert.deepEqual(sortByUrgency([dated, undated], { now }).map((x) => x.name), ['wel', 'geen']);
+});
+
+// --- aggregatePurchaseItems (review P4: bon met 2× hetzelfde product) ---
+
+test('aggregatePurchaseItems: telt hetzelfde product+unit bij elkaar op', () => {
+  const out = aggregatePurchaseItems([
+    { name: 'Melk', product_id: 'p1', unit: 'pak', quantity: 2 },
+    { name: 'Melk', product_id: 'p1', unit: 'pak', quantity: 3 },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].quantity, 5); // 2 + 3, niet "laatste wint" (3)
+  assert.equal(out[0].product_id, 'p1');
+  assert.equal(out[0].unit, 'pak');
+});
+
+test('aggregatePurchaseItems: verschillende unit = aparte regels', () => {
+  const out = aggregatePurchaseItems([
+    { name: 'Melk', product_id: 'p1', unit: 'pak', quantity: 2 },
+    { name: 'Melk', product_id: 'p1', unit: 'liter', quantity: 1 },
+  ]);
+  assert.equal(out.length, 2);
+});
+
+test('aggregatePurchaseItems: matcht op genormaliseerde naam als er geen product-id is', () => {
+  const out = aggregatePurchaseItems([
+    { name: 'Halfvolle melk', unit: 'stuk', quantity: 1 },
+    { name: 'halfvolle  melk', unit: 'stuk', quantity: 1 },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].quantity, 2);
+});
+
+test('aggregatePurchaseItems: ontbrekend aantal telt als 1 (net als voorheen)', () => {
+  const out = aggregatePurchaseItems([
+    { name: 'Brood', product_id: 'b1', unit: 'stuk' },
+    { name: 'Brood', product_id: 'b1', unit: 'stuk' },
+  ]);
+  assert.equal(out[0].quantity, 2);
+});
+
+test('aggregatePurchaseItems: regels zonder naam vallen weg', () => {
+  const out = aggregatePurchaseItems([
+    { name: '   ', product_id: 'x', quantity: 5 },
+    { name: 'Kaas', quantity: 1 },
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, 'Kaas');
+});
+
+test('aggregatePurchaseItems: behoudt de volgorde van eerste voorkomen', () => {
+  const out = aggregatePurchaseItems([
+    { name: 'B', product_id: 'b', quantity: 1 },
+    { name: 'A', product_id: 'a', quantity: 1 },
+    { name: 'B', product_id: 'b', quantity: 1 },
+  ]);
+  assert.deepEqual(out.map((x) => x.name), ['B', 'A']);
+});
+
+test('aggregatePurchaseItems: lege invoer → lege lijst (default-param)', () => {
+  assert.deepEqual(aggregatePurchaseItems(), []);
+});
+
+test('purchaseItemKey: product wint van catalogus wint van naam; unit hoort erbij', () => {
+  assert.equal(purchaseItemKey({ product_id: 'p', catalog_product_id: 'c', name: 'X', unit: 'pak' }), 'p@@pak');
+  assert.equal(purchaseItemKey({ catalog_product_id: 'c', name: 'X', unit: 'pak' }), 'c@@pak');
+  assert.equal(purchaseItemKey({ name: 'Melk', unit: 'pak' }), 'naam:melk@@pak');
+  assert.equal(purchaseItemKey({ name: 'Melk' }), 'naam:melk@@stuk'); // unit-default
 });

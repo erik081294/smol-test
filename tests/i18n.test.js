@@ -3,7 +3,7 @@
 // (nooit crashen), en {vars} invullen — plus taal schakelen en simpel pluraal.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { t, setLang, getLang, registerDict, plural } from '../lib/i18n.js';
+import { t, setLang, getLang, registerDict, plural, authErrorMessage } from '../lib/i18n.js';
 
 test('t vindt een bestaande NL-sleutel', () => {
   assert.equal(t('common.cancel'), 'Annuleer');
@@ -51,4 +51,27 @@ test('plural kiest één- vs meer-sleutel en geeft {n} door', () => {
   });
   assert.equal(plural(1, 'test.participants.one', 'test.participants.other'), '1 deelnemer');
   assert.equal(plural(3, 'test.participants.one', 'test.participants.other'), '3 deelnemers');
+});
+
+test('authErrorMessage vertaalt bekende Supabase-authfouten naar NL', () => {
+  // Accepteert zowel een string als een { message }-object; matcht hoofdletter-ongevoelig.
+  assert.equal(authErrorMessage('Invalid login credentials'), t('auth.err.invalidCredentials'));
+  assert.equal(authErrorMessage({ message: 'invalid login credentials' }), t('auth.err.invalidCredentials'));
+  assert.equal(authErrorMessage(new Error('Email not confirmed')), t('auth.err.emailNotConfirmed'));
+  assert.equal(authErrorMessage('User already registered'), t('auth.err.userExists'));
+  assert.equal(authErrorMessage('Email rate limit exceeded'), t('auth.err.rateLimit'));
+  assert.equal(
+    authErrorMessage('For security purposes, you can only request this after 51 seconds'),
+    t('auth.err.rateLimit'),
+  );
+  assert.equal(authErrorMessage('Password should be at least 6 characters'), t('auth.err.weakPassword'));
+  assert.equal(authErrorMessage('Network request failed'), t('auth.err.network'));
+});
+
+test('authErrorMessage valt terug: leeg → generiek, onbekend → ruwe tekst', () => {
+  assert.equal(authErrorMessage(''), t('auth.err.generic'));
+  assert.equal(authErrorMessage(null), t('auth.err.generic'));
+  assert.equal(authErrorMessage({}), t('auth.err.generic'));
+  // Onbekende fout blijft zichtbaar (geen zwart gat), maar wordt niet vertaald.
+  assert.equal(authErrorMessage('Some brand-new server error'), 'Some brand-new server error');
 });

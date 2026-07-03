@@ -46,13 +46,16 @@ function StoreBadge({ label, onPress }) {
   );
 }
 
-function Problem({ title, body, onClose }) {
+function Problem({ title, body, onClose, onRetry }) {
   return (
     <Centered>
       <Brand />
       <Card style={{ alignItems: 'center' }}>
         <Text style={[type.h2, { textAlign: 'center', marginBottom: space.sm }]}>{title}</Text>
         <Text style={[type.body, { color: colors.inkSoft, textAlign: 'center' }]}>{body}</Text>
+        {onRetry ? (
+          <Button title={t('common.retry')} onPress={onRetry} style={{ marginTop: space.lg, alignSelf: 'stretch' }} />
+        ) : null}
       </Card>
       <Button title={t('common.close')} variant="ghost" onPress={onClose}
         style={{ marginTop: space.lg, borderColor: 'transparent' }} />
@@ -75,13 +78,16 @@ export default function JoinInvite() {
 
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false); // netwerk-/serverfout, ≠ ongeldig token
+  const [attempt, setAttempt] = useState(0); // ophogen = opnieuw proberen
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
     let active = true;
-    if (!token) { setPreview(null); setLoading(false); return; }
+    if (!token) { setPreview(null); setLoadError(false); setLoading(false); return undefined; }
     setLoading(true);
+    setLoadError(false);
     peekInvite(token)
       .then((p) => {
         if (!active) return;
@@ -89,10 +95,15 @@ export default function JoinInvite() {
         // Alleen een geldige uitnodiging onthouden voor de melding na inloggen.
         if (p && p.status === 'valid') setPendingInvite(token);
       })
-      .catch(() => { if (active) setPreview(null); })
+      // peekInvite gooit alléén bij een mislukte call (offline/server) — een geldig
+      // "niet gevonden"-antwoord komt als preview=null terug. Zo onderscheiden we een
+      // netwerkfout (met retry) van een écht ongeldige link.
+      .catch(() => { if (active) { setPreview(null); setLoadError(true); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [token]);
+  }, [token, attempt]);
+
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
   const onAccept = useCallback(async () => {
     setBusy(true);
@@ -151,6 +162,10 @@ export default function JoinInvite() {
     );
   }
 
+  // Netwerk-/serverfout: geen kale "ongeldig", maar een retry-actie.
+  if (loadError) {
+    return <Problem title={t('join.network.title')} body={t('join.network.body')} onClose={dismiss} onRetry={retry} />;
+  }
   if (!token || !preview) {
     return <Problem title={t('join.invalid.title')} body={t('join.invalid.body')} onClose={dismiss} />;
   }
