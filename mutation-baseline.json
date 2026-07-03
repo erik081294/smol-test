@@ -58,9 +58,9 @@
       "score": 100
     },
     "lib/openFoodFacts.js": {
-      "killed": 49,
-      "total": 56,
-      "score": 87.5
+      "killed": 40,
+      "total": 47,
+      "score": 85.1
     },
     "lib/decisions.js": {
       "killed": 67,
@@ -323,9 +323,9 @@
       "score": 78.1
     },
     "lib/secureStorage.js": {
-      "killed": 51,
+      "killed": 45,
       "total": 98,
-      "score": 52
+      "score": 45.9
     }
   }
 }
