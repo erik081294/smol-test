@@ -160,23 +160,39 @@ de statische tokens dekken en niet de dynamische combinaties.
 
 ---
 
-## Nog te draaien (sessielimiet)
+## Nog te draaien (sessielimiet) — bijgewerkt 2026-07-04
 
-Drie dimensies zijn **niet** beoordeeld. Aanbevolen om ze in een verse sessie alsnog te draaien —
-de workflow-cache herspeelt de 6 voltooide dimensies gratis:
+De drie ontbrekende dimensies zijn in de vervolgsessie (2026-07-04) alsnog gedraaid als losse
+read-only dimensie-agents (niet via de workflow-resume, want die is sessie-gebonden). Uitkomst:
 
-```
-Workflow({ scriptPath: ".../huishoek-app-review-wf_6c4a0932-323.js",
-           resumeFromRunId: "wf_6c4a0932-323", args: {"date":"2026-07-02"} })
-```
+- **Security — ✅ gedraaid (2026-07-04), fixes bewust UITGESTELD naar een aparte sessie.**
+  Geen high-bevindingen; tenant-isolatie + RLS-contract solide na de 0041–0058-remediatiegolven.
+  Geverifieerd tegen de code + de live `get_advisors` security-scan. Openstaand (klein, voor de
+  security-sessie):
+  - **medium · `enable_module_rls` verloor z'n `search_path`-pin** — `0066_module_insert_creator_check.sql`
+    doet `create or replace ... language plpgsql` zónder `set search_path = public`, wat de pin uit
+    `0024` reset. Live-advisor bevestigt: `function_search_path_mutable` WARN op precies deze functie.
+    Fix: pin terugzetten in een nieuwe migratie.
+  - **medium · globale catalogus vervuilbaar** — `insert_catalog_product` (`0031`, DEFINER,
+    `grant ... to authenticated`) slaat client-aangeleverde `p_image_url`/`p_name` ongefilterd op in de
+    cross-tenant `catalog_products`; die thumbnail rendert bij álle huishoudens → hotlink-tracking van
+    elke viewer. Fix: `image_url` allowlisten (OFF-CDN) of weren + naam normaliseren/cappen.
+  - **low** · HIBP-lekwachtwoordbescherming uit (dashboard-toggle) + zwak wachtwoordbeleid (min 8, geen
+    complexiteit); `peek_invite` geeft anoniem de voornaam van de uitnodiger prijs (bewust, 244-bit token
+    dus geen orakel); RLS-helpers (`is_member` e.d.) blijven door `authenticated` direct aanroepbaar
+    (advisor-WARN, `0058` bewust — mogelijk verder in te trekken, vergt live-RLS-test).
+  - Sterke punten (bevestigd): foto-buckets alle `public=false` + `is_member(foldername[1])`-padscoping op
+    alle 4 ops; invite-tokens 244-bit/single-use/24u/niet-gelogd; Sentry `sendDefaultPii:false` geen
+    setUser/breadcrumbs; `notify` constant-time secret-vergelijking fail-closed; geen secrets in git.
+- **Datamodel & database — ⏸ doorgeschoven.** De agent-run van 2026-07-04 werd halverwege
+  afgebroken (interrupt); op verzoek niet herstart — meenemen in de geplande security-sessie
+  (past daar goed bij: RLS-performance/policies raakt beide dimensies).
+- **Platform & tooling — ⏸ doorgeschoven.** Idem; meenemen in dezelfde vervolgsessie.
 
-- **Security** — RLS-gaten buiten het contract, edge-function-auth (notify/scan-receipt), invite/
-  join-token-entropie, foto-bucket-policies, PII naar Sentry, gecommitte secrets. *(De live Supabase
-  `get_advisors` security-scan zat in de opdracht — nog niet uitgevoerd.)*
-- **Datamodel & database** — FK's/ON DELETE, ontbrekende CHECK/NOT NULL, indexen op household_id/
-  created_at-paden, RLS-performance (`(select auth.uid())`-wrapping), realtime-publication-match.
-- **Platform & tooling** — app.config.js/eas.json/permissies, Sentry-source-maps, `@opentelemetry/api`
-  dood of levend, ongebruikte dependencies, web-parity (Platform.OS), notificatie-pijplijn.
+> Naast de dimensie-agent leverde de **live `get_advisors` performance-scan** (2026-07-04): 19×
+> `auth_rls_initplan` (kale `auth.uid()` per rij i.p.v. `(select auth.uid())`), 66× dubbele permissive
+> policies, 42 ongeïndexeerde FK's, 16 ongebruikte indexen. Bundelen in één DB-hardening-migratie
+> (samen met de twee security-mediums) in een vervolgsessie.
 
 > **Overlap met bekende roadmap:** de roadmap-agent vond ~59 reeds bekende open items (backlog §6 +
 > eerdere reviews). Nieuw t.o.v. die stapel zijn vooral: de SWR-foutpad-cascade (P0), de refetch-
