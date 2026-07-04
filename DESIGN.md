@@ -83,7 +83,9 @@ gewone taal. Vernietigende acties (`danger`) vragen om bevestiging.
 | Groep | Token | Gebruik |
 |------|-------|---------|
 | Kleur | `forest` / `forestSoft` | primaire knop, koppen, navigatie (+ pressed) |
-| | `ocher` / `ocherSoft` | accent, FAB, highlights |
+| | `ocher` / `ocherSoft` | accent, FAB, highlights (achtergrond/vlak) |
+| | `onAccent` | **voorgrond** op een accent-/FAB-vlak (tekst/icoon) — dark-mode-veilig contrast i.p.v. `forest` op `ocher` |
+| | `onDark` | voorgrond op een donker vlak (bv. tekst op `forest`) |
 | | `ink` / `inkSoft` / `inkFaint` | tekst (faint alleen decoratief) |
 | | `success/warning/danger/info` (+ `…Soft`) | status, altijd kleur + tekst |
 | Ruimte | `space.xs…xxxl` (4pt-grid) | marges, gaps; `screenPadding` voor de rand |
