@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 4332,
-    "total": 5214,
-    "score": 83.1
+    "killed": 5163,
+    "total": 6125,
+    "score": 84.3
   },
   "files": {
     "lib/activity.js": {
@@ -331,6 +331,21 @@
       "killed": 45,
       "total": 98,
       "score": 45.9
+    },
+    "lib/assistantUi.js": {
+      "killed": 148,
+      "total": 156,
+      "score": 94.9
+    },
+    "supabase/functions/assistant/core.js": {
+      "killed": 255,
+      "total": 292,
+      "score": 87.3
+    },
+    "supabase/functions/_shared/assistantTools.js": {
+      "killed": 263,
+      "total": 282,
+      "score": 93.3
     }
   }
 }

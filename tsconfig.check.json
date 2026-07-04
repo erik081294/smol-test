@@ -31,6 +31,7 @@
     "lib/activity.js",
     "lib/agenda.js",
     "lib/appRoute.js",
+    "lib/assistantUi.js",
     "lib/barcode.js",
     "lib/buyFrequency.js",
     "lib/choreLibrary.js",
@@ -91,6 +92,8 @@
     "lib/widgets/grid.js",
     "lib/widgets/summaries.js",
     "lib/widgets/colorSchemes.js",
+    "supabase/functions/_shared/assistantTools.js",
+    "supabase/functions/assistant/core.js",
     "supabase/functions/notify/core.js",
     "supabase/functions/scan-receipt/core.js"
   ]
