@@ -23,6 +23,10 @@ import {
   toResponsesTools,
   parseResponsesOutput,
   functionCallOutputItem,
+  drainSseBuffer,
+  clientEventsFromRouterEvent,
+  statusLabelMap,
+  sseLine,
 } from '../supabase/functions/assistant/core.js';
 
 test('SYSTEM_PROMPT: bevat de gedrags-ankers (persona, geen-tool-bij-groet, HITL, eerlijkheid)', () => {
@@ -289,4 +293,81 @@ test('functionCallOutputItem: JSON-output, null-bestendig', () => {
 test('buildTurnResult: lege/whitespace-tekst geeft geen lege text-node; default-arg', () => {
   assert.deepEqual(buildTurnResult('   '), { v: 1, text: '   ', tree: [], choices: [] });
   assert.deepEqual(buildTurnResult(null), { v: 1, text: '', tree: [], choices: [] });
+});
+
+// ---------------------------------------------------------------------------
+// SSE-streaming (AI-5, ronde D)
+// ---------------------------------------------------------------------------
+
+test('drainSseBuffer: complete events eruit, onafgemaakte rest blijft staan', () => {
+  const chunk = 'data: {"a":1}\n\ndata: {"b":2}\n\ndata: {"half":';
+  const { events, rest } = drainSseBuffer(chunk);
+  assert.deepEqual(events, [{ a: 1 }, { b: 2 }]);
+  assert.equal(rest, 'data: {"half":');
+  // De rest + het vervolg leveren samen alsnog het derde event op.
+  const round2 = drainSseBuffer(`${rest}3}\n\n`);
+  assert.deepEqual(round2.events, [{ half: 3 }]);
+  assert.equal(round2.rest, '');
+});
+
+test('drainSseBuffer: [DONE], event:-regels, kapotte JSON en niet-strings vallen stil weg', () => {
+  const chunk = 'event: response.completed\ndata: {"ok":true}\n\ndata: [DONE]\n\ndata: {kapot\n\n';
+  const { events, rest } = drainSseBuffer(chunk);
+  assert.deepEqual(events, [{ ok: true }]);
+  assert.equal(rest, '');
+  assert.deepEqual(drainSseBuffer(null), { events: [], rest: '' });
+});
+
+test('drainSseBuffer: buffer zonder compleet event blijft integraal de rest', () => {
+  const { events, rest } = drainSseBuffer('data: {"a":1}\n');
+  assert.deepEqual(events, []);
+  assert.equal(rest, 'data: {"a":1}\n');
+});
+
+test('clientEventsFromRouterEvent: tekst-delta wordt delta-event; lege delta niet', () => {
+  assert.deepEqual(
+    clientEventsFromRouterEvent({ type: 'response.output_text.delta', delta: 'Hoi' }),
+    [{ type: 'delta', text: 'Hoi' }]
+  );
+  assert.deepEqual(clientEventsFromRouterEvent({ type: 'response.output_text.delta', delta: '' }), []);
+  assert.deepEqual(clientEventsFromRouterEvent({ type: 'response.output_text.delta' }), []);
+});
+
+test('clientEventsFromRouterEvent: function_call-start wordt tool_status(run) met label', () => {
+  const ev = { type: 'response.output_item.added', item: { type: 'function_call', name: 'get_open_tasks' } };
+  assert.deepEqual(
+    clientEventsFromRouterEvent(ev, { get_open_tasks: 'Even in de taken kijken…' }),
+    [{ type: 'tool_status', name: 'get_open_tasks', label: 'Even in de taken kijken…', state: 'run' }]
+  );
+  // Zonder label-map: leeg label, geen crash (default-arg).
+  assert.deepEqual(
+    clientEventsFromRouterEvent(ev),
+    [{ type: 'tool_status', name: 'get_open_tasks', label: '', state: 'run' }]
+  );
+});
+
+test('clientEventsFromRouterEvent: suggest_replies en overige events blijven onzichtbaar', () => {
+  assert.deepEqual(
+    clientEventsFromRouterEvent({ type: 'response.output_item.added', item: { type: 'function_call', name: SUGGEST_TOOL.name } }),
+    []
+  );
+  assert.deepEqual(clientEventsFromRouterEvent({ type: 'response.completed', response: {} }), []);
+  assert.deepEqual(clientEventsFromRouterEvent({ type: 'response.output_item.added', item: { type: 'reasoning' } }), []);
+  assert.deepEqual(clientEventsFromRouterEvent(null), []);
+});
+
+test('statusLabelMap: alleen tools met een niet-lege statusLabel; default-arg leeg', () => {
+  assert.deepEqual(
+    statusLabelMap([
+      { name: 'a', statusLabel: 'Even kijken…' },
+      { name: 'b', statusLabel: '' },
+      { name: 'c' },
+    ]),
+    { a: 'Even kijken…' }
+  );
+  assert.deepEqual(statusLabelMap(), {});
+});
+
+test('sseLine: exact draadformaat data: {json}\\n\\n', () => {
+  assert.equal(sseLine({ type: 'done' }), 'data: {"type":"done"}\n\n');
 });

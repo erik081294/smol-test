@@ -230,6 +230,86 @@ export function functionCallOutputItem(callId, result) {
 }
 
 // ---------------------------------------------------------------------------
+// SSE-streaming (AI-5, plan 24 ronde D). De router streamt standaard
+// Responses-API-events; wij vertalen die naar een klein client-protocol:
+//   { type:'delta', text }                       — stukje antwoordtekst
+//   { type:'tool_status', name, label, state }   — tool gestart ('run') / klaar ('done')
+//   { type:'tree', conversationId, ...turn }     — het definitieve beurt-resultaat
+//   { type:'done' } / { type:'error', message }  — afronding
+// Het `response.completed`-event bevat het VOLLEDIGE response-object, dus de
+// agent-loop blijft op parseResponsesOutput draaien — streaming is alleen een
+// doorgeefluik, geen tweede parser van de waarheid.
+// ---------------------------------------------------------------------------
+
+/**
+ * Trek complete SSE-events uit een tekstbuffer. Retourneert de geparste
+ * data-payloads (JSON) + de onafgemaakte rest voor de volgende chunk.
+ * `[DONE]` en onparseerbare regels worden stil overgeslagen.
+ * @param {string} buf
+ * @returns {{ events: any[], rest: string }}
+ */
+export function drainSseBuffer(buf) {
+  const events = [];
+  let rest = typeof buf === 'string' ? buf : '';
+  let idx;
+  while ((idx = rest.indexOf('\n\n')) >= 0) {
+    const block = rest.slice(0, idx);
+    rest = rest.slice(idx + 2);
+    for (const line of block.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if (raw.length === 0 || raw === '[DONE]') continue;
+      try {
+        events.push(JSON.parse(raw));
+      } catch {
+        // half of kapot event — overslaan, de stroom gaat door
+      }
+    }
+  }
+  return { events, rest };
+}
+
+/**
+ * Eén upstream router-event → nul of meer client-protocol-events.
+ * Alleen tekst-deltas en het startsein van échte tool-calls zijn interessant;
+ * suggest_replies is een pseudo-tool en blijft onzichtbaar voor de gebruiker.
+ * @param {any} ev
+ * @param {Record<string,string>} [statusLabels] toolnaam → statuszin
+ * @returns {object[]}
+ */
+export function clientEventsFromRouterEvent(ev, statusLabels = {}) {
+  if (ev?.type === 'response.output_text.delta' && typeof ev.delta === 'string' && ev.delta.length > 0) {
+    return [{ type: 'delta', text: ev.delta }];
+  }
+  if (ev?.type === 'response.output_item.added' && ev.item?.type === 'function_call'
+      && typeof ev.item.name === 'string' && ev.item.name !== SUGGEST_TOOL.name) {
+    return [{ type: 'tool_status', name: ev.item.name, label: statusLabels[ev.item.name] ?? '', state: 'run' }];
+  }
+  return [];
+}
+
+/**
+ * Registry → { toolnaam: statusLabel } voor de tool_status-events.
+ * @param {Array<{name:string, statusLabel?:string}>} [tools]
+ * @returns {Record<string,string>}
+ */
+export function statusLabelMap(tools = []) {
+  const map = /** @type {Record<string,string>} */ ({});
+  for (const t of tools) {
+    if (typeof t.statusLabel === 'string' && t.statusLabel.length > 0) map[t.name] = t.statusLabel;
+  }
+  return map;
+}
+
+/**
+ * Client-protocol-event → SSE-draadformaat.
+ * @param {object} event
+ */
+export function sseLine(event) {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
+// ---------------------------------------------------------------------------
 // Chat-persistentie (AI-4): pure vertalingen tussen assistant_messages-rijen en
 // de LLM-history. Content-jsonb heeft altijd { v: 1, text, ... } (migratie 0068).
 // ---------------------------------------------------------------------------

@@ -121,6 +121,7 @@ export const ASSISTANT_TOOLS = [
     name: 'get_open_tasks',
     moduleKey: 'taken',
     kind: 'read',
+    statusLabel: 'Even in de taken kijken…',
     description: 'Haal de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager.',
     parameters: {
       type: 'object',
@@ -142,6 +143,7 @@ export const ASSISTANT_TOOLS = [
     name: 'get_grocery_list',
     moduleKey: 'boodschappen',
     kind: 'read',
+    statusLabel: 'Boodschappenlijstje erbij pakken…',
     description: 'Haal de actuele (onafgevinkte) boodschappenlijst op.',
     parameters: { type: 'object', properties: {}, required: [] },
     async run(ctx) {
@@ -161,6 +163,7 @@ export const ASSISTANT_TOOLS = [
     name: 'get_expenses_summary',
     moduleKey: 'kosten',
     kind: 'read',
+    statusLabel: 'Uitgaven op een rijtje zetten…',
     description: 'Samenvatting van de uitgaven in een maand (default: de maand van vandaag). month als "YYYY-MM".',
     parameters: {
       type: 'object',
@@ -185,6 +188,7 @@ export const ASSISTANT_TOOLS = [
     name: 'get_pantry_low_stock',
     moduleKey: 'voorraad',
     kind: 'read',
+    statusLabel: 'Voorraad nalopen…',
     description: 'Welke voorraad-items zijn bijna op of lopen binnen een week tegen de houdbaarheidsdatum aan?',
     parameters: { type: 'object', properties: {}, required: [] },
     async run(ctx) {

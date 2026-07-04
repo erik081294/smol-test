@@ -7,7 +7,8 @@
 //   3. antwoord: { v:1, text, tree } — de tree komt deterministisch uit tool-output
 //      (lib/assistantUi.js normaliseert 'm nogmaals aan de app-kant).
 //
-// v1 is bewust non-streaming; SSE volgt in AI-5 (plan 24 ronde D).
+// Antwoordvorm: met body.stream=true een SSE-stroom (AI-5, ronde D — protocol
+// delta|tool_status|tree|done|error, zie core.js); anders één JSON-antwoord.
 // LLM-route (AI-2, plan 24 ronde A): DUAL —
 //   - bevat ORQ_ASSISTANT_MODEL een provider-prefix ("google/eu.claude-sonnet-5"), dan via
 //     de v3-router (Responses API): dynamische tools + thread (=conversatie) + metadata
@@ -37,6 +38,10 @@ import {
   functionCallOutputItem,
   historyFromRows,
   titleFromMessage,
+  drainSseBuffer,
+  clientEventsFromRouterEvent,
+  statusLabelMap,
+  sseLine,
 } from './core.js';
 // @ts-ignore — zie boven.
 import { ASSISTANT_TOOLS } from '../_shared/assistantTools.js';
@@ -86,6 +91,7 @@ Deno.serve(async (req: Request) => {
     enabledModuleKeys?: string[];
     memberNames?: Record<string, string>;
     today?: string;
+    stream?: boolean;
   };
   try {
     body = await req.json();
@@ -221,12 +227,20 @@ Deno.serve(async (req: Request) => {
   // voert 'm nooit uit maar oogst de opties (splitSuggestions).
   const responsesTools = [...toResponsesTools(tools), SUGGEST_TOOL];
   const proxyTools = [...chatTools, { type: 'function', function: { name: SUGGEST_TOOL.name, description: SUGGEST_TOOL.description, parameters: SUGGEST_TOOL.parameters } }];
-  const toolOutputs: unknown[] = [];
-  let text = '';
-  let choices: string[] = [];
+  const statusLabels = statusLabelMap(tools);
 
-  for (let iteration = 1; iteration <= MAX_TOOL_ITERATIONS; iteration++) {
-    let orqRes: Response;
+  // Fout die veilig aan de gebruiker getoond mag worden (de details staan in de log).
+  class TurnError extends Error {
+    status: number;
+    constructor(userMessage: string, status: number) { super(userMessage); this.status = status; }
+  }
+
+  // Eén upstream-call. Non-streaming: gewoon json. Streaming (alleen de router):
+  // SSE consumeren, delta/tool_status doorgeven via `emit`, en het VOLLEDIGE
+  // response-object uit `response.completed` teruggeven — de loop parseert dus
+  // altijd dezelfde vorm (parseResponsesOutput blijft de bron van waarheid).
+  async function callOrq(emit: ((ev: object) => void) | null): Promise<unknown> {
+    const streamUpstream = emit !== null && useRouter;
     const orqBody = useRouter
       ? {
           model: MODEL,
@@ -235,6 +249,7 @@ Deno.serve(async (req: Request) => {
           thread: { id: threadId, tags: ['assistant'] },
           metadata: { feature: 'assistant', user: userHash, household: householdHash },
           tools: responsesTools,
+          ...(streamUpstream ? { stream: true } : {}),
         }
       : {
           model: MODEL,
@@ -242,6 +257,7 @@ Deno.serve(async (req: Request) => {
           max_tokens: MAX_OUTPUT_TOKENS,
           tools: proxyTools,
         };
+    let orqRes: Response;
     try {
       orqRes = await fetch(useRouter ? ORQ_RESPONSES_URL : ORQ_CHAT_URL, {
         method: 'POST',
@@ -250,66 +266,140 @@ Deno.serve(async (req: Request) => {
       });
     } catch (e) {
       console.error('[assistant] Orq onbereikbaar', String(e));
-      return json({ error: 'Kon de assistent-service niet bereiken.' }, 502);
+      throw new TurnError('Kon de assistent-service niet bereiken.', 502);
     }
     if (!orqRes.ok) {
       const detail = await orqRes.text().catch(() => '');
       console.error('[assistant] Orq-fout', orqRes.status, detail.slice(0, 500));
-      return json({ error: 'Dat lukte even niet — probeer het nog eens.' }, 502);
+      throw new TurnError('Dat lukte even niet — probeer het nog eens.', 502);
     }
+    if (!streamUpstream) return await orqRes.json().catch(() => null);
 
-    const raw = await orqRes.json().catch(() => null);
-    const parsed = useRouter ? parseResponsesOutput(raw) : parseChatResponse(raw);
-    text = parsed.text;
-
-    // Antwoordopties (suggest_replies) afsplitsen; alleen échte calls sturen de loop.
-    const split = splitSuggestions(parsed.toolCalls);
-    if (split.choices.length > 0) choices = split.choices;
-
-    if (!shouldContinueLoop({ toolCalls: split.calls }, iteration)) break;
-
-    // Tool-calls uitvoeren tegen de RLS-client; fouten worden een {error}-resultaat
-    // zodat het model netjes kan reageren i.p.v. de beurt te laten klappen.
-    // NB: alle callItems (incl. suggest_replies) gaan terug in de history — de
-    // Responses API eist een output-item per call; suggest_replies krijgt {ok:true}.
-    if (useRouter) messages.push(...(parsed as { callItems: unknown[] }).callItems);
-    else messages.push((parsed as { message: unknown }).message);
-    for (const sug of parsed.toolCalls.filter((c: { name: string }) => c.name === SUGGEST_TOOL.name)) {
-      messages.push(useRouter ? functionCallOutputItem(sug.id, { ok: true }) : toolResultMessage(sug.id, { ok: true }));
-    }
-    for (const call of split.calls) {
-      const tool = tools.find((t) => t.name === call.name);
-      let result: unknown;
-      if (!tool) {
-        result = { error: `Onbekende tool: ${call.name}` };
-      } else {
-        try {
-          result = await tool.run(ctx, call.args);
-          toolOutputs.push(result);
-        } catch (e) {
-          console.error(`[assistant] tool ${call.name} faalde`, String(e));
-          result = { error: 'Deze gegevens konden niet worden opgehaald.' };
+    const reader = orqRes.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let completed: unknown = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const { events, rest } = drainSseBuffer(buf);
+      buf = rest;
+      for (const ev of events) {
+        for (const clientEv of clientEventsFromRouterEvent(ev, statusLabels)) emit!(clientEv);
+        if (ev?.type === 'response.completed') completed = ev.response;
+        if (ev?.type === 'response.failed' || ev?.type === 'error') {
+          console.error('[assistant] Orq-stream-fout', JSON.stringify(ev).slice(0, 500));
         }
       }
-      // Alleen de data (niet de render-tree) terug naar het model: compact, en de
-      // UI-vorm blijft server-deterministisch.
-      const forModel = result && typeof result === 'object' && 'data' in (result as object)
-        ? (result as { data: unknown }).data
-        : result;
-      messages.push(useRouter ? functionCallOutputItem(call.id, forModel) : toolResultMessage(call.id, forModel));
     }
+    if (!completed) throw new TurnError('Dat lukte even niet — probeer het nog eens.', 502);
+    return completed;
   }
 
-  const turn = buildTurnResult(text, toolOutputs as { render?: object[] }[], choices);
-  // Assistent-beurt persisteren + gesprek naar boven in de lijst (updated_at).
-  await db.from('assistant_messages').insert({
-    conversation_id: conversationId,
-    household_id: householdId,
-    created_by: userId,
-    role: 'assistant',
-    content: turn,
-  });
-  await db.from('assistant_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
+  // De agent-loop (identiek voor beide antwoordvormen) + persistentie van de beurt.
+  async function runTurn(emit: ((ev: object) => void) | null) {
+    const toolOutputs: unknown[] = [];
+    let text = '';
+    let choices: string[] = [];
 
-  return json({ conversationId, ...turn });
+    for (let iteration = 1; iteration <= MAX_TOOL_ITERATIONS; iteration++) {
+      const raw = await callOrq(emit);
+      const parsed = useRouter ? parseResponsesOutput(raw) : parseChatResponse(raw);
+      text = parsed.text;
+
+      // Antwoordopties (suggest_replies) afsplitsen; alleen échte calls sturen de loop.
+      const split = splitSuggestions(parsed.toolCalls);
+      if (split.choices.length > 0) choices = split.choices;
+
+      if (!shouldContinueLoop({ toolCalls: split.calls }, iteration)) break;
+
+      // Tool-calls uitvoeren tegen de RLS-client; fouten worden een {error}-resultaat
+      // zodat het model netjes kan reageren i.p.v. de beurt te laten klappen.
+      // NB: alle callItems (incl. suggest_replies) gaan terug in de history — de
+      // Responses API eist een output-item per call; suggest_replies krijgt {ok:true}.
+      if (useRouter) messages.push(...(parsed as { callItems: unknown[] }).callItems);
+      else messages.push((parsed as { message: unknown }).message);
+      for (const sug of parsed.toolCalls.filter((c: { name: string }) => c.name === SUGGEST_TOOL.name)) {
+        messages.push(useRouter ? functionCallOutputItem(sug.id, { ok: true }) : toolResultMessage(sug.id, { ok: true }));
+      }
+      for (const call of split.calls) {
+        const tool = tools.find((t) => t.name === call.name);
+        let result: unknown;
+        if (!tool) {
+          result = { error: `Onbekende tool: ${call.name}` };
+        } else {
+          try {
+            result = await tool.run(ctx, call.args);
+            toolOutputs.push(result);
+          } catch (e) {
+            console.error(`[assistant] tool ${call.name} faalde`, String(e));
+            result = { error: 'Deze gegevens konden niet worden opgehaald.' };
+          }
+        }
+        emit?.({ type: 'tool_status', name: call.name, label: statusLabels[call.name] ?? '', state: 'done' });
+        // Alleen de data (niet de render-tree) terug naar het model: compact, en de
+        // UI-vorm blijft server-deterministisch.
+        const forModel = result && typeof result === 'object' && 'data' in (result as object)
+          ? (result as { data: unknown }).data
+          : result;
+        messages.push(useRouter ? functionCallOutputItem(call.id, forModel) : toolResultMessage(call.id, forModel));
+      }
+    }
+
+    const turn = buildTurnResult(text, toolOutputs as { render?: object[] }[], choices);
+    // Assistent-beurt persisteren + gesprek naar boven in de lijst (updated_at).
+    await db.from('assistant_messages').insert({
+      conversation_id: conversationId,
+      household_id: householdId,
+      created_by: userId,
+      role: 'assistant',
+      content: turn,
+    });
+    await db.from('assistant_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
+    return turn;
+  }
+
+  // --- Antwoordvorm 1: SSE (AI-5, ronde D). De client vraagt erom met stream:true;
+  // events volgen het protocol delta|tool_status|tree|done|error (core.js). De
+  // Response gaat direct terug terwijl de beurt in de stream-start doorloopt.
+  if (body.stream === true) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const emit = (ev: object) => {
+          try {
+            controller.enqueue(encoder.encode(sseLine(ev)));
+          } catch {
+            // Client weg (abort/stop-knop): stil stoppen met schrijven; de beurt
+            // rondt server-side af zodat het bericht wél persistent is.
+          }
+        };
+        try {
+          const turn = await runTurn(emit);
+          emit({ type: 'tree', conversationId, ...turn });
+          emit({ type: 'done' });
+        } catch (e) {
+          const msg = e instanceof TurnError ? e.message : 'Dat lukte even niet — probeer het nog eens.';
+          if (!(e instanceof TurnError)) console.error('[assistant] beurt faalde', String(e));
+          emit({ type: 'error', message: msg });
+        } finally {
+          try { controller.close(); } catch { /* al gesloten */ }
+        }
+      },
+    });
+    return new Response(stream, {
+      headers: { ...cors, 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+    });
+  }
+
+  // --- Antwoordvorm 2: één JSON-antwoord (fallback en web).
+  try {
+    const turn = await runTurn(null);
+    return json({ conversationId, ...turn });
+  } catch (e) {
+    if (e instanceof TurnError) return json({ error: e.message }, e.status);
+    console.error('[assistant] beurt faalde', String(e));
+    return json({ error: 'Dat lukte even niet — probeer het nog eens.' }, 500);
+  }
 });
