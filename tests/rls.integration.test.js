@@ -852,3 +852,92 @@ test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander bu
     .select('profile_id').eq('household_id', hh.id).eq('profile_id', eve.id);
   assert.equal(eveMember.data?.length ?? 0, 0, 'Eve is geen lid geworden via een gebruikt token');
 });
+
+// --- 0070: rekey-guard + aangescherpte insert-policies + share-guards ----------
+//     (review-addendum 2026-07-04, Sec-1/Data-10/Data-3). De trigger maakt
+//     household_id en de creator-kolom onveranderlijk; de directe inserts op
+//     expenses/recurring_expenses eisen creator = de inzender; create_expense
+//     weigert negatieve of opgeblazen aandelen.
+
+test('RLS 0070: created_by/household_id zijn na aanmaak onveranderlijk (rekey-guard)', opts, async () => {
+  const alice = await makeUser('alice_rekey');
+  const bob = await makeUser('bob_rekey');     // huisgenoot
+  const hh = await makeHousehold(alice, 'Rekeyhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: task } = await alice.client.from('tasks')
+    .insert({ household_id: hh.id, title: 'Rekey-taak', visibility: 'household', created_by: alice.id })
+    .select().single();
+
+  // Legitiem gedeeld bewerken blijft werken (huisgenoot hernoemt/vinkt af).
+  const { error: renameErr } = await bob.client.from('tasks')
+    .update({ title: 'Hernoemd door huisgenoot' }).eq('id', task.id);
+  assert.ok(!renameErr, `huisgenoot mag de taak bewerken: ${renameErr?.message}`);
+
+  // Attributie-spoofing via UPDATE is dicht (de 0066-omzeiling uit het addendum).
+  const { error: spoofErr } = await bob.client.from('tasks')
+    .update({ created_by: bob.id }).eq('id', task.id);
+  assert.ok(spoofErr, 'created_by herschrijven moet worden geweigerd');
+
+  const { error: moveErr } = await alice.client.from('tasks')
+    .update({ household_id: hh.id === task.household_id ? task.household_id : hh.id, created_by: bob.id })
+    .eq('id', task.id);
+  assert.ok(moveErr, 'ook de creator zelf mag de attributie niet herschrijven');
+
+  const after = await alice.client.from('tasks').select('created_by').eq('id', task.id).single();
+  assert.equal(after.data?.created_by, alice.id, 'de oorspronkelijke creator staat er nog');
+});
+
+test('RLS 0070: directe insert met gespoofte created_by op (recurring_)expenses geweigerd', opts, async () => {
+  const alice = await makeUser('alice_spoof');
+  const bob = await makeUser('bob_spoof');     // huisgenoot
+  const hh = await makeHousehold(alice, 'Spoofhuis');
+  await addMember(alice, bob, hh.id);
+
+  // recurring_expenses: de client schrijft deze tabel direct.
+  const { error: spoofRecur } = await bob.client.from('recurring_expenses')
+    .insert({ household_id: hh.id, description: 'Nep-huur', amount_cents: 1, paid_by: bob.id,
+      next_date: '2026-08-01', visibility: 'household', created_by: alice.id });
+  assert.ok(spoofRecur, 'recurring_expenses-insert met andermans created_by moet worden geweigerd');
+
+  const { error: okRecur } = await bob.client.from('recurring_expenses')
+    .insert({ household_id: hh.id, description: 'Echte huur', amount_cents: 1, paid_by: bob.id,
+      next_date: '2026-08-01', visibility: 'household', created_by: bob.id });
+  assert.ok(!okRecur, `eigen created_by blijft toegestaan: ${okRecur?.message}`);
+
+  // expenses: het REST-pad om de DEFINER-RPC's heen.
+  const { error: spoofExp } = await bob.client.from('expenses')
+    .insert({ household_id: hh.id, description: 'Nep', amount_cents: 1, paid_by: bob.id,
+      spent_on: '2026-07-04', split_type: 'exact', visibility: 'household', created_by: alice.id });
+  assert.ok(spoofExp, 'expenses-insert met andermans created_by moet worden geweigerd');
+});
+
+test('RLS 0070: create_expense weigert negatieve en opgeblazen aandelen (share-guard)', opts, async () => {
+  const alice = await makeUser('alice_shareguard');
+  const hh = await makeHousehold(alice, 'Shareguardhuis');
+
+  const { error: negErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Negatief aandeel', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'exact',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: -5 }],
+  });
+  assert.ok(negErr, 'negatief aandeel moet worden geweigerd');
+
+  const { error: inflateErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Opgeblazen som', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'exact',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 999 }],
+  });
+  assert.ok(inflateErr, 'som boven het bedrag moet worden geweigerd');
+
+  // Subset-split (som < bedrag) blijft legitiem — de saldologica rekent op de shares.
+  const { data: okId, error: okErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Subset-split', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 40 }],
+  });
+  assert.ok(!okErr && okId, `subset-split blijft toegestaan: ${okErr?.message}`);
+});

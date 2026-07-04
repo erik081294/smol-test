@@ -1311,3 +1311,24 @@ Ratchet-dalingen uit de gestrande commit gedicht (assistantUi 93,6→95,5%, assi
 `npm test` 1049 pass / 0 fail / 29 RLS-skip, typecheck schoon, `eslint .` 0 errors,
 `mutation-check --since=origin/main` groen. **Rest voor toestel:** stream + markdown +
 stop/retry op de moto (licht/donker), zie AI-5/AI-6.
+
+**2026-07-04 (vervolg 2) — P7 DB-hardening live: migratie 0070.**
+De zwaarste addendum-bevindingen direct gedicht (rij REV-2): (1) **rekey-guard-trigger**
+`prevent_module_rekey` op 16 tabellen — `household_id` + de creator-kolom zijn
+onveranderlijk; dit dicht de Sec-1-omzeiling (0066 hardde alleen INSERT) zonder gedeeld
+bewerken te breken (een `with check creator=auth.uid()` op UPDATE zou huisgenoot B's
+afvinken van A's taak blokkeren — daarom een OLD/NEW-trigger, geen policy). (2) De
+insert-policies op `expenses`/`recurring_expenses` eisen nu `created_by = auth.uid()`
+(Data-10). (3) **Replica identity FULL op 23 extra tabellen** (Data-2, high): DELETE-events
+dragen nu `household_id`, dus het realtime-filter van huisgenoten matcht — geen spook-rijen
+meer na andermans verwijdering (0032 dekte er maar 2). (4) Share-guards in
+`create/update_expense` + `CHECK (amount_cents >= 0)` op `expense_shares` (Data-3).
+Belangrijke nuance uit het live-onderzoek: **som(shares) == bedrag is bewust géén eis** —
+19 van de 56 live uitgaven zijn subset-splits (som < bedrag) en `computeBalances` rekent
+op de shares zelf; de guard is dus ≥ 0 per aandeel én som ≤ bedrag. (5) Indexen op
+`plant_photos`/`pet_log` (household_id, created_at desc) + `household_members(profile_id)`
+(Data-7). Alles via MCP `apply_migration`; per onderdeel live geverifieerd met SQL
+(rekey geblokkeerd ✓, legitiem huisgenoot-bewerken werkt ✓, negatieve/opgeblazen shares
+geweigerd ✓, subset-split blijft werken ✓, testdata opgeruimd). Drie nieuwe scenario's in
+`tests/rls.integration.test.js` bewaken dit voortaan (post-merge in `rls-check.yml`).
+Rest: realtime-DELETE cross-device op toestel zien (REV-2).
