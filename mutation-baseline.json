@@ -137,6 +137,11 @@
       "total": 74,
       "score": 86.5
     },
+    "lib/optimisticList.js": {
+      "killed": 19,
+      "total": 20,
+      "score": 95
+    },
     "lib/pantry.js": {
       "killed": 101,
       "total": 121,

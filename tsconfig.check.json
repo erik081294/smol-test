@@ -60,6 +60,7 @@
     "lib/offCategoryMap.js",
     "lib/offDelta.js",
     "lib/openFoodFacts.js",
+    "lib/optimisticList.js",
     "lib/pantry.js",
     "lib/pendingDeletes.js",
     "lib/petCare.js",

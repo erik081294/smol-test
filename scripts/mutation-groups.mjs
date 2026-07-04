@@ -57,6 +57,9 @@ export const GROUPS = [
   // redenering als i18n) + Timeout-mutanten op de fetch-tak (nondeterministisch op een trage
   // CI-runner). De parse-/mapping-LOGICA wordt wél gemuteerd; StringLiteral eruit dempt de flake.
   { test: 'openFoodFacts', srcs: ['lib/openFoodFacts.js'], exclude: ['StringLiteral'] },
+  // Pure lijst-kern onder de optimistische mutaties van useCollection (patch/remove/
+  // removeMany; review 2026-07-02). De hook zelf blijft React-schil (niet gemuteerd).
+  { test: 'optimisticList', srcs: ['lib/optimisticList.js'] },
   { test: 'pantry', srcs: ['lib/pantry.js'] },
   { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
   { test: 'plantCare', srcs: ['lib/plantCare.js'] },
