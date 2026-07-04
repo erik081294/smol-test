@@ -3,6 +3,7 @@ import { FlatList, View, Text, Image, RefreshControl, Pressable } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
+import { useReactions } from '../../lib/useReactions';
 import { useActivity } from '../../lib/useActivity';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
@@ -40,7 +41,27 @@ function PhotoStrip({ photos }) {
   );
 }
 
-function PostCard({ post, author, onPress }) {
+// Read-only reactie-samenvatting op de feed-kaart: opgetelde emoji-chips (jouw eigen
+// reactie licht op). Bewust niet-interactief hier — togglen gebeurt op het detail-scherm,
+// zodat de kaart-Pressable (die naar detail navigeert) niet botst met chip-taps.
+function ReactionSummary({ reactions }) {
+  if (!reactions?.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.sm }}>
+      {reactions.map((r) => (
+        <View key={r.emoji} style={{
+          flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: space.sm, paddingVertical: 2,
+          borderRadius: radius.md, backgroundColor: r.mine ? colors.forestTint : colors.surfaceAlt,
+        }}>
+          <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+          <Text style={[type.caption, { color: r.mine ? colors.brandText : colors.inkSoft }]}>{r.count}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PostCard({ post, author, reactions, onPress }) {
   const body = (post.body ?? '').trim();
   const name = author?.display_name ?? 'Lid';
   const pinned = post.pinned_at != null;
@@ -57,6 +78,7 @@ function PostCard({ post, author, onPress }) {
       </View>
       {body ? <Text style={[type.body, { marginTop: space.sm }]} numberOfLines={6}>{body}</Text> : null}
       <PhotoStrip photos={post.photos} />
+      <ReactionSummary reactions={reactions} />
     </Card>
   );
 }
@@ -78,6 +100,7 @@ function ActivityRow({ item }) {
 export default function Tijdlijn() {
   const router = useRouter();
   const { posts, loading, error, reload, loadMore, hasMore, members } = useTimeline();
+  const { reactionsFor } = useReactions();
   const { feed: activity } = useActivity();
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
@@ -113,7 +136,7 @@ export default function Tijdlijn() {
         onEndReached={hasMore ? loadMore : undefined}
         onEndReachedThreshold={0.5}
         renderItem={({ item }) => (
-          <PostCard post={item} author={byId[item.author_id]} onPress={() => router.push(`/tijdlijn/${item.id}`)} />
+          <PostCard post={item} author={byId[item.author_id]} reactions={reactionsFor('post', item.id)} onPress={() => router.push(`/tijdlijn/${item.id}`)} />
         )}
         ListEmptyComponent={loading ? (
           <ListSkeleton count={4} />

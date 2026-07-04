@@ -770,6 +770,63 @@ test('RLS: tijdlijnbericht + foto zichtbaar voor huisgenoot, niet voor buitensta
   assert.equal(evePhoto.data?.length ?? 0, 0, 'buitenstaander ziet de foto-rij NIET');
 });
 
+// --- Emoji-reacties (0067) — polymorf doel + can_view-lekpreventie op de parent ---
+test('RLS: emoji-reactie — lid reageert/toggelt, buitenstaander buitenspel, auteur niet te vervalsen, geen lek op onzichtbare post (0067)', opts, async () => {
+  const alice = await makeUser('alice_rx');
+  const bob = await makeUser('bob_rx');     // huisgenoot
+  const eve = await makeUser('eve_rx');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Reactiehuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: post, error: pErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Reageer maar', visibility: 'household' })
+    .select().single();
+  assert.ok(!pErr, `post: ${pErr?.message}`);
+
+  // Lid reageert op een zichtbare post → mag, en de huisgenoot ziet de reactie.
+  const { data: rx, error: rxErr } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: bob.id, target_type: 'post', target_id: post.id, emoji: '👏' })
+    .select().single();
+  assert.ok(!rxErr, `lid reageert: ${rxErr?.message}`);
+  const aliceSees = await alice.client.from('timeline_reactions').select('id, emoji').eq('target_id', post.id);
+  assert.equal(aliceSees.data?.length, 1, 'huisgenoot ziet de reactie');
+  assert.equal(aliceSees.data?.[0].emoji, '👏', 'de juiste emoji');
+
+  // Buitenstaander: ziet de reactie NIET en mag er zelf geen plaatsen (geen lid).
+  const eveSees = await eve.client.from('timeline_reactions').select('id').eq('target_id', post.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de reactie NIET');
+  const { error: eveInsErr } = await eve.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: eve.id, target_type: 'post', target_id: post.id, emoji: '👏' });
+  assert.ok(eveInsErr, 'buitenstaander mag niet reageren (geen lid)');
+
+  // Auteur niet te vervalsen: een lid mag geen reactie op naam van een ander plaatsen.
+  const { error: forgeErr } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: alice.id, target_type: 'post', target_id: post.id, emoji: '❤️' });
+  assert.ok(forgeErr, 'een lid mag geen reactie op naam van een ander plaatsen (author_id = auth.uid())');
+
+  // Togglen-uit: eigen reactie verwijderen → weg voor iedereen.
+  const { error: delErr } = await bob.client.from('timeline_reactions').delete().eq('id', rx.id);
+  assert.ok(!delErr, `eigen reactie verwijderen: ${delErr?.message}`);
+  const gone = await alice.client.from('timeline_reactions').select('id').eq('id', rx.id);
+  assert.equal(gone.data?.length ?? 0, 0, 'de reactie is weg na togglen');
+
+  // Lekpreventie: Alice plaatst een custom post die Bob NIET mag zien en reageert er zelf op.
+  // Bob (wel lid) mag die reactie niet zien én er niet op reageren (can_view op de parent).
+  const { data: secret, error: sErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Alleen ik', visibility: 'custom', share_with: [alice.id] })
+    .select().single();
+  assert.ok(!sErr, `custom post: ${sErr?.message}`);
+  const { error: aliceSelfRx } = await alice.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: alice.id, target_type: 'post', target_id: secret.id, emoji: '🎉' });
+  assert.ok(!aliceSelfRx, `auteur reageert op eigen custom post: ${aliceSelfRx?.message}`);
+  const bobSecret = await bob.client.from('timeline_reactions').select('id').eq('target_id', secret.id);
+  assert.equal(bobSecret.data?.length ?? 0, 0, 'lid ziet reactie op onzichtbare post NIET (can_view-lekpreventie)');
+  const { error: bobSecretIns } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: bob.id, target_type: 'post', target_id: secret.id, emoji: '👍' });
+  assert.ok(bobSecretIns, 'lid mag niet reageren op een post die het niet mag zien');
+});
+
 // --- Uitnodigingen (0053) — de toetredingsroute zelf moet waterdicht zijn -----
 test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander buitenspel', opts, async () => {
   const alice = await makeUser('alice_inv');   // owner

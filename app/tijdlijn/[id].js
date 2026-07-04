@@ -3,9 +3,10 @@ import { View, Text, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
+import { useReactions } from '../../lib/useReactions';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
-import { ModalHeader, Avatar, Button, Empty, ListSkeleton } from '../../lib/ui';
+import { ModalHeader, Avatar, Button, Empty, ListSkeleton, ReactionBar } from '../../lib/ui';
 import { colors, type, space, radius } from '../../lib/theme';
 import { dialog } from '../../lib/dialog';
 import { useToast } from '../../lib/toast';
@@ -29,6 +30,7 @@ export default function PostDetail() {
   const toast = useToast();
   const { id } = useLocalSearchParams();
   const { posts, loading, deletePost, setPinned, members } = useTimeline();
+  const { reactionsFor, toggle } = useReactions();
   const post = posts.find((p) => p.id === id);
   const pinned = post?.pinned_at != null;
   const author = post ? (members ?? []).find((m) => m.id === post.author_id) : null;
@@ -68,6 +70,12 @@ export default function PostDetail() {
           </View>
           {post.body ? <Text style={[type.body, { marginTop: space.md }]}>{post.body}</Text> : null}
           {(post.photos ?? []).map((ph) => <BigPhoto key={ph.id} path={ph.photo_path} />)}
+          {/* Emoji-reacties (TML-3): teller-chips + picker onder het bericht. */}
+          <ReactionBar
+            reactions={reactionsFor('post', id)}
+            onToggle={(emoji) => toggle('post', id, emoji).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }))}
+            style={{ marginTop: space.lg }}
+          />
           <View style={{ marginTop: space.xl, gap: space.sm }}>
             {/* Pin/ontpin (TML-2): gepinde berichten staan bovenaan de feed. */}
             <Button title={pinned ? t('timeline.unpin') : t('timeline.pin')} icon="pinboard" variant="soft"

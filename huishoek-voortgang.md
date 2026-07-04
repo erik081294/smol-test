@@ -1175,6 +1175,15 @@ afgerond, de rest bewust doorgeschoven:
   **nog niet toegepast**). De pure kern staat nu óók in [`lib/timeline.js`](lib/timeline.js):
   `aggregateReactions(rows, viewerId)` → teller-chips `[{emoji,count,mine}]` (count desc, dan emoji als
   tie-break) + `eventReactionTarget(table,id)` voor het stabiele event-doel-id. Unit-getest (6 cases,
-  ratchet **93.8%**, baseline bijgewerkt); typecheck + `eslint .` schoon. **Rest van TML-3:** migratie
-  live zetten (MCP) + de hook-/UI-schil (picker + chips) — pure logica staat klaar om op te klikken.
-  Heel TML-4 (comments) en TML-6/7/8 (filters) nog niet gestart.
+  ratchet **93.8%**, baseline bijgewerkt); typecheck + `eslint .` schoon.
+- **Tijdlijn TML-3 — 🔧 volledig gebouwd + live-RLS-bewezen (post-reacties).** Migratie
+  `timeline_reactions` (repo `0067`) **staat live** (via MCP `apply_migration`, versie `20260704101435`);
+  `get_advisors` toont géén nieuwe security-bevinding voor de tabel (RLS + policies herkend). React-schil:
+  [`lib/useReactions.js`](lib/useReactions.js) (household-brede laad + realtime + optimistische toggle,
+  leunend op de pure `aggregateReactions`), de gedeelde [`ReactionBar`](lib/ui.js) (teller-chips + "+"-picker,
+  vast emoji-setje) op het bericht-detail, en een read-only chip-samenvatting op de feed-kaart. Nieuwe
+  live-RLS-test (`0067`) bewijst: lid reageert/toggelt, buitenstaander buitenspel, `author_id` niet te
+  vervalsen, en `can_view`-lekpreventie op een onzichtbare (custom) post — **RLS-suite 29/29 groen** tegen
+  de echte DB. `npm test` **941 pass / 0 fail**, typecheck + `eslint .` (0 errors) schoon. **Rest:**
+  reacties op systeem-events (vergt het `reactionTarget` door de feed te rijgen → hoort bij TML-5's
+  folding) + toestel-UX-smoketest. TML-4 (comments) en TML-6/7/8 (filters) nog niet gestart.
