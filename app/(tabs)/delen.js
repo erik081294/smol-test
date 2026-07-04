@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Pressable } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useResources } from '../../lib/useResources';
 import { useHousehold } from '../../lib/household';
-import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModuleHelpButton, ModalHeader, BottomSheet, SheetScrollView } from '../../lib/ui';
+import { Empty, ScreenHeader, ItemRow, ListSkeleton, FAB, Field, Chip, Row, Badge, ModuleHelpButton, ModalHeader, BottomSheet, SheetScrollView, Banner } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { colors, space, type } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
@@ -15,7 +15,7 @@ import { t } from '../../lib/i18n';
 const KINDS = ['auto', 'gereedschap', 'overig'];
 
 export default function Delen() {
-  const { resources, loading, reload, addResource } = useResources();
+  const { resources, loading, error, reload, addResource } = useResources();
   const { members, subgroups } = useHousehold();
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -24,6 +24,18 @@ export default function Delen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('share.title')} subtitle={t('share.subtitle')}
         right={<ModuleHelpButton module="delen" />} />
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginTop: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.xs, paddingBottom: 96 }}
         data={resources}

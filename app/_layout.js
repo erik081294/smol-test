@@ -48,6 +48,11 @@ function Gate({ themeMode }) {
     // inloggen, accepteren erna). De Gate stuurt het niet weg, ongeacht in-/uitgelogd.
     if (group === 'join') return;
 
+    // Het wachtwoord-herstelscherm (UX-P5) draait op een tijdelijke PASSWORD_RECOVERY-
+    // sessie. Die maakt `session` truthy → zonder deze uitzondering zou de Gate de
+    // gebruiker meteen de app in kaatsen vóór hij een nieuw wachtwoord kan zetten.
+    if (group === 'herstel') return;
+
     if (route === 'auth') {
       if (group !== '(auth)') router.replace('/(auth)/welcome');
       return;
@@ -79,6 +84,7 @@ function Gate({ themeMode }) {
       <Stack key={`${lang}-${themeMode}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="herstel" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="join" />
         <Stack.Screen name="(tabs)" />

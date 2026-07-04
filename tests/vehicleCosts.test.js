@@ -42,7 +42,10 @@ test('depreciationEstimate: dalende balans, null zonder prijs/datum', () => {
 });
 
 test('maintenanceMonthlyAvgCents: alleen kosten binnen het venster → maandgemiddelde', () => {
-  const now = new Date('2026-06-25');
+  // Lokale middernacht (niet new Date('2026-06-25') = UTC): performed_on-date-only's worden
+  // óók als lokale dag geparset, dus de exacte grens-gelijkheid (log op `now`) klopt alleen
+  // als beide in dezelfde lokale tijd staan.
+  const now = new Date(2026, 5, 25);
   const logs = [
     { performed_on: '2026-01-10', cost_cents: 24000 }, // binnen 12 mnd
     { performed_on: '2026-05-01', cost_cents: 12000 }, // binnen
@@ -78,6 +81,16 @@ test('maintenanceMonthlyAvgCents: venster is inclusief op beide grenzen', () => 
   assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opOndergrens, cost_cents: 1200 }], { now }), 100);
   // Een log precies óp de bovengrens telt mee (<= now, niet < now).
   assert.equal(maintenanceMonthlyAvgCents([{ performed_on: opBovengrens, cost_cents: 1200 }], { now }), 100);
+});
+
+test('maintenanceMonthlyAvgCents: date-only op de vensterrand is tijdzone-veilig (lokale middernacht)', () => {
+  // now = 1 jun 2026 00:00 lokaal → cutoff (now − 12 mnd) = 1 jun 2025 00:00 lokaal.
+  // Een date-only '2025-06-01' hoort als lokale middernacht exact op die ondergrens te
+  // vallen en dus mee te tellen (>= cutoff). Onder de oude UTC-parse zou new Date('2025-06-01')
+  // naar 31 mei 17:00 lokaal (PDT) schuiven → vóór de cutoff → (fout) buiten het venster.
+  const now = new Date(2026, 5, 1, 0, 0, 0);
+  const logs = [{ performed_on: '2025-06-01', cost_cents: 12000 }];
+  assert.equal(maintenanceMonthlyAvgCents(logs, { now }), 1000); // 12000/12, niet 0
 });
 
 test('vehicleCostSummary: telt vaste lasten + onderhoud + afschrijving op', () => {

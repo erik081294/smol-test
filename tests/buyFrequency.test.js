@@ -65,10 +65,19 @@ test('frequencyEstimate: even aantal intervallen → gemiddelde van de twee midd
   assert.equal(est.medianDays, 11);
 });
 
-test('frequencyEstimate: zelfde dag twee keer → mediaan 0 en dueScore 0 (geen deling door nul)', () => {
-  const est = frequencyEstimate(['2026-06-01', '2026-06-01'], new Date(2026, 5, 10));
-  assert.equal(est.medianDays, 0);
-  assert.equal(est.dueScore, 0);
+test('frequencyEstimate: zelfde dag twee keer → één unieke dag → null (dedup)', () => {
+  // Na dedup op kalenderdag blijft er maar één aankoopdag over (< 2) → geen schatting.
+  assert.equal(frequencyEstimate(['2026-06-01', '2026-06-01'], new Date(2026, 5, 10)), null);
+});
+
+test('sortedDays dedupliceert kalenderdagen: zelfde-dag-aankopen halveren de mediaan niet', () => {
+  // Aankopen 1 jun (2×) en 15 jun. Distinct dagen: 1, 15 → één interval van 14 dagen.
+  // Zonder dedup zou de dubbele 1 juni een interval 0 toevoegen → intervallen [0, 14] →
+  // mediaan (0+14)/2 = 7: exact de "gehalveerde mediaan" uit de review.
+  assert.deepEqual(purchaseIntervals(['2026-06-01', '2026-06-01', '2026-06-15']), [14]);
+  const est = frequencyEstimate(['2026-06-01', '2026-06-01', '2026-06-15'], new Date(2026, 5, 20));
+  assert.equal(est.count, 2);       // 2 unieke dagen, niet 4
+  assert.equal(est.medianDays, 14); // niet 7 (gehalveerd door een 0-interval)
 });
 
 test('datum-only strings zijn tijdzone-veilig (geen UTC-dagverschuiving)', () => {

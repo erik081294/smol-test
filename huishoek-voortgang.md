@@ -1081,3 +1081,70 @@ file-env dus wél. Zelfde project als de sleutel → end-to-end consistent. Runb
 [`docs/notify-setup.md`](docs/notify-setup.md) §FCM-credentials. `npm test` 840 pass, `eslint .` 0 err.
 **Rest voor de PLT-1-tick:** APK op de moto installeren → permissie → token in `push_tokens` →
 alice wijst erik een taak toe → push moet landen (toestel was tijdens dit werk losgekoppeld).
+
+**2026-07-03 — Verificatie-batch op de moto: rooktest groen + PLT-1 on-device tick afgevinkt.**
+Device-sessie (moto via USB, live Metro/dev-client, push-ready build `241b0a4f`, ingelogd op
+`erik@evdn.nl`/Vark's huishouden). Twee resultaten:
+- **INF-3 rooktest.** De **crash-sweep** (15 schermen via deeplink) rendert schoon — geen
+  error-boundary — en logcat bevat geen harde JS/native-fouten. Alle **5 Maestro-gedragsflows**
+  (01-taak, 02-uitgave, 03-boodschap-undo, 04-swipe, 05-editor-guard) draaien groen, wat het
+  gedeelde formulierfundament (ARCH-5: `useEntityForm`/`useDiscardGuard`/inline-validatie), de
+  expense-editor (ARCH-1) en de undo/veeg-interacties herbevestigt. *Leerpunt:* de `npm run rooktest`
+  batch flakete eerst op twee dingen — (1) de zwevende expo-dev-client **"Tools button"-bubbel**
+  onderschepte Maestro-taps (uitgezet via het dev-menu → toggle "Tools button" uit) en (2) een trage
+  koude bundle-rebuild waardoor de flows te vroeg startten (de "tab-shell niet gezien binnen 45s"-
+  waarschuwing); los gedraaid tegen een wárme app slaagden alle vijf. Genoteerde dev-only warning bij
+  cold-load: `E/ReactNativeJS: Can't perform a React state update on a component that hasn't mounted
+  yet` (side-effect-in-render, vuurt éénmalig, breekt niets — kandidaat voor opruimen).
+- **PLT-1 on-device push-tick — afgerond.** De push-ready build heeft FCM aan boord
+  (`FirebaseApp: initializing all Firebase APIs`), `POST_NOTIFICATIONS` = granted, en na inloggen
+  registreerde de app een Expo-push-token in `push_tokens` (1 android-rij). Een synthetische
+  `tasks`-INSERT (toegewezen aan erik, `created_by` = een ánder huishoudlid) vuurde de Database-Webhook
+  → `notify` edge-function (edge-log `POST 200`, ~996ms) → Expo → **FCM-notificatie op de moto**
+  (`android.title = "Nieuwe taak voor jou"`, body = de taaktitel). Dat is de volledige keten
+  token→webhook→notify→Expo→FCM→scherm, precies de laatste openstaande stap van PLT-1. Testtaak +
+  testnotificatie opgeruimd. **PLT-1 → ✅ → archief** (backlog §6 bijgewerkt).
+
+**2026-07-03 — Multidimensionale review-fixronde (P0–P6 + CI-hardening).** De onvolledige
+maar handmatig-geverifieerde multi-agent-review van 2026-07-02
+([`docs/reviews/2026-07-02-app-review.md`](docs/reviews/2026-07-02-app-review.md)) integraal
+opgepakt: alle bevindingen P0 t/m P6 + de CI-punten gebouwd op branch `fix/review-2026-07-02`,
+met de DoD-gates groen (`npm test` 918 pass / 0 fail / 28 RLS-skip, `npm run typecheck` schoon,
+`npx eslint .` 0 errors). Per blok:
+- **P0 — Foutpaden (kernbevinding).** Een mislukte load kwam als "leeg"/"quitte" binnen omdat
+  `run()` stil de fallback teruggaf. Nieuwe pure `runResult()` ({ data, error }) in een RN-vrij
+  [`lib/dbResult.js`](lib/dbResult.js) (node-toetsbaar, in GROUPS/tsconfig), `error` doorgelust uit
+  álle data-hooks (useExpenses/usePurchases/useMealPlan/useTaskCompletions/useTimeline + de
+  useCollection-wrappers useGroceries/usePlants/usePets/useVehicles/useResources/usePantry), en een
+  foutbanner + "opnieuw proberen" (patroon uit `vandaag.js`) op de 9 lijstschermen. Kosten toont niet
+  langer onterecht "iedereen quitte" via `computeBalances([])`.
+- **P1 — Realtime refetch-storm.** In-flight `dedupeFetch` in [`lib/dataCache.js`](lib/dataCache.js)
+  (meerdere gemounte instanties van dezelfde collectie delen één query per event i.p.v. ~7 refetches),
+  `useActivity` herlaadt bron-selectief (alleen `payload.table`) i.p.v. alle 6 queries,
+  `effectiveModules` gememoiseerd in `household.js`, en `useNotifications` herplant alleen bij een
+  inhoudelijke wijziging (`remindersSignature` in `notifications.js`) i.p.v. bij elke array-identiteit.
+- **P2 — Dark-mode/contrast.** Nieuw per-thema token `onAccent` (FAB/accent nu ~6.3:1 i.p.v. 2.94:1 in
+  dark), chip-voorgrond op runtime gekozen (`pickReadable` in `contrast.js`), `PendingInviteBanner`-tekst
+  op `onDark`, + contrast-tests over alle categoriekleuren in beide thema's.
+- **P4 — Correctheid.** Pure `aggregatePurchaseItems` (bon met 2× hetzelfde product → +5 i.p.v. +3),
+  generatie-guard in `useCollection.load` tegen stale huishouden-wissel, drie datumbugs
+  (`vehicleCosts` UTC-parse, `buyFrequency.sortedDays` same-day-dedup, `notifications` DST via `addDays`),
+  en de `useGroceries` dubbel-tik-race (serialisatie per genormaliseerde naam). Elk met units.
+- **P6 — Architectuur.** Cover-terugval ontdubbeld naar puur [`lib/entityDiary.js`](lib/entityDiary.js)
+  (`deleteDiaryEntryWithCover`), care-checklist-diff uit `app/pet/[id].js` naar pure `diffCareSelection`/
+  `isCareTaskFor`/`presentCareKeys` in `petCare.js`, dode `lib/useCatalog.js` verwijderd, cache-seed als
+  pure `seedFromCache`.
+- **P3 — Testdekking.** RLS-integratiescenario's voor `pets`/`vehicles`/`groceries`/`pet_log`/`vehicle_log`
+  (het gedeelde RLS-helper-pad van migr. 0066), `openFoodFacts.js` onder de ratchet (test + GROUPS +
+  `// @ts-check`), secureStorage-chunklogica beter gedekt.
+- **CI.** Live service-role-key uit `ci.yml` (met de secrets zou `npm test` de RLS-suite op élke PR tegen
+  live draaien, zonder concurrency — in tegenspraak met `rls-check.yml`); RLS blijft exclusief in
+  `rls-check.yml`, dat nu óók automatisch draait bij een migratie-push naar `main`.
+
+**Bewust doorgeschoven (device-/dashboard-verificatie nodig, niet hier te valideren):** tabbar-
+fontschaling + de 44pt-tikdoelen (breidt A11Y-2 uit); de volledige `HouseholdCtx`-value-memo (vergt het
+stabiliseren van ~20 handlers op een centrale provider — device-test nodig); de `useCollection`
+optimistic-rollback-extractie (te verweven met setState); en de wachtwoord-recovery op **native** (het
+`app/herstel.js`-scherm werkt op web; native deep-link + de Supabase redirect-allowlist voor `/herstel`
+staan als expliciete TODO). De drie niet-gedraaide reviewdimensies (Security, Datamodel, Platform) zijn
+in deze ronde bewust overgeslagen — apart oppakken via de workflow-resume.

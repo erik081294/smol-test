@@ -36,6 +36,42 @@ test('splitByBytes geeft [""] voor lege invoer', () => {
   assert.deepEqual(splitByBytes('', 10), ['']);
 });
 
+test('byteLen: grenswaarden van elke UTF-8-band (0x7F/0x80/0x7FF/0x800/0xFFFF)', () => {
+  assert.equal(byteLen(String.fromCodePoint(0x7f)), 1);   // laatste 1-byte code point
+  assert.equal(byteLen(String.fromCodePoint(0x80)), 2);   // eerste 2-byte code point
+  assert.equal(byteLen(String.fromCodePoint(0x7ff)), 2);  // laatste 2-byte code point
+  assert.equal(byteLen(String.fromCodePoint(0x800)), 3);  // eerste 3-byte code point
+  assert.equal(byteLen(String.fromCodePoint(0xffff)), 3); // laatste BMP 3-byte code point
+});
+
+test('splitByBytes: een precies gevulde chunk splitst NIET vroegtijdig (grens >, niet >=)', () => {
+  // 4 ascii-bytes bij maxBytes 4 → één chunk (4+... pas de 5e byte breekt).
+  assert.deepEqual(splitByBytes('xxxx', 4), ['xxxx']);
+  // 5e byte valt net buiten → tweede chunk.
+  assert.deepEqual(splitByBytes('xxxxx', 4), ['xxxx', 'x']);
+});
+
+test('splitByBytes: meerdere volle chunks + rest, in volgorde en met exacte grootte', () => {
+  const value = 'abcdefghij'; // 10 ascii-bytes
+  const parts = splitByBytes(value, 3);
+  assert.deepEqual(parts, ['abc', 'def', 'ghi', 'j']); // volgorde + grenzen
+  assert.ok(parts.every((p) => byteLen(p) <= 3));
+  assert.equal(parts.join(''), value); // samenvoegen in volgorde geeft het origineel
+});
+
+test('splitByBytes: een code point groter dan maxBytes blijft heel (kan niet splitsen)', () => {
+  // 😀 = 4 bytes, maxBytes 3: de && cur-guard voorkomt een lege chunk vooraf.
+  assert.deepEqual(splitByBytes('😀', 3), ['😀']);
+  assert.deepEqual(splitByBytes('a😀', 3), ['a', '😀']); // 'a' vol genoeg, emoji apart
+});
+
+test('splitByBytes: gemengde multibyte-inhoud houdt elke chunk binnen de bytelimiet', () => {
+  const value = 'é€aé€'; // 2+3+1+2+3 = 11 bytes
+  const parts = splitByBytes(value, 4);
+  assert.ok(parts.every((p) => byteLen(p) <= 4), 'geen enkele chunk overschrijdt de limiet');
+  assert.equal(parts.join(''), value, 'volledige inhoud behouden na samenvoegen');
+});
+
 test('safeKey laat geldige sleutels intact en saneert de rest', () => {
   assert.equal(safeKey('sb-abcdef-auth-token'), 'sb-abcdef-auth-token');
   assert.equal(safeKey('a.b_c-1'), 'a.b_c-1');

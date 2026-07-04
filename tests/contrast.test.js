@@ -3,8 +3,13 @@
 // in UX-14), dan faalt dit. Drempels: AA-tekst 4.5, AA-groot/UI 3.0.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contrastRatio, AA_TEXT, AA_LARGE } from '../lib/contrast.js';
+import { contrastRatio, pickReadable, AA_TEXT, AA_LARGE } from '../lib/contrast.js';
 import { lightColors, darkColors } from '../lib/palette.js';
+
+// De categorie-accenten die als actieve-chip-vulling kunnen dienen (dynamische tint).
+const CATEGORY_TOKENS = [
+  'catKlus', 'catHuishouden', 'catPlant', 'catHuisdier', 'catAfspraak', 'catOverig', 'catVoertuig',
+];
 
 const atLeast = (fg, bg, min, label) => {
   const r = contrastRatio(fg, bg);
@@ -19,6 +24,20 @@ test('contrastRatio: exacte WCAG-uitersten — zwart/wit = 21, symmetrisch, geli
   // Gelijke kleur → ratio exact 1 (zou NaN worden als een +0.05 wegviel: 0/0).
   assert.equal(contrastRatio('#000000', '#000000'), 1);
   assert.equal(contrastRatio('#ffffff', '#ffffff'), 1);
+});
+
+test('pickReadable: kiest de kandidaat met het hoogste contrast op de achtergrond', () => {
+  // Op wit wint de donkere kandidaat, op zwart de lichte.
+  assert.equal(pickReadable('#ffffff', '#000000', '#ffffff'), '#000000');
+  assert.equal(pickReadable('#000000', '#000000', '#ffffff'), '#ffffff');
+  // Default-kandidaten (zwart/wit) — óók zónder expliciete kleuren aanroepen.
+  assert.equal(pickReadable('#ffffff'), '#000000');
+  assert.equal(pickReadable('#000000'), '#ffffff');
+  // Retourneert altijd één van de twee meegegeven kandidaten, nooit iets anders.
+  const got = pickReadable('#E0A53D', '#0E3A2F', '#FFFFFF');
+  assert.ok(got === '#0E3A2F' || got === '#FFFFFF', `pickReadable gaf ${got}`);
+  // Gelijkspel → donker (deterministische tie-break, `>=`).
+  assert.equal(pickReadable('#777777', '#000000', '#000000'), '#000000');
 });
 
 for (const [theme, c] of [['licht', lightColors], ['donker', darkColors]]) {
@@ -56,6 +75,26 @@ for (const [theme, c] of [['licht', lightColors], ['donker', darkColors]]) {
   // identiteitskleuren voor het categorie-icoon (decoratief); op wit halen ze geen
   // tekstcontrast. De categorie wordt altijd óók met een leesbaar label getoond
   // (inkSoft, AA) — kleur is dus redundant, nooit het enige signaal (PLT-5/DESIGN.md).
+
+  test(`contrast (${theme}): onAccent op het accent (ocher, FAB/accent-knop) haalt de UI/groot-vloer (3:1)`, () => {
+    // De FAB en de accent-knop tekenen `onAccent` op `ocher`; in donker was dat met
+    // `forest` 2.94:1 (P2-bevinding). onAccent moet in BEIDE thema's ≥3:1 halen.
+    atLeast(c.onAccent, c.ocher, AA_LARGE, `${theme} onAccent op ocher`);
+  });
+
+  test(`contrast (${theme}): actieve chip-voorgrond (runtime-keuze) haalt op elke categoriekleur ≥3:1`, () => {
+    // De actieve Chip vult met een dynamische tint en kiest de voorgrond op runtime
+    // met pickReadable(tint, onAccent, onDark) — exact wat ui.js Chip doet. Vaste witte
+    // tekst zakte hier onder 3:1 (wit op oker ≈ 2.0:1). Test de hele categorie-set.
+    for (const tok of CATEGORY_TOKENS) {
+      const tint = c[tok];
+      const fg = pickReadable(tint, c.onAccent, c.onDark);
+      atLeast(fg, tint, AA_LARGE, `${theme} chip-fg op ${tok} (${tint})`);
+    }
+    // Default-tint (geen kleur-prop) = forest → witte tekst blijft ruim leesbaar.
+    const forestFg = pickReadable(c.forest, c.onAccent, c.onDark);
+    atLeast(forestFg, c.forest, AA_LARGE, `${theme} chip-fg op forest`);
+  });
 
   test(`contrast (${theme}): toast-tekst op toast-bg haalt AA-tekst`, () => {
     atLeast(c.toastText, c.toastBg, AA_TEXT, `${theme} toast`);

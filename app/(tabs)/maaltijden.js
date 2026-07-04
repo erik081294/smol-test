@@ -17,7 +17,7 @@ import { useToast } from '../../lib/toast';
 import {
   Empty, ScreenHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Chip, Row, Card, Button,
   Badge, ModalHeader, Field, Stepper, Checkbox, BottomSheet, SwipeRow, SheetScrollView,
-  SegmentedControl, Avatar, FAB,
+  SegmentedControl, Avatar, FAB, Banner,
 } from '../../lib/ui';
 import { filterRecipes, MEAL_MOMENTS, DISH_TYPES, dishTypeMeta } from '../../lib/recipeCatalog';
 import { SearchField } from '../../lib/SearchField';
@@ -37,7 +37,7 @@ export default function Keuken() {
   const router = useRouter();
   const [view, setView] = useState('weekmenu'); // 'weekmenu' | 'recepten'
   const [weekStart, setWeekStart] = useState(new Date());
-  const { entries, loading, reload, weekDays, addEntry, removeEntry, buildShoppingList, commitShoppingList } = useMealPlan(weekStart);
+  const { entries, loading, error, reload, weekDays, addEntry, removeEntry, buildShoppingList, commitShoppingList } = useMealPlan(weekStart);
   const { recipes, loading: recipesLoading, removeRecipe } = useRecipes();
   const { items: pantryItems } = usePantry();
   const { removeMany: removeGroceries } = useGroceries();
@@ -210,6 +210,19 @@ export default function Keuken() {
             { value: 'recepten', label: t('keuken.tab.recepten') },
           ]} />
       </View>
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt van het weekmenu toont een nette
+          banner met opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {view === 'weekmenu' && error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
 
       {view === 'weekmenu' ? (
         <>

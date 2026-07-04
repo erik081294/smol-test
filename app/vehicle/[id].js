@@ -209,7 +209,10 @@ export default function VehicleEditor() {
   };
 
   const onDelete = async () => {
-    const ok = await dialog.confirm({ title: t('vehicle.deleteButton'), body: existing?.name ?? '', tone: 'danger' });
+    const ok = await dialog.confirm({
+      title: t('vehicle.deleteButton'), body: existing?.name ?? '', tone: 'danger',
+      confirmLabel: t('common.delete'), cancelLabel: t('common.cancel'),
+    });
     if (!ok) return;
     try { await removeVehicle(id); router.back(); }
     catch (e) { dialog.alert({ title: t('vehicle.error.save'), body: e.message }); }

@@ -59,7 +59,7 @@ const GroceryRow = React.memo(function GroceryRow({ item, onToggle, onChangeCoun
 
 export default function Boodschappen() {
   const dialog = useDialog();
-  const { items, loading, reload, toggle: toggleItem, setQuantity, setCount, remove: removeItem, removeMany } = useGroceries();
+  const { items, loading, error, reload, toggle: toggleItem, setQuantity, setCount, remove: removeItem, removeMany } = useGroceries();
   const { products, ensureProduct } = useProducts();
   const { byProduct: freqByProduct } = useProductFrequencies();
   const toast = useToast();
@@ -315,6 +315,19 @@ export default function Boodschappen() {
             ))}
           </ScrollView>
           ) : null}
+        </View>
+      ) : null}
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
         </View>
       ) : null}
 

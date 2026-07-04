@@ -41,6 +41,7 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 
 | Document | Datum | Waarover |
 |----------|-------|----------|
+| [`reviews/2026-07-02-app-review.md`](./reviews/2026-07-02-app-review.md) | 2026-07-02 | **Multidimensionale multi-agent review** (workflow) — 6 van 9 dimensies (Perf/Correctheid/UX/Design/Tests/Architectuur) + geconsolideerd P0–P6-verbeterplan. Onvolledig door sessielimiet: Security/Datamodel/Platform nog te draaien. Zwaarste bevindingen handmatig code-geverifieerd. |
 | [`verbeterplan-modules-2026-06-30.md`](./verbeterplan-modules-2026-06-30.md) | 2026-06-30 | **Verbeterplan** Voertuigen/Bonnen/Catalogus — bevindingen uit de twee reviews hieronder, élk tegen de code geverifieerd (gefixt / beslissing / groter werk / non-issue). Opvolging: §6 **UXR-11**. |
 | [`ux-review-modules-2026-06-30.md`](./ux-review-modules-2026-06-30.md) | 2026-06-30 | Onafhankelijke UX/interactie-review (subagent) van Voertuigen/Bonnen/Catalogus-screenshots — 12 punten, [zeker]/[aanname]-getagd. |
 | [`visual-design-review-2026-06-30.md`](./visual-design-review-2026-06-30.md) | 2026-06-30 | Onafhankelijke puur-visuele review (subagent) van dezelfde modules — kleur-rolzuiverheid, hiërarchie, consistentie. |

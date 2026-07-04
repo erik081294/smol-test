@@ -84,7 +84,7 @@ export default function HuishoudenTab() {
       title: t('household.subgroup.delete.title'),
       body: t('household.subgroup.delete.body', { name: g.name }),
       confirmLabel: t('common.delete'), cancelLabel: t('common.cancel'), tone: 'danger',
-    })) deleteSubgroup(g.id);
+    })) deleteSubgroup(g.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   const sgEmojis = ['👥', '👩‍❤️‍👨', '⚽', '🎓', '🏠', '🧒', '🎸', '🐾'];
@@ -133,7 +133,7 @@ export default function HuishoudenTab() {
       title: t('household.leave.title'),
       body: t('household.leave.body', { name: active.name }),
       confirmLabel: t('household.leave.confirm'), cancelLabel: t('common.cancel'), tone: 'danger',
-    })) leaveHousehold(active.id);
+    })) leaveHousehold(active.id).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   return (

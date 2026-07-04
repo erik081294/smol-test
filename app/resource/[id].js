@@ -32,6 +32,7 @@ export default function ResourceDetail() {
   const { addExpense } = useExpenses();
   const { user } = useAuth();
   const toast = useToast();
+  const dialog = useDialog();
   const [resource, setResource] = useState(null);
 
   // Reservering toevoegen + (V4) automatische km-verrekening: heeft de resource een tarief
@@ -50,7 +51,11 @@ export default function ResourceDetail() {
           sourceType: 'reservation', sourceId: resource.id,
         });
         toast.show({ message: t('share.kmBill.done', { amount: formatCents(cost) }) });
-      } catch { /* reservering staat al; verrekening faalde → stil (niet blokkeren) */ }
+      } catch {
+        // De reservering staat al; alleen de km-verrekening (geld!) faalde. Niet stil
+        // wegslikken — meld het zodat de gebruiker 'm desnoods handmatig kan toevoegen.
+        dialog.alert({ title: t('share.kmBill.failed.title'), body: t('share.kmBill.failed.body') });
+      }
     }
   };
   const [reserving, setReserving] = useState(false);

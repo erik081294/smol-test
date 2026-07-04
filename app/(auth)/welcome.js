@@ -7,10 +7,10 @@ import { useDialog } from '../../lib/dialog';
 import { Button, Field } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type } from '../../lib/theme';
-import { t } from '../../lib/i18n';
+import { t, authErrorMessage } from '../../lib/i18n';
 
 export default function Welcome() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const dialog = useDialog();
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
@@ -42,7 +42,28 @@ export default function Welcome() {
         if (error) throw error;
       }
     } catch (err) {
-      setErrors({ form: err.message }); // inline foutmelding onder het formulier
+      setErrors({ form: authErrorMessage(err) }); // inline, in NL i.p.v. kale Engelse Supabase-tekst
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Wachtwoord vergeten: stuur een herstelmail. We bevestigen altijd neutraal
+  // ("als dit adres bekend is") zodat de flow niet verklapt of een e-mail bestaat.
+  const forgotPassword = async () => {
+    if (!isConfigured) {
+      dialog.alert({ title: t('auth.supabaseMissing.title'), body: t('auth.supabaseMissing.body') });
+      return;
+    }
+    const addr = email.trim();
+    if (!addr) { setErrors((e) => ({ ...e, email: t('auth.forgot.needEmail') })); return; }
+    setBusy(true);
+    try {
+      const { error } = await resetPassword(addr);
+      if (error) throw error;
+      dialog.alert({ title: t('auth.forgot.sent.title'), body: t('auth.forgot.sent.body', { email: addr }) });
+    } catch (err) {
+      setErrors({ form: authErrorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -81,6 +102,19 @@ export default function Welcome() {
               title={mode === 'signup' ? t('auth.submit.signup') : t('auth.submit.signin')}
               onPress={submit} loading={busy} style={{ marginTop: 6 }}
             />
+            {mode === 'signin' && (
+              <Pressable
+                onPress={forgotPassword}
+                disabled={busy}
+                accessibilityRole="button"
+                hitSlop={8}
+                style={({ pressed }) => ({ marginTop: 14, alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>
+                  {t('auth.forgot.link')}
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Secundaire actie (inloggen ↔ account maken) als duidelijk zichtbare link:

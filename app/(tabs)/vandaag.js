@@ -78,7 +78,8 @@ export default function Home() {
 
   const toggle = (tk) => {
     animateNextLayout();
-    return tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
+    const p = tk.completed_at ? uncompleteTask(tk.id) : completeTask(tk);
+    return Promise.resolve(p).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   };
 
   // Veeg-actie op de focuslijst — app-brede conventie (UX-43): LINKS = verwijderen
@@ -89,12 +90,13 @@ export default function Home() {
   const snoozeFromHome = (task) => {
     const prev = task.due_date ?? null;
     const next = snoozeDate(task, 1);
+    const fail = (e) => dialog.alert({ title: t('common.failed'), body: e.message });
     animateNextLayout();
-    updateTask(task.id, { due_date: next });
+    Promise.resolve(updateTask(task.id, { due_date: next })).catch(fail);
     toast.show({
       message: t('tasks.snoozed', { date: dueLabel({ due_date: next }) }),
       actionLabel: t('common.undo'),
-      onAction: () => { animateNextLayout(); updateTask(task.id, { due_date: prev }); },
+      onAction: () => { animateNextLayout(); Promise.resolve(updateTask(task.id, { due_date: prev })).catch(fail); },
     });
   };
 

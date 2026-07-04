@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTasks } from '../../lib/useTasks';
 import { usePlants, usePlantSpecies, usePlantPhotoUrl } from '../../lib/usePlants';
-import { Empty, FAB, ScreenHeader, ModuleHelpButton, ListSkeleton } from '../../lib/ui';
+import { Empty, FAB, ScreenHeader, ModuleHelpButton, ListSkeleton, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, elevation, type, space } from '../../lib/theme';
 import { dueLabel } from '../../lib/recurrence';
@@ -46,7 +46,7 @@ function PlantCard({ plant, speciesName, next, onPress }) {
 }
 
 export default function Planten() {
-  const { plants, loading, reload } = usePlants();
+  const { plants, loading, error, reload } = usePlants();
   const { species } = usePlantSpecies();
   const { tasks } = useTasks();
   const router = useRouter();
@@ -80,6 +80,19 @@ export default function Planten() {
               : undefined}
           />
         } />
+
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginTop: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
 
       <FlatList
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: 100 }}

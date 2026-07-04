@@ -22,6 +22,15 @@ export const GROUPS = [
   { test: 'choreLibrary', srcs: ['lib/choreLibrary.js'] },
   { test: 'cleaningTemplates', srcs: ['lib/cleaningTemplates.js'] },
   { test: 'dataCache', srcs: ['lib/dataCache.js'] },
+  // Pure kern van de entiteit-dagboeken: de omslag-terugval bij verwijderen (voorheen
+  // letterlijk gedupliceerd in usePets/usePlants; P6-review 2026-07-02). Supabase-effecten
+  // worden ingespoten zodat de beslissing puur/testbaar blijft.
+  { test: 'entityDiary', srcs: ['lib/entityDiary.js'] },
+  // Pure kern onder lib/db.js (fout-vorm + fout≠leeg-discriminatie, P0-review 2026-07-02).
+  // De survivors zijn uitsluitend StringLiteral-mutaties op de console.warn-logteksten
+  // (data-ruis, geen gedrag — zelfde redenering als i18n/groceryCatalog); de fout≠leeg-
+  // LOGICA wordt wél gemuteerd.
+  { test: 'dbResult', srcs: ['lib/dbResult.js'], exclude: ['StringLiteral'] },
   { test: 'decisions', srcs: ['lib/decisions.js'] },
   { test: 'expenses', srcs: ['lib/expenses.js'] },
   { test: 'fairness', srcs: ['lib/fairness.js'] },
@@ -41,6 +50,13 @@ export const GROUPS = [
   { test: 'notifications', srcs: ['lib/notifications.js'] },
   { test: 'offCatalog', srcs: ['lib/offCatalog.js'] },
   { test: 'offDelta', srcs: ['lib/offDelta.js'] },
+  // OFF live-lookup-parser (BOO-9): pure map van de OFF v2-respons → catalog_products-vorm.
+  // De fetch-wrapper is dun/injecteerbaar; de LOGICA (velden extraheren, fallback, null bij
+  // geen-product) valt hiermee onder de ratchet. Geen data-tabel → geen StringLiteral-exclude.
+  // Overlevers zijn grotendeels StringLiteral op fallback-/URL-teksten (data-ruis, zelfde
+  // redenering als i18n) + Timeout-mutanten op de fetch-tak (nondeterministisch op een trage
+  // CI-runner). De parse-/mapping-LOGICA wordt wél gemuteerd; StringLiteral eruit dempt de flake.
+  { test: 'openFoodFacts', srcs: ['lib/openFoodFacts.js'], exclude: ['StringLiteral'] },
   { test: 'pantry', srcs: ['lib/pantry.js'] },
   { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
   { test: 'plantCare', srcs: ['lib/plantCare.js'] },

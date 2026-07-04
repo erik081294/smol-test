@@ -1,12 +1,12 @@
 import React, { useMemo, useCallback } from 'react';
-import { FlatList, View, Text, Image, RefreshControl } from 'react-native';
+import { FlatList, View, Text, Image, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
 import { useActivity } from '../../lib/useActivity';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
-import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton, Collapsible } from '../../lib/ui';
+import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton, Collapsible, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -77,7 +77,7 @@ function ActivityRow({ item }) {
 
 export default function Tijdlijn() {
   const router = useRouter();
-  const { posts, loading, reload, loadMore, hasMore, members } = useTimeline();
+  const { posts, loading, error, reload, loadMore, hasMore, members } = useTimeline();
   const { feed: activity } = useActivity();
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
@@ -93,6 +93,18 @@ export default function Tijdlijn() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('timeline.title')} subtitle={t('timeline.subtitle')}
         right={<ModuleHelpButton module="tijdlijn" />} />
+      {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
+          opnieuw-proberen i.p.v. een stille lege lijst. */}
+      {error && !loading ? (
+        <View style={{ paddingHorizontal: space.lg, marginTop: space.sm }}>
+          <Banner tone="warning" icon="warning" title={t('common.loadError')}>
+            <Pressable onPress={reload} accessibilityRole="button" hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: space.xs })}>
+              <Text style={[type.label, { color: colors.forest }]}>{t('common.retry')}</Text>
+            </Pressable>
+          </Banner>
+        </View>
+      ) : null}
       <FlatList
         data={posts}
         keyExtractor={(it) => it.id}

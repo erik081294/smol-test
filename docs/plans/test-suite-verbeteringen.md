@@ -3,6 +3,18 @@
 > Status: **voorstel** (nog niet ingepland). Dit doc bevat een survey van de huidige
 > teststand + een geprioriteerde lijst verbeteringen. Er zijn met dit plan **geen
 > code-wijzigingen** doorgevoerd — het is puur richting.
+>
+> **Deels ingehaald door de review-fixronde (2026-07-03, [`docs/reviews/2026-07-02-app-review.md`](../reviews/2026-07-02-app-review.md)):**
+> - **Punt 1a (logica naar pure modules) — eerste stap gezet:** de cache-seed van
+>   `useCollection` is verhuisd naar de pure, geteste `seedFromCache` (`lib/dataCache.js`);
+>   de optimistic-rollback-kern blijft als vervolgstap (te verweven met `setState`).
+> - **Punt 3 (goedkope pure-data-gaten) — deels gedicht:** `openFoodFacts.js` heeft nu een
+>   unit-test + staat onder de ratchet (het ís een pure parser, geen I/O-wrapper — zie de
+>   correctie hieronder); `secureStorage.js` kreeg extra chunk-/byte-tests.
+> - **Punt 4 (integratie voorbij RLS) — RLS zelf verbreed:** `rls.integration.test.js` dekt nu
+>   ook `pets`/`vehicles`/`groceries`/`pet_log`/`vehicle_log` (het gedeelde helper-pad van migr. 0066).
+>
+> De survey-cijfers hieronder zijn een momentopname van vóór die ronde en dus licht verouderd.
 
 ## Huidige stand (survey, juli 2026)
 
@@ -59,7 +71,10 @@ DoD een test te hebben):
   side-effects.
 
 De overige ongeteste niet-React-modules (`auth`, `household`, `db`, `supabase`,
-`openFoodFacts`, `barcodeLookup`) zijn I/O-wrappers → daar hoort integratie, geen unit.
+`barcodeLookup`) zijn I/O-wrappers → daar hoort integratie, geen unit. *(Correctie
+2026-07-03: `openFoodFacts.js` hoorde hier niet — het is een pure response-parser, geen
+I/O-wrapper; het heeft nu een unit-test + staat onder de ratchet. De fetch-kant zit als
+injecteerbare `fetchImpl` ernaast.)*
 
 ### 4. Breid integratie uit voorbij RLS
 We hebben één integratietest. De Supabase query-builders in

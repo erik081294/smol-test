@@ -7,11 +7,21 @@ name: RLS-integratietest (handmatig)
 # Per-PR draaien zou productie hameren en flaky/traag zijn. Handmatig + geserialiseerd is de
 # robuuste vorm: je triggert 'm bewust ná RLS-/migratiewerk om het contract in de DB te bewijzen.
 #
+# Toevoeging (review P3, tests-medium): draai óók automatisch zodra een migratie op `main`
+# landt (paths-filter). Anders kon een policy-versoepelende migratie met groene CI mergen
+# zónder dat het RLS-contract ooit tegen de DB werd bewezen. Bewust alléén op `main` (post-
+# merge), niet op elke PR/branch — dat beperkt de live-prod-impact tot een gemergede migratie,
+# en de concurrency-groep hieronder serialiseert nog steeds. Zónder secrets skipt de test.
+#
 # Activeren: zet de repo-secrets SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY.
 # Zónder die secrets skipt de test zichzelf (de job slaagt dan zonder iets te verifiëren).
 # Zie docs/mutatietesten.md (testlagen) en de RLS-notitie in het geheugen/VERIFICATIE.md.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
 
 # Serialiseer: nooit twee runs tegelijk op hetzelfde live project.
 concurrency:
