@@ -208,9 +208,9 @@
       "score": 92.3
     },
     "lib/timeline.js": {
-      "killed": 72,
-      "total": 77,
-      "score": 93.5
+      "killed": 105,
+      "total": 112,
+      "score": 93.8
     },
     "lib/visibility.js": {
       "killed": 60,

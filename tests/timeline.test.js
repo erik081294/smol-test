@@ -1,7 +1,7 @@
 // Units voor de pure kern van de tijdlijn / prikbord (TML-1). Zie lib/timeline.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderTimeline, summarizePost, isPostValid } from '../lib/timeline.js';
+import { orderTimeline, summarizePost, isPostValid, aggregateReactions, eventReactionTarget } from '../lib/timeline.js';
 
 const ids = (list) => list.map((p) => p.id);
 
@@ -122,4 +122,71 @@ test('isPostValid: tekst óf foto vereist; leeg/whitespace ongeldig', () => {
   assert.equal(isPostValid({ body: '   ', photoCount: 0 }), false); // whitespace telt niet
   assert.equal(isPostValid({ body: '' }), false);
   assert.equal(isPostValid(), false);                            // default-param: niets → ongeldig
+});
+
+// ── aggregateReactions (TML-3) ─────────────────────────────────────────────
+
+test('aggregateReactions: telt per emoji en sorteert op count desc, dan emoji oplopend', () => {
+  // Insertievolgorde bewust OPLOPEND op count (😂=1 komt als eerste emoji binnen,
+  // 👏=3 als laatste), zodat de sort de lijst écht moet omkeren — anders overleeft
+  // de count-vergelijker (zijn tak wordt nooit geraakt als de invoer al gesorteerd is).
+  const rows = [
+    { emoji: '😂', author_id: 'u5' },
+    { emoji: '❤️', author_id: 'u2' },
+    { emoji: '❤️', author_id: 'u4' },
+    { emoji: '👏', author_id: 'u1' },
+    { emoji: '👏', author_id: 'u3' },
+    { emoji: '👏', author_id: 'u6' },
+  ];
+  // 👏=3, ❤️=2, 😂=1 → op count desc; assert de héle geordende lijst.
+  assert.deepEqual(aggregateReactions(rows, 'niemand'), [
+    { emoji: '👏', count: 3, mine: false },
+    { emoji: '❤️', count: 2, mine: false },
+    { emoji: '😂', count: 1, mine: false },
+  ]);
+});
+
+test('aggregateReactions: gelijke count → emoji-tie-break, stabiel bij omgekeerde invoer', () => {
+  // Twee emoji met dezelfde count: de tie-break op emoji-string moet dezelfde
+  // volgorde geven, ongeacht invoervolgorde. '👏' (U+1F44F) < '🙌' (U+1F64C).
+  const a = [{ emoji: '🙌', author_id: 'u1' }, { emoji: '👏', author_id: 'u2' }];
+  const b = [{ emoji: '👏', author_id: 'u2' }, { emoji: '🙌', author_id: 'u1' }];
+  const expected = [
+    { emoji: '👏', count: 1, mine: false },
+    { emoji: '🙌', count: 1, mine: false },
+  ];
+  assert.deepEqual(aggregateReactions(a, 'x'), expected);
+  assert.deepEqual(aggregateReactions(b, 'x'), expected);
+});
+
+test('aggregateReactions: mine=true zodra de kijker zelf die emoji gaf, anders false', () => {
+  const rows = [
+    { emoji: '👏', author_id: 'ik' },
+    { emoji: '👏', author_id: 'ander' },
+    { emoji: '❤️', author_id: 'ander' },
+  ];
+  assert.deepEqual(aggregateReactions(rows, 'ik'), [
+    { emoji: '👏', count: 2, mine: true },   // ik zit erbij
+    { emoji: '❤️', count: 1, mine: false },  // ik niet
+  ]);
+});
+
+test('aggregateReactions: rijen zonder (geldige) emoji tellen niet mee', () => {
+  const rows = [
+    { emoji: '👏', author_id: 'u1' },
+    { emoji: '', author_id: 'u2' },        // lege string → weg
+    { author_id: 'u3' },                   // ontbrekend veld → weg
+    { emoji: null, author_id: 'u4' },      // null → weg
+    null,                                  // hele rij null → geen crash, overgeslagen
+  ];
+  assert.deepEqual(aggregateReactions(rows, 'x'), [{ emoji: '👏', count: 1, mine: false }]);
+});
+
+test('aggregateReactions: lege/ontbrekende invoer → lege lijst (default-param)', () => {
+  assert.deepEqual(aggregateReactions([], 'x'), []);
+  assert.deepEqual(aggregateReactions(), []);              // beide args weg
+});
+
+test('eventReactionTarget: koppelt bron-tabel en id tot een stabiel doel-id', () => {
+  assert.equal(eventReactionTarget('task_completions', 'abc-123'), 'task_completions:abc-123');
 });

@@ -1169,8 +1169,12 @@ afgerond, de rest bewust doorgeschoven:
 - **Live-RLS-verificatie — ✅ 946 pass / 0 fail / 0 skipped** tegen de echte DB (secrets uit `.env`),
   incl. de 5 P3-scenario's (pets/vehicles/groceries/pet_log/vehicle_log). Bewijst het LRN-1-restpunt
   "live-RLS-verificatie" (vorige meting 775). Live DB t/m migratie `0066` (MCP `list_migrations`).
-- **Tijdlijn TML-3/4 — ◐ alleen migratie gedraft.** Statuscorrectie: TML-1/2 zijn af én de
-  TML-5-activiteitenlaag rendert al. Van TML-3 (emoji-reacties) ligt de migratie
+- **Tijdlijn TML-3/4 — ◐ migratie gedraft + pure aggregatielaag gebouwd.** Statuscorrectie: TML-1/2
+  zijn af én de TML-5-activiteitenlaag rendert al. Van TML-3 (emoji-reacties) ligt de migratie
   [`0067_timeline_reacties.sql`](supabase/migrations/0067_timeline_reacties.sql) klaar (doordacht RLS,
-  **nog niet toegepast**, geen consumerende code); de rest van TML-3 + heel TML-4 (comments) is een
-  vervolgstap (agent-limiet). TML-6/7/8 (filters) niet gestart.
+  **nog niet toegepast**). De pure kern staat nu óók in [`lib/timeline.js`](lib/timeline.js):
+  `aggregateReactions(rows, viewerId)` → teller-chips `[{emoji,count,mine}]` (count desc, dan emoji als
+  tie-break) + `eventReactionTarget(table,id)` voor het stabiele event-doel-id. Unit-getest (6 cases,
+  ratchet **93.8%**, baseline bijgewerkt); typecheck + `eslint .` schoon. **Rest van TML-3:** migratie
+  live zetten (MCP) + de hook-/UI-schil (picker + chips) — pure logica staat klaar om op te klikken.
+  Heel TML-4 (comments) en TML-6/7/8 (filters) nog niet gestart.
