@@ -95,6 +95,11 @@ export const GROUPS = [
   { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },
   // Assistent (AI-1, plan 23): catalog-poortwachter, agent-loop-kern en tool-registry.
   { test: 'assistantUi', srcs: ['lib/assistantUi.js'] },
+  // SSE-client-laag + markdown-subset van de assistent (AI-5, plan 24 ronde D).
+  { test: 'assistantStream', srcs: ['lib/assistantStream.js'] },
+  { test: 'markdownLite', srcs: ['lib/markdownLite.js'] },
+  // Push-token-administratie bij uitloggen (Plat-1, platform-review 2026-07-04).
+  { test: 'pushTokenRegistry', srcs: ['lib/pushTokenRegistry.js'] },
   { test: 'assistantCore', srcs: ['supabase/functions/assistant/core.js'] },
   { test: 'assistantTools', srcs: ['supabase/functions/_shared/assistantTools.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },

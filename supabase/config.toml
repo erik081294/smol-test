@@ -350,6 +350,12 @@ verify_jwt = true
 [functions.notify]
 verify_jwt = false
 
+# Assistent (AI-1, plan 23): betaalde LLM-call + DB-schrijvend — expliciet achter
+# een ingelogde sessie, consistent met scan-receipt (security-review 2026-07-04,
+# Sec-2: niet op de impliciete default leunen).
+[functions.assistant]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

@@ -102,3 +102,18 @@ test('treeToText: zonder argument → lege string; alle node-types leesbaar', ()
 test('treeToText: card zonder titel laat het streepje weg', () => {
   assert.equal(treeToText(normalizeTree([{ type: 'card', lines: ['alleen regel'] }])), 'alleen regel');
 });
+
+test('treeToText: lijst zonder titel geeft alleen de items (geen losse dubbele punt)', () => {
+  assert.equal(
+    treeToText(normalizeTree([{ type: 'list', items: [{ text: 'melk' }, { text: 'brood' }] }])),
+    'melk, brood'
+  );
+});
+
+test('normalizeNode: keyvalue overleeft null-paren en niet-array-pairs', () => {
+  assert.deepEqual(
+    normalizeNode({ type: 'keyvalue', pairs: [null, { k: 'A', v: '1' }, { k: '', v: 'x' }] }),
+    { type: 'keyvalue', title: null, pairs: [{ k: 'A', v: '1' }] }
+  );
+  assert.equal(normalizeNode({ type: 'keyvalue', pairs: 'rommel' }), null);
+});

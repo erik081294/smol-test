@@ -289,3 +289,23 @@ test('get_pantry_low_stock: juiste tabel/kolommen', async () => {
   assert.equal(calls[0].selected, 'name, quantity, unit, low_threshold, best_before');
   assert.deepEqual(calls[0].filters, [['eq', 'household_id', 'h1']]);
 });
+
+test('statusLabel: elke read-tool draagt zijn eigen NL-statusregel (AI-5 tool_status)', () => {
+  const labels = Object.fromEntries(ASSISTANT_TOOLS.map((t) => [t.name, t.statusLabel]));
+  assert.deepEqual(labels, {
+    get_open_tasks: 'Even in de taken kijken…',
+    get_grocery_list: 'Boodschappenlijstje erbij pakken…',
+    get_expenses_summary: 'Uitgaven op een rijtje zetten…',
+    get_pantry_low_stock: 'Voorraad nalopen…',
+  });
+});
+
+test('renderOpenTasks: gelijke due_dates behouden hun invoervolgorde (comparator geeft 0)', () => {
+  const rows = [
+    { title: 'A', due_date: '2026-07-05', assigned_to: null },
+    { title: 'B', due_date: '2026-07-05', assigned_to: null },
+    { title: 'C', due_date: '2026-07-01', assigned_to: null },
+  ];
+  assert.deepEqual(renderOpenTasks(rows).data.tasks.map((t) => t.title), ['C', 'A', 'B']);
+  assert.deepEqual(renderOpenTasks([...rows].reverse()).data.tasks.map((t) => t.title), ['C', 'B', 'A']);
+});

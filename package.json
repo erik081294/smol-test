@@ -1,6 +1,9 @@
 {
   "name": "huishoek",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=22"
+  },
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -17,7 +20,7 @@
     "test:mutation:baseline": "node scripts/mutation-check.mjs --update",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.check.json",
-    "import:catalog": "node scripts/import-off-nl.mjs"
+    "import:catalog": "node scripts/import-off-dump.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

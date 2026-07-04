@@ -1276,3 +1276,38 @@ alleen de tree). Slot-DoD: `npm test` 1009 pass / 0 fail, typecheck schoon, `esl
 0 errors. Open naar volgende sessie: ronde D (SSE + streamdown; markdown rendert nog plat
 — zichtbaar als **X** in het hervatte gesprek), ronde E-rest (stop-knop, tool-status,
 haptics), AI-7 t/m AI-9.
+
+**2026-07-04 (vervolg) — Ronde D+E van de assistent af, review-addendum compleet, quick-fixes.**
+De halsoverkop gestopte sessie opgepakt op `feat/assistent-fase1`. Drie sporen:
+- **AI-5 (ronde D) af.** De server-kant (SSE-route, gedeployed als v10) lag er al; de
+  app-kant is nu aangesloten: `useAssistant` streamt via `expo/fetch` (POST `stream:true`
+  rechtstreeks naar de edge function; `functions.invoke` kan geen ReadableStream terug­geven)
+  met de pure reducer [`lib/assistantStream.js`](lib/assistantStream.js) — nu wél
+  unit-getest (14 tests) + GROUPS/`@ts-check` (dat DoD-gat zat nog in de gestrande
+  commit), ratchet 86,3%. Terugval naar non-streaming alléén als de request de server
+  niet bereikte (anders zou een midweg-afgebroken stroom de vraag dupliceren én dubbel
+  op de rate-limit tellen). Streamende bubble + tool-statusregel in het scherm.
+  **Markdown:** platte `**sterren**` opgelost met een pure subset-parser
+  [`lib/markdownLite.js`](lib/markdownLite.js) (bold/cursief/code/kopjes/lijsten;
+  streaming-tolerant: een nog niet gesloten marker stylet de rest van de regel) —
+  bewust géén `react-native-streamdown` (vergt de device-spike uit plan 24-risico's;
+  de parser is hier verifieerbaar en dep-vrij), ratchet 86%.
+- **AI-6 (ronde E-kern).** Stop-knop (abort; de al gestreamde tekst blijft staan als
+  bericht — de server maakt de beurt af en persisteert de volledige versie), retry-chip
+  op een foutbubble, haptics (tik bij antwoord, error-tril bij fout). Rest van E
+  (collapsible tool-calls, message-actions, scroll-anchoring) staat in de AI-6-rij.
+- **Review-addendum + quick wins.** De 3 nooit gedraaide reviewdimensies (Security /
+  Datamodel / Platform) alsnog gedraaid met drie onafhankelijke agents + de live
+  advisor-scan; addendum in [het rapport](docs/reviews/2026-07-02-app-review.md), zwaarste
+  bevindingen handmatig geverifieerd (✓): de 0066-attributie-fix is via een UPDATE te
+  omzeilen (Sec-1) en realtime-DELETE-events bereiken huisgenoten op ~22 tabellen niet
+  (Data-2, high — 0032 dekte er maar 2). Direct gefixt: **push-token-opruiming bij
+  uitloggen** (Plat-1-privacylek; nieuw [`lib/pushTokenRegistry.js`](lib/pushTokenRegistry.js),
+  mutatie 100%), `[functions.assistant] verify_jwt=true`, CI naar Node 22 + `engines`,
+  `import:catalog`-script gerepareerd. De rest is geconsolideerd in backlog-rij **REV-2**
+  (P7 DB-hardening / P8 release-keten / P9 push-poets).
+Ratchet-dalingen uit de gestrande commit gedicht (assistantUi 93,6→95,5%, assistantTools
+90,6→92,3% — statusLabels + comparator-randen getest), baselines herijkt. Slot-DoD:
+`npm test` 1049 pass / 0 fail / 29 RLS-skip, typecheck schoon, `eslint .` 0 errors,
+`mutation-check --since=origin/main` groen. **Rest voor toestel:** stream + markdown +
+stop/retry op de moto (licht/donker), zie AI-5/AI-6.

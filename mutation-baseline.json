@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 5163,
-    "total": 6125,
-    "score": 84.3
+    "killed": 5388,
+    "total": 6385,
+    "score": 84.4
   },
   "files": {
     "lib/activity.js": {
@@ -333,9 +333,9 @@
       "score": 45.9
     },
     "lib/assistantUi.js": {
-      "killed": 148,
+      "killed": 149,
       "total": 156,
-      "score": 94.9
+      "score": 95.5
     },
     "supabase/functions/assistant/core.js": {
       "killed": 255,
@@ -343,9 +343,24 @@
       "score": 87.3
     },
     "supabase/functions/_shared/assistantTools.js": {
-      "killed": 263,
-      "total": 282,
-      "score": 93.3
+      "killed": 264,
+      "total": 286,
+      "score": 92.3
+    },
+    "lib/assistantStream.js": {
+      "killed": 88,
+      "total": 102,
+      "score": 86.3
+    },
+    "lib/markdownLite.js": {
+      "killed": 117,
+      "total": 136,
+      "score": 86.0
+    },
+    "lib/pushTokenRegistry.js": {
+      "killed": 18,
+      "total": 18,
+      "score": 100.0
     }
   }
 }

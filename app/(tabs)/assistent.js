@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { FlatList, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader, ModuleHelpButton, Field, IconButton, Chip, T, Stack, Row, Empty, BottomSheet, ItemRow } from '../../lib/ui';
-import { AssistantMessageView } from '../../lib/AssistantMessageView';
+import { AssistantMessageView, MarkdownText } from '../../lib/AssistantMessageView';
 import { Icon } from '../../lib/icons';
 import { useAssistant } from '../../lib/useAssistant';
 import { colors, space, radius } from '../../lib/theme';
@@ -35,8 +35,19 @@ function Bubble({ item }) {
   );
 }
 
+// Tussenstand van een streamende beurt (AI-5, ronde D): de tekst groeit mee met
+// de delta's, in dezelfde vorm als de definitieve assistent-bubble.
+function StreamingBubble({ stream }) {
+  if (!stream?.text) return null;
+  return (
+    <View style={{ alignSelf: 'flex-start', maxWidth: '88%', marginBottom: space.sm }}>
+      <MarkdownText text={stream.text} />
+    </View>
+  );
+}
+
 export default function Assistent() {
-  const { enabled, messages, busy, send, choices, conversations, conversationId, openConversation, newConversation } = useAssistant();
+  const { enabled, messages, busy, stream, send, stop, retry, canRetry, choices, conversations, conversationId, openConversation, newConversation } = useAssistant();
   const [draft, setDraft] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -73,17 +84,21 @@ export default function Assistent() {
             data={messages}
             keyExtractor={(m) => m.id}
             renderItem={({ item }) => <Bubble item={item} />}
+            // Inverted lijst: de header rendert onderaan — precies waar de
+            // streamende (nieuwste) beurt hoort.
+            ListHeaderComponent={<StreamingBubble stream={stream} />}
             contentContainerStyle={{ paddingHorizontal: space.lg, paddingVertical: space.md }}
             keyboardShouldPersistTaps="handled"
           />
         )}
         {busy ? (
           <T variant="caption" color={colors.inkSoft} style={{ paddingHorizontal: space.lg, paddingBottom: space.xs }}>
-            {t('assistant.thinking')}
+            {stream?.status || t('assistant.thinking')}
           </T>
         ) : null}
-        {choices.length > 0 ? (
+        {choices.length > 0 || canRetry ? (
           <Row gap={space.xs} wrap style={{ paddingHorizontal: space.lg, paddingBottom: space.xs }}>
+            {canRetry ? <Chip label={t('assistant.retry')} onPress={retry} testID="t-assistant-retry" /> : null}
             {choices.map((c) => <Chip key={c} label={c} onPress={() => submit(c)} />)}
           </Row>
         ) : null}
@@ -99,8 +114,14 @@ export default function Assistent() {
               testID="t-assistant-input"
             />
           </View>
-          <IconButton icon="send" accessibilityLabel={t('assistant.send')} onPress={() => submit()}
-            disabled={!enabled || busy || draft.trim().length === 0} testID="t-assistant-send" />
+          {busy ? (
+            // Stop-knop (ronde E): breekt de streamende beurt af, partial blijft staan.
+            <IconButton icon="stop" accessibilityLabel={t('assistant.stop')} onPress={stop}
+              testID="t-assistant-stop" />
+          ) : (
+            <IconButton icon="send" accessibilityLabel={t('assistant.send')} onPress={() => submit()}
+              disabled={!enabled || draft.trim().length === 0} testID="t-assistant-send" />
+          )}
         </Row>
       </KeyboardAvoidingView>
       <BottomSheet visible={historyOpen} onClose={() => setHistoryOpen(false)}>
