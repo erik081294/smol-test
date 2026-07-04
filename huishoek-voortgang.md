@@ -1148,3 +1148,29 @@ optimistic-rollback-extractie (te verweven met setState); en de wachtwoord-recov
 `app/herstel.js`-scherm werkt op web; native deep-link + de Supabase redirect-allowlist voor `/herstel`
 staan als expliciete TODO). De drie niet-gedraaide reviewdimensies (Security, Datamodel, Platform) zijn
 in deze ronde bewust overgeslagen — apart oppakken via de workflow-resume.
+
+**2026-07-04 — Review-vervolgronde: follow-ups geland, Security gedraaid, live-RLS bewezen.**
+Branch `feat/vervolg-review-fases` (stapelt op PR #115). Vier sporen parallel opgezet; twee volledig
+afgerond, de rest bewust doorgeschoven:
+- **Review-follow-ups (Fase 2) — ✅ gebouwd + gecommit.** De `HouseholdCtx`-value-memo (handlers via
+  `useCallback` + `value`/`active`/`modules` gememoiseerd → consumers her-renderen alleen bij een echte
+  wijziging, Perf-medium); de `useCollection` optimistic-rollback naar een pure, ratchet-bewaakte
+  [`lib/optimisticList.js`](lib/optimisticList.js) (`patchItem`/`removeItem`/`removeItems`, mutatie **95%**);
+  a11y-tikdoelen (`hitSlopFor` op de kleine tekstacties in `ui.js`) + tabbar-fontschaling
+  (hoogte groeit mee met `PixelRatio.getFontScale()`, `adjustsFontSizeToFit` weg). `npm test` **935 pass /
+  0 fail**, typecheck + `eslint .` schoon. **Restpunt:** het native wachtwoord-recovery-codedeel
+  (`app/herstel.js`) is niet gebouwd (agent-limiet) — web-recovery werkt al.
+- **Security-dimensie van de review — ✅ gedraaid, fixes UITGESTELD (keuze Erik).** Geen highs;
+  tenant-isolatie solide. Twee mediums vastgelegd voor een aparte security-sessie: de teruggedraaide
+  `search_path`-pin op `enable_module_rls` (`0066`) en de vervuilbare globale catalogus-`image_url`
+  (`insert_catalog_product`). Plus de live `get_advisors`-scan (19× RLS-initplan, 66× dubbele policies,
+  42 ongeïndexeerde FK's) — bundelen in één DB-hardening-migratie later. Detail in het review-doc.
+  **Datamodel + Platform-dimensies:** doorgeschoven naar diezelfde vervolgsessie.
+- **Live-RLS-verificatie — ✅ 946 pass / 0 fail / 0 skipped** tegen de echte DB (secrets uit `.env`),
+  incl. de 5 P3-scenario's (pets/vehicles/groceries/pet_log/vehicle_log). Bewijst het LRN-1-restpunt
+  "live-RLS-verificatie" (vorige meting 775). Live DB t/m migratie `0066` (MCP `list_migrations`).
+- **Tijdlijn TML-3/4 — ◐ alleen migratie gedraft.** Statuscorrectie: TML-1/2 zijn af én de
+  TML-5-activiteitenlaag rendert al. Van TML-3 (emoji-reacties) ligt de migratie
+  [`0067_timeline_reacties.sql`](supabase/migrations/0067_timeline_reacties.sql) klaar (doordacht RLS,
+  **nog niet toegepast**, geen consumerende code); de rest van TML-3 + heel TML-4 (comments) is een
+  vervolgstap (agent-limiet). TML-6/7/8 (filters) niet gestart.
