@@ -1332,3 +1332,13 @@ op de shares zelf; de guard is dus ≥ 0 per aandeel én som ≤ bedrag. (5) Ind
 geweigerd ✓, subset-split blijft werken ✓, testdata opgeruimd). Drie nieuwe scenario's in
 `tests/rls.integration.test.js` bewaken dit voortaan (post-merge in `rls-check.yml`).
 Rest: realtime-DELETE cross-device op toestel zien (REV-2).
+
+**2026-07-04 (vervolg 3) — P8-deel: web-source-maps in de deploy + OTel-opruiming.**
+`npm run deploy:web` exporteert nu mét `--source-maps` en draait
+[`scripts/deploy-web.mjs`](scripts/deploy-web.mjs): Sentry-upload (overslaan + waarschuwing
+zonder `SENTRY_AUTH_TOKEN` — de deploy blokkeert er nooit op), daarna de `.map`-bestanden
+uit `dist` strippen (broncode niet publiek op Cloudflare), dan pas `wrangler pages deploy`.
+Dit vult de INF-4-rest ("web-frames geminified") concreet in; verificatie = de
+eerstvolgende echte deploy mét token. `@opentelemetry/api` verhuisde naar devDependencies
+(alleen supabase-js-onder-Node gebruikt 'm; metro stubt 'm al voor de bundle — comment
+bijgewerkt). Suite/typecheck/lint groen na `npm install`.

@@ -11,7 +11,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
-    "deploy:web": "expo export --platform web && npx wrangler pages deploy dist --project-name=huishoek",
+    "deploy:web": "expo export --platform web --source-maps && node scripts/deploy-web.mjs",
     "device": "bash scripts/dev-device.sh",
     "rooktest": "bash scripts/rooktest.sh",
     "test": "node --import ./tests/register.mjs --test tests/*.test.js",
@@ -23,7 +23,6 @@
     "import:catalog": "node scripts/import-off-dump.mjs"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@sentry/react-native": "~7.11.0",
     "@supabase/supabase-js": "^2.45.0",
@@ -61,6 +60,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@expo/ngrok": "^4.1.3",
+    "@opentelemetry/api": "^1.9.1",
     "@stryker-mutator/core": "^9.6.1",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~56.0.4",
