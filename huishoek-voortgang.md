@@ -1187,3 +1187,92 @@ afgerond, de rest bewust doorgeschoven:
   de echte DB. `npm test` **941 pass / 0 fail**, typecheck + `eslint .` (0 errors) schoon. **Rest:**
   reacties op systeem-events (vergt het `reactionTarget` door de feed te rijgen → hoort bij TML-5's
   folding) + toestel-UX-smoketest. TML-4 (comments) en TML-6/7/8 (filters) nog niet gestart.
+
+**2026-07-04 — Huishoek Assistent (AI-1): plan 23 + offline-deel fase 1 gebouwd.**
+AI-1 van geparkeerd → lopend. Ontwerp: [plan 23](docs/plans/23-assistent.md) — persona/toon,
+vijf kernflows, alle UI-states met copy, bevestigingskaart-ontwerp, fasering 0a–6 (incl. de
+"Huisregels"-NL-automations als 5b). Architectuur: eigen dunne agent-loop in een edge function
+(géén CopilotKit/A2UI-dep), Orq als gateway, tools RLS-gescoped, writes altijd HITL, gesprekken
+creator-privé. Gebouwd (alles behalve de live Orq-koppeling, want workspace `evdn` heeft nog
+geen credits/provider-key): pure laag `lib/assistantUi.js` (catalog-poortwachter, mutatie 94,9%),
+`supabase/functions/assistant/core.js` (loop-kern, 90,8%) en `_shared/assistantTools.js`
+(4 read-tools over tasks/groceries/expenses/pantry, 93,3%) — samen 60+ unit-tests; migratie
+`0068_assistent.sql` (assistant_conversations/-messages met creator-privé RLS i.p.v. het
+module-sjabloon — privacylek-preventie — + `record_assistant_call` met per-user én per-household
+dagplafond, fail-closed; **nog niet live**); edge function `assistant/index.ts` (Orq-proxy,
+non-streaming v1; **nog niet gedeployed**); app-schil: module-entry (niet-primair, groep 'huis'),
+`app/(tabs)/assistent.js` (inverted chat + suggestie-chips), `lib/useAssistant.js`,
+`lib/AssistantMessageView.js`, i18n-copy voor álle states, moduleHelp, iconen (ChatCircleDots/
+PaperPlaneRight). `npm test` 985 pass / 0 fail, typecheck schoon, `eslint .` 0 errors,
+mutatie-ratchet groen (nieuwe baselines toegevoegd). **Rest:** Orq-credits → 0c-spike →
+migratie via MCP `apply_migration` → deploy + `ORQ_ASSISTANT_MODEL`-secret → device-rooktest.
+
+**2026-07-04 (later) — Assistent live: spike GO, migratie 0068 + deploy + device-rooktest.**
+Orq-workspace op orde (credits + AI-Studio-key; modellen zai/glm-5.2, google/eu.claude-sonnet-5,
+gemini-3.1-flash-image). 0c-spike via de Orq-proxy: tool-call (correct OpenAI-formaat incl.
+`only_mine`-inferentie), tool-resultaat-ronde (net NL-antwoord) én SSE — **GO**, geen fallback nodig.
+Migratie `0068` live via MCP `apply_migration`; secrets `ORQ_API_KEY` + `ORQ_ASSISTANT_MODEL=
+eu.claude-sonnet-5` gezet; `assistant`-function gedeployed (bundler nam `_shared`/`core.js` mee —
+import-risico beslecht). E2E: curl met user-JWT → 200 met echte huishouddata (~6,5s, 2 tools).
+Device-rooktest moto: lege staat + suggestie-chips renderen (dark), chip-tap → antwoord met echte
+open-taken-kaart (25 taken; signaleert zelf de achterstallige "Groenbak"). Bekende fase-2-punten:
+markdown rendert plat, non-streaming voelt traag bij lange antwoorden → SSE. Bonus: hetzelfde
+ORQ_API_KEY-secret maakt scan-receipt (BOO-7) live-klaar.
+
+**2026-07-04 (avond) — Plan 24 "Assistent volwassen" + ronde A (AI-2) code-af.**
+Nieuw plan [24](docs/plans/24-assistent-volwassen.md): 8 shipbare rondes AI-2…AI-9
+(observability → evals/GLM-experiment → persistentie → SSE/streamdown → UX-poets →
+A2UI-alignment → HITL-writes → geheugen), plus normatieve guidelines
+[`docs/assistent-architectuur.md`](docs/assistent-architectuur.md) (tool-pack-contract,
+tool-budget ≤12, prompt in Orq-deployment met eval-gate, specialist-afsplitscriteria,
+geheugen-schrijfregels, observability-conventies, catalog-regels) en monitoring-runbook
+[`docs/orq-assistant.md`](docs/orq-assistant.md) — beide ingeweven (docs/README, CLAUDE.md).
+Ronde A gebouwd: invoke-schema geverifieerd (thread/metadata/identity/inputs/extra_params;
+géén top-level tools → dynamische tool-set via `extra_params`), `assistant/index.ts`
+dual-route (deployment-invoke bij secret, anders proxy) met SHA-256-gehashte
+user/household-ids en `thread.id` = conversatie-id (client stuurt `conversationId` mee,
+lazy gegenereerd — react-compiler-purity-lint gefixt), `parseChatResponse` verhardt voor
+parts-array-content. Deploy + live-regressie op de proxy-route ✓ (200, kaart + tekst).
+Rest: deployment aanklikken (dashboard; REST kan het niet) + secret + invoke-live-test.
+
+**2026-07-04 (laat) — AI-2: Orq-route empirisch beslecht → v3-router; alles via MCP opgezet.**
+De Orq MCP-server rechtstreeks via JSON-RPC benaderd (registratie bij Erik nog open):
+deployment (`huishoek_assistant_live`) en agent (`huishoek_assistant`) via MCP aangemaakt.
+Bevinding: `deployments/invoke` (extra_params/top-level) én agents (Responses) negeren
+per-request tools — ook met `tool_choice=required`; op de kale **v3-router**
+(`/v3/router/responses`) werkt alles wél: function_call met correcte args, `thread`
+(=conversatie, komt als `session_id` in traces), `metadata` (gehashte ids), trace_id, en
+de function_call_output-ronde geeft een net NL-antwoord. `index.ts` omgebouwd naar
+router-route (activatie via provider-prefix in `ORQ_ASSISTANT_MODEL`), pure
+Responses-parsers (`toResponsesTools`/`parseResponsesOutput`/`functionCallOutputItem`)
+in `core.js` + tests (20 pass), typecheck groen, gedeployed. Traces via MCP `list_traces`
+geverifieerd. Docs (runbook/guidelines §3/backlog) bijgewerkt naar de werkelijkheid:
+prompt blijft voorlopig in de edge function; Orq-agent staat klaar voor migratie zodra
+per-request tools op agents landen. Open bij Erik: model-secret met prefix, MCP-koppeling,
+dashboard-opruiming (2 misdeployments + toolprobe), zai-saldo voor het GLM-experiment.
+
+**2026-07-04 (nacht) — AI-3-kern, AI-4 en het antwoordopties-patroon gebouwd.**
+Op verzoek van Erik twee nieuwe interactie-principes verankerd (guidelines §8): (1) élke
+beurt eindigt met 2–4 tikbare antwoordopties via de `suggest_replies`-pseudo-tool
+(AskUserQuestion-patroon; de loop voert 'm nooit uit, `splitSuggestions` oogst de opties;
+vrij typen blijft altijd de "Other"-route), en (2) BEKNOPT-prompt: 1–3 zinnen, data in
+kaarten, details via deep-link. Effect gemeten met de nieuwe eval-gate: tool-F1 89,7→**96%**,
+args 100%, geen-tool 100%. AI-3-kern: golden-set (29 NL-cases + registry-meta-test),
+eval-runner `scripts/assistant-eval.mjs` met baseline+tolerantie (2pp, ratchet-stijl),
+Orq-judges `huishoek-nl-toon`/`huishoek-groundedness` via de (nu native) Orq MCP; het
+GLM-experiment geparkeerd (zai-route zonder saldo). AI-4: migratie 0069 live, server-side
+schrijfpad (user-bericht vóór de LLM-call), history uit DB, titel + updated_at,
+gesprekkenlijst/hervatten/nieuw-gesprek in hook + sheet. E2E: vervolgvraag beantwoord uit
+DB-context; kortere antwoorden zichtbaar ("Je hebt 1 open taak, met deadline 23 juli." +
+3 chips). Mutatie assistantCore 87,3% (baseline herijkt), typecheck/lint groen.
+
+**2026-07-04 (nacht, vervolg) — device-verificatie AI-4 + antwoordopties (moto, licht+donker).**
+Volledige flow op toestel bevestigd: suggestie-chip → beknopt antwoord (3 zinnen i.p.v.
+verslag) + taken-kaart + 3 verse antwoordopties-chips; gesprekken-sheet (nieuw gesprek +
+lijst met titels, actief gesprek gemarkeerd); hervatten laadt het gesprek uit de DB
+inclusief kaarten én gepersisteerde antwoordopties. Gevonden + gefixt op device: de
+antwoordtekst renderde dubbel (item.text én de text-node in de tree — bubble rendert nu
+alleen de tree). Slot-DoD: `npm test` 1009 pass / 0 fail, typecheck schoon, `eslint .`
+0 errors. Open naar volgende sessie: ronde D (SSE + streamdown; markdown rendert nog plat
+— zichtbaar als **X** in het hervatte gesprek), ronde E-rest (stop-knop, tool-status,
+haptics), AI-7 t/m AI-9.

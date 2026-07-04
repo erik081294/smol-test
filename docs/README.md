@@ -21,6 +21,8 @@ Wegwijzer voor deze map. Drie soorten document — let op het verschil:
 | [`notify-setup.md`](./notify-setup.md) | Notificaties opzetten (PLT-1) — lokale herinneringen + push. |
 | [`recurring-setup.md`](./recurring-setup.md) | Terugkerende uitgaven server-side materialiseren (KOS-4). |
 | [`orq-receipt-scan.md`](./orq-receipt-scan.md) | Bonscan via Orq.ai (BOO-7) — edge function `scan-receipt` setup. |
+| [`orq-assistant.md`](./orq-assistant.md) | Assistent-gateway (AI-2) — Orq-deployment, trace-conventies, monitoring-runbook. |
+| [`assistent-architectuur.md`](./assistent-architectuur.md) | **Normatieve guidelines** voor de assistent: tool-pack-contract, prompt-beheer, eval-gate, specialist-criteria, geheugen- en catalog-regels. |
 | [`off-catalog.md`](./off-catalog.md) | Productcatalogus uit Open Food Facts vullen/vers houden — operator-runbook. |
 
 ## Runbook

@@ -26,6 +26,11 @@ Begin hier; ga niet op je geheugen af — de code beweegt sneller dan losse docs
   pass/fail-oordeel (i.p.v. handmatig tikken + screenshots lezen). Flows in [`.maestro/`](.maestro/).
 - **Design-systeem:** [`DESIGN.md`](DESIGN.md). **Overige naslag/how-to & gedateerde reviews:**
   [`docs/README.md`](docs/README.md).
+- **Assistent (AI-laag):** normatieve guidelines in
+  [`docs/assistent-architectuur.md`](docs/assistent-architectuur.md) (tool-pack-contract,
+  prompt-beheer via Orq-deployment, eval-gate, specialist-criteria) + runbook
+  [`docs/orq-assistant.md`](docs/orq-assistant.md). Raak je assistent-tools, -prompt of
+  -model aan? Lees die eerst.
 
 Onderstaande **definition of done** borgt onze integratiesnelheid: testgaten horen dicht
 vóór de PR, niet pas bij de merge. (Deze sessie kostte een half uur omdat een PR pas bij
