@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-05T09:29:30.650Z",
+  "generatedAt": "2026-07-05T11:10:58.577Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 6316,
-    "total": 7407,
-    "score": 85.3
+    "killed": 6504,
+    "total": 7606,
+    "score": 85.5
   },
   "files": {
     "lib/activity.js": {
@@ -338,9 +338,9 @@
       "score": 95.6
     },
     "supabase/functions/assistant/core.js": {
-      "killed": 387,
-      "total": 442,
-      "score": 87.6
+      "killed": 437,
+      "total": 497,
+      "score": 87.9
     },
     "lib/assistantStream.js": {
       "killed": 88,
@@ -363,44 +363,44 @@
       "score": 98.9
     },
     "supabase/functions/_shared/tools/index.js": {
-      "killed": 6,
-      "total": 6,
+      "killed": 13,
+      "total": 13,
       "score": 100
     },
     "supabase/functions/_shared/tools/taken.js": {
-      "killed": 180,
-      "total": 205,
-      "score": 87.8
+      "killed": 184,
+      "total": 209,
+      "score": 88
     },
     "supabase/functions/_shared/tools/boodschappen.js": {
-      "killed": 137,
-      "total": 148,
-      "score": 92.6
+      "killed": 141,
+      "total": 152,
+      "score": 92.8
     },
     "supabase/functions/_shared/tools/kosten.js": {
-      "killed": 65,
-      "total": 68,
-      "score": 95.6
+      "killed": 69,
+      "total": 72,
+      "score": 95.8
     },
     "supabase/functions/_shared/tools/voorraad.js": {
-      "killed": 61,
-      "total": 65,
-      "score": 93.8
+      "killed": 65,
+      "total": 69,
+      "score": 94.2
     },
     "supabase/functions/_shared/tools/maaltijden.js": {
-      "killed": 193,
-      "total": 211,
-      "score": 91.5
+      "killed": 197,
+      "total": 215,
+      "score": 91.6
     },
     "supabase/functions/assistant/actions.js": {
-      "killed": 185,
-      "total": 206,
-      "score": 89.8
+      "killed": 186,
+      "total": 207,
+      "score": 89.9
     },
     "lib/assistantActions.js": {
-      "killed": 74,
-      "total": 83,
-      "score": 89.2
+      "killed": 184,
+      "total": 199,
+      "score": 92.5
     }
   }
 }
