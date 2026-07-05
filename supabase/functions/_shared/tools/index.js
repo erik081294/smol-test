@@ -11,11 +11,11 @@
 // dus de set moet binnen een gesprek byte-stabiel zijn — nooit afhangen van
 // import- of Object.keys-volgorde.
 
-import { TAKEN_TOOLS } from './taken.js';
-import { BOODSCHAPPEN_TOOLS } from './boodschappen.js';
-import { KOSTEN_TOOLS } from './kosten.js';
-import { VOORRAAD_TOOLS } from './voorraad.js';
-import { MAALTIJDEN_TOOLS } from './maaltijden.js';
+import { TAKEN_TOOLS, TAKEN_BRIEF } from './taken.js';
+import { BOODSCHAPPEN_TOOLS, BOODSCHAPPEN_BRIEF } from './boodschappen.js';
+import { KOSTEN_TOOLS, KOSTEN_BRIEF } from './kosten.js';
+import { VOORRAAD_TOOLS, VOORRAAD_BRIEF } from './voorraad.js';
+import { MAALTIJDEN_TOOLS, MAALTIJDEN_BRIEF } from './maaltijden.js';
 
 /**
  * Voeg packs samen tot één registry: gesorteerd op naam, met een harde fout op
@@ -41,4 +41,28 @@ export const ASSISTANT_TOOLS = aggregateToolPacks([
   KOSTEN_TOOLS,
   VOORRAAD_TOOLS,
   MAALTIJDEN_TOOLS,
+]);
+
+/**
+ * Voeg module-briefs samen tot één map moduleKey → { label, brief } (AI-10):
+ * de goedkope altijd-in-context-laag van de systemprompt-snapshot. Dubbele
+ * moduleKeys zijn een bouwfout — hard falen, net als bij toolnamen.
+ * @param {Array<{moduleKey: string, label: string, brief: string}>} briefs
+ * @returns {Record<string, {label: string, brief: string}>}
+ */
+export function aggregateBriefs(briefs) {
+  const map = /** @type {Record<string, {label: string, brief: string}>} */ ({});
+  for (const b of briefs) {
+    if (map[b.moduleKey]) throw new Error(`Dubbele module-brief: ${b.moduleKey}`);
+    map[b.moduleKey] = { label: b.label, brief: b.brief };
+  }
+  return map;
+}
+
+export const MODULE_BRIEFS = aggregateBriefs([
+  TAKEN_BRIEF,
+  BOODSCHAPPEN_BRIEF,
+  KOSTEN_BRIEF,
+  VOORRAAD_BRIEF,
+  MAALTIJDEN_BRIEF,
 ]);

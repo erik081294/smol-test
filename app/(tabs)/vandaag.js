@@ -27,6 +27,7 @@ import { useToast } from '../../lib/toast';
 import { animateNextLayout } from '../../lib/motion';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
+import { useAssistantHub } from '../../lib/assistantProvider';
 
 const SCREEN_PAD = 18;
 const GRID_GAP = space.md;
@@ -62,6 +63,7 @@ export default function Home() {
   const toast = useToast();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { openAssistant } = useAssistantHub();
 
   const { overdue, today } = useMemo(() => {
     const open = tasks.filter((tk) => !tk.completed_at);
@@ -367,8 +369,10 @@ export default function Home() {
             onPress={() => setEditing(false)} />
         </View>
       ) : (
-        /* Snel een taak toevoegen — verborgen in bewerkmodus. */
-        <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} onPress={() => router.push('/task/new')} />
+        /* Snel een taak toevoegen — verborgen in bewerkmodus. AI-first (AI-10):
+           de assistent-sheet eerst, "Zelf invoeren" als uitwijk. */
+        <FAB label={t('fab.task')} accessibilityLabel={t('task.add')}
+          onPress={() => openAssistant({ moduleKey: 'taken', onManual: () => router.push('/task/new') })} />
       )}
     </SafeAreaView>
   );

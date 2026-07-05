@@ -72,9 +72,17 @@ test('actionState: opgeslagen status telt, verlopen pending toont expired, onbek
 });
 
 test('constanten: whitelists en statusmachine-vocabulaire liggen exact vast', () => {
-  assert.deepEqual(ACTION_DECISIONS, ['confirm', 'reject', 'undo']);
+  assert.deepEqual(ACTION_DECISIONS, ['confirm', 'reject', 'undo', 'edit']);
   assert.deepEqual(ACTION_STATUSES, ['pending', 'executing', 'done', 'failed', 'rejected', 'undone']);
   assert.equal(ACTION_TTL_SECONDS, 3600);
+});
+
+test('canResolve: edit mag alleen op een verse pending (net als confirm/reject)', () => {
+  const now = atSeconds(1);
+  assert.equal(canResolve(pendingRow(), 'edit', now).ok, true);
+  assert.match(canResolve(pendingRow(), 'edit', atSeconds(ACTION_TTL_SECONDS + 1)).error, /verlopen/);
+  assert.match(canResolve(pendingRow({ status: 'done' }), 'edit', now).error, /al verwerkt/);
+  assert.match(canResolve(pendingRow({ status: 'rejected' }), 'edit', now).error, /al verwerkt/);
 });
 
 test('null-veiligheid: een null/lege rij crasht nergens en is nooit uitvoerbaar', () => {

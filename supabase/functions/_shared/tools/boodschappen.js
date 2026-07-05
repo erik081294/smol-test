@@ -46,6 +46,15 @@ export function proposeAddGroceries(args = {}) {
   return { ok: true, summary, items, args: { items: norm } };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const BOODSCHAPPEN_BRIEF = {
+  moduleKey: 'boodschappen',
+  label: 'Boodschappen',
+  brief: 'de gedeelde boodschappenlijst; kan de lijst tonen en items voorstellen',
+};
+
 export const BOODSCHAPPEN_TOOLS = [
   {
     name: 'boodschappen_lijst',

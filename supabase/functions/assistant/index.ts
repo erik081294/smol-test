@@ -42,9 +42,10 @@ import {
   clientEventsFromRouterEvent,
   statusLabelMap,
   sseLine,
+  openProposalsNote,
 } from './core.js';
 // @ts-ignore — zie boven.
-import { ASSISTANT_TOOLS } from '../_shared/tools/index.js';
+import { ASSISTANT_TOOLS, MODULE_BRIEFS } from '../_shared/tools/index.js';
 // @ts-ignore — zie boven. Pure HITL-statusmachine (AI-8): de agent-loop voert
 // write-tools nooit uit; de harness maakt er een voorstel van en deze module
 // bepaalt wat er met een besluit (confirm/reject/undo) mag gebeuren.
@@ -56,6 +57,7 @@ import {
   contentWithStatus,
   selectItems,
   undoPlan,
+  isExpired,
 } from './actions.js';
 // @ts-ignore — Deno-runtime-import.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -106,9 +108,13 @@ Deno.serve(async (req: Request) => {
     memberNames?: Record<string, string>;
     today?: string;
     stream?: boolean;
+    // Scherm-context (AI-10): moduleKey van het scherm waar de assistent is
+    // geopend — een aanwijzing voor het model, nooit een beperking.
+    screen?: string;
     // HITL-besluit op een eerder voorstel (AI-8): los van message — een besluit
-    // is geen chatbeurt en kost geen LLM-call.
-    action?: { id?: string; decision?: string; selected?: number[] };
+    // is geen chatbeurt en kost geen LLM-call. decision 'edit' (AI-10) draagt
+    // de door de GEBRUIKER bewerkte args (gaat door dezelfde propose-validatie).
+    action?: { id?: string; decision?: string; selected?: number[]; args?: object; memberNames?: Record<string, string> };
   };
   try {
     body = await req.json();
@@ -170,6 +176,38 @@ Deno.serve(async (req: Request) => {
     if (decision === 'reject') {
       if (!(await finish('rejected'))) return json({ error: 'Dit voorstel is al verwerkt.' }, 409);
       return json({ ok: true, status: 'rejected' });
+    }
+
+    // edit (AI-10, mens↔AI-overdracht): de gebruiker nam het voorstel over en
+    // bewerkte de items. Zijn args gaan door DEZELFDE pure propose()-validatie
+    // als model-args en vervangen de opgeslagen args; status blijft pending —
+    // bevestigen blijft een aparte, bewuste stap. edited_by_user gaat mee in het
+    // audit-spoor én in de openstaand-voorstel-context van de volgende beurt.
+    if (decision === 'edit') {
+      const editTool = ASSISTANT_TOOLS.find((t) => t.name === row.content?.tool && t.kind === 'write');
+      if (!editTool) return json({ error: 'Dit voorstel wordt niet meer ondersteund.' }, 409);
+      const editMembers = body.action.memberNames && typeof body.action.memberNames === 'object' ? body.action.memberNames : {};
+      const proposal = editTool.propose(body.action.args ?? {}, { today: nowIso.slice(0, 10), memberNames: editMembers });
+      if (!proposal.ok) return json({ error: proposal.error }, 400);
+      const edited = contentWithStatus(row.content, 'pending', {
+        summary: proposal.summary,
+        items: proposal.items,
+        args: proposal.args,
+        edited_by_user: true,
+      });
+      const { data: updated } = await db
+        .from('assistant_messages')
+        .update({ content: edited })
+        .eq('id', actionId)
+        .eq('content->>status', 'pending')
+        .select('id');
+      if ((updated ?? []).length === 0) return json({ error: 'Dit voorstel is al verwerkt.' }, 409);
+      return json({
+        ok: true,
+        status: 'pending',
+        summary: proposal.summary,
+        items: proposal.items.map((text: string, i: number) => ({ id: i, text })),
+      });
     }
 
     if (decision === 'undo') {
@@ -257,11 +295,6 @@ Deno.serve(async (req: Request) => {
   // hieronder maakt er een bevestigingsvoorstel van (HITL).
   const tools = filterTools(ASSISTANT_TOOLS, enabledKeys, { includeWrite: true });
   const chatTools = toChatTools(tools);
-  const snapshot = buildContextSnapshot({
-    today,
-    memberNames: Object.values(memberNames),
-    moduleLabels: enabledKeys,
-  });
 
   // --- Persistentie (AI-4): het gesprek leeft server-side in assistant_* (RLS,
   // creator-privé). Bestaand conversationId (uuid) → history uit de DB; anders
@@ -280,7 +313,7 @@ Deno.serve(async (req: Request) => {
     if (!convo) return json({ error: 'Gesprek niet gevonden.' }, 404);
     const { data: rows, error: histErr } = await db
       .from('assistant_messages')
-      .select('role, content')
+      .select('role, content, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
       .limit(60);
@@ -308,6 +341,21 @@ Deno.serve(async (req: Request) => {
     content: { v: 1, text: message },
   });
 
+  // Snapshot ná de history-load (AI-10): briefs van de actieve modules, het
+  // scherm waar de assistent is geopend (aanwijzing, geen beperking) en de nog
+  // openstaande — mogelijk door de gebruiker bewerkte — voorstellen.
+  const nowIsoTurn = new Date().toISOString();
+  const actionRows = (historyRows as Array<{ role?: string }>).filter(
+    (r) => r?.role === 'action' && !isExpired(r, nowIsoTurn)
+  );
+  const snapshot = buildContextSnapshot({
+    today,
+    memberNames: Object.values(memberNames),
+    moduleLabels: enabledKeys,
+    moduleBriefs: enabledKeys.map((k) => MODULE_BRIEFS[k]).filter(Boolean),
+    screenLabel: typeof body.screen === 'string' ? (MODULE_BRIEFS[body.screen]?.label ?? '') : '',
+    proposalsNote: openProposalsNote(actionRows),
+  });
   const systemText = snapshot ? `${SYSTEM_PROMPT}\n\n${snapshot}` : SYSTEM_PROMPT;
   // Beide routes: system + geklemde history (uit de DB) + nieuwe vraag. De
   // Responses API accepteert dezelfde {role, content}-berichtvorm als input-items.

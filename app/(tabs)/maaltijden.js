@@ -28,6 +28,7 @@ import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { success } from '../../lib/haptics';
 import { MEAL_TYPES } from '../../lib/constants';
 import { t, plural } from '../../lib/i18n';
+import { useAssistantHub } from '../../lib/assistantProvider';
 
 // "Keuken" — de eigen omgeving voor het weekmenu (plannen) én het beheren van recepten.
 // Eén scherm met een Weekmenu/Recepten-toggle; Boodschappen staat los (de "uit recept →
@@ -43,6 +44,7 @@ export default function Keuken() {
   const { removeMany: removeGroceries } = useGroceries();
   const { members } = useHousehold();
   const toast = useToast();
+  const { openAssistant } = useAssistantHub();
 
   // Snel een profiel-id → lid opzoeken voor de eters-avatars op de dagkaart.
   const memberById = useMemo(() => Object.fromEntries((members ?? []).map((m) => [m.id, m])), [members]);
@@ -271,7 +273,9 @@ export default function Keuken() {
           ocher FAB als elke andere module, i.p.v. een afwijkende grijze inline-knop. Het
           Weekmenu houdt zijn eigen per-dag "+" en de "Boodschappen aanvullen"-actie. */}
       {view === 'recepten' ? (
-        <FAB label={t('recipe.fab')} accessibilityLabel={t('recipe.new')} onPress={() => router.push('/recipe/new')} />
+        /* AI-first FAB (AI-10): assistent eerst, "Zelf invoeren" als uitwijk. */
+        <FAB label={t('recipe.fab')} accessibilityLabel={t('recipe.new')}
+          onPress={() => openAssistant({ moduleKey: 'maaltijden', onManual: () => router.push('/recipe/new') })} />
       ) : null}
 
       <AddEntryModal

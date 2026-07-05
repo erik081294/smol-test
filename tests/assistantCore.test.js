@@ -18,6 +18,7 @@ import {
   toolResultMessage,
   clampHistory,
   buildContextSnapshot,
+  openProposalsNote,
   shouldContinueLoop,
   buildTurnResult,
   toResponsesTools,
@@ -157,6 +158,56 @@ test('buildContextSnapshot: alle delen, deel-loos leeg, default-arg', () => {
   assert.equal(buildContextSnapshot({ memberNames: ['Erik'] }), 'Leden van het huishouden: Erik.');
   assert.equal(buildContextSnapshot({}), '');
   assert.equal(buildContextSnapshot(), '');
+});
+
+test('buildContextSnapshot: briefs verdringen de labellijst; één regel per module (AI-10)', () => {
+  const out = buildContextSnapshot({
+    moduleLabels: ['taken', 'maaltijden'], // hoort genegeerd te worden zodra er briefs zijn
+    moduleBriefs: [
+      { label: 'Taken', brief: 'open taken en klusjes' },
+      { label: 'Keuken', brief: 'weekmenu en recepten' },
+    ],
+  });
+  assert.equal(out, 'Actieve modules:\n- Taken: open taken en klusjes.\n- Keuken: weekmenu en recepten.');
+});
+
+test('buildContextSnapshot: schermregel is aanwijzing-geen-beperking; voorstellen-nota plakt achteraan', () => {
+  const out = buildContextSnapshot({
+    today: '2026-07-05',
+    screenLabel: 'Boodschappen',
+    proposalsNote: 'NOTA',
+  });
+  assert.equal(
+    out,
+    'Vandaag is 2026-07-05. De gebruiker kijkt nu naar het scherm "Boodschappen" — gebruik dit als aanwijzing waar de vraag over kan gaan, niet als beperking. NOTA'
+  );
+  // Zonder scherm/nota geen loze regels.
+  assert.equal(buildContextSnapshot({ screenLabel: '', proposalsNote: '' }), '');
+});
+
+test('openProposalsNote: alleen pending, met items en bewerkt-markering', () => {
+  const rows = [
+    { content: { status: 'done', summary: 'oud voorstel' } },
+    { content: { status: 'pending', summary: 'Voorstel A', items: ['een', 'twee'] } },
+    { content: { status: 'pending', summary: 'Voorstel B', items: [], edited_by_user: true } },
+  ];
+  const note = openProposalsNote(rows);
+  assert.match(note, /^Openstaand voorstel, wacht op bevestiging/);
+  assert.match(note, /- Voorstel A \[een \| twee\]\n/);
+  assert.match(note, /- Voorstel B \(door de gebruiker bewerkt\)/);
+  assert.doesNotMatch(note, /oud voorstel/);
+  assert.match(note, /Zeg niet dat dit al is uitgevoerd/);
+});
+
+test('openProposalsNote: leeg bij geen pending; max klemt op de recentste; default-args', () => {
+  assert.equal(openProposalsNote([]), '');
+  assert.equal(openProposalsNote(), '');
+  assert.equal(openProposalsNote([{ content: { status: 'rejected', summary: 'x' } }]), '');
+  const veel = Array.from({ length: 5 }, (_, i) => ({ content: { status: 'pending', summary: `V${i}` } }));
+  const note = openProposalsNote(veel, 2);
+  assert.doesNotMatch(note, /V2\b/); // alleen de laatste twee (V3, V4)
+  assert.match(note, /V3/);
+  assert.match(note, /V4/);
 });
 
 test('historyFromRows: alleen user/assistant met tekst, in volgorde; rommel-bestendig; default-arg', () => {

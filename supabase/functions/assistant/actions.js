@@ -17,7 +17,11 @@
 export const ACTION_TTL_SECONDS = 3600;
 
 // Besluiten die de client mag insturen — whitelist, al het andere is een 400.
-export const ACTION_DECISIONS = ['confirm', 'reject', 'undo'];
+// 'edit' (AI-10, mens↔AI-overdracht) is de expliciete gebruikersbewerking van een
+// pending voorstel: de nieuwe args gaan door dezelfde pure propose()-validatie en
+// vervangen de opgeslagen args; de status blijft pending. Dit is wezenlijk anders
+// dan model-args: een geauthenticeerde bewerking door de eigenaar zelf.
+export const ACTION_DECISIONS = ['confirm', 'reject', 'undo', 'edit'];
 
 // Statussen van een action-rij (content.status). 'executing' is het claim-slot
 // tegen dubbel uitvoeren (dubbeltik/race): de conditionele update van pending →

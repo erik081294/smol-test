@@ -67,6 +67,15 @@ export function proposeAddTasks(args = {}, env = {}) {
   return { ok: true, summary, items, args: { items: norm } };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const TAKEN_BRIEF = {
+  moduleKey: 'taken',
+  label: 'Taken',
+  brief: 'open taken en klusjes van het huishouden; kan taken bekijken en nieuwe taken voorstellen',
+};
+
 export const TAKEN_TOOLS = [
   {
     name: 'taken_open',

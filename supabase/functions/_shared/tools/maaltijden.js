@@ -68,6 +68,15 @@ export function proposePlanMeals(args = {}) {
   return { ok: true, summary, items, args: { items: norm } };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const MAALTIJDEN_BRIEF = {
+  moduleKey: 'maaltijden',
+  label: 'Keuken',
+  brief: 'weekmenu en recepten; kan het menu tonen en maaltijden voorstellen',
+};
+
 export const MAALTIJDEN_TOOLS = [
   {
     name: 'maaltijden_weekmenu',

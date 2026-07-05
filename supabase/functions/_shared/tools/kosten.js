@@ -29,6 +29,15 @@ export function renderExpensesSummary(rows = [], monthLabel = '') {
   };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const KOSTEN_BRIEF = {
+  moduleKey: 'kosten',
+  label: 'Kosten',
+  brief: 'uitgaven van het huishouden; kan maandoverzichten en grootste kostenposten geven',
+};
+
 export const KOSTEN_TOOLS = [
   {
     name: 'kosten_maandoverzicht',

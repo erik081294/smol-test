@@ -30,6 +30,15 @@ export function renderPantryLow(rows = []) {
   return { data, render };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const VOORRAAD_BRIEF = {
+  moduleKey: 'voorraad',
+  label: 'Voorraad',
+  brief: 'wat er in huis is; kan tonen wat bijna op is of tegen de houdbaarheidsdatum aanloopt',
+};
+
 export const VOORRAAD_TOOLS = [
   {
     name: 'voorraad_bijna_op',

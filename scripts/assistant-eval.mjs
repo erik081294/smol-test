@@ -16,8 +16,8 @@
 // Traces landen in Orq onder thread-tag 'eval' (metadata feature=assistant-eval),
 // zodat eval-verkeer nooit met productie-verkeer vermengd raakt.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { SYSTEM_PROMPT, SUGGEST_TOOL, splitSuggestions, toResponsesTools, parseResponsesOutput } from '../supabase/functions/assistant/core.js';
-import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/tools/index.js';
+import { SYSTEM_PROMPT, SUGGEST_TOOL, splitSuggestions, toResponsesTools, parseResponsesOutput, buildContextSnapshot } from '../supabase/functions/assistant/core.js';
+import { ASSISTANT_TOOLS, MODULE_BRIEFS } from '../supabase/functions/_shared/tools/index.js';
 
 const ROUTER_URL = 'https://api.orq.ai/v3/router/responses';
 const BASELINE_PATH = 'assistant-eval-baseline.json';
@@ -50,6 +50,14 @@ const golden = JSON.parse(readFileSync('tests/assistant-golden.json', 'utf8'));
 const tools = [...toResponsesTools(ASSISTANT_TOOLS), SUGGEST_TOOL];
 const runId = `eval-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}`;
 
+// Snapshot via de ECHTE bouwer + briefs (AI-10): de eval test exact de context
+// die productie meestuurt — geen handgetypte kopie die kan driften.
+const SNAPSHOT = buildContextSnapshot({
+  today: '2026-07-04',
+  memberNames: ['Erik', 'Sam'],
+  moduleBriefs: Object.keys(MODULE_BRIEFS).map((k) => MODULE_BRIEFS[k]),
+});
+
 async function runCase(c) {
   const res = await fetch(ROUTER_URL, {
     method: 'POST',
@@ -57,7 +65,7 @@ async function runCase(c) {
     body: JSON.stringify({
       model,
       input: [
-        { role: 'system', content: `${SYSTEM_PROMPT}\n\nVandaag is 2026-07-04. Leden van het huishouden: Erik, Sam. Actieve modules: taken, boodschappen, kosten, voorraad.` },
+        { role: 'system', content: `${SYSTEM_PROMPT}\n\n${SNAPSHOT}` },
         { role: 'user', content: c.question },
       ],
       max_output_tokens: 400,

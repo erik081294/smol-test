@@ -9,6 +9,8 @@ import { appRoute } from '../lib/appRoute';
 import { SplashWait } from '../lib/ui';
 import { ToastProvider } from '../lib/toast';
 import { DialogProvider } from '../lib/dialog';
+import { AssistantProvider } from '../lib/assistantProvider';
+import { AssistantSheet } from '../lib/AssistantSheet';
 import { ErrorBoundary } from '../lib/ErrorBoundary';
 import { initMonitoring } from '../lib/monitoring';
 import { useLang, initLocale } from '../lib/i18nRuntime';
@@ -120,7 +122,12 @@ export default function RootLayout() {
           <HouseholdProvider>
             <ToastProvider>
               <DialogProvider>
-                <Gate themeMode={themeMode} />
+                {/* Assistent app-breed (AI-10): één gespreksstate voor tab én
+                    overlay-sheet; de sheet rendert boven elk scherm. */}
+                <AssistantProvider>
+                  <Gate themeMode={themeMode} />
+                  <AssistantSheet />
+                </AssistantProvider>
               </DialogProvider>
             </ToastProvider>
           </HouseholdProvider>
