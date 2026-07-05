@@ -43,6 +43,8 @@ const MONTH_NAMES = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'se
 
 /** Geldige kalenderdatum als "YYYY-MM-DD"? (regex + round-trip, vangt 2026-02-31). @param {string} [s] */
 export function isIsoDate(s) {
+  // Stryker disable next-line all -- de regex is een fast-path; de Date-round-trip
+  // hieronder verwerpt alles wat hier doorheen zou glippen (equivalente mutanten).
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;

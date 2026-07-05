@@ -71,9 +71,31 @@ test('actionState: opgeslagen status telt, verlopen pending toont expired, onbek
   assert.equal(actionState({}, atSeconds(1)), 'expired'); // geen created_at → onleesbaar
 });
 
+test('constanten: whitelists en statusmachine-vocabulaire liggen exact vast', () => {
+  assert.deepEqual(ACTION_DECISIONS, ['confirm', 'reject', 'undo']);
+  assert.deepEqual(ACTION_STATUSES, ['pending', 'executing', 'done', 'failed', 'rejected', 'undone']);
+  assert.equal(ACTION_TTL_SECONDS, 3600);
+});
+
+test('null-veiligheid: een null/lege rij crasht nergens en is nooit uitvoerbaar', () => {
+  const now = atSeconds(1);
+  assert.equal(isExpired(null, now), true);          // onleesbaar = niet uitvoeren
+  assert.equal(isExpired(undefined, now), true);
+  assert.equal(actionState(null, now), 'expired');
+  assert.equal(canResolve(null, 'confirm', now).ok, false);
+  assert.equal(canResolve(undefined, 'undo', now).ok, false);
+});
+
+test('canResolve: kind én tool moeten er allebei zijn (geen half proposal uitvoeren)', () => {
+  const now = atSeconds(1);
+  // kind klopt maar tool ontbreekt → niet gevonden.
+  assert.equal(canResolve({ content: { kind: 'proposal', status: 'pending' }, created_at: CREATED }, 'confirm', now).ok, false);
+  // tool aanwezig maar kind fout → niet gevonden.
+  assert.equal(canResolve({ content: { kind: 'iets', tool: 't', status: 'pending' }, created_at: CREATED }, 'confirm', now).ok, false);
+});
+
 test('canResolve: besluit-whitelist en de status-overgangen per besluit', () => {
   const now = atSeconds(1);
-  assert.deepEqual(ACTION_DECISIONS, ['confirm', 'reject', 'undo']);
   assert.equal(canResolve(pendingRow(), 'weglaten', now).ok, false);
   // Geen proposal-rij (verkeerde kind/tool) → niet gevonden.
   assert.equal(canResolve({ content: { status: 'pending' }, created_at: CREATED }, 'confirm', now).ok, false);
@@ -105,6 +127,10 @@ test('selectItems: lege of volledig ongeldige selectie → fout; buiten bereik v
   assert.equal(selectItems(args, 'alles').ok, false);
   assert.equal(selectItems({ items: [] }, undefined).ok, false);
   assert.equal(selectItems({}, undefined).ok, false);
+  assert.equal(selectItems(null, undefined).ok, false);          // null-args crashen niet
+  // Index exact op de lengte is buiten bereik (grens is exclusief).
+  assert.equal(selectItems(args, [2]).ok, false);
+  assert.deepEqual(selectItems(args, [1, 2]).args.items, ['b']);
 });
 
 test('undoPlan: groepeert per tabel binnen de whitelist; alles erbuiten wordt geweigerd', () => {

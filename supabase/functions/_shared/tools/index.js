@@ -30,6 +30,8 @@ export function aggregateToolPacks(packs) {
     if (seen.has(t.name)) throw new Error(`Dubbele toolnaam in de packs: ${t.name}`);
     seen.add(t.name);
   }
+  // Stryker disable next-line all -- namen zijn hierboven uniek bewezen: de 0-tak
+  // is onbereikbaar en <= / >= zijn dan equivalent aan < / > (onvangbare mutanten).
   return [...all].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 

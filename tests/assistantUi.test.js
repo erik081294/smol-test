@@ -4,7 +4,7 @@
 // null/ontbrekend veld → drop of degradatie, en de route-whitelist ('/').
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CATALOG_TYPES, normalizeNode, normalizeTree, treeToText } from '../lib/assistantUi.js';
+import { CATALOG_TYPES, ACTION_UI_STATES, normalizeNode, normalizeTree, treeToText } from '../lib/assistantUi.js';
 
 test('CATALOG_TYPES blijft de afgesproken vaste set (≤6, plan 23)', () => {
   assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link']);
@@ -82,6 +82,22 @@ test('normalizeNode: confirm_action met onbekende status valt terug op pending',
   const node = normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 's', status: 'geheim' });
   assert.equal(node.status, 'pending');
   assert.equal(normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 's', items: 'rommel' }).items.length, 0);
+});
+
+test('ACTION_UI_STATES: vocabulaire ligt exact vast en elke staat passeert de poortwachter', () => {
+  assert.deepEqual(ACTION_UI_STATES, ['pending', 'executing', 'done', 'failed', 'rejected', 'undone', 'expired']);
+  for (const status of ACTION_UI_STATES) {
+    const node = normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 's', status });
+    assert.equal(node.status, status);
+  }
+});
+
+test('normalizeNode: confirm_action overleeft null/rommel-items zonder crash', () => {
+  const node = normalizeNode({
+    type: 'confirm_action', actionId: 'a1', summary: 's',
+    items: [null, 'tekst', { id: 0, text: 'ok' }, {}],
+  });
+  assert.deepEqual(node.items, [{ id: 0, text: 'ok' }]);
 });
 
 test('normalizeNode: link alleen naar interne routes (moet met "/" beginnen)', () => {

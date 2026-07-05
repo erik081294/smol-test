@@ -92,12 +92,42 @@ test('contract: propose houdt items en args.items 1-op-1 uitgelijnd (selectie-in
   }
 });
 
-test('aggregateToolPacks: sorteert op naam en gooit op dubbele namen', () => {
-  const a = { name: 'b_twee' };
-  const b = { name: 'a_een' };
-  assert.deepEqual(aggregateToolPacks([[a], [b]]).map((t) => t.name), ['a_een', 'b_twee']);
-  assert.throws(() => aggregateToolPacks([[a], [{ name: 'b_twee' }]]), /Dubbele toolnaam.*b_twee/);
+test('aggregateToolPacks: sorteert op naam (permutatie-onafhankelijk) en gooit op dubbele namen', () => {
+  const a = { name: 'a_een' };
+  const b = { name: 'b_twee' };
+  const c = { name: 'c_drie' };
+  // Meerdere invoervolgordes: een kapotte comparator kan bij één volgorde
+  // toevallig goed uitpakken (insertion-sort), bij drie niet meer.
+  for (const packs of [[[a], [b], [c]], [[c], [a], [b]], [[b, c], [a]], [[c, b, a]]]) {
+    assert.deepEqual(aggregateToolPacks(packs).map((t) => t.name), ['a_een', 'b_twee', 'c_drie']);
+  }
+  assert.throws(() => aggregateToolPacks([[b], [{ name: 'b_twee' }]]), /Dubbele toolnaam.*b_twee/);
   assert.deepEqual(aggregateToolPacks([]), []);
+});
+
+// --- throwOnError: het foutcontract van elke run/execute (deze groep bewaakt helpers.js).
+
+test('throwOnError: data door, fout gooit met message of de fallback', async () => {
+  const { throwOnError } = await import('../supabase/functions/_shared/tools/helpers.js');
+  assert.deepEqual(throwOnError({ data: [1, 2], error: null }), [1, 2]);
+  assert.deepEqual(throwOnError({ data: null, error: null }), []); // null-data → lege lijst
+  assert.throws(() => throwOnError({ data: null, error: { message: 'boem' } }), /boem/);
+  assert.throws(() => throwOnError({ data: null, error: {} }), /query mislukt/);
+});
+
+test('dayLabel: alle 7 dagnamen en alle 12 maandnamen komen uit de juiste tabellen', () => {
+  // Week van 2026-07-05 (zondag) t/m 2026-07-11 (zaterdag).
+  const week = ['zo 5 jul', 'ma 6 jul', 'di 7 jul', 'wo 8 jul', 'do 9 jul', 'vr 10 jul', 'za 11 jul'];
+  week.forEach((expected, i) => assert.equal(dayLabel(`2026-07-${String(5 + i).padStart(2, '0')}`), expected));
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  months.forEach((m, i) => assert.equal(dayLabel(`2026-${String(i + 1).padStart(2, '0')}-15`).endsWith(m), true, m));
+});
+
+test('resolveMemberId: trimt en verlaagt de OPGESLAGEN naam ook; null-namen matchen nooit', () => {
+  assert.equal(resolveMemberId('erik', { u1: ' Erik ' }), 'u1');       // opgeslagen naam met spaties
+  assert.equal(resolveMemberId('', { u1: '' }), null);                  // lege vraag matcht geen leeg veld
+  assert.equal(resolveMemberId('   ', { u1: 'Erik' }), null);
+  assert.equal(resolveMemberId('Stryker was here!', { u1: null }), null); // null-naam → '' → geen match
 });
 
 // --- Gedeelde helpers (tools/helpers.js).
