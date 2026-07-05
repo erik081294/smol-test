@@ -1397,3 +1397,22 @@ notitie. §6 houdt de lopende epic-rijen (AI-1 parent + AI-2/3/6…9). Tegelijk 
 nummer-collision weggewerkt: AI-9's geplande `assistant_memories`-migratie stond op `0071`,
 dat inmiddels bezet is door de Sec-3/Data-5-hardening → herbenoemd naar "eerstvolgend vrij
 nummer".
+
+**2026-07-05 (parallelle dev-sessie) — Device-verificatie assistent + Data-6 init-plan-sweep.**
+Twee sporen naast elkaar (twee dev-sessies op dezelfde branch). Device-kant (deze sessie):
+de assistent-stream (AI-5) + stop-knop (AI-6) op de moto bevestigd in **licht én donker** —
+streamende tekst zichtbaar mid-delta ("Vo…" groeit aan) + "Even nadenken…"-status,
+markdown-bullets renderen schoon (`·`-rijen, geen letterlijke `-`/`*`), tool-render-trees,
+suggest_replies-chips, persistentie + hervatten; stop-knop → "Gestopt." + verzendknop terug.
+`npm run rooktest`: crash-sweep **15/15 schoon** + logcat schoon; 3 Maestro-flows flakten in de
+back-to-back sweep (flow-state-bleed), maar **individuele warme her-runs alle 3 groen**
+(02-uitgave, 03-boodschap-undo, 05-editor-guard) — geen regressie. (De AI-5/AI-6-docs +
+archief-verplaatsing zijn door de tweede sessie afgehandeld; dit corroboreert dat.)
+**Data-6 (REV-2) opgelost — migr. `0072` live via MCP:** de 23 RLS-policies met een naakte
+`auth.uid()` gewrapt naar `(select auth.uid())` via **ALTER POLICY** (init-plan-caching: één
+evaluatie per query i.p.v. per rij; command + rol-scope onaangeroerd → gedragsbehoudend).
+Advisor `auth_rls_initplan` van 23 → **0**; SQL-spot-check bevestigt dat de policies nog
+afdwingen (gespoofte `created_by` geblokkeerd, eigen insert werkt, select gescoped). NB:
+migratienummer `0072` is hiermee bezet — AI-9's geplande geheugen-migratie schuift naar het
+eerstvolgende vrije nummer (`0073`+). Gedaan op branch `claude/rls-initplan-data6` (aparte
+branch om push-races met de parallelle sessie te vermijden) → PR.

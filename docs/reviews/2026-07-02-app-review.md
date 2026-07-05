@@ -343,9 +343,12 @@ zitten in de randen van de push-pijplijn en de laatste meters van de release-ket
   (helper, alleen door migraties aangeroepen), en **leaked-password-protection staat nog
   uit** (bekend: INF-10 B6, dashboard-toggle). INFO: RLS-aan-zonder-policy op de zes
   tel-/systeemtabellen — bewust (alleen service-role/DEFINER).
-- **Performance:** de scan bevestigt Data-6 (auth-initplan-wrapping) en de
-  ontbrekende-index-klasse van Data-7; volledige lijst te herhalen via MCP
-  `get_advisors(performance)` bij de fixronde.
+- **Performance:** de scan bevestigde Data-6 (auth-initplan-wrapping) en de
+  ontbrekende-index-klasse van Data-7. **Data-6 opgelost 2026-07-05 (migr. `0072`):**
+  23 policies met een naakte `auth.uid()` gewrapt naar `(select auth.uid())` via
+  ALTER POLICY (gedragsbehoudend); advisor `auth_rls_initplan` 23 → 0. Resterend in de
+  perf-scan: 72 `multiple_permissive_policies`, 43 `unindexed_foreign_keys`, 18
+  `unused_index` — aparte, lager-prioritaire items.
 
 ## Direct gefixt in de vervolg-PR (2026-07-04)
 
