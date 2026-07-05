@@ -1378,3 +1378,21 @@ irrelevantie-bucket in de eval niet verschuift. Doc-accuratessefix: [guidelines 
 kreeg het trigger-first-principe; §6/§8 gecorrigeerd — de geautomatiseerde eval-gate scoort
 tool-F1/args/no-tool (beurt 1), **niet** NL-toon/groundedness (die zijn handmatige trace-
 review; LLM-as-judge blijft openstaande verbetering). Eval-gate + baseline: zie PR-run.
+
+**2026-07-05 (vervolg) — AI-10: assistent overal + mens↔AI-overdracht (gebouwd + live).**
+De assistent is nu een laag over de app i.p.v. een tab: één gespreksstate app-breed
+([`assistantProvider`](lib/assistantProvider.js) — lost meteen het AI-6-remount-restpunt
+op), een [`AssistantSheet`](lib/AssistantSheet.js)-overlay boven elk scherm en **AI-first
+FAB's** op taken/vandaag/maaltijden (bewuste herziening van plan 23 §5: de FAB opent de
+chat met invoer-focus; "Zelf invoeren" is de altijd-zichtbare uitwijk naar de klassieke
+editor). Context-lagen per beurt: module-**briefs** uit de skill-files (één regel per
+actieve module), **scherm-context** als aanwijzing-geen-beperking, en de
+openstaand-voorstel-nota. De **mens↔AI-overdracht** sluit de cirkel: "Bewerken" op de
+bevestigingskaart → generieke edit-sheet (veldenkaart per write-tool, registry-contract-
+getest incl. propose-roundtrip) → `decision:'edit'` hervalideert de gebruikers-args via
+dezelfde pure `propose()` (status blijft pending, `edited_by_user` in het audit-spoor) →
+de AI rekent in de volgende beurt verder met de bewerkte versie. **Edge v12/v13 live +
+E2E bewezen** (Testmelk → edit → Testhavermelk 2 pakken → AI benoemt de bewerking →
+confirm voert exact de bewerkte args uit → undo; kapotte edit → 400). Eval-gate
+100/100/100 nadat het 400-token-reasoning-artefact in de runner is gefixt (eval draait
+nu op het productie-budget van 1500). Rest: device-rooktest van sheet/FAB/edit-flow.

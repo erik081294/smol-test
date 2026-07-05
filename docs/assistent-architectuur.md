@@ -56,6 +56,20 @@ afwijken faalt in CI, niet pas in productie:
 - **Multi-edit-contract**: write-args dragen de batch onder `items[]` (verplicht);
   `propose` houdt de weergaveteksten en `args.items` 1-op-1 uitgelijnd — de
   aan/uitvink-selectie op de kaart zijn indexen in die array.
+- **Module-brief (AI-10)**: elke skill-file exporteert `<MODULE>_BRIEF`
+  `{ moduleKey, label, brief }` — één regel per actieve module in de
+  systemprompt-snapshot (de goedkoopste altijd-in-context-laag; brief 20–140
+  tekens, alleen voor modules mét tools — beide contract-getest én exact
+  vastgepind in de pack-test).
+- **Mens↔AI-overdracht (AI-10)**: `decision:'edit'` is de enige route waarin de
+  client args stuurt — een expliciete, geauthenticeerde bewerking door de
+  eigenaar van het voorstel, hervalideerd via dezelfde pure `propose()`; status
+  blijft pending, `edited_by_user` gaat het audit-spoor én de
+  openstaand-voorstel-nota in (`openProposalsNote` in core.js) zodat de AI in de
+  volgende beurt met de bewerkte versie verder rekent. De bewerkbare velden per
+  write-tool staan (tijdelijk, tot A2UI een server-schema levert) in
+  `EDITABLE_FIELDS` in [`lib/assistantActions.js`](../lib/assistantActions.js),
+  met een registry-contract-test + propose-roundtrip-test.
 - **RLS-plicht**: `ctx.db` is altijd de RLS-gebonden client (user-JWT). Een tool
   implementeert nooit eigen autorisatie-filtering; de database bepaalt zichtbaarheid.
 - **Render is server-side en deterministisch**: kaarten komen uit `render*`-helpers over
@@ -132,6 +146,15 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
   failures worden golden-cases.
 
 ## 8. Interactie-principes (chat-gedrag)
+
+- **Assistent overal, AI-first (AI-10 — bewuste herziening van plan 23 §5).**
+  De chat leeft app-breed (één gespreksstate in `lib/assistantProvider.js`) en
+  opent als sheet óver elk scherm (`lib/AssistantSheet.js`): prominent, nooit
+  blokkerend. Module-FAB's zijn AI-first: tik → chat met invoer-focus en
+  scherm-context; **"Zelf invoeren" is de altijd-zichtbare uitwijk** naar de
+  klassieke editor — controle blijft bij de gebruiker. Scherm-context gaat mee
+  als `screen` (moduleKey) en is in de prompt expliciet "aanwijzing, geen
+  beperking".
 
 - **Beknopt is de default.** Antwoorden zijn 1–3 zinnen; gegevens staan in de
   server-gerenderde kaarten, niet in lopende tekst. Details bereiken gebruikers via
