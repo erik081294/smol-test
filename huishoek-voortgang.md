@@ -1438,3 +1438,37 @@ en de héle HITL-keten E2E live bewezen** (user-JWT): voorstel-kaart met aanvink
 items → confirm met deelselectie → alleen dát item in de DB → dubbeltik 409 → undo
 verwijdert → tweede undo 409. Rest: device-rooktest van de kaart-UI.
 
+
+**2026-07-05 — Sonnet-5-afstelling: tool-descriptions + systemprompt aangescherpt (geen gedragsherstructurering).**
+Onderzoek (Anthropic writing-tools-for-agents / context-engineering + de Sonnet-5-
+migratierichtlijnen uit de `claude-api`-naslag) wijst op één ongebruikte winst: het
+productiemodel `eu.claude-sonnet-5` volgt letterlijker en **onder-triggert tools** zodra er
+een systemprompt staat (hoog-precisie/laag-recall). Remedie zonder herstructurering:
+**triggerconditie voorop** in elke tool-`description` (*"Roep dit aan wanneer …"* i.p.v.
+bijzin achteraf) + disambiguatie bij overlappende tools (boodschappen↔voorraad,
+taken↔maaltijden), plus één tool-gebruik-nudge in de systemprompt (róép de tool aan i.p.v.
+uit het geheugen antwoorden). Alle 8 descriptors herschreven; de per-pack descriptor-
+contracttests (die de string exact pinnen) meegevraagd. Systemprompt bleef lean — geen
+secties, geen few-shot; de no-tool-uitzondering (groet/bedankje) intact zodat de
+irrelevantie-bucket in de eval niet verschuift. Doc-accuratessefix: [guidelines §1](docs/assistent-architectuur.md)
+kreeg het trigger-first-principe; §6/§8 gecorrigeerd — de geautomatiseerde eval-gate scoort
+tool-F1/args/no-tool (beurt 1), **niet** NL-toon/groundedness (die zijn handmatige trace-
+review; LLM-as-judge blijft openstaande verbetering). Eval-gate + baseline: zie PR-run.
+
+**2026-07-05 (vervolg) — AI-10: assistent overal + mens↔AI-overdracht (gebouwd + live).**
+De assistent is nu een laag over de app i.p.v. een tab: één gespreksstate app-breed
+([`assistantProvider`](lib/assistantProvider.js) — lost meteen het AI-6-remount-restpunt
+op), een [`AssistantSheet`](lib/AssistantSheet.js)-overlay boven elk scherm en **AI-first
+FAB's** op taken/vandaag/maaltijden (bewuste herziening van plan 23 §5: de FAB opent de
+chat met invoer-focus; "Zelf invoeren" is de altijd-zichtbare uitwijk naar de klassieke
+editor). Context-lagen per beurt: module-**briefs** uit de skill-files (één regel per
+actieve module), **scherm-context** als aanwijzing-geen-beperking, en de
+openstaand-voorstel-nota. De **mens↔AI-overdracht** sluit de cirkel: "Bewerken" op de
+bevestigingskaart → generieke edit-sheet (veldenkaart per write-tool, registry-contract-
+getest incl. propose-roundtrip) → `decision:'edit'` hervalideert de gebruikers-args via
+dezelfde pure `propose()` (status blijft pending, `edited_by_user` in het audit-spoor) →
+de AI rekent in de volgende beurt verder met de bewerkte versie. **Edge v12/v13 live +
+E2E bewezen** (Testmelk → edit → Testhavermelk 2 pakken → AI benoemt de bewerking →
+confirm voert exact de bewerkte args uit → undo; kapotte edit → 400). Eval-gate
+100/100/100 nadat het 400-token-reasoning-artefact in de runner is gefixt (eval draait
+nu op het productie-budget van 1500). Rest: device-rooktest van sheet/FAB/edit-flow.

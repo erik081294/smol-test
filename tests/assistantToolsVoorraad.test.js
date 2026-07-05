@@ -2,11 +2,16 @@
 // houdbaarheids-grenswaarden (<=), default-params en de horizon-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VOORRAAD_TOOLS, lowPantryItems, renderPantryLow } from '../supabase/functions/_shared/tools/voorraad.js';
+import { VOORRAAD_TOOLS, VOORRAAD_BRIEF, lowPantryItems, renderPantryLow } from '../supabase/functions/_shared/tools/voorraad.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = VOORRAAD_TOOLS.find((t) => t.name === 'voorraad_bijna_op');
 const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(VOORRAAD_BRIEF, { moduleKey: 'voorraad', label: 'Voorraad', brief: 'wat er in huis is; kan tonen wat bijna op is of tegen de houdbaarheidsdatum aanloopt' });
+});
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm ligt exact vast', () => {
@@ -15,7 +20,7 @@ test('descriptor-contract: statische vorm ligt exact vast', () => {
     moduleKey: 'voorraad',
     kind: 'read',
     statusLabel: 'Voorraad nalopen…',
-    description: 'Welke voorraad-items zijn bijna op of lopen binnen een week tegen de houdbaarheidsdatum aan? Gebruik dit bij vragen over wat er in huis is of wat aangevuld moet worden.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er in huis is, wat bijna op is, of wat tegen de houdbaarheid aanloopt. Toont voorraad-items onder de drempel of die binnen een week over datum zijn. Voor de boodschappenlijst zelf: gebruik boodschappen_lijst.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
   });
 });

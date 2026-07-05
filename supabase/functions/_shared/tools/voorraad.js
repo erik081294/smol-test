@@ -30,13 +30,22 @@ export function renderPantryLow(rows = []) {
   return { data, render };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const VOORRAAD_BRIEF = {
+  moduleKey: 'voorraad',
+  label: 'Voorraad',
+  brief: 'wat er in huis is; kan tonen wat bijna op is of tegen de houdbaarheidsdatum aanloopt',
+};
+
 export const VOORRAAD_TOOLS = [
   {
     name: 'voorraad_bijna_op',
     moduleKey: 'voorraad',
     kind: 'read',
     statusLabel: 'Voorraad nalopen…',
-    description: 'Welke voorraad-items zijn bijna op of lopen binnen een week tegen de houdbaarheidsdatum aan? Gebruik dit bij vragen over wat er in huis is of wat aangevuld moet worden.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er in huis is, wat bijna op is, of wat tegen de houdbaarheid aanloopt. Toont voorraad-items onder de drempel of die binnen een week over datum zijn. Voor de boodschappenlijst zelf: gebruik boodschappen_lijst.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
     async run(ctx) {
       const rows = throwOnError(

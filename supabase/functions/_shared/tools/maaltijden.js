@@ -68,13 +68,22 @@ export function proposePlanMeals(args = {}) {
   return { ok: true, summary, items, args: { items: norm } };
 }
 
+// Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
+// regel per actieve module in de systemprompt-snapshot (progressive disclosure:
+// brief altijd, tool-descriptions als detail, tool-output als derde laag).
+export const MAALTIJDEN_BRIEF = {
+  moduleKey: 'maaltijden',
+  label: 'Keuken',
+  brief: 'weekmenu en recepten; kan het menu tonen en maaltijden voorstellen',
+};
+
 export const MAALTIJDEN_TOOLS = [
   {
     name: 'maaltijden_weekmenu',
     moduleKey: 'maaltijden',
     kind: 'read',
     statusLabel: 'Weekmenu erbij pakken…',
-    description: 'Haal het geplande weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten. Gebruik dit bij vragen over wat er gegeten wordt of wat er op het menu staat.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er gegeten wordt, wat er op het menu staat of wat er gepland is om te koken. Haalt het weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten.',
     parameters: {
       type: 'object',
       properties: { days: { type: 'integer', description: 'Hoeveel dagen vooruit (1-14, default 7)' } },
@@ -103,7 +112,7 @@ export const MAALTIJDEN_TOOLS = [
     destructive: false, // additief: zet alleen nieuwe maaltijden op het menu
     idempotent: false,  // nogmaals uitvoeren = dubbele menu-regels
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer maaltijden op het weekmenu te zetten (bv. "vrijdag lasagne"). De gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    description: 'Roep dit aan wanneer de gebruiker een maaltijd wil inplannen of op het menu wil zetten (bv. "vrijdag lasagne"). Stelt één of meer maaltijden voor: de gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {

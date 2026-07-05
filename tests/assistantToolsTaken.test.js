@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TAKEN_TOOLS,
+  TAKEN_BRIEF,
   renderOpenTasks,
   proposeAddTasks,
   MAX_PROPOSED_TASKS,
@@ -13,6 +14,11 @@ import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = (name) => TAKEN_TOOLS.find((t) => t.name === name);
 const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(TAKEN_BRIEF, { moduleKey: 'taken', label: 'Taken', brief: 'open taken en klusjes van het huishouden; kan taken bekijken en nieuwe taken voorstellen' });
+});
 
 // Het descriptor-contract ligt EXACT vast: naam/annotaties/statusLabel/schema én
 // de description zijn het gedrag richting het model — een gemuteerde description
@@ -23,7 +29,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     moduleKey: 'taken',
     kind: 'read',
     statusLabel: 'Even in de taken kijken…',
-    description: 'Haal de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager. Gebruik dit bij vragen over wat er nog moet gebeuren, deadlines of wie wat doet.',
+    description: 'Roep dit aan zodra de gebruiker vraagt wat er nog moet gebeuren, naar deadlines, of wie welke taak doet — antwoord niet uit het geheugen. Haalt de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager (only_mine).',
     parameters: {
       type: 'object',
       properties: { only_mine: { type: 'boolean', description: 'Alleen taken die aan de vrager zijn toegewezen' } },
@@ -38,7 +44,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer taken toe te voegen. De gebruiker ziet een bevestigingskaart en beslist zelf; er wordt nooit direct iets opgeslagen. Gebruik dit wanneer de gebruiker een taak of klusje wil vastleggen.',
+    description: 'Roep dit aan wanneer de gebruiker een taak of klusje wil vastleggen (niet voor een maaltijd — gebruik daarvoor maaltijden_plannen). Stelt één of meer taken voor: de gebruiker ziet een bevestigingskaart en beslist zelf, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {

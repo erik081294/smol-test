@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAALTIJDEN_TOOLS,
+  MAALTIJDEN_BRIEF,
   renderWeekMenu,
   proposePlanMeals,
   MAX_PROPOSED_MEALS,
@@ -15,6 +16,11 @@ import { toolCtx } from './fakeAssistantDb.js';
 const tool = (name) => MAALTIJDEN_TOOLS.find((t) => t.name === name);
 const shape = ({ run, propose, execute, ...rest }) => rest;
 
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en recepten; kan het menu tonen en maaltijden voorstellen' });
+});
+
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
   assert.deepEqual(shape(tool('maaltijden_weekmenu')), {
@@ -22,7 +28,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     moduleKey: 'maaltijden',
     kind: 'read',
     statusLabel: 'Weekmenu erbij pakken…',
-    description: 'Haal het geplande weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten. Gebruik dit bij vragen over wat er gegeten wordt of wat er op het menu staat.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er gegeten wordt, wat er op het menu staat of wat er gepland is om te koken. Haalt het weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten.',
     parameters: {
       type: 'object',
       properties: { days: { type: 'integer', description: 'Hoeveel dagen vooruit (1-14, default 7)' } },
@@ -37,7 +43,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer maaltijden op het weekmenu te zetten (bv. "vrijdag lasagne"). De gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    description: 'Roep dit aan wanneer de gebruiker een maaltijd wil inplannen of op het menu wil zetten (bv. "vrijdag lasagne"). Stelt één of meer maaltijden voor: de gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {

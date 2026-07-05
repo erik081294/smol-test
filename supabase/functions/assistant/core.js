@@ -27,10 +27,13 @@ de app toont de details al als kaart naast je antwoord. Noem alleen de kern (een
 het belangrijkste item, wat opvalt). Alleen als de gebruiker expliciet om een uitgebreid
 overzicht of verslag vraagt mag je langer antwoorden.
 
-Gebruik de meegegeven tools om vragen over het huishouden te beantwoorden. Roep alleen
-tools aan die relevant zijn voor de vraag; bij een simpele groet, bedankje of vraag over
-wat je kunt hoort géén tool-call. Doe nooit zelfstandig aanpassingen: voorstellen voor
-wijzigingen lopen altijd via een bevestiging van de gebruiker.
+Gebruik de meegegeven tools om vragen over het huishouden te beantwoorden. Gaat een vraag
+over de eigen gegevens van het huishouden — taken, boodschappen, voorraad, kosten of
+maaltijden — róép dan de bijbehorende tool aan in plaats van uit je geheugen te antwoorden
+of te gokken; die gegevens staan alléén in de tools. Roep verder alleen tools aan die
+relevant zijn voor de vraag; bij een simpele groet, bedankje of vraag over wat je kunt
+hoort géén tool-call. Doe nooit zelfstandig aanpassingen: voorstellen voor wijzigingen
+lopen altijd via een bevestiging van de gebruiker.
 
 Wil de gebruiker iets toevoegen of inplannen? Roep dan direct de bijbehorende
 voorstel-tool aan — de app toont zelf een bevestigingskaart waarop de gebruiker
@@ -164,17 +167,54 @@ export function clampHistory(messages = [], max = MAX_HISTORY_MESSAGES) {
 }
 
 /**
- * Compacte huishouden-snapshot voor in de systemprompt (plan 23 §6-geheugen v1):
- * wie wonen hier, welke modules staan aan, welke dag is het. Bewust klein en
- * zonder privé-data — de echte data komt via tools, RLS-gescoped.
- * @param {{ today?: string, memberNames?: string[], moduleLabels?: string[] }} [ctx]
+ * Compacte huishouden-snapshot voor in de systemprompt (plan 23 §6-geheugen v1 +
+ * AI-10): wie wonen hier, welke modules staan aan (mét module-brief als die er
+ * is — de goedkope altijd-in-context-laag), op welk scherm de gebruiker kijkt
+ * (aanwijzing, geen beperking) en welke voorstellen nog openstaan. Bewust klein
+ * en zonder privé-data — de echte data komt via tools, RLS-gescoped.
+ * @param {{ today?: string, memberNames?: string[], moduleLabels?: string[],
+ *           moduleBriefs?: Array<{label: string, brief: string}>,
+ *           screenLabel?: string, proposalsNote?: string }} [ctx]
  */
-export function buildContextSnapshot({ today = '', memberNames = [], moduleLabels = [] } = {}) {
+export function buildContextSnapshot({ today = '', memberNames = [], moduleLabels = [], moduleBriefs = [], screenLabel = '', proposalsNote = '' } = {}) {
   const parts = [];
   if (today) parts.push(`Vandaag is ${today}.`);
   if (memberNames.length > 0) parts.push(`Leden van het huishouden: ${memberNames.join(', ')}.`);
-  if (moduleLabels.length > 0) parts.push(`Actieve modules: ${moduleLabels.join(', ')}.`);
+  if (moduleBriefs.length > 0) {
+    // Briefs verdringen de kale labellijst: één regel per module, met wat de
+    // assistent er concreet mee kan (stuurt de tool-keuze én "wat kun jij?").
+    parts.push(`Actieve modules:\n${moduleBriefs.map((b) => `- ${b.label}: ${b.brief}.`).join('\n')}`);
+  } else if (moduleLabels.length > 0) {
+    parts.push(`Actieve modules: ${moduleLabels.join(', ')}.`);
+  }
+  if (screenLabel) {
+    parts.push(`De gebruiker kijkt nu naar het scherm "${screenLabel}" — gebruik dit als aanwijzing waar de vraag over kan gaan, niet als beperking.`);
+  }
+  if (proposalsNote) parts.push(proposalsNote);
   return parts.join(' ');
+}
+
+/**
+ * Openstaande-voorstellen-regel voor de snapshot (AI-10, mens↔AI-overdracht):
+ * zo kan het model doorredeneren op een voorstel dat de gebruiker intussen
+ * (deels) heeft bewerkt — "maak er 4 personen van" slaat dan ergens op.
+ * Alleen pending rijen tellen; bewerkt-door-gebruiker wordt expliciet benoemd.
+ * @param {Array<{ content?: { status?: string, summary?: string, items?: string[], edited_by_user?: boolean } }>} [rows]
+ * @param {number} [max] hooguit zoveel voorstellen benoemen (token-budget)
+ * @returns {string}
+ */
+export function openProposalsNote(rows = [], max = 3) {
+  const pending = rows
+    .filter((r) => r?.content?.status === 'pending' && typeof r.content.summary === 'string')
+    .slice(-max);
+  if (pending.length === 0) return '';
+  const lines = pending.map((r) => {
+    const c = /** @type {{ summary: string, items?: string[], edited_by_user?: boolean }} */ (r.content);
+    const items = Array.isArray(c.items) && c.items.length > 0 ? ` [${c.items.join(' | ')}]` : '';
+    const edited = c.edited_by_user ? ' (door de gebruiker bewerkt)' : '';
+    return `- ${c.summary}${items}${edited}`;
+  });
+  return `Openstaand voorstel, wacht op bevestiging van de gebruiker:\n${lines.join('\n')}\nDit is de actuele versie — eerdere formuleringen van hetzelfde voorstel in dit gesprek zijn achterhaald. Zeg niet dat dit al is uitgevoerd; bij een vervolgvraag mag je een nieuw, aangepast voorstel doen.`;
 }
 
 // ---------------------------------------------------------------------------

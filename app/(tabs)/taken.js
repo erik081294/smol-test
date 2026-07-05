@@ -31,6 +31,7 @@ import { isOverdue, snoozeDate, dueLabel } from '../../lib/recurrence';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import { dateLocale, t } from '../../lib/i18n';
+import { useAssistantHub } from '../../lib/assistantProvider';
 
 const EMPTY_FILTERS = { categories: [], assigneeId: null, subgroupId: null, tagIds: [], status: 'open', audience: 'all', cleaningOnly: false, zoneId: null };
 
@@ -74,6 +75,7 @@ export default function Taken() {
   const params = useLocalSearchParams();
   const toast = useToast();
   const dialog = useDialog();
+  const { openAssistant } = useAssistantHub();
   const [hiddenIds, setHiddenIds] = useState([]);
 
   const [scope, setScope] = useState('week');        // 'dag' | 'week' | 'maand' | 'jaar' — week is de standaard (UX-31)
@@ -441,8 +443,13 @@ export default function Taken() {
         </Animated.View>
       </GestureDetector>
 
+      {/* AI-first FAB (AI-10): opent de assistent-sheet met scherm-context;
+          "Zelf invoeren" in de sheet is de uitwijk naar de klassieke editor. */}
       <FAB label={t('fab.task')} accessibilityLabel={t('task.add')} testID="t-fab-task"
-        onPress={() => router.push(scope === 'dag' ? `/task/new?date=${dateKey(cursor)}` : '/task/new')} />
+        onPress={() => openAssistant({
+          moduleKey: 'taken',
+          onManual: () => router.push(scope === 'dag' ? `/task/new?date=${dateKey(cursor)}` : '/task/new'),
+        })} />
 
       <ChoreLibrarySheet visible={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={addFromLibrary} />
 

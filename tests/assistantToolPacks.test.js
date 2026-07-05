@@ -5,7 +5,7 @@
 // mutatietest aan te pas komt.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSISTANT_TOOLS, aggregateToolPacks } from '../supabase/functions/_shared/tools/index.js';
+import { ASSISTANT_TOOLS, MODULE_BRIEFS, aggregateToolPacks, aggregateBriefs } from '../supabase/functions/_shared/tools/index.js';
 import { fmtEuro, nextMonth, addDays, isIsoDate, dayLabel, resolveMemberId } from '../supabase/functions/_shared/tools/helpers.js';
 import { MODULES } from '../lib/modules.js';
 
@@ -128,6 +128,31 @@ test('resolveMemberId: trimt en verlaagt de OPGESLAGEN naam ook; null-namen matc
   assert.equal(resolveMemberId('', { u1: '' }), null);                  // lege vraag matcht geen leeg veld
   assert.equal(resolveMemberId('   ', { u1: 'Erik' }), null);
   assert.equal(resolveMemberId('Stryker was here!', { u1: null }), null); // null-naam → '' → geen match
+});
+
+// --- Module-briefs (AI-10): de altijd-in-context-laag per module.
+
+test('briefs-contract: elke module met tools heeft een brief, met label en zinnige lengte', () => {
+  const toolModules = [...new Set(ASSISTANT_TOOLS.map((t) => t.moduleKey))];
+  for (const key of toolModules) {
+    const b = MODULE_BRIEFS[key];
+    assert.ok(b, `module ${key} heeft tools maar geen brief`);
+    assert.ok(MODULE_KEYS.has(key), `brief-moduleKey onbekend: ${key}`);
+    assert.ok(typeof b.label === 'string' && b.label.length > 0, `${key}: label`);
+    assert.ok(b.brief.length >= 20 && b.brief.length <= 140, `${key}: brief hoort 20-140 tekens te zijn (nu ${b.brief.length})`);
+  }
+  // En andersom: geen briefs voor modules zonder tools (dode context kost tokens).
+  assert.deepEqual(Object.keys(MODULE_BRIEFS).sort(), toolModules.sort());
+});
+
+test('aggregateBriefs: bouwt de map en gooit op dubbele moduleKeys', () => {
+  const map = aggregateBriefs([{ moduleKey: 'a', label: 'A', brief: 'x' }]);
+  assert.deepEqual(map, { a: { label: 'A', brief: 'x' } });
+  assert.throws(
+    () => aggregateBriefs([{ moduleKey: 'a', label: 'A', brief: 'x' }, { moduleKey: 'a', label: 'B', brief: 'y' }]),
+    /Dubbele module-brief.*a/
+  );
+  assert.deepEqual(aggregateBriefs([]), {});
 });
 
 // --- Gedeelde helpers (tools/helpers.js).

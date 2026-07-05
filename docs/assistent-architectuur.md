@@ -34,6 +34,13 @@ afwijken faalt in CI, niet pas in productie:
   Anthropic-namespacing per module; maakt latere tool-search gratis effectief.
   Empirisch bevestigd (2026-07-05): rename van `get_*` naar dit schema → tool-F1
   96,4 → 98,3 op de golden-set.
+- **`description` = triggerconditie voorop** (Sonnet-5-afstelling, 2026-07-05). Het
+  productiemodel `eu.claude-sonnet-5` volgt letterlijker en onder-triggert tools zodra
+  er een systemprompt staat (hoog-precisie/laag-recall). Schrijf de description daarom
+  als leidende trigger — *"Roep dit aan wanneer de gebruiker …"* — niet als bijzin
+  achteraf, en benoem bij overlappende tools expliciet wanneer je 'm níét gebruikt
+  (bv. boodschappen vs. voorraad). Anthropic meet hier meetbare lift op Sonnet 5 /
+  Opus 4.8; ditzelfde patroon staat als tool-gebruik-nudge in de systemprompt.
 - **HITL: de tool-call ís het voorstel** (industry-convergentie: OpenAI
   `needsApproval` / Vercel AI SDK / LangGraph `interrupt` / Claude Code
   permissions). De harness (index.ts) onderschept elke `kind:'write'`-call:
@@ -49,6 +56,20 @@ afwijken faalt in CI, niet pas in productie:
 - **Multi-edit-contract**: write-args dragen de batch onder `items[]` (verplicht);
   `propose` houdt de weergaveteksten en `args.items` 1-op-1 uitgelijnd — de
   aan/uitvink-selectie op de kaart zijn indexen in die array.
+- **Module-brief (AI-10)**: elke skill-file exporteert `<MODULE>_BRIEF`
+  `{ moduleKey, label, brief }` — één regel per actieve module in de
+  systemprompt-snapshot (de goedkoopste altijd-in-context-laag; brief 20–140
+  tekens, alleen voor modules mét tools — beide contract-getest én exact
+  vastgepind in de pack-test).
+- **Mens↔AI-overdracht (AI-10)**: `decision:'edit'` is de enige route waarin de
+  client args stuurt — een expliciete, geauthenticeerde bewerking door de
+  eigenaar van het voorstel, hervalideerd via dezelfde pure `propose()`; status
+  blijft pending, `edited_by_user` gaat het audit-spoor én de
+  openstaand-voorstel-nota in (`openProposalsNote` in core.js) zodat de AI in de
+  volgende beurt met de bewerkte versie verder rekent. De bewerkbare velden per
+  write-tool staan (tijdelijk, tot A2UI een server-schema levert) in
+  `EDITABLE_FIELDS` in [`lib/assistantActions.js`](../lib/assistantActions.js),
+  met een registry-contract-test + propose-roundtrip-test.
 - **RLS-plicht**: `ctx.db` is altijd de RLS-gebonden client (user-JWT). Een tool
   implementeert nooit eigen autorisatie-filtering; de database bepaalt zichtbaarheid.
 - **Render is server-side en deterministisch**: kaarten komen uit `render*`-helpers over
@@ -104,8 +125,12 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
 ## 6. Eval-gate in de Definition of Done (vanaf AI-3)
 
 - Wijzigt een PR de prompt, een tool(-beschrijving) of het model? Dan draait de
-  golden-set (`tests/assistant-golden.json` → Orq-experiment) en mag er **geen regressie**
-  zijn op tool-selectie-F1, NL-toon en groundedness t.o.v. de baseline.
+  golden-set (`tests/assistant-golden.json` via [`scripts/assistant-eval.mjs`](../scripts/assistant-eval.mjs))
+  en mag er **geen regressie** zijn t.o.v. de baseline
+  ([`assistant-eval-baseline.json`](../assistant-eval-baseline.json)). De geautomatiseerde
+  gate scoort **tool-selectie-F1, args-subset-match en no-tool-accuracy** (beurt 1). NL-toon
+  en groundedness zijn (nog) géén geautomatiseerde judge — die borg je via handmatige
+  trace-review (§7); een LLM-as-judge daarvoor is een openstaande verbetering.
 - Elke productie-failure (uit trace-review, §7) wordt een nieuwe golden-case in de repo.
   De repo is de bron van waarheid; Orq is de runner.
 
@@ -122,11 +147,21 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
 
 ## 8. Interactie-principes (chat-gedrag)
 
+- **Assistent overal, AI-first (AI-10 — bewuste herziening van plan 23 §5).**
+  De chat leeft app-breed (één gespreksstate in `lib/assistantProvider.js`) en
+  opent als sheet óver elk scherm (`lib/AssistantSheet.js`): prominent, nooit
+  blokkerend. Module-FAB's zijn AI-first: tik → chat met invoer-focus en
+  scherm-context; **"Zelf invoeren" is de altijd-zichtbare uitwijk** naar de
+  klassieke editor — controle blijft bij de gebruiker. Scherm-context gaat mee
+  als `screen` (moduleKey) en is in de prompt expliciet "aanwijzing, geen
+  beperking".
+
 - **Beknopt is de default.** Antwoorden zijn 1–3 zinnen; gegevens staan in de
   server-gerenderde kaarten, niet in lopende tekst. Details bereiken gebruikers via
   `link`-nodes (deep-link naar het module-scherm). Alleen op expliciet verzoek
   ("geef me een uitgebreid overzicht") mag een lang antwoord. Dit is in de
-  systemprompt verankerd (BEKNOPT-blok) en de NL-toon-judge bestraft breedsprakigheid.
+  systemprompt verankerd (BEKNOPT-blok); breedsprakigheid vang je nu via handmatige
+  trace-review (§6) — een geautomatiseerde NL-toon-judge is nog niet gebouwd.
 - **Elke beurt eindigt met antwoordopties** (AskUserQuestion-patroon): het model sluit
   af met de pseudo-tool `suggest_replies` (2–4 opties, ≤6 woorden); de app toont ze als
   tikbare chips boven de invoer. De opties zijn een versnelling, nooit een beperking:

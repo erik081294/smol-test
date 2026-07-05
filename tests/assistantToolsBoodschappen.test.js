@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BOODSCHAPPEN_TOOLS,
+  BOODSCHAPPEN_BRIEF,
   renderGroceryList,
   proposeAddGroceries,
   MAX_PROPOSED_GROCERIES,
@@ -13,6 +14,11 @@ import { toolCtx } from './fakeAssistantDb.js';
 const tool = (name) => BOODSCHAPPEN_TOOLS.find((t) => t.name === name);
 const shape = ({ run, propose, execute, ...rest }) => rest;
 
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(BOODSCHAPPEN_BRIEF, { moduleKey: 'boodschappen', label: 'Boodschappen', brief: 'de gedeelde boodschappenlijst; kan de lijst tonen en items voorstellen' });
+});
+
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
   assert.deepEqual(shape(tool('boodschappen_lijst')), {
@@ -20,7 +26,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     moduleKey: 'boodschappen',
     kind: 'read',
     statusLabel: 'Boodschappenlijstje erbij pakken…',
-    description: 'Haal de actuele (onafgevinkte) boodschappenlijst op. Gebruik dit bij vragen over wat er nog gehaald moet worden of wat er op de lijst staat.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er nog gehaald moet worden of wat er op de boodschappenlijst staat. Haalt de actuele (onafgevinkte) lijst op. Voor "wat is er in huis / bijna op" is dit niet de juiste tool — gebruik voorraad_bijna_op.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
   });
   assert.deepEqual(shape(tool('boodschappen_toevoegen')), {
@@ -30,7 +36,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer items op de boodschappenlijst te zetten. De gebruiker ziet een bevestigingskaart en kan per item aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    description: 'Roep dit aan wanneer de gebruiker iets op de boodschappenlijst wil zetten of wil laten halen. Stelt één of meer items voor: de gebruiker ziet een bevestigingskaart en kan per item aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {
