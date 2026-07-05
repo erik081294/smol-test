@@ -1372,3 +1372,19 @@ leeg gesprek — het vorige gesprek staat in de sheet; „actief gesprek onthoud
 genoteerd bij de AI-6-rest. NB: de test liep deels gelijktijdig met een tweede
 dev-sessie op hetzelfde toestel (interleaved `adb input`), dus flaky stappen zijn
 gecontroleerd herhaald voordat ze als bevinding telden.
+
+**2026-07-05 (tweede dev-sessie) — AI-5 licht-thema + rooktest-regressie.** Corroboratie
+van bovenstaande op dezelfde moto, aanvullend op twee punten. (1) **Licht thema:** met het
+systeemthema op licht (`cmd uimode night no`) streamt de assistent net zo schoon — de
+tekst-delta is mid-stream gevangen (antwoord groeit letterlijk aan), tool-render-kaarten,
+antwoordoptie-chips en de stop-knop renderen met correcte contrast; de app volgt
+`Appearance` zonder stale Fabric-kleuren. Daarmee is AI-5's laatste "Rest" (licht-thema)
+op toestel bevestigd — beide thema's ✓. De **stop-knop** halverwege een beurt tikken toont
+netjes „Gestopt.” en zet de verstuurknop terug (AI-6 abort-pad). (2) **Rooktest (INF-3):**
+`npm run rooktest` — crash-sweep **15/15 schermen schoon** (geen error-boundary) en logcat
+schoon. Van de 5 Maestro-flows slaagden 01-taak + 04-swipe direct; 02-uitgave,
+03-boodschap-undo en 05-editor-guard flakten in de gebundelde run (bekende oorzaak: een
+ⓘ-help-drawer/verkeerd scherm bleef tussen flows staan — zie de faal-screenshot van
+05-editor-guard) en **slaagden alle drie op een warme, losse her-run** (21/39/42s, alle
+groen, logcat schoon). Geen regressie uit de assistent-/push-token-/config-wijzigingen van
+deze ronde; de flakes zitten in de flow-state tussen sequentiële launches, niet in app-code.
