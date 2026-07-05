@@ -1342,3 +1342,18 @@ Dit vult de INF-4-rest ("web-frames geminified") concreet in; verificatie = de
 eerstvolgende echte deploy mét token. `@opentelemetry/api` verhuisde naar devDependencies
 (alleen supabase-js-onder-Node gebruikt 'm; metro stubt 'm al voor de bundle — comment
 bijgewerkt). Suite/typecheck/lint groen na `npm install`.
+
+**2026-07-05 — Stapel gemerged naar main + migratie 0071 (Sec-3/Data-5).**
+PR #118 (de hele stapel: assistent fase 1 + ronde D/E + review-addendum + 0070-hardening)
+naar `main` gemerged; #116 sloot vanzelf mee, #117 handmatig gesloten (vervat). De nieuwe
+push-trigger op `rls-check.yml` vuurde direct: **live RLS-suite groen op main**, inclusief
+de drie 0070-scenario's. Daarna REV-2 verder afgepeld met migratie `0071` (live via MCP):
+(1) **Sec-3** — `peek_invite` geeft voor ingetrokken/verlopen/gebruikte tokens alleen nog
+de status; huishoudnaam/emoji/uitnodiger/id zijn dan null. Een ooit gelekte join-link
+onthult dus niets blijvends meer. Gedragsneutraal voor de app (het join-scherm gebruikt
+die velden alleen bij `valid` — code-geverifieerd). (2) **Data-5** — bereik-CHECKs op het
+bonnen-/voorraaddomein (quantity > 0, centen ≥ 0), naar het patroon van het kosten- en
+voertuigdomein; de editor klemt quantity al op ≥ 1 en de live data was schoon, dus geen
+migratierisico. Beide live met SQL geverifieerd (valid-preview intact ✓, revoked lekt
+niets ✓, quantity 0 en negatieve prijs geweigerd ✓); nieuw RLS-scenario bewaakt de
+peek-privacy. Suite 1049 pass / 0 fail (33 RLS-skips lokaal).

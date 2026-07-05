@@ -941,3 +941,27 @@ test('RLS 0070: create_expense weigert negatieve en opgeblazen aandelen (share-g
   });
   assert.ok(!okErr && okId, `subset-split blijft toegestaan: ${okErr?.message}`);
 });
+
+test('RLS 0071: peek_invite lekt geen huishoud-info meer voor een ingetrokken token', opts, async () => {
+  const alice = await makeUser('alice_peekpriv');
+  const eve = await makeUser('eve_peekpriv');     // buitenstaander met de gelekte link
+  const hh = await makeHousehold(alice, 'Peekprivhuis');
+
+  const { data: inv, error: cErr } = await alice.client
+    .rpc('create_invite', { p_household_id: hh.id, p_role: 'member' });
+  assert.ok(!cErr, `invite maken: ${cErr?.message}`);
+
+  // Geldig token: preview met huishoudnaam (het normale join-scherm).
+  const { data: validPeek } = await eve.client.rpc('peek_invite', { p_token: inv.token });
+  assert.equal(validPeek?.[0]?.status, 'valid');
+  assert.equal(validPeek?.[0]?.household_name, 'Peekprivhuis');
+
+  // Ingetrokken token: alleen nog de status — naam/emoji/uitnodiger zijn weg (Sec-3).
+  const { error: rErr } = await alice.client.rpc('revoke_invite', { p_id: inv.id });
+  assert.ok(!rErr, `invite intrekken: ${rErr?.message}`);
+  const { data: revokedPeek } = await eve.client.rpc('peek_invite', { p_token: inv.token });
+  assert.equal(revokedPeek?.[0]?.status, 'revoked');
+  assert.equal(revokedPeek?.[0]?.household_name, null, 'huishoudnaam mag niet meer lekken');
+  assert.equal(revokedPeek?.[0]?.inviter_name, null, 'uitnodiger mag niet meer lekken');
+  assert.equal(revokedPeek?.[0]?.household_id, null, 'household_id mag niet meer lekken');
+});
