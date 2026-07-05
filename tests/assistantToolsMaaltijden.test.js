@@ -13,6 +13,55 @@ import {
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = (name) => MAALTIJDEN_TOOLS.find((t) => t.name === name);
+const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
+test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
+  assert.deepEqual(shape(tool('maaltijden_weekmenu')), {
+    name: 'maaltijden_weekmenu',
+    moduleKey: 'maaltijden',
+    kind: 'read',
+    statusLabel: 'Weekmenu erbij pakken…',
+    description: 'Haal het geplande weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten. Gebruik dit bij vragen over wat er gegeten wordt of wat er op het menu staat.',
+    parameters: {
+      type: 'object',
+      properties: { days: { type: 'integer', description: 'Hoeveel dagen vooruit (1-14, default 7)' } },
+      required: [],
+      additionalProperties: false,
+    },
+  });
+  assert.deepEqual(shape(tool('maaltijden_plannen')), {
+    name: 'maaltijden_plannen',
+    moduleKey: 'maaltijden',
+    kind: 'write',
+    destructive: false,
+    idempotent: false,
+    statusLabel: 'Voorstel klaarzetten…',
+    description: 'Stel voor om één of meer maaltijden op het weekmenu te zetten (bv. "vrijdag lasagne"). De gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De in te plannen maaltijden (maximaal 14).',
+          items: {
+            type: 'object',
+            properties: {
+              date: { type: 'string', description: 'De dag als YYYY-MM-DD' },
+              title: { type: 'string', description: 'Wat er gegeten wordt, bv. "Lasagne"' },
+              meal_type: { type: 'string', enum: ['ontbijt', 'lunch', 'diner', 'snack'], description: 'Welk eetmoment (default: diner)' },
+              servings: { type: 'integer', description: 'Optioneel aantal eters (1-12)' },
+            },
+            required: ['date', 'title'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  });
+});
 
 test('renderWeekMenu: diner blijft onbenoemd, andere momenten wél; titel-fallbacks recept → "Maaltijd"', () => {
   const rows = [

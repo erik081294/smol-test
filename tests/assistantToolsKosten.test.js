@@ -6,6 +6,24 @@ import { KOSTEN_TOOLS, renderExpensesSummary } from '../supabase/functions/_shar
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = KOSTEN_TOOLS.find((t) => t.name === 'kosten_maandoverzicht');
+const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
+test('descriptor-contract: statische vorm ligt exact vast', () => {
+  assert.deepEqual(shape(tool), {
+    name: 'kosten_maandoverzicht',
+    moduleKey: 'kosten',
+    kind: 'read',
+    statusLabel: 'Uitgaven op een rijtje zetten…',
+    description: 'Samenvatting van de uitgaven in een maand (default: de maand van vandaag). Gebruik dit bij vragen over wat er is uitgegeven of waar het geld heen ging. month als "YYYY-MM".',
+    parameters: {
+      type: 'object',
+      properties: { month: { type: 'string', description: 'Maand als YYYY-MM, bv. 2026-07' } },
+      required: [],
+      additionalProperties: false,
+    },
+  });
+});
 
 test('renderExpensesSummary: totaal + top-3 (aflopend), euro-notatie met komma', () => {
   const rows = [

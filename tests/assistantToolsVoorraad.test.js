@@ -6,6 +6,19 @@ import { VOORRAAD_TOOLS, lowPantryItems, renderPantryLow } from '../supabase/fun
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = VOORRAAD_TOOLS.find((t) => t.name === 'voorraad_bijna_op');
+const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
+test('descriptor-contract: statische vorm ligt exact vast', () => {
+  assert.deepEqual(shape(tool), {
+    name: 'voorraad_bijna_op',
+    moduleKey: 'voorraad',
+    kind: 'read',
+    statusLabel: 'Voorraad nalopen…',
+    description: 'Welke voorraad-items zijn bijna op of lopen binnen een week tegen de houdbaarheidsdatum aan? Gebruik dit bij vragen over wat er in huis is of wat aangevuld moet worden.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  });
+});
 
 test('lowPantryItems: drempel is inclusief (<=), zonder drempel geen "bijna op"', () => {
   const rows = [

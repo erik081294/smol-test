@@ -11,6 +11,48 @@ import {
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = (name) => BOODSCHAPPEN_TOOLS.find((t) => t.name === name);
+const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
+test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
+  assert.deepEqual(shape(tool('boodschappen_lijst')), {
+    name: 'boodschappen_lijst',
+    moduleKey: 'boodschappen',
+    kind: 'read',
+    statusLabel: 'Boodschappenlijstje erbij pakken…',
+    description: 'Haal de actuele (onafgevinkte) boodschappenlijst op. Gebruik dit bij vragen over wat er nog gehaald moet worden of wat er op de lijst staat.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  });
+  assert.deepEqual(shape(tool('boodschappen_toevoegen')), {
+    name: 'boodschappen_toevoegen',
+    moduleKey: 'boodschappen',
+    kind: 'write',
+    destructive: false,
+    idempotent: false,
+    statusLabel: 'Voorstel klaarzetten…',
+    description: 'Stel voor om één of meer items op de boodschappenlijst te zetten. De gebruiker ziet een bevestigingskaart en kan per item aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De toe te voegen boodschappen (maximaal 20).',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Wat er gehaald moet worden, bv. "Melk"' },
+              quantity: { type: 'string', description: 'Optionele hoeveelheid, bv. "2 pakken"' },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  });
+});
 
 test('renderGroceryList: quantity tussen haakjes, zonder quantity kaal; leeg → kaart', () => {
   const { data, render } = renderGroceryList([{ name: 'Melk', quantity: '2 pak' }, { name: 'Brood', quantity: null }]);

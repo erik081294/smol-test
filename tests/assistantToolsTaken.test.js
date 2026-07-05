@@ -12,6 +12,79 @@ import {
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = (name) => TAKEN_TOOLS.find((t) => t.name === name);
+const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// Het descriptor-contract ligt EXACT vast: naam/annotaties/statusLabel/schema én
+// de description zijn het gedrag richting het model — een gemuteerde description
+// verandert de tool-selectie en hoort hier te breken (en dan door de eval-gate).
+test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
+  assert.deepEqual(shape(tool('taken_open')), {
+    name: 'taken_open',
+    moduleKey: 'taken',
+    kind: 'read',
+    statusLabel: 'Even in de taken kijken…',
+    description: 'Haal de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager. Gebruik dit bij vragen over wat er nog moet gebeuren, deadlines of wie wat doet.',
+    parameters: {
+      type: 'object',
+      properties: { only_mine: { type: 'boolean', description: 'Alleen taken die aan de vrager zijn toegewezen' } },
+      required: [],
+      additionalProperties: false,
+    },
+  });
+  assert.deepEqual(shape(tool('taken_toevoegen')), {
+    name: 'taken_toevoegen',
+    moduleKey: 'taken',
+    kind: 'write',
+    destructive: false,
+    idempotent: false,
+    statusLabel: 'Voorstel klaarzetten…',
+    description: 'Stel voor om één of meer taken toe te voegen. De gebruiker ziet een bevestigingskaart en beslist zelf; er wordt nooit direct iets opgeslagen. Gebruik dit wanneer de gebruiker een taak of klusje wil vastleggen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De toe te voegen taken (maximaal 10).',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Korte taaktitel, bv. "Stofzuigen"' },
+              due_date: { type: 'string', description: 'Optionele deadline als YYYY-MM-DD' },
+              assignee_name: { type: 'string', description: 'Optionele naam van het huisgenoot-lid dat de taak krijgt' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  });
+  assert.equal(typeof tool('taken_open').run, 'function');
+  assert.equal(typeof tool('taken_toevoegen').propose, 'function');
+  assert.equal(typeof tool('taken_toevoegen').execute, 'function');
+});
+
+test('renderOpenTasks: sorteervolgorde is permutatie-onafhankelijk', () => {
+  const rows = [
+    { title: 'B-laat', due_date: '2026-07-20', assigned_to: null },
+    { title: 'A-vroeg', due_date: '2026-07-01', assigned_to: null },
+    { title: 'Z1-zonder', due_date: null, assigned_to: null },
+    { title: 'M-midden', due_date: '2026-07-10', assigned_to: null },
+  ];
+  // Alle rotaties + de omkering: elke comparator-tak wordt vanuit beide
+  // invoegrichtingen geraakt (V8-insertion-sort maakt sommige mutanten anders
+  // onzichtbaar voor één enkele invoervolgorde).
+  const perms = [rows, [...rows].reverse(), [rows[3], rows[0], rows[1], rows[2]], [rows[2], rows[3], rows[0], rows[1]]];
+  for (const perm of perms) {
+    assert.deepEqual(
+      renderOpenTasks(perm).data.tasks.map((t) => t.title),
+      ['A-vroeg', 'M-midden', 'B-laat', 'Z1-zonder'],
+      JSON.stringify(perm.map((r) => r.title))
+    );
+  }
+});
 
 test('renderOpenTasks: sorteert op due_date, zonder datum achteraan — ook bij omgekeerde invoer', () => {
   const rows = [
