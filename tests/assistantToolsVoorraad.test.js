@@ -15,7 +15,7 @@ test('descriptor-contract: statische vorm ligt exact vast', () => {
     moduleKey: 'voorraad',
     kind: 'read',
     statusLabel: 'Voorraad nalopen…',
-    description: 'Welke voorraad-items zijn bijna op of lopen binnen een week tegen de houdbaarheidsdatum aan? Gebruik dit bij vragen over wat er in huis is of wat aangevuld moet worden.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er in huis is, wat bijna op is, of wat tegen de houdbaarheid aanloopt. Toont voorraad-items onder de drempel of die binnen een week over datum zijn. Voor de boodschappenlijst zelf: gebruik boodschappen_lijst.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
   });
 });

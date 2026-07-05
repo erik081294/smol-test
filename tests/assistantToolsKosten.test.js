@@ -15,7 +15,7 @@ test('descriptor-contract: statische vorm ligt exact vast', () => {
     moduleKey: 'kosten',
     kind: 'read',
     statusLabel: 'Uitgaven op een rijtje zetten…',
-    description: 'Samenvatting van de uitgaven in een maand (default: de maand van vandaag). Gebruik dit bij vragen over wat er is uitgegeven of waar het geld heen ging. month als "YYYY-MM".',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er is uitgegeven, hoeveel iets kostte of waar het geld heen ging. Geeft een uitgaven-samenvatting van één maand (default: de maand van vandaag); geef month als "YYYY-MM" voor een andere maand.',
     parameters: {
       type: 'object',
       properties: { month: { type: 'string', description: 'Maand als YYYY-MM, bv. 2026-07' } },

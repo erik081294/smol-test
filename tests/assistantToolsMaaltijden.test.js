@@ -22,7 +22,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     moduleKey: 'maaltijden',
     kind: 'read',
     statusLabel: 'Weekmenu erbij pakken…',
-    description: 'Haal het geplande weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten. Gebruik dit bij vragen over wat er gegeten wordt of wat er op het menu staat.',
+    description: 'Roep dit aan wanneer de gebruiker vraagt wat er gegeten wordt, wat er op het menu staat of wat er gepland is om te koken. Haalt het weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten.',
     parameters: {
       type: 'object',
       properties: { days: { type: 'integer', description: 'Hoeveel dagen vooruit (1-14, default 7)' } },
@@ -37,7 +37,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer maaltijden op het weekmenu te zetten (bv. "vrijdag lasagne"). De gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken; er wordt nooit direct iets opgeslagen.',
+    description: 'Roep dit aan wanneer de gebruiker een maaltijd wil inplannen of op het menu wil zetten (bv. "vrijdag lasagne"). Stelt één of meer maaltijden voor: de gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {

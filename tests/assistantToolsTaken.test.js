@@ -23,7 +23,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     moduleKey: 'taken',
     kind: 'read',
     statusLabel: 'Even in de taken kijken…',
-    description: 'Haal de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager. Gebruik dit bij vragen over wat er nog moet gebeuren, deadlines of wie wat doet.',
+    description: 'Roep dit aan zodra de gebruiker vraagt wat er nog moet gebeuren, naar deadlines, of wie welke taak doet — antwoord niet uit het geheugen. Haalt de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager (only_mine).',
     parameters: {
       type: 'object',
       properties: { only_mine: { type: 'boolean', description: 'Alleen taken die aan de vrager zijn toegewezen' } },
@@ -38,7 +38,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Stel voor om één of meer taken toe te voegen. De gebruiker ziet een bevestigingskaart en beslist zelf; er wordt nooit direct iets opgeslagen. Gebruik dit wanneer de gebruiker een taak of klusje wil vastleggen.',
+    description: 'Roep dit aan wanneer de gebruiker een taak of klusje wil vastleggen (niet voor een maaltijd — gebruik daarvoor maaltijden_plannen). Stelt één of meer taken voor: de gebruiker ziet een bevestigingskaart en beslist zelf, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {
