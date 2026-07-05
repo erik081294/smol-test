@@ -2,39 +2,361 @@
   "v": 1,
   "comment": "Golden-set voor de assistent-eval-gate (AI-3, plan 24 ronde B; guidelines §6). Elke case: vraag → verwachte tool-keuze op de EERSTE beurt. expect.tools = [] betekent: er hoort GÉÉN tool te vuren (de irrelevance-bucket). args = verwachte argument-subset (alleen de velden die er echt toe doen). Nieuwe productie-failure uit de trace-review? Voeg 'm hier toe. Draaien: node scripts/assistant-eval.mjs",
   "cases": [
-    { "id": "tak-01", "question": "Hoeveel open taken heb ik?", "expect": { "tools": [{ "name": "get_open_tasks", "args": { "only_mine": true } }] } },
-    { "id": "tak-02", "question": "Wat staat er allemaal nog open in huis?", "expect": { "tools": [{ "name": "get_open_tasks" }] } },
-    { "id": "tak-03", "question": "Welke taken zijn er voor mij deze week?", "expect": { "tools": [{ "name": "get_open_tasks", "args": { "only_mine": true } }] } },
-    { "id": "tak-04", "question": "Is er nog iets achterstallig?", "expect": { "tools": [{ "name": "get_open_tasks" }] } },
-    { "id": "tak-05", "question": "Wat moet er vandaag gebeuren?", "expect": { "tools": [{ "name": "get_open_tasks" }] } },
-    { "id": "tak-06", "question": "Staat stofzuigen nog op de lijst?", "expect": { "tools": [{ "name": "get_open_tasks" }] } },
-    { "id": "tak-07", "question": "Wiens beurt is het eigenlijk om iets te doen?", "expect": { "tools": [{ "name": "get_open_tasks" }] } },
-
-    { "id": "boo-01", "question": "Wat staat er op de boodschappenlijst?", "expect": { "tools": [{ "name": "get_grocery_list" }] } },
-    { "id": "boo-02", "question": "Moet ik nog iets halen bij de supermarkt?", "expect": { "tools": [{ "name": "get_grocery_list" }] } },
-    { "id": "boo-03", "question": "Staat er melk op de lijst?", "expect": { "tools": [{ "name": "get_grocery_list" }] } },
-    { "id": "boo-04", "question": "Hoeveel dingen moeten we nog kopen?", "expect": { "tools": [{ "name": "get_grocery_list" }] } },
-
-    { "id": "voo-01", "question": "Wat is er bijna op?", "expect": { "tools": [{ "name": "get_pantry_low_stock" }] } },
-    { "id": "voo-02", "question": "Loopt er iets tegen de houdbaarheidsdatum aan?", "expect": { "tools": [{ "name": "get_pantry_low_stock" }] } },
-    { "id": "voo-03", "question": "Moeten we de voorraad aanvullen?", "expect": { "tools": [{ "name": "get_pantry_low_stock" }] } },
-    { "id": "voo-04", "question": "Hebben we nog genoeg rijst in huis?", "expect": { "tools": [{ "name": "get_pantry_low_stock" }] } },
-
-    { "id": "kos-01", "question": "Wat gaven we deze maand uit?", "expect": { "tools": [{ "name": "get_expenses_summary" }] } },
-    { "id": "kos-02", "question": "Hoeveel kostte juni ons?", "expect": { "tools": [{ "name": "get_expenses_summary", "args": { "month": "2026-06" } }] } },
-    { "id": "kos-03", "question": "Wat was onze grootste uitgave deze maand?", "expect": { "tools": [{ "name": "get_expenses_summary" }] } },
-    { "id": "kos-04", "question": "Geef me een overzicht van de kosten van maart 2026.", "expect": { "tools": [{ "name": "get_expenses_summary", "args": { "month": "2026-03" } }] } },
-
-    { "id": "mix-01", "question": "Hoeveel open taken heb ik en wat staat er op de boodschappenlijst?", "expect": { "tools": [{ "name": "get_open_tasks" }, { "name": "get_grocery_list" }] } },
-    { "id": "mix-02", "question": "Geef me het huishoud-overzicht: taken én wat er bijna op is.", "expect": { "tools": [{ "name": "get_open_tasks" }, { "name": "get_pantry_low_stock" }] } },
-
-    { "id": "geen-01", "question": "Hoi!", "expect": { "tools": [] }, "note": "groet → geen tool" },
-    { "id": "geen-02", "question": "Dankjewel, fijne avond!", "expect": { "tools": [] }, "note": "bedankje → geen tool" },
-    { "id": "geen-03", "question": "Wat kun jij allemaal?", "expect": { "tools": [] }, "note": "meta-vraag → uitleg, geen tool" },
-    { "id": "geen-04", "question": "Wat is de hoofdstad van Frankrijk?", "expect": { "tools": [] }, "note": "buiten domein → vriendelijk afwijzen" },
-    { "id": "geen-05", "question": "Schrijf een gedicht over de liefde.", "expect": { "tools": [] }, "note": "buiten domein" },
-    { "id": "geen-06", "question": "Wat vind jij van ons huishouden?", "expect": { "tools": [] }, "note": "smalltalk; data-loze mening hoeft geen tool" },
-    { "id": "geen-07", "question": "Kun je aandelenkoersen opzoeken?", "expect": { "tools": [] }, "note": "buiten domein → afwijzen met hint" },
-    { "id": "geen-08", "question": "Verwijder al mijn taken.", "expect": { "tools": [] }, "note": "write-verzoek in read-only v1 → uitleggen dat bevestigde acties nog niet kunnen, nooit een read-tool misbruiken" }
+    {
+      "id": "tak-01",
+      "question": "Hoeveel open taken heb ik?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks",
+            "args": {
+              "only_mine": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-02",
+      "question": "Wat staat er allemaal nog open in huis?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-03",
+      "question": "Welke taken zijn er voor mij deze week?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks",
+            "args": {
+              "only_mine": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-04",
+      "question": "Is er nog iets achterstallig?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-05",
+      "question": "Wat moet er vandaag gebeuren?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-06",
+      "question": "Staat stofzuigen nog op de lijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-07",
+      "question": "Wiens beurt is het eigenlijk om iets te doen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-01",
+      "question": "Wat staat er op de boodschappenlijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-02",
+      "question": "Moet ik nog iets halen bij de supermarkt?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-03",
+      "question": "Staat er melk op de lijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-04",
+      "question": "Hoeveel dingen moeten we nog kopen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-01",
+      "question": "Wat is er bijna op?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_pantry_low_stock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-02",
+      "question": "Loopt er iets tegen de houdbaarheidsdatum aan?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_pantry_low_stock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-03",
+      "question": "Moeten we de voorraad aanvullen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_pantry_low_stock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-04",
+      "question": "Hebben we nog genoeg rijst in huis?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_pantry_low_stock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-01",
+      "question": "Wat gaven we deze maand uit?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_expenses_summary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-02",
+      "question": "Hoeveel kostte juni ons?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_expenses_summary",
+            "args": {
+              "month": "2026-06"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-03",
+      "question": "Wat was onze grootste uitgave deze maand?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_expenses_summary"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-04",
+      "question": "Geef me een overzicht van de kosten van maart 2026.",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_expenses_summary",
+            "args": {
+              "month": "2026-03"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mix-01",
+      "question": "Hoeveel open taken heb ik en wat staat er op de boodschappenlijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          },
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mix-02",
+      "question": "Geef me het huishoud-overzicht: taken én wat er bijna op is.",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          },
+          {
+            "name": "get_pantry_low_stock"
+          }
+        ]
+      }
+    },
+    {
+      "id": "geen-01",
+      "question": "Hoi!",
+      "expect": {
+        "tools": []
+      },
+      "note": "groet → geen tool"
+    },
+    {
+      "id": "geen-02",
+      "question": "Dankjewel, fijne avond!",
+      "expect": {
+        "tools": []
+      },
+      "note": "bedankje → geen tool"
+    },
+    {
+      "id": "geen-03",
+      "question": "Wat kun jij allemaal?",
+      "expect": {
+        "tools": []
+      },
+      "note": "meta-vraag → uitleg, geen tool"
+    },
+    {
+      "id": "geen-04",
+      "question": "Wat is de hoofdstad van Frankrijk?",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein → vriendelijk afwijzen"
+    },
+    {
+      "id": "geen-05",
+      "question": "Schrijf een gedicht over de liefde.",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein"
+    },
+    {
+      "id": "geen-06",
+      "question": "Wat vind jij van ons huishouden?",
+      "expect": {
+        "tools": []
+      },
+      "note": "smalltalk; data-loze mening hoeft geen tool"
+    },
+    {
+      "id": "geen-07",
+      "question": "Kun je aandelenkoersen opzoeken?",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein → afwijzen met hint"
+    },
+    {
+      "id": "geen-08",
+      "question": "Verwijder al mijn taken.",
+      "expect": {
+        "tools": []
+      },
+      "note": "write-verzoek in read-only v1 → uitleggen dat bevestigde acties nog niet kunnen, nooit een read-tool misbruiken"
+    },
+    {
+      "id": "tak-08",
+      "question": "Wat staat er vandaag op de planning?",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_open_tasks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-05",
+      "question": "Check de boodschappenlijst",
+      "expect": {
+        "tools": [
+          {
+            "name": "get_grocery_list"
+          }
+        ]
+      }
+    },
+    {
+      "id": "geen-09",
+      "question": "Wat kun je allemaal voor me doen? Geef een kort lijstje.",
+      "expect": {
+        "tools": []
+      }
+    },
+    {
+      "id": "geen-10",
+      "question": "Geef me een uitgebreid overzicht van wat je kunt.",
+      "expect": {
+        "tools": []
+      }
+    },
+    {
+      "id": "geen-11",
+      "question": "Zet cola op de boodschappenlijst.",
+      "expect": {
+        "tools": []
+      }
+    }
   ]
 }
