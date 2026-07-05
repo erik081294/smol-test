@@ -27,6 +27,7 @@ function assertClosedSchemas(schema, path, toolName) {
 
 test('registry: de verwachte toolset, gesorteerd op naam (cache-hygiëne)', () => {
   assert.deepEqual(ASSISTANT_TOOLS.map((t) => t.name), [
+    'boodschappen_afvinken',
     'boodschappen_lijst',
     'boodschappen_toevoegen',
     'kosten_maandoverzicht',
@@ -82,6 +83,7 @@ test('contract: read-tools hebben run; write-tools hebben propose+execute + risi
 test('contract: propose houdt items en args.items 1-op-1 uitgelijnd (selectie-indexen)', () => {
   const samples = {
     taken_toevoegen: { items: [{ title: 'A' }, { title: 'B', due_date: '2026-07-10' }] },
+    boodschappen_afvinken: { items: [{ name: 'Melk' }, { name: 'Brood' }] },
     boodschappen_toevoegen: { items: [{ name: 'Melk' }, { name: 'Kaas', quantity: '2' }] },
     maaltijden_plannen: { items: [{ date: '2026-07-10', title: 'X' }, { date: '2026-07-11', title: 'Y' }] },
     maaltijden_recept_opslaan: { items: [{ title: 'Pesto', ingredients: [{ name: 'Basilicum' }] }, { title: 'Soep', ingredients: [{ name: 'Ui' }] }] },

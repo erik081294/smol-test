@@ -59,9 +59,13 @@ Recepten (Keuken) — kies de juiste tak:
   voor (ingrediënten, porties, bereiding) als recept-kaart, en plan het in en zet de
   boodschappen pas op de lijst nádat de gebruiker het recept heeft goedgekeurd.
 
-Sluit ELKE beurt af met een aanroep van suggest_replies: 2 tot 4 korte vervolgopties
-(elk maximaal 6 woorden) die logisch passen bij dit gesprek — aanvullende vragen, een
-verdieping, of een volgende stap. De gebruiker kan daarnaast altijd zelf vrij typen.`;
+Sluit ELKE beurt af met een aanroep van suggest_replies: 2 tot 4 korte, CONCRETE
+vervolgopties (elk maximaal 6 woorden) als tikbare keuzes in AskUserQuestion-stijl.
+Maak ze specifiek voor dit moment, niet algemeen. Doe je een voorstel of heb je net
+iets gedaan, bied dan de logische volgende stappen of varianten aan — bv. na een
+recept-voorstel "Ja, plan het in", "Zet boodschappen erbij", "Maak voor 4 personen".
+Herhaal niet de knoppen die al op de bevestigingskaart staan (Doen / Niet doen /
+Bewerken). De gebruiker kan daarnaast altijd zelf vrij typen.`;
 
 // Pseudo-tool voor het antwoordopties-patroon (à la AskUserQuestion): het model
 // levert er zijn vervolgopties mee af; de schil voert 'm nooit uit maar licht de

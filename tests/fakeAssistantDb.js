@@ -16,10 +16,19 @@ export function fakeDb(rowsByTable, calls, opts = {}) {
           const ids = rec.inserted.map((_, i) => ({ id: `${table}-${i + 1}` }));
           return Promise.resolve({ data: ids, error: null });
         }
+        if (rec.updated) {
+          // update(...).in('id', ids).select('id') → de ge-update ids (of een fout).
+          if (opts.updateError) return Promise.resolve({ data: null, error: opts.updateError });
+          const inFilter = rec.filters.find((f) => f[0] === 'in');
+          const ids = (inFilter?.[2] ?? []).map((id) => ({ id }));
+          return Promise.resolve({ data: ids, error: null });
+        }
         return api;
       },
       insert(rows) { rec.inserted = rows; return api; },
+      update(patch) { rec.updated = patch; return api; },
       eq(col, val) { rec.filters.push(['eq', col, val]); return api; },
+      in(col, vals) { rec.filters.push(['in', col, vals]); return api; },
       is(col, val) { rec.filters.push(['is', col, val]); return api; },
       gte(col, val) { rec.filters.push(['gte', col, val]); return api; },
       lt(col, val) { rec.filters.push(['lt', col, val]); return api; },

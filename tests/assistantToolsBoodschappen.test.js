@@ -7,6 +7,7 @@ import {
   BOODSCHAPPEN_BRIEF,
   renderGroceryList,
   proposeAddGroceries,
+  proposeCheckGroceries,
   MAX_PROPOSED_GROCERIES,
 } from '../supabase/functions/_shared/tools/boodschappen.js';
 import { toolCtx } from './fakeAssistantDb.js';
@@ -16,7 +17,7 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
-  assert.deepEqual(BOODSCHAPPEN_BRIEF, { moduleKey: 'boodschappen', label: 'Boodschappen', brief: 'de gedeelde boodschappenlijst; kan de lijst tonen en items voorstellen' });
+  assert.deepEqual(BOODSCHAPPEN_BRIEF, { moduleKey: 'boodschappen', label: 'Boodschappen', brief: 'de gedeelde boodschappenlijst; kan de lijst tonen, items voorstellen en afvinken' });
 });
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
@@ -143,4 +144,80 @@ test('boodschappen_toevoegen.execute: één item → enkelvoud-summary; insert-f
     () => tool('boodschappen_toevoegen').execute(toolCtx({}, [], { insertError: {} }), { items: [{ name: 'Melk', quantity: null }] }),
     /query mislukt/
   );
+});
+
+// --- boodschappen_afvinken (punt 1, device-feedback): een write-tool die op naam
+//     matcht en checked=true zet; geen undo-spoor (afvinken is geen insert).
+
+test('descriptor-contract: boodschappen_afvinken ligt exact vast', () => {
+  assert.deepEqual(shape(tool('boodschappen_afvinken')), {
+    name: 'boodschappen_afvinken',
+    moduleKey: 'boodschappen',
+    kind: 'write',
+    destructive: false,
+    idempotent: true,
+    statusLabel: 'Voorstel klaarzetten…',
+    description: 'Roep dit aan wanneer de gebruiker een of meer boodschappen als gehaald/gekocht wil afvinken of van de lijst wil halen (bv. "ik heb melk en brood gehaald"). Gebruik de namen zoals ze op de lijst staan (haal ze zo nodig eerst op met boodschappen_lijst). De gebruiker ziet een bevestigingskaart en kan per item aan- of uitvinken. Dit is niet voor het TOEVOEGEN van items — gebruik daarvoor boodschappen_toevoegen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De af te vinken boodschappen (maximaal 20).',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'De naam zoals op de lijst, bv. "Melk"' },
+            },
+            required: ['name'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  });
+});
+
+test('proposeCheckGroceries: trimt namen, 1-op-1 uitlijning, grenzen', () => {
+  const out = proposeCheckGroceries({ items: [{ name: ' Melk ' }, { name: 'Brood' }] });
+  assert.equal(out.ok, true);
+  assert.equal(out.summary, '2 boodschappen afvinken');
+  assert.deepEqual(out.items, ['Melk', 'Brood']);
+  assert.deepEqual(out.args.items, [{ name: 'Melk' }, { name: 'Brood' }]);
+  assert.equal(out.items.length, out.args.items.length);
+  assert.equal(proposeCheckGroceries({ items: [{ name: 'Melk' }] }).summary, '"Melk" afvinken van de boodschappenlijst');
+  assert.equal(proposeCheckGroceries().ok, false);
+  assert.equal(proposeCheckGroceries({ items: [] }).ok, false);
+  assert.match(proposeCheckGroceries({ items: [{ name: '  ' }] }).error, /naam/);
+  assert.match(proposeCheckGroceries({ items: Array.from({ length: MAX_PROPOSED_GROCERIES + 1 }, () => ({ name: 'x' })) }).error, /Maximaal 20/);
+});
+
+test('boodschappen_afvinken.execute: matcht case-insensitief op naam, zet checked=true, geen undo-spoor', async () => {
+  const calls = [];
+  const out = await tool('boodschappen_afvinken').execute(
+    toolCtx({ groceries: [{ id: 'g1', name: 'Melk' }, { id: 'g2', name: 'Brood' }, { id: 'g3', name: 'Kaas' }] }, calls),
+    { items: [{ name: 'melk' }, { name: 'BROOD' }] }
+  );
+  // Eerst de onafgevinkte lijst ophalen…
+  assert.equal(calls[0].table, 'groceries');
+  assert.deepEqual(calls[0].filters, [['eq', 'household_id', 'h1'], ['eq', 'checked', false]]);
+  // …dan alleen de treffers (g1 + g2, niet Kaas) op checked=true.
+  assert.equal(calls[1].table, 'groceries');
+  assert.deepEqual(calls[1].updated, { checked: true });
+  assert.deepEqual(calls[1].filters.find((f) => f[0] === 'in'), ['in', 'id', ['g1', 'g2']]);
+  assert.equal(out.summary, '2 boodschappen afgevinkt.');
+  assert.deepEqual(out.inserted, []); // niet undo-baar via insert-verwijdering
+});
+
+test('boodschappen_afvinken.execute: geen match → nette melding, geen update-call', async () => {
+  const calls = [];
+  const out = await tool('boodschappen_afvinken').execute(
+    toolCtx({ groceries: [{ id: 'g1', name: 'Melk' }] }, calls),
+    { items: [{ name: 'Bananen' }] }
+  );
+  assert.match(out.summary, /niet \(meer\) open/);
+  assert.deepEqual(out.inserted, []);
+  assert.equal(calls.length, 1); // alleen de select, geen update
 });

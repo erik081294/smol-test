@@ -1590,3 +1590,32 @@ iOS-toestel. Er is dus geen oppervlak om de visuele hotspot-smoke te draaien →
 is (cloud-sim aanzetten, of TestFlight op device bij livegang; gebruikersbesluit). Parallel gestart op de
 livegang-checklist: Apple App ID `app.huishoek` (Team `J3DDDK3JB2`, = de AASA-Team-ID) met **Push
 Notifications** + **Associated Domains** capabilities.
+
+---
+
+**2026-07-05 — Assistent chat-UX na device-feedback (AI-15).** Vijf punten uit echt gebruik van de
+assistent op toestel:
+- **Chat-overlay herbouwd** (punt 2+5). De overlay was een `BottomSheet` met swipe-to-dismiss: die
+  swipe botste met het scrollen (de drawer "sprong alle kanten op"), de vaste hoogte `height*0.78` liet
+  het toetsenbord over de invoer vallen, de tab-bar schemerde eronder door en er stonden grote lege
+  ruimtes. Nu een opaque full-screen `Modal` met kruisje + `KeyboardAvoidingView` ([`AssistantSheet.js`](lib/AssistantSheet.js)):
+  geen gesture-conflict, invoer altijd boven het toetsenbord, navbar afgedekt. **Device-geverifieerd
+  (moto, screenshots met/zonder toetsenbord):** invoerveld schuift netjes omhoog bij het toetsenbord,
+  kruisje sluit. Lost AI-13-(2)/(3) op.
+- **LLM-response full-width** (punt 4): de assistent-beurt rendert nu op volle breedte zonder bubble
+  (de gebruikersbeurt houdt zijn bubble rechts) → kaarten en tekst krijgen de hele chatruimte ([`AssistantChat.js`](lib/AssistantChat.js)).
+  Device-geverifieerd (de weekmenu-kaart vult nu de breedte).
+- **Boodschappen afvinken** (punt 1): de AI zei terecht dat 'ie het niet kon — geen prompting-bug, de
+  tool ontbrak. Nieuwe HITL-write-tool [`boodschappen_afvinken`](supabase/functions/_shared/tools/boodschappen.js):
+  matcht case-insensitief op naam tegen de onafgevinkte lijst en zet `checked=true`. Bewust géén
+  undo-spoor — afvinken is geen insert (undo verwijdert inserts) en triviaal terug te zetten in de
+  lijst-UI. EDITABLE_FIELDS-entry + descriptor-contract + execute-tests; fake-db kreeg `update`/`in`.
+- **Beslis-opties** (punt 3a): `suggest_replies`-prompt aangescherpt naar concrete, AskUserQuestion-stijl
+  vervolgstappen na een voorstel of actie (bv. "Ja, plan het in", "Zet boodschappen erbij"), zonder de
+  bevestigingskaart-knoppen te herhalen. Server-auto-continuation na een confirm blijft bewust uit
+  (guidelines §10) — de chips zijn de gebruiker-geïnitieerde vervolgroute.
+- **A2UI-plan** (punt 3b): de wens om industry-leading interactieve componenten (grafiek/rooster/recept)
+  is als **AI-16** vastgelegd — bouwt op AI-7 (surface/patch), niet nu gebouwd (bewust uitgesteld).
+- **DoD:** `npm test` 1153 pass, typecheck + `eslint .` groen, **eval-gate 100/100/100 (45 cases)**, edge
+  **v16 gedeployed**. **Rest:** device-verificatie van de afvink-HITL-flow (toestel raakte los tijdens de
+  sessie) + trace-review van de nieuwe beslis-opties.
