@@ -44,7 +44,19 @@ import {
   sseLine,
 } from './core.js';
 // @ts-ignore — zie boven.
-import { ASSISTANT_TOOLS } from '../_shared/assistantTools.js';
+import { ASSISTANT_TOOLS } from '../_shared/tools/index.js';
+// @ts-ignore — zie boven. Pure HITL-statusmachine (AI-8): de agent-loop voert
+// write-tools nooit uit; de harness maakt er een voorstel van en deze module
+// bepaalt wat er met een besluit (confirm/reject/undo) mag gebeuren.
+import {
+  ACTION_DECISIONS,
+  buildActionContent,
+  confirmActionNode,
+  canResolve,
+  contentWithStatus,
+  selectItems,
+  undoPlan,
+} from './actions.js';
 // @ts-ignore — Deno-runtime-import.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -72,6 +84,8 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Persona/toon: plan 23 §1 — de prompt zelf leeft in core.js (één bron, gedeeld
 // met de eval-runner; guidelines §3).
 
@@ -92,18 +106,15 @@ Deno.serve(async (req: Request) => {
     memberNames?: Record<string, string>;
     today?: string;
     stream?: boolean;
+    // HITL-besluit op een eerder voorstel (AI-8): los van message — een besluit
+    // is geen chatbeurt en kost geen LLM-call.
+    action?: { id?: string; decision?: string; selected?: number[] };
   };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Ongeldige aanvraag' }, 400);
   }
-  const { householdId, message } = body;
-  if (!householdId || typeof message !== 'string' || message.trim().length === 0) {
-    return json({ error: 'householdId en message zijn verplicht' }, 400);
-  }
-  if (message.length > 2000) return json({ error: 'Bericht te lang' }, 413);
-
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
   const authHeader = req.headers.get('Authorization') ?? '';
@@ -118,6 +129,92 @@ Deno.serve(async (req: Request) => {
     global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false },
   });
+
+  // --- HITL-besluit op een eerder voorstel (AI-8, plan 23 §4). Geen LLM-call:
+  // alleen het OPGESLAGEN voorstel valideren en (bij confirm) de opgeslagen args
+  // uitvoeren — de client stuurt uitsluitend een voorstel-ID + besluit + welke
+  // items aangevinkt bleven, nooit args. Telt daarom niet mee in
+  // record_assistant_call (dat bewaakt betaalde LLM-beurten); RLS (creator-privé)
+  // bepaalt of de vrager dit voorstel überhaupt ziet.
+  if (body.action) {
+    const actionId = typeof body.action.id === 'string' ? body.action.id : '';
+    const decision = typeof body.action.decision === 'string' ? body.action.decision : '';
+    if (!UUID_RE.test(actionId) || !ACTION_DECISIONS.includes(decision)) {
+      return json({ error: 'Ongeldig besluit.' }, 400);
+    }
+    const { data: actionUser } = await db.auth.getUser();
+    const actionUserId = actionUser?.user?.id ?? '';
+    const nowIso = new Date().toISOString();
+    const { data: row } = await db
+      .from('assistant_messages')
+      .select('id, household_id, conversation_id, content, created_at')
+      .eq('id', actionId)
+      .eq('role', 'action')
+      .maybeSingle();
+    if (!row) return json({ error: 'Dit voorstel is niet gevonden.' }, 404);
+    const allowed = canResolve(row, decision, nowIso);
+    if (!allowed.ok) return json({ error: allowed.error }, 409);
+
+    // Conditionele status-update = het claim-slot tegen dubbeltik/races: alleen
+    // de aanroep die de verwachte status aantreft wint; de rest krijgt een 409.
+    const finish = async (status: string, extra: object = {}, expectStatus = 'pending') => {
+      const { data: updated } = await db
+        .from('assistant_messages')
+        .update({ content: contentWithStatus(row.content, status, extra) })
+        .eq('id', actionId)
+        .eq('content->>status', expectStatus)
+        .select('id');
+      return (updated ?? []).length > 0;
+    };
+
+    if (decision === 'reject') {
+      if (!(await finish('rejected'))) return json({ error: 'Dit voorstel is al verwerkt.' }, 409);
+      return json({ ok: true, status: 'rejected' });
+    }
+
+    if (decision === 'undo') {
+      const plan = undoPlan(row.content?.result?.inserted);
+      if (!plan.ok) return json({ error: plan.error }, 409);
+      // Eerst claimen (done → undone, conditioneel), dan pas verwijderen:
+      // een dubbeltik verwijdert zo nooit twee keer.
+      if (!(await finish('undone', {}, 'done'))) return json({ error: 'Er is niets om ongedaan te maken.' }, 409);
+      for (const [table, ids] of Object.entries(plan.byTable)) {
+        const { error } = await db.from(table).delete().in('id', ids);
+        if (error) console.error('[assistant] undo faalde', table, error.message);
+      }
+      return json({ ok: true, status: 'undone' });
+    }
+
+    // confirm: tool moet nog bestaan én een write-tool zijn; args zijn de
+    // opgeslagen, genormaliseerde args, gefilterd op de aangevinkte items.
+    const tool = ASSISTANT_TOOLS.find((t) => t.name === row.content?.tool && t.kind === 'write');
+    if (!tool) return json({ error: 'Dit voorstel wordt niet meer ondersteund.' }, 409);
+    const sel = selectItems(row.content?.args, body.action.selected);
+    if (!sel.ok) return json({ error: sel.error }, 400);
+    if (!(await finish('executing'))) return json({ error: 'Dit voorstel is al verwerkt.' }, 409);
+    try {
+      const executeCtx = {
+        db,
+        householdId: row.household_id,
+        userId: actionUserId,
+        today: nowIso.slice(0, 10),
+      };
+      const result = await tool.execute(executeCtx, sel.args);
+      await finish('done', { result }, 'executing');
+      return json({ ok: true, status: 'done', summary: result.summary, undoable: (result.inserted ?? []).length > 0 });
+    } catch (e) {
+      console.error('[assistant] voorstel uitvoeren faalde', String(e));
+      await finish('failed', {}, 'executing');
+      return json({ error: 'Dat lukte even niet — het voorstel is niet uitgevoerd.' }, 500);
+    }
+  }
+
+  // --- Chatbeurt: vanaf hier is message verplicht.
+  const { householdId, message } = body;
+  if (!householdId || typeof message !== 'string' || message.trim().length === 0) {
+    return json({ error: 'householdId en message zijn verplicht' }, 400);
+  }
+  if (message.length > 2000) return json({ error: 'Bericht te lang' }, 413);
 
   // Rate-limit vóór de betaalde call (fail-closed; zelfde discipline als scan-receipt).
   try {
@@ -156,7 +253,9 @@ Deno.serve(async (req: Request) => {
   const userId = userData?.user?.id ?? '';
   const ctx = { db, householdId, userId, today, memberNames };
 
-  const tools = filterTools(ASSISTANT_TOOLS, enabledKeys);
+  // Write-tools doen mee (AI-8): de loop voert ze nooit uit — de interceptie
+  // hieronder maakt er een bevestigingsvoorstel van (HITL).
+  const tools = filterTools(ASSISTANT_TOOLS, enabledKeys, { includeWrite: true });
   const chatTools = toChatTools(tools);
   const snapshot = buildContextSnapshot({
     today,
@@ -168,7 +267,6 @@ Deno.serve(async (req: Request) => {
   // creator-privé). Bestaand conversationId (uuid) → history uit de DB; anders
   // een nieuw gesprek met een deterministische titel. De client stuurt alleen
   // conversationId + het nieuwe bericht.
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   let conversationId = typeof body.conversationId === 'string' && UUID_RE.test(body.conversationId)
     ? body.conversationId
     : null;
@@ -328,6 +426,43 @@ Deno.serve(async (req: Request) => {
         let result: unknown;
         if (!tool) {
           result = { error: `Onbekende tool: ${call.name}` };
+        } else if (tool.kind === 'write') {
+          // HITL-interceptie (AI-8): een write-call wordt NOOIT uitgevoerd. De
+          // tool bouwt puur een voorstel (propose), dat als role='action'-rij
+          // wordt opgeslagen; de gebruiker beslist op de bevestigingskaart en
+          // pas dán draait tool.execute — met de hier opgeslagen args.
+          const proposal = tool.propose(call.args, { today, memberNames });
+          if (!proposal.ok) {
+            result = { error: proposal.error };
+          } else {
+            const content = buildActionContent(tool, proposal);
+            const { data: actionRow, error: actionErr } = await db
+              .from('assistant_messages')
+              .insert({
+                conversation_id: conversationId,
+                household_id: householdId,
+                created_by: userId,
+                role: 'action',
+                content,
+              })
+              .select('id')
+              .single();
+            if (actionErr || !actionRow) {
+              console.error('[assistant] voorstel opslaan faalde', actionErr?.message);
+              result = { error: 'Het voorstel kon niet worden klaargezet.' };
+            } else {
+              // Render-tree: de bevestigingskaart (server-deterministisch);
+              // het model krijgt alleen het feit dat er een voorstel klaarstaat.
+              toolOutputs.push({ render: [confirmActionNode(actionRow.id, content)] });
+              result = {
+                data: {
+                  proposed: true,
+                  awaiting_user_confirmation: true,
+                  summary: proposal.summary,
+                },
+              };
+            }
+          }
         } else {
           try {
             result = await tool.run(ctx, call.args);

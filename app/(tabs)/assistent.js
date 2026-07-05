@@ -14,7 +14,7 @@ import { t } from '../../lib/i18n';
 
 const SUGGESTIONS = ['assistant.suggest.today', 'assistant.suggest.groceries', 'assistant.suggest.pantry', 'assistant.suggest.expenses'];
 
-function Bubble({ item }) {
+function Bubble({ item, onAction }) {
   const mine = item.role === 'user';
   return (
     <View style={{
@@ -30,7 +30,7 @@ function Bubble({ item }) {
         ? <T variant="body" color={colors.bg}>{item.text}</T>
         // De tree bevat de antwoordtekst al als text-node (buildTurnResult) —
         // item.text hier óók renderen zou 'm verdubbelen.
-        : <AssistantMessageView tree={item.tree} />}
+        : <AssistantMessageView tree={item.tree} onAction={onAction} />}
     </View>
   );
 }
@@ -47,7 +47,7 @@ function StreamingBubble({ stream }) {
 }
 
 export default function Assistent() {
-  const { enabled, messages, busy, stream, send, stop, retry, canRetry, choices, conversations, conversationId, openConversation, newConversation } = useAssistant();
+  const { enabled, messages, busy, stream, send, stop, retry, canRetry, choices, conversations, conversationId, openConversation, newConversation, resolveAction } = useAssistant();
   const [draft, setDraft] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -83,7 +83,7 @@ export default function Assistent() {
             inverted
             data={messages}
             keyExtractor={(m) => m.id}
-            renderItem={({ item }) => <Bubble item={item} />}
+            renderItem={({ item }) => <Bubble item={item} onAction={resolveAction} />}
             // Inverted lijst: de header rendert onderaan — precies waar de
             // streamende (nieuwste) beurt hoort.
             ListHeaderComponent={<StreamingBubble stream={stream} />}

@@ -17,7 +17,7 @@
 // zodat eval-verkeer nooit met productie-verkeer vermengd raakt.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { SYSTEM_PROMPT, SUGGEST_TOOL, splitSuggestions, toResponsesTools, parseResponsesOutput } from '../supabase/functions/assistant/core.js';
-import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/assistantTools.js';
+import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/tools/index.js';
 
 const ROUTER_URL = 'https://api.orq.ai/v3/router/responses';
 const BASELINE_PATH = 'assistant-eval-baseline.json';

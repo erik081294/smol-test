@@ -53,11 +53,35 @@ test('normalizeNode: keyvalue vereist k én v per paar', () => {
   assert.equal(normalizeNode({ type: 'keyvalue', pairs: [{ k: 'x', v: '' }] }), null);
 });
 
-test('normalizeNode: confirm_action vereist actionId én summary', () => {
+test('normalizeNode: confirm_action vereist actionId én summary; defaults voor items/status', () => {
   const ok = normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 'Taak aanmaken' });
-  assert.deepEqual(ok, { type: 'confirm_action', actionId: 'a1', summary: 'Taak aanmaken' });
+  assert.deepEqual(ok, { type: 'confirm_action', actionId: 'a1', summary: 'Taak aanmaken', items: [], status: 'pending' });
   assert.equal(normalizeNode({ type: 'confirm_action', actionId: 'a1' }), null);
   assert.equal(normalizeNode({ type: 'confirm_action', summary: 's' }), null);
+});
+
+test('normalizeNode: confirm_action multi-edit — alleen items met integer-id ≥ 0 én tekst blijven', () => {
+  const node = normalizeNode({
+    type: 'confirm_action',
+    actionId: 'a1',
+    summary: '3 dingen',
+    items: [
+      { id: 0, text: 'Melk' },
+      { id: 1, text: '' },        // lege tekst → weg
+      { id: -1, text: 'X' },      // negatieve id → weg
+      { id: '2', text: 'Y' },     // string-id → weg (id's zijn server-args-indexen)
+      { id: 2, text: 'Kaas' },
+    ],
+    status: 'done',
+  });
+  assert.deepEqual(node.items, [{ id: 0, text: 'Melk' }, { id: 2, text: 'Kaas' }]);
+  assert.equal(node.status, 'done');
+});
+
+test('normalizeNode: confirm_action met onbekende status valt terug op pending', () => {
+  const node = normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 's', status: 'geheim' });
+  assert.equal(node.status, 'pending');
+  assert.equal(normalizeNode({ type: 'confirm_action', actionId: 'a1', summary: 's', items: 'rommel' }).items.length, 0);
 });
 
 test('normalizeNode: link alleen naar interne routes (moet met "/" beginnen)', () => {
