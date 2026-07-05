@@ -1552,3 +1552,29 @@ server-side gerenderd tegen prompt-injectie. Zeven losse eindjes gedicht (branch
 - **Device-gated rest (AI-13-(2)/(3)):** sheet-hoogte vs. toetsenbord + navbar-z-index raken het
   gedeelde `BottomSheet`-primitief (auto-metende `maxHeight`) en zijn niet zonder toestel te
   verifiëren — bewust niet blind gegokt.
+- **Device-rooktest groen (moto, 2026-07-05):** crash-sweep 15/15 schermen ✓, alle 5 Maestro-flows
+  ✓, logcat schoon — AI-14 is regressie-vrij op toestel. **Daarbij een AI-10-los-eindje gedicht:**
+  sinds de FAB's AI-first werden (AI-10) openden `t-fab-task` c.s. de assistent-sheet i.p.v. de
+  editor, maar de Maestro-flows (`01-taak`/`04-swipe`/`05-editor-guard`) waren niet meegegaan → ze
+  faalden en lieten de overlay open, wat de tab-bar voor álle vervolg-flows verborg. Flows nu:
+  FAB → "Zelf invoeren" → editor (dat test meteen de AI-first-uitwijk). De assistent-specifieke
+  gedragingen (chip-scroll, "Akkoord met alles", FAB-terugval bij uitgezette module) blijven
+  handmatig te verifiëren — een LLM-afhankelijke Maestro-flow zou inherent flaky zijn.
+
+---
+
+**IOS-1 — iOS-readiness-enabler (2026-07-05).** Blindevlekken-analyse op iOS (we testen alleen
+Android/web): nooit een `ios/`-prebuild gedraaid, nul testlagen raken iOS. Drie onzekere aannames
+getoetst tegen de echte config/live-host: (1) **geen first-tap crash** — `expo config --type introspect`
+toont de camera/foto-`UsageDescription`-keys in de opgeloste iOS-`Info.plist` óók zónder de plugin te
+lijsten (Expo SDK 56 past module-config-plugins auto toe → Engelse defaults; weerlegt de crash-aanname,
+bevestigt INF-5); (2) **live universal links dood** — huishoek.app AASA serveert live nog
+`REPLACE_APPLE_TEAM_ID`; (3) **cloud-simulator = experimenteel** (`expo:eas-simulator`), buildsleutel
+`ios.simulator` correct. **Gebouwd (enabler):** `eas.json` `development` → `ios:{simulator:true}`;
+`app.config.js` `expo-image-picker`-plugin met NL camera/foto-permissieteksten (introspect-geverifieerd);
+docs: [plan 25](docs/plans/25-ios-readiness.md), backlog §6 IOS-1, `credentials/README.md` (APNs-key +
+uitgestelde checklist), rooktest-runbook iOS-sectie. `eas.json` blijft valide JSON; geen `lib/*.js`
+geraakt (geen mutatie-ratchet). **Strategie:** goedkope observability-enabler nu + lichte periodieke
+EAS-sim reality-check (géén per-PR-CI); config-checklist (APNs/submit/icoon/AASA-herdeploy) uitgesteld
+tot livegang. **Rest:** eerste `eas build -p ios --profile development` + smoke langs de divergentie-
+hotspots (modals/`pageSheet`, KAV-`padding`, gestures, schaduw) → basislijn hier loggen.

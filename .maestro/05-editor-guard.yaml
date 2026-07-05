@@ -15,6 +15,7 @@ appId: app.huishoek
 - assertVisible: "Taken"
 - tapOn:
     id: "t-fab-task"
+- tapOn: "Zelf invoeren"        # AI-first FAB (AI-10): opent de assistent; dit is de uitwijk naar de editor
 - assertVisible: "Nieuwe afspraak"
 
 # 1. Validatie: opslaan zonder titel → inline fout, editor blijft open.

@@ -10,6 +10,9 @@
       "environment": "development",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
       }
     },
     "preview": {

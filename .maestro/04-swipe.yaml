@@ -20,6 +20,7 @@ appId: app.huishoek
 # Maak een verse taak om op te vegen (datum staat al op vandaag).
 - tapOn:
     id: "t-fab-task"                     # FAB (task.add)
+- tapOn: "Zelf invoeren"        # AI-first FAB (AI-10): opent de assistent; dit is de uitwijk naar de editor
 - assertVisible: "Nieuwe afspraak"       # task.new (editor-titel)
 - tapOn:
     id: "t-field-title"                  # titel-veld (task.field.title)

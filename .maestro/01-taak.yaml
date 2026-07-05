@@ -11,6 +11,7 @@ appId: app.huishoek
 - assertVisible: "Taken"                 # scherm-titel
 - tapOn:
     id: "t-fab-task"                     # FAB "Taak toevoegen"
+- tapOn: "Zelf invoeren"        # AI-first FAB (AI-10): opent de assistent; dit is de uitwijk naar de editor
 - assertVisible: "Nieuwe afspraak"       # task.new (editor-titel)
 - tapOn:
     id: "t-field-title"                  # titel-veld (task.field.title)

@@ -116,7 +116,7 @@ error_boundary_hit() {
 # Loop elke route langs en assert dat de error-boundary NIET verschijnt. Harde crashes
 # (app valt weg) komen daarnaast via de logcat-grep binnen.
 run_sweep() {
-  local routes="vandaag taken boodschappen kosten planten huisdieren voertuigen tijdlijn maaltijden voorraad schoonmaak inzichten delen huishouden instellingen"
+  local routes="vandaag taken boodschappen kosten planten huisdieren voertuigen tijdlijn maaltijden voorraad schoonmaak inzichten delen assistent huishouden instellingen"
   local r fails=""
   echo "› crash-sweep (deeplinks)…"
   for r in $routes; do
