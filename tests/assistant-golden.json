@@ -2,50 +2,480 @@
   "v": 1,
   "comment": "Golden-set voor de assistent-eval-gate (AI-3, plan 24 ronde B; guidelines §6). Elke case: vraag → verwachte tool-keuze op de EERSTE beurt. expect.tools = [] betekent: er hoort GÉÉN tool te vuren (de irrelevance-bucket). args = verwachte argument-subset (alleen de velden die er echt toe doen). Nieuwe productie-failure uit de trace-review? Voeg 'm hier toe. Draaien: node scripts/assistant-eval.mjs",
   "cases": [
-    { "id": "tak-01", "question": "Hoeveel open taken heb ik?", "expect": { "tools": [{ "name": "taken_open", "args": { "only_mine": true } }] } },
-    { "id": "tak-02", "question": "Wat staat er allemaal nog open in huis?", "expect": { "tools": [{ "name": "taken_open" }] } },
-    { "id": "tak-03", "question": "Welke taken zijn er voor mij deze week?", "expect": { "tools": [{ "name": "taken_open", "args": { "only_mine": true } }] } },
-    { "id": "tak-04", "question": "Is er nog iets achterstallig?", "expect": { "tools": [{ "name": "taken_open" }] } },
-    { "id": "tak-05", "question": "Wat moet er vandaag gebeuren?", "expect": { "tools": [{ "name": "taken_open" }] } },
-    { "id": "tak-06", "question": "Staat stofzuigen nog op de lijst?", "expect": { "tools": [{ "name": "taken_open" }] } },
-    { "id": "tak-07", "question": "Wiens beurt is het eigenlijk om iets te doen?", "expect": { "tools": [{ "name": "taken_open" }] } },
-
-    { "id": "boo-01", "question": "Wat staat er op de boodschappenlijst?", "expect": { "tools": [{ "name": "boodschappen_lijst" }] } },
-    { "id": "boo-02", "question": "Moet ik nog iets halen bij de supermarkt?", "expect": { "tools": [{ "name": "boodschappen_lijst" }] } },
-    { "id": "boo-03", "question": "Staat er melk op de lijst?", "expect": { "tools": [{ "name": "boodschappen_lijst" }] } },
-    { "id": "boo-04", "question": "Hoeveel dingen moeten we nog kopen?", "expect": { "tools": [{ "name": "boodschappen_lijst" }] } },
-
-    { "id": "voo-01", "question": "Wat is er bijna op?", "expect": { "tools": [{ "name": "voorraad_bijna_op" }] } },
-    { "id": "voo-02", "question": "Loopt er iets tegen de houdbaarheidsdatum aan?", "expect": { "tools": [{ "name": "voorraad_bijna_op" }] } },
-    { "id": "voo-03", "question": "Moeten we de voorraad aanvullen?", "expect": { "tools": [{ "name": "voorraad_bijna_op" }] } },
-    { "id": "voo-04", "question": "Hebben we nog genoeg rijst in huis?", "expect": { "tools": [{ "name": "voorraad_bijna_op" }] } },
-
-    { "id": "kos-01", "question": "Wat gaven we deze maand uit?", "expect": { "tools": [{ "name": "kosten_maandoverzicht" }] } },
-    { "id": "kos-02", "question": "Hoeveel kostte juni ons?", "expect": { "tools": [{ "name": "kosten_maandoverzicht", "args": { "month": "2026-06" } }] } },
-    { "id": "kos-03", "question": "Wat was onze grootste uitgave deze maand?", "expect": { "tools": [{ "name": "kosten_maandoverzicht" }] } },
-    { "id": "kos-04", "question": "Geef me een overzicht van de kosten van maart 2026.", "expect": { "tools": [{ "name": "kosten_maandoverzicht", "args": { "month": "2026-03" } }] } },
-
-    { "id": "mix-01", "question": "Hoeveel open taken heb ik en wat staat er op de boodschappenlijst?", "expect": { "tools": [{ "name": "taken_open" }, { "name": "boodschappen_lijst" }] } },
-    { "id": "mix-02", "question": "Geef me het huishoud-overzicht: taken én wat er bijna op is.", "expect": { "tools": [{ "name": "taken_open" }, { "name": "voorraad_bijna_op" }] } },
-
-    { "id": "geen-01", "question": "Hoi!", "expect": { "tools": [] }, "note": "groet → geen tool" },
-    { "id": "geen-02", "question": "Dankjewel, fijne avond!", "expect": { "tools": [] }, "note": "bedankje → geen tool" },
-    { "id": "geen-03", "question": "Wat kun jij allemaal?", "expect": { "tools": [] }, "note": "meta-vraag → uitleg, geen tool" },
-    { "id": "geen-04", "question": "Wat is de hoofdstad van Frankrijk?", "expect": { "tools": [] }, "note": "buiten domein → vriendelijk afwijzen" },
-    { "id": "geen-05", "question": "Schrijf een gedicht over de liefde.", "expect": { "tools": [] }, "note": "buiten domein" },
-    { "id": "geen-06", "question": "Wat vind jij van ons huishouden?", "expect": { "tools": [] }, "note": "smalltalk; data-loze mening hoeft geen tool" },
-    { "id": "geen-07", "question": "Kun je aandelenkoersen opzoeken?", "expect": { "tools": [] }, "note": "buiten domein → afwijzen met hint" },
-    { "id": "geen-08", "question": "Verwijder al mijn taken.", "expect": { "tools": [] }, "note": "verwijderen kan (nog) niet — er is geen delete-tool; nooit taken_toevoegen of een read-tool misbruiken" },
-
-    { "id": "maa-01", "question": "Wat eten we deze week?", "expect": { "tools": [{ "name": "maaltijden_weekmenu" }] } },
-    { "id": "maa-02", "question": "Staat er al iets op het menu voor vrijdag?", "expect": { "tools": [{ "name": "maaltijden_weekmenu" }] } },
-    { "id": "maa-03", "question": "Wat staat er morgen op het weekmenu?", "expect": { "tools": [{ "name": "maaltijden_weekmenu" }] } },
-
-    { "id": "wri-01", "question": "Zet melk op de boodschappenlijst.", "expect": { "tools": [{ "name": "boodschappen_toevoegen" }] }, "note": "HITL: propose-tool vuren, de kaart vraagt de bevestiging — niet zelf 'zal ik?' vragen" },
-    { "id": "wri-02", "question": "Voeg melk, eieren en kaas toe aan de lijst.", "expect": { "tools": [{ "name": "boodschappen_toevoegen" }] }, "note": "multi-edit in één voorstel" },
-    { "id": "wri-03", "question": "Plan voor vrijdag lasagne in.", "expect": { "tools": [{ "name": "maaltijden_plannen" }] } },
-    { "id": "wri-03b", "question": "Zet voor zondag pannenkoeken op het menu.", "expect": { "tools": [{ "name": "maaltijden_plannen" }] } },
-    { "id": "wri-04", "question": "Maak een taak aan: zaterdag stofzuigen.", "expect": { "tools": [{ "name": "taken_toevoegen" }] } },
-    { "id": "wri-05", "question": "Kun je brood op het lijstje zetten en een taak maken om de wc schoon te maken?", "expect": { "tools": [{ "name": "boodschappen_toevoegen" }, { "name": "taken_toevoegen" }] }, "note": "twee voorstellen in één beurt mag" }
+    {
+      "id": "tak-01",
+      "question": "Hoeveel open taken heb ik?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open",
+            "args": {
+              "only_mine": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-02",
+      "question": "Wat staat er allemaal nog open in huis?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-03",
+      "question": "Welke taken zijn er voor mij deze week?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open",
+            "args": {
+              "only_mine": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-04",
+      "question": "Is er nog iets achterstallig?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-05",
+      "question": "Wat moet er vandaag gebeuren?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-06",
+      "question": "Staat stofzuigen nog op de lijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tak-07",
+      "question": "Wiens beurt is het eigenlijk om iets te doen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-01",
+      "question": "Wat staat er op de boodschappenlijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_lijst"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-02",
+      "question": "Moet ik nog iets halen bij de supermarkt?",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_lijst"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-03",
+      "question": "Staat er melk op de lijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_lijst"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-04",
+      "question": "Hoeveel dingen moeten we nog kopen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_lijst"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-01",
+      "question": "Wat is er bijna op?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voorraad_bijna_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-02",
+      "question": "Loopt er iets tegen de houdbaarheidsdatum aan?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voorraad_bijna_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-03",
+      "question": "Moeten we de voorraad aanvullen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voorraad_bijna_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "voo-04",
+      "question": "Hebben we nog genoeg rijst in huis?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voorraad_bijna_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-01",
+      "question": "Wat gaven we deze maand uit?",
+      "expect": {
+        "tools": [
+          {
+            "name": "kosten_maandoverzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-02",
+      "question": "Hoeveel kostte juni ons?",
+      "expect": {
+        "tools": [
+          {
+            "name": "kosten_maandoverzicht",
+            "args": {
+              "month": "2026-06"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-03",
+      "question": "Wat was onze grootste uitgave deze maand?",
+      "expect": {
+        "tools": [
+          {
+            "name": "kosten_maandoverzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kos-04",
+      "question": "Geef me een overzicht van de kosten van maart 2026.",
+      "expect": {
+        "tools": [
+          {
+            "name": "kosten_maandoverzicht",
+            "args": {
+              "month": "2026-03"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "mix-01",
+      "question": "Hoeveel open taken heb ik en wat staat er op de boodschappenlijst?",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          },
+          {
+            "name": "boodschappen_lijst"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mix-02",
+      "question": "Geef me het huishoud-overzicht: taken én wat er bijna op is.",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_open"
+          },
+          {
+            "name": "voorraad_bijna_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "geen-01",
+      "question": "Hoi!",
+      "expect": {
+        "tools": []
+      },
+      "note": "groet → geen tool"
+    },
+    {
+      "id": "geen-02",
+      "question": "Dankjewel, fijne avond!",
+      "expect": {
+        "tools": []
+      },
+      "note": "bedankje → geen tool"
+    },
+    {
+      "id": "geen-03",
+      "question": "Wat kun jij allemaal?",
+      "expect": {
+        "tools": []
+      },
+      "note": "meta-vraag → uitleg, geen tool"
+    },
+    {
+      "id": "geen-04",
+      "question": "Wat is de hoofdstad van Frankrijk?",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein → vriendelijk afwijzen"
+    },
+    {
+      "id": "geen-05",
+      "question": "Schrijf een gedicht over de liefde.",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein"
+    },
+    {
+      "id": "geen-06",
+      "question": "Wat vind jij van ons huishouden?",
+      "expect": {
+        "tools": []
+      },
+      "note": "smalltalk; data-loze mening hoeft geen tool"
+    },
+    {
+      "id": "geen-07",
+      "question": "Kun je aandelenkoersen opzoeken?",
+      "expect": {
+        "tools": []
+      },
+      "note": "buiten domein → afwijzen met hint"
+    },
+    {
+      "id": "geen-08",
+      "question": "Verwijder al mijn taken.",
+      "expect": {
+        "tools": []
+      },
+      "note": "verwijderen kan (nog) niet — er is geen delete-tool; nooit taken_toevoegen of een read-tool misbruiken"
+    },
+    {
+      "id": "maa-01",
+      "question": "Wat eten we deze week?",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_weekmenu"
+          }
+        ]
+      }
+    },
+    {
+      "id": "maa-02",
+      "question": "Staat er al iets op het menu voor vrijdag?",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_weekmenu"
+          }
+        ]
+      }
+    },
+    {
+      "id": "maa-03",
+      "question": "Wat staat er morgen op het weekmenu?",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_weekmenu"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wri-01",
+      "question": "Zet melk op de boodschappenlijst.",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_toevoegen"
+          }
+        ]
+      },
+      "note": "HITL: propose-tool vuren, de kaart vraagt de bevestiging — niet zelf 'zal ik?' vragen"
+    },
+    {
+      "id": "wri-02",
+      "question": "Voeg melk, eieren en kaas toe aan de lijst.",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_toevoegen"
+          }
+        ]
+      },
+      "note": "multi-edit in één voorstel"
+    },
+    {
+      "id": "wri-03",
+      "question": "Plan voor vrijdag lasagne in.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_plannen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wri-03b",
+      "question": "Zet voor zondag pannenkoeken op het menu.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_plannen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wri-04",
+      "question": "Maak een taak aan: zaterdag stofzuigen.",
+      "expect": {
+        "tools": [
+          {
+            "name": "taken_toevoegen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wri-05",
+      "question": "Kun je brood op het lijstje zetten en een taak maken om de wc schoon te maken?",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_toevoegen"
+          },
+          {
+            "name": "taken_toevoegen"
+          }
+        ]
+      },
+      "note": "twee voorstellen in één beurt mag"
+    },
+    {
+      "id": "rec-01",
+      "question": "Heb ik al een recept voor lasagne?",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_recept_zoeken"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rec-02",
+      "question": "Zoek in mijn recepten naar iets met pompoen.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_recept_zoeken"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rec-03",
+      "question": "Ik wil vrijdag pasta pesto koken, met recept erbij.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_recept_zoeken"
+          }
+        ]
+      },
+      "note": "koken-met-recept → eerst zoeken, niet blind inplannen (AI-12 bug)"
+    },
+    {
+      "id": "rec-04",
+      "question": "Sla dit recept op: pasta pesto met 400g penne, 100g pesto en 50g parmezaan.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_recept_opslaan"
+          }
+        ]
+      },
+      "note": "gebruiker levert het recept aan → direct opslaan, geen zoekstap"
+    },
+    {
+      "id": "rec-05",
+      "question": "Bewaar dit recept in het boek: bananenbrood met 3 bananen, 200g bloem en 100g suiker.",
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_recept_opslaan"
+          }
+        ]
+      }
+    }
   ]
 }

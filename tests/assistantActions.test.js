@@ -157,6 +157,26 @@ test('edit-roundtrip: toEditable → fromEditable levert propose-geldige args op
   assert.deepEqual(proposal.args.items, stored.items);
 });
 
+test('CARRY_FIELDS: niet-bewerkbare velden reizen mee bij een edit (recept-ingrediënten, recipe_id)', () => {
+  // Recept opslaan: de ingrediënten zijn niet plat bewerkbaar maar propose() eist
+  // ze — zonder carry zou bewaren het recept leeg achterlaten.
+  const storedRecipe = { items: [{ title: 'Pesto', servings: 4, instructions: 'Kook', ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }] }] };
+  const editableR = toEditableItems('maaltijden_recept_opslaan', storedRecipe);
+  const backR = fromEditableItems('maaltijden_recept_opslaan', editableR, storedRecipe.items);
+  assert.deepEqual(backR.items[0].ingredients, [{ name: 'Penne', quantity: 400, unit: 'gram' }]);
+  const recipeTool = ASSISTANT_TOOLS.find((t) => t.name === 'maaltijden_recept_opslaan');
+  assert.equal(recipeTool.propose(backR).ok, true);
+
+  // Maaltijd inplannen: het recipe_id blijft aan de maaltijd gekoppeld na een edit.
+  const storedMeal = { items: [{ date: '2026-07-10', meal_type: 'diner', title: 'Pesto', servings: null, recipe_id: '11111111-1111-1111-1111-111111111111' }] };
+  const editableM = toEditableItems('maaltijden_plannen', storedMeal);
+  const backM = fromEditableItems('maaltijden_plannen', editableM, storedMeal.items);
+  assert.equal(backM.items[0].recipe_id, '11111111-1111-1111-1111-111111111111');
+
+  // Zonder originalItems (oud aanroeppad) blijft het gedrag ongewijzigd: geen carry.
+  assert.equal('ingredients' in fromEditableItems('maaltijden_recept_opslaan', editableR).items[0], false);
+});
+
 test('toggleSelection: aan/uit, gesorteerd en zonder duplicaten', () => {
   assert.deepEqual(toggleSelection([0, 2], 1), [0, 1, 2]);
   assert.deepEqual(toggleSelection([0, 1, 2], 1), [0, 2]);

@@ -4,9 +4,8 @@
 // remount of tab-wissel begint dus niet meer leeg). Hier alleen de kop + de
 // gesprekkenlijst-sheet.
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { View, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView, Platform } from 'react-native';
 import { ScreenHeader, ModuleHelpButton, IconButton, T, Stack, Row, BottomSheet, ItemRow } from '../../lib/ui';
 import { AssistantChat } from '../../lib/AssistantChat';
 import { useAssistantHub } from '../../lib/assistantProvider';

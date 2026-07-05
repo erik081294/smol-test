@@ -499,9 +499,13 @@ Deno.serve(async (req: Request) => {
               console.error('[assistant] voorstel opslaan faalde', actionErr?.message);
               result = { error: 'Het voorstel kon niet worden klaargezet.' };
             } else {
-              // Render-tree: de bevestigingskaart (server-deterministisch);
+              // Render-tree: eventuele preview-kaarten uit propose (bv. de rijke
+              // recept-kaart, AI-11) + de bevestigingskaart (server-deterministisch);
               // het model krijgt alleen het feit dat er een voorstel klaarstaat.
-              toolOutputs.push({ render: [confirmActionNode(actionRow.id, content)] });
+              const preview = Array.isArray((proposal as { preview?: object[] }).preview)
+                ? (proposal as { preview: object[] }).preview
+                : [];
+              toolOutputs.push({ render: [...preview, confirmActionNode(actionRow.id, content)] });
               result = {
                 data: {
                   proposed: true,
