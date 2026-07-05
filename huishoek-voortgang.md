@@ -1357,3 +1357,18 @@ voertuigdomein; de editor klemt quantity al op ≥ 1 en de live data was schoon,
 migratierisico. Beide live met SQL geverifieerd (valid-preview intact ✓, revoked lekt
 niets ✓, quantity 0 en negatieve prijs geweigerd ✓); nieuw RLS-scenario bewaakt de
 peek-privacy. Suite 1049 pass / 0 fail (33 RLS-skips lokaal).
+
+**2026-07-05 (vervolg) — AI-5 device-bevestigd: de stream werkt op het toestel.**
+Device-rooktest van de SSE-keten op de moto (donkere modus): een beurt streamt zichtbaar —
+eerst de tool-statusregel („Even in de taken kijken…”), dan de „Even nadenken…”-fase, en
+tijdens de beurt vervangt de **stop-knop** de verstuurknop; na afloop verschijnen de
+antwoordoptie-chips. Markdown-bullets renderen correct in een hervat gesprek
+(`lib/markdownLite.js` → `AssistantMessageView`), de gesprekken-sheet toont titels en
+hervatten laadt kaarten mee. Geen crashes of foutbubbels. Aandachtspunten uit de test:
+(1) een adb-deeplink tijdens de cold start raced in expo-routers `useLinking`
+(setState-in-render-warning, kan op de verkeerde tab landen) — puur de dev-testflow, geen
+app-code; (2) een remount van het scherm (bv. door zo'n deeplink) begint bewust op een
+leeg gesprek — het vorige gesprek staat in de sheet; „actief gesprek onthouden” staat
+genoteerd bij de AI-6-rest. NB: de test liep deels gelijktijdig met een tweede
+dev-sessie op hetzelfde toestel (interleaved `adb input`), dus flaky stappen zijn
+gecontroleerd herhaald voordat ze als bevinding telden.
