@@ -1578,3 +1578,15 @@ geraakt (geen mutatie-ratchet). **Strategie:** goedkope observability-enabler nu
 EAS-sim reality-check (géén per-PR-CI); config-checklist (APNs/submit/icoon/AASA-herdeploy) uitgesteld
 tot livegang. **Rest:** eerste `eas build -p ios --profile development` + smoke langs de divergentie-
 hotspots (modals/`pageSheet`, KAV-`padding`, gestures, schaduw) → basislijn hier loggen.
+
+**IOS-1 vervolg — eerste iOS-build groen, run uitgesteld (2026-07-05).** `eas build -p ios --profile
+development` → **FINISHED** (SDK56, simulator-`.tar.gz`-artefact): de app compileert/linkt voor iOS,
+config valide (incl. NL-permissie-strings), géén build-blokkade — de eerste keer dat iOS is gebouwd.
+Bonus: EAS-**tunnel v2** komt wél op op ons netwerk (waar ngrok bij Android-testen werd gestript), dus de
+live Mode C-route (dev-client + Metro-tunnel op de cloud-sim) is bewezen haalbaar. **Blokkade op het
+draaien:** cloud-sim-sessie geweigerd — *"device run sessions are not enabled for this account"* (gated
+feature op `evdns-team`) — plus geen lokale simulator (alleen Xcode CLI-tools, geen admin) en geen fysiek
+iOS-toestel. Er is dus geen oppervlak om de visuele hotspot-smoke te draaien → **uitgesteld** tot er één
+is (cloud-sim aanzetten, of TestFlight op device bij livegang; gebruikersbesluit). Parallel gestart op de
+livegang-checklist: Apple App ID `app.huishoek` (Team `J3DDDK3JB2`, = de AASA-Team-ID) met **Push
+Notifications** + **Associated Domains** capabilities.

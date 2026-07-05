@@ -26,3 +26,4 @@ fcm-service-account*.json
 # Android signing keystore(s) — geheim; downloaden via `eas credentials`, nooit committen.
 *.jks
 *.keystore
+.env.eas-simulator
