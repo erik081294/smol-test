@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Text, View } from 'react-native';
+import { PixelRatio, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, space } from '../../lib/theme';
 import { Icon } from '../../lib/icons';
@@ -16,10 +16,12 @@ function TabIcon({ icon, label, focused }) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', width: 86, gap: 3 }}>
       <Icon name={icon} size={24} weight={focused ? 'fill' : 'regular'} color={tint} />
+      {/* Geen adjustsFontSizeToFit meer (a11y-review 2026-07-02): dat kromp het label
+          terug naar de beschikbare breedte en hief zo de systeem-fontschaling op.
+          Het label schaalt nu gewoon mee; de balk groeit mee (zie tabHeight). Een
+          extreem lang label wordt afgekapt i.p.v. verkleind — leesbaar > passend. */}
       <Text
         numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.85}
         style={{ fontSize: 11, fontWeight: focused ? '700' : '500', color: tint }}
       >
         {label}
@@ -48,6 +50,13 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const tabBottom = Math.max(insets.bottom, space.sm);
 
+  // Fontschaling (a11y-review 2026-07-02): de vaste 56pt-contenthoogte kapte grotere
+  // systeemfonts af — het label werd door adjustsFontSizeToFit teruggekrompen tot het
+  // paste. Conservatieve fix: laat de contenthoogte meegroeien met de systeem-fontschaal
+  // (~20pt per hele stap), gecapt op +24pt zodat de balk nooit buitensporig hoog wordt.
+  const fontScale = PixelRatio.getFontScale();
+  const tabHeight = 56 + Math.min(Math.max(fontScale - 1, 0) * 20, 24);
+
   return (
     <Tabs
       // backBehavior="history": Android-hardware-back keert terug naar de vórige
@@ -66,7 +75,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
-          height: 56 + tabBottom,
+          height: tabHeight + tabBottom,
           paddingTop: space.sm,
           paddingBottom: tabBottom,
         },

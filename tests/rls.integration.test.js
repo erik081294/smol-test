@@ -770,6 +770,63 @@ test('RLS: tijdlijnbericht + foto zichtbaar voor huisgenoot, niet voor buitensta
   assert.equal(evePhoto.data?.length ?? 0, 0, 'buitenstaander ziet de foto-rij NIET');
 });
 
+// --- Emoji-reacties (0067) — polymorf doel + can_view-lekpreventie op de parent ---
+test('RLS: emoji-reactie — lid reageert/toggelt, buitenstaander buitenspel, auteur niet te vervalsen, geen lek op onzichtbare post (0067)', opts, async () => {
+  const alice = await makeUser('alice_rx');
+  const bob = await makeUser('bob_rx');     // huisgenoot
+  const eve = await makeUser('eve_rx');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Reactiehuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: post, error: pErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Reageer maar', visibility: 'household' })
+    .select().single();
+  assert.ok(!pErr, `post: ${pErr?.message}`);
+
+  // Lid reageert op een zichtbare post → mag, en de huisgenoot ziet de reactie.
+  const { data: rx, error: rxErr } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: bob.id, target_type: 'post', target_id: post.id, emoji: '👏' })
+    .select().single();
+  assert.ok(!rxErr, `lid reageert: ${rxErr?.message}`);
+  const aliceSees = await alice.client.from('timeline_reactions').select('id, emoji').eq('target_id', post.id);
+  assert.equal(aliceSees.data?.length, 1, 'huisgenoot ziet de reactie');
+  assert.equal(aliceSees.data?.[0].emoji, '👏', 'de juiste emoji');
+
+  // Buitenstaander: ziet de reactie NIET en mag er zelf geen plaatsen (geen lid).
+  const eveSees = await eve.client.from('timeline_reactions').select('id').eq('target_id', post.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de reactie NIET');
+  const { error: eveInsErr } = await eve.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: eve.id, target_type: 'post', target_id: post.id, emoji: '👏' });
+  assert.ok(eveInsErr, 'buitenstaander mag niet reageren (geen lid)');
+
+  // Auteur niet te vervalsen: een lid mag geen reactie op naam van een ander plaatsen.
+  const { error: forgeErr } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: alice.id, target_type: 'post', target_id: post.id, emoji: '❤️' });
+  assert.ok(forgeErr, 'een lid mag geen reactie op naam van een ander plaatsen (author_id = auth.uid())');
+
+  // Togglen-uit: eigen reactie verwijderen → weg voor iedereen.
+  const { error: delErr } = await bob.client.from('timeline_reactions').delete().eq('id', rx.id);
+  assert.ok(!delErr, `eigen reactie verwijderen: ${delErr?.message}`);
+  const gone = await alice.client.from('timeline_reactions').select('id').eq('id', rx.id);
+  assert.equal(gone.data?.length ?? 0, 0, 'de reactie is weg na togglen');
+
+  // Lekpreventie: Alice plaatst een custom post die Bob NIET mag zien en reageert er zelf op.
+  // Bob (wel lid) mag die reactie niet zien én er niet op reageren (can_view op de parent).
+  const { data: secret, error: sErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Alleen ik', visibility: 'custom', share_with: [alice.id] })
+    .select().single();
+  assert.ok(!sErr, `custom post: ${sErr?.message}`);
+  const { error: aliceSelfRx } = await alice.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: alice.id, target_type: 'post', target_id: secret.id, emoji: '🎉' });
+  assert.ok(!aliceSelfRx, `auteur reageert op eigen custom post: ${aliceSelfRx?.message}`);
+  const bobSecret = await bob.client.from('timeline_reactions').select('id').eq('target_id', secret.id);
+  assert.equal(bobSecret.data?.length ?? 0, 0, 'lid ziet reactie op onzichtbare post NIET (can_view-lekpreventie)');
+  const { error: bobSecretIns } = await bob.client.from('timeline_reactions')
+    .insert({ household_id: hh.id, author_id: bob.id, target_type: 'post', target_id: secret.id, emoji: '👍' });
+  assert.ok(bobSecretIns, 'lid mag niet reageren op een post die het niet mag zien');
+});
+
 // --- Uitnodigingen (0053) — de toetredingsroute zelf moet waterdicht zijn -----
 test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander buitenspel', opts, async () => {
   const alice = await makeUser('alice_inv');   // owner
@@ -794,4 +851,93 @@ test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander bu
   const eveMember = await eve.client.from('household_members')
     .select('profile_id').eq('household_id', hh.id).eq('profile_id', eve.id);
   assert.equal(eveMember.data?.length ?? 0, 0, 'Eve is geen lid geworden via een gebruikt token');
+});
+
+// --- 0070: rekey-guard + aangescherpte insert-policies + share-guards ----------
+//     (review-addendum 2026-07-04, Sec-1/Data-10/Data-3). De trigger maakt
+//     household_id en de creator-kolom onveranderlijk; de directe inserts op
+//     expenses/recurring_expenses eisen creator = de inzender; create_expense
+//     weigert negatieve of opgeblazen aandelen.
+
+test('RLS 0070: created_by/household_id zijn na aanmaak onveranderlijk (rekey-guard)', opts, async () => {
+  const alice = await makeUser('alice_rekey');
+  const bob = await makeUser('bob_rekey');     // huisgenoot
+  const hh = await makeHousehold(alice, 'Rekeyhuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: task } = await alice.client.from('tasks')
+    .insert({ household_id: hh.id, title: 'Rekey-taak', visibility: 'household', created_by: alice.id })
+    .select().single();
+
+  // Legitiem gedeeld bewerken blijft werken (huisgenoot hernoemt/vinkt af).
+  const { error: renameErr } = await bob.client.from('tasks')
+    .update({ title: 'Hernoemd door huisgenoot' }).eq('id', task.id);
+  assert.ok(!renameErr, `huisgenoot mag de taak bewerken: ${renameErr?.message}`);
+
+  // Attributie-spoofing via UPDATE is dicht (de 0066-omzeiling uit het addendum).
+  const { error: spoofErr } = await bob.client.from('tasks')
+    .update({ created_by: bob.id }).eq('id', task.id);
+  assert.ok(spoofErr, 'created_by herschrijven moet worden geweigerd');
+
+  const { error: moveErr } = await alice.client.from('tasks')
+    .update({ household_id: hh.id === task.household_id ? task.household_id : hh.id, created_by: bob.id })
+    .eq('id', task.id);
+  assert.ok(moveErr, 'ook de creator zelf mag de attributie niet herschrijven');
+
+  const after = await alice.client.from('tasks').select('created_by').eq('id', task.id).single();
+  assert.equal(after.data?.created_by, alice.id, 'de oorspronkelijke creator staat er nog');
+});
+
+test('RLS 0070: directe insert met gespoofte created_by op (recurring_)expenses geweigerd', opts, async () => {
+  const alice = await makeUser('alice_spoof');
+  const bob = await makeUser('bob_spoof');     // huisgenoot
+  const hh = await makeHousehold(alice, 'Spoofhuis');
+  await addMember(alice, bob, hh.id);
+
+  // recurring_expenses: de client schrijft deze tabel direct.
+  const { error: spoofRecur } = await bob.client.from('recurring_expenses')
+    .insert({ household_id: hh.id, description: 'Nep-huur', amount_cents: 1, paid_by: bob.id,
+      next_date: '2026-08-01', visibility: 'household', created_by: alice.id });
+  assert.ok(spoofRecur, 'recurring_expenses-insert met andermans created_by moet worden geweigerd');
+
+  const { error: okRecur } = await bob.client.from('recurring_expenses')
+    .insert({ household_id: hh.id, description: 'Echte huur', amount_cents: 1, paid_by: bob.id,
+      next_date: '2026-08-01', visibility: 'household', created_by: bob.id });
+  assert.ok(!okRecur, `eigen created_by blijft toegestaan: ${okRecur?.message}`);
+
+  // expenses: het REST-pad om de DEFINER-RPC's heen.
+  const { error: spoofExp } = await bob.client.from('expenses')
+    .insert({ household_id: hh.id, description: 'Nep', amount_cents: 1, paid_by: bob.id,
+      spent_on: '2026-07-04', split_type: 'exact', visibility: 'household', created_by: alice.id });
+  assert.ok(spoofExp, 'expenses-insert met andermans created_by moet worden geweigerd');
+});
+
+test('RLS 0070: create_expense weigert negatieve en opgeblazen aandelen (share-guard)', opts, async () => {
+  const alice = await makeUser('alice_shareguard');
+  const hh = await makeHousehold(alice, 'Shareguardhuis');
+
+  const { error: negErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Negatief aandeel', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'exact',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: -5 }],
+  });
+  assert.ok(negErr, 'negatief aandeel moet worden geweigerd');
+
+  const { error: inflateErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Opgeblazen som', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'exact',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 999 }],
+  });
+  assert.ok(inflateErr, 'som boven het bedrag moet worden geweigerd');
+
+  // Subset-split (som < bedrag) blijft legitiem — de saldologica rekent op de shares.
+  const { data: okId, error: okErr } = await alice.client.rpc('create_expense', {
+    p_household_id: hh.id, p_description: 'Subset-split', p_amount_cents: 100,
+    p_paid_by: alice.id, p_spent_on: '2026-07-04', p_split_type: 'equal',
+    p_visibility: 'household', p_share_subgroup_id: null, p_share_with: null,
+    p_shares: [{ profile_id: alice.id, amount_cents: 40 }],
+  });
+  assert.ok(!okErr && okId, `subset-split blijft toegestaan: ${okErr?.message}`);
 });

@@ -1148,3 +1148,197 @@ optimistic-rollback-extractie (te verweven met setState); en de wachtwoord-recov
 `app/herstel.js`-scherm werkt op web; native deep-link + de Supabase redirect-allowlist voor `/herstel`
 staan als expliciete TODO). De drie niet-gedraaide reviewdimensies (Security, Datamodel, Platform) zijn
 in deze ronde bewust overgeslagen — apart oppakken via de workflow-resume.
+
+**2026-07-04 — Review-vervolgronde: follow-ups geland, Security gedraaid, live-RLS bewezen.**
+Branch `feat/vervolg-review-fases` (stapelt op PR #115). Vier sporen parallel opgezet; twee volledig
+afgerond, de rest bewust doorgeschoven:
+- **Review-follow-ups (Fase 2) — ✅ gebouwd + gecommit.** De `HouseholdCtx`-value-memo (handlers via
+  `useCallback` + `value`/`active`/`modules` gememoiseerd → consumers her-renderen alleen bij een echte
+  wijziging, Perf-medium); de `useCollection` optimistic-rollback naar een pure, ratchet-bewaakte
+  [`lib/optimisticList.js`](lib/optimisticList.js) (`patchItem`/`removeItem`/`removeItems`, mutatie **95%**);
+  a11y-tikdoelen (`hitSlopFor` op de kleine tekstacties in `ui.js`) + tabbar-fontschaling
+  (hoogte groeit mee met `PixelRatio.getFontScale()`, `adjustsFontSizeToFit` weg). `npm test` **935 pass /
+  0 fail**, typecheck + `eslint .` schoon. **Restpunt:** het native wachtwoord-recovery-codedeel
+  (`app/herstel.js`) is niet gebouwd (agent-limiet) — web-recovery werkt al.
+- **Security-dimensie van de review — ✅ gedraaid, fixes UITGESTELD (keuze Erik).** Geen highs;
+  tenant-isolatie solide. Twee mediums vastgelegd voor een aparte security-sessie: de teruggedraaide
+  `search_path`-pin op `enable_module_rls` (`0066`) en de vervuilbare globale catalogus-`image_url`
+  (`insert_catalog_product`). Plus de live `get_advisors`-scan (19× RLS-initplan, 66× dubbele policies,
+  42 ongeïndexeerde FK's) — bundelen in één DB-hardening-migratie later. Detail in het review-doc.
+  **Datamodel + Platform-dimensies:** doorgeschoven naar diezelfde vervolgsessie.
+- **Live-RLS-verificatie — ✅ 946 pass / 0 fail / 0 skipped** tegen de echte DB (secrets uit `.env`),
+  incl. de 5 P3-scenario's (pets/vehicles/groceries/pet_log/vehicle_log). Bewijst het LRN-1-restpunt
+  "live-RLS-verificatie" (vorige meting 775). Live DB t/m migratie `0066` (MCP `list_migrations`).
+- **Tijdlijn TML-3/4 — ◐ migratie gedraft + pure aggregatielaag gebouwd.** Statuscorrectie: TML-1/2
+  zijn af én de TML-5-activiteitenlaag rendert al. Van TML-3 (emoji-reacties) ligt de migratie
+  [`0067_timeline_reacties.sql`](supabase/migrations/0067_timeline_reacties.sql) klaar (doordacht RLS,
+  **nog niet toegepast**). De pure kern staat nu óók in [`lib/timeline.js`](lib/timeline.js):
+  `aggregateReactions(rows, viewerId)` → teller-chips `[{emoji,count,mine}]` (count desc, dan emoji als
+  tie-break) + `eventReactionTarget(table,id)` voor het stabiele event-doel-id. Unit-getest (6 cases,
+  ratchet **93.8%**, baseline bijgewerkt); typecheck + `eslint .` schoon.
+- **Tijdlijn TML-3 — 🔧 volledig gebouwd + live-RLS-bewezen (post-reacties).** Migratie
+  `timeline_reactions` (repo `0067`) **staat live** (via MCP `apply_migration`, versie `20260704101435`);
+  `get_advisors` toont géén nieuwe security-bevinding voor de tabel (RLS + policies herkend). React-schil:
+  [`lib/useReactions.js`](lib/useReactions.js) (household-brede laad + realtime + optimistische toggle,
+  leunend op de pure `aggregateReactions`), de gedeelde [`ReactionBar`](lib/ui.js) (teller-chips + "+"-picker,
+  vast emoji-setje) op het bericht-detail, en een read-only chip-samenvatting op de feed-kaart. Nieuwe
+  live-RLS-test (`0067`) bewijst: lid reageert/toggelt, buitenstaander buitenspel, `author_id` niet te
+  vervalsen, en `can_view`-lekpreventie op een onzichtbare (custom) post — **RLS-suite 29/29 groen** tegen
+  de echte DB. `npm test` **941 pass / 0 fail**, typecheck + `eslint .` (0 errors) schoon. **Rest:**
+  reacties op systeem-events (vergt het `reactionTarget` door de feed te rijgen → hoort bij TML-5's
+  folding) + toestel-UX-smoketest. TML-4 (comments) en TML-6/7/8 (filters) nog niet gestart.
+
+**2026-07-04 — Huishoek Assistent (AI-1): plan 23 + offline-deel fase 1 gebouwd.**
+AI-1 van geparkeerd → lopend. Ontwerp: [plan 23](docs/plans/23-assistent.md) — persona/toon,
+vijf kernflows, alle UI-states met copy, bevestigingskaart-ontwerp, fasering 0a–6 (incl. de
+"Huisregels"-NL-automations als 5b). Architectuur: eigen dunne agent-loop in een edge function
+(géén CopilotKit/A2UI-dep), Orq als gateway, tools RLS-gescoped, writes altijd HITL, gesprekken
+creator-privé. Gebouwd (alles behalve de live Orq-koppeling, want workspace `evdn` heeft nog
+geen credits/provider-key): pure laag `lib/assistantUi.js` (catalog-poortwachter, mutatie 94,9%),
+`supabase/functions/assistant/core.js` (loop-kern, 90,8%) en `_shared/assistantTools.js`
+(4 read-tools over tasks/groceries/expenses/pantry, 93,3%) — samen 60+ unit-tests; migratie
+`0068_assistent.sql` (assistant_conversations/-messages met creator-privé RLS i.p.v. het
+module-sjabloon — privacylek-preventie — + `record_assistant_call` met per-user én per-household
+dagplafond, fail-closed; **nog niet live**); edge function `assistant/index.ts` (Orq-proxy,
+non-streaming v1; **nog niet gedeployed**); app-schil: module-entry (niet-primair, groep 'huis'),
+`app/(tabs)/assistent.js` (inverted chat + suggestie-chips), `lib/useAssistant.js`,
+`lib/AssistantMessageView.js`, i18n-copy voor álle states, moduleHelp, iconen (ChatCircleDots/
+PaperPlaneRight). `npm test` 985 pass / 0 fail, typecheck schoon, `eslint .` 0 errors,
+mutatie-ratchet groen (nieuwe baselines toegevoegd). **Rest:** Orq-credits → 0c-spike →
+migratie via MCP `apply_migration` → deploy + `ORQ_ASSISTANT_MODEL`-secret → device-rooktest.
+
+**2026-07-04 (later) — Assistent live: spike GO, migratie 0068 + deploy + device-rooktest.**
+Orq-workspace op orde (credits + AI-Studio-key; modellen zai/glm-5.2, google/eu.claude-sonnet-5,
+gemini-3.1-flash-image). 0c-spike via de Orq-proxy: tool-call (correct OpenAI-formaat incl.
+`only_mine`-inferentie), tool-resultaat-ronde (net NL-antwoord) én SSE — **GO**, geen fallback nodig.
+Migratie `0068` live via MCP `apply_migration`; secrets `ORQ_API_KEY` + `ORQ_ASSISTANT_MODEL=
+eu.claude-sonnet-5` gezet; `assistant`-function gedeployed (bundler nam `_shared`/`core.js` mee —
+import-risico beslecht). E2E: curl met user-JWT → 200 met echte huishouddata (~6,5s, 2 tools).
+Device-rooktest moto: lege staat + suggestie-chips renderen (dark), chip-tap → antwoord met echte
+open-taken-kaart (25 taken; signaleert zelf de achterstallige "Groenbak"). Bekende fase-2-punten:
+markdown rendert plat, non-streaming voelt traag bij lange antwoorden → SSE. Bonus: hetzelfde
+ORQ_API_KEY-secret maakt scan-receipt (BOO-7) live-klaar.
+
+**2026-07-04 (avond) — Plan 24 "Assistent volwassen" + ronde A (AI-2) code-af.**
+Nieuw plan [24](docs/plans/24-assistent-volwassen.md): 8 shipbare rondes AI-2…AI-9
+(observability → evals/GLM-experiment → persistentie → SSE/streamdown → UX-poets →
+A2UI-alignment → HITL-writes → geheugen), plus normatieve guidelines
+[`docs/assistent-architectuur.md`](docs/assistent-architectuur.md) (tool-pack-contract,
+tool-budget ≤12, prompt in Orq-deployment met eval-gate, specialist-afsplitscriteria,
+geheugen-schrijfregels, observability-conventies, catalog-regels) en monitoring-runbook
+[`docs/orq-assistant.md`](docs/orq-assistant.md) — beide ingeweven (docs/README, CLAUDE.md).
+Ronde A gebouwd: invoke-schema geverifieerd (thread/metadata/identity/inputs/extra_params;
+géén top-level tools → dynamische tool-set via `extra_params`), `assistant/index.ts`
+dual-route (deployment-invoke bij secret, anders proxy) met SHA-256-gehashte
+user/household-ids en `thread.id` = conversatie-id (client stuurt `conversationId` mee,
+lazy gegenereerd — react-compiler-purity-lint gefixt), `parseChatResponse` verhardt voor
+parts-array-content. Deploy + live-regressie op de proxy-route ✓ (200, kaart + tekst).
+Rest: deployment aanklikken (dashboard; REST kan het niet) + secret + invoke-live-test.
+
+**2026-07-04 (laat) — AI-2: Orq-route empirisch beslecht → v3-router; alles via MCP opgezet.**
+De Orq MCP-server rechtstreeks via JSON-RPC benaderd (registratie bij Erik nog open):
+deployment (`huishoek_assistant_live`) en agent (`huishoek_assistant`) via MCP aangemaakt.
+Bevinding: `deployments/invoke` (extra_params/top-level) én agents (Responses) negeren
+per-request tools — ook met `tool_choice=required`; op de kale **v3-router**
+(`/v3/router/responses`) werkt alles wél: function_call met correcte args, `thread`
+(=conversatie, komt als `session_id` in traces), `metadata` (gehashte ids), trace_id, en
+de function_call_output-ronde geeft een net NL-antwoord. `index.ts` omgebouwd naar
+router-route (activatie via provider-prefix in `ORQ_ASSISTANT_MODEL`), pure
+Responses-parsers (`toResponsesTools`/`parseResponsesOutput`/`functionCallOutputItem`)
+in `core.js` + tests (20 pass), typecheck groen, gedeployed. Traces via MCP `list_traces`
+geverifieerd. Docs (runbook/guidelines §3/backlog) bijgewerkt naar de werkelijkheid:
+prompt blijft voorlopig in de edge function; Orq-agent staat klaar voor migratie zodra
+per-request tools op agents landen. Open bij Erik: model-secret met prefix, MCP-koppeling,
+dashboard-opruiming (2 misdeployments + toolprobe), zai-saldo voor het GLM-experiment.
+
+**2026-07-04 (nacht) — AI-3-kern, AI-4 en het antwoordopties-patroon gebouwd.**
+Op verzoek van Erik twee nieuwe interactie-principes verankerd (guidelines §8): (1) élke
+beurt eindigt met 2–4 tikbare antwoordopties via de `suggest_replies`-pseudo-tool
+(AskUserQuestion-patroon; de loop voert 'm nooit uit, `splitSuggestions` oogst de opties;
+vrij typen blijft altijd de "Other"-route), en (2) BEKNOPT-prompt: 1–3 zinnen, data in
+kaarten, details via deep-link. Effect gemeten met de nieuwe eval-gate: tool-F1 89,7→**96%**,
+args 100%, geen-tool 100%. AI-3-kern: golden-set (29 NL-cases + registry-meta-test),
+eval-runner `scripts/assistant-eval.mjs` met baseline+tolerantie (2pp, ratchet-stijl),
+Orq-judges `huishoek-nl-toon`/`huishoek-groundedness` via de (nu native) Orq MCP; het
+GLM-experiment geparkeerd (zai-route zonder saldo). AI-4: migratie 0069 live, server-side
+schrijfpad (user-bericht vóór de LLM-call), history uit DB, titel + updated_at,
+gesprekkenlijst/hervatten/nieuw-gesprek in hook + sheet. E2E: vervolgvraag beantwoord uit
+DB-context; kortere antwoorden zichtbaar ("Je hebt 1 open taak, met deadline 23 juli." +
+3 chips). Mutatie assistantCore 87,3% (baseline herijkt), typecheck/lint groen.
+
+**2026-07-04 (nacht, vervolg) — device-verificatie AI-4 + antwoordopties (moto, licht+donker).**
+Volledige flow op toestel bevestigd: suggestie-chip → beknopt antwoord (3 zinnen i.p.v.
+verslag) + taken-kaart + 3 verse antwoordopties-chips; gesprekken-sheet (nieuw gesprek +
+lijst met titels, actief gesprek gemarkeerd); hervatten laadt het gesprek uit de DB
+inclusief kaarten én gepersisteerde antwoordopties. Gevonden + gefixt op device: de
+antwoordtekst renderde dubbel (item.text én de text-node in de tree — bubble rendert nu
+alleen de tree). Slot-DoD: `npm test` 1009 pass / 0 fail, typecheck schoon, `eslint .`
+0 errors. Open naar volgende sessie: ronde D (SSE + streamdown; markdown rendert nog plat
+— zichtbaar als **X** in het hervatte gesprek), ronde E-rest (stop-knop, tool-status,
+haptics), AI-7 t/m AI-9.
+
+**2026-07-04 (vervolg) — Ronde D+E van de assistent af, review-addendum compleet, quick-fixes.**
+De halsoverkop gestopte sessie opgepakt op `feat/assistent-fase1`. Drie sporen:
+- **AI-5 (ronde D) af.** De server-kant (SSE-route, gedeployed als v10) lag er al; de
+  app-kant is nu aangesloten: `useAssistant` streamt via `expo/fetch` (POST `stream:true`
+  rechtstreeks naar de edge function; `functions.invoke` kan geen ReadableStream terug­geven)
+  met de pure reducer [`lib/assistantStream.js`](lib/assistantStream.js) — nu wél
+  unit-getest (14 tests) + GROUPS/`@ts-check` (dat DoD-gat zat nog in de gestrande
+  commit), ratchet 86,3%. Terugval naar non-streaming alléén als de request de server
+  niet bereikte (anders zou een midweg-afgebroken stroom de vraag dupliceren én dubbel
+  op de rate-limit tellen). Streamende bubble + tool-statusregel in het scherm.
+  **Markdown:** platte `**sterren**` opgelost met een pure subset-parser
+  [`lib/markdownLite.js`](lib/markdownLite.js) (bold/cursief/code/kopjes/lijsten;
+  streaming-tolerant: een nog niet gesloten marker stylet de rest van de regel) —
+  bewust géén `react-native-streamdown` (vergt de device-spike uit plan 24-risico's;
+  de parser is hier verifieerbaar en dep-vrij), ratchet 86%.
+- **AI-6 (ronde E-kern).** Stop-knop (abort; de al gestreamde tekst blijft staan als
+  bericht — de server maakt de beurt af en persisteert de volledige versie), retry-chip
+  op een foutbubble, haptics (tik bij antwoord, error-tril bij fout). Rest van E
+  (collapsible tool-calls, message-actions, scroll-anchoring) staat in de AI-6-rij.
+- **Review-addendum + quick wins.** De 3 nooit gedraaide reviewdimensies (Security /
+  Datamodel / Platform) alsnog gedraaid met drie onafhankelijke agents + de live
+  advisor-scan; addendum in [het rapport](docs/reviews/2026-07-02-app-review.md), zwaarste
+  bevindingen handmatig geverifieerd (✓): de 0066-attributie-fix is via een UPDATE te
+  omzeilen (Sec-1) en realtime-DELETE-events bereiken huisgenoten op ~22 tabellen niet
+  (Data-2, high — 0032 dekte er maar 2). Direct gefixt: **push-token-opruiming bij
+  uitloggen** (Plat-1-privacylek; nieuw [`lib/pushTokenRegistry.js`](lib/pushTokenRegistry.js),
+  mutatie 100%), `[functions.assistant] verify_jwt=true`, CI naar Node 22 + `engines`,
+  `import:catalog`-script gerepareerd. De rest is geconsolideerd in backlog-rij **REV-2**
+  (P7 DB-hardening / P8 release-keten / P9 push-poets).
+Ratchet-dalingen uit de gestrande commit gedicht (assistantUi 93,6→95,5%, assistantTools
+90,6→92,3% — statusLabels + comparator-randen getest), baselines herijkt. Slot-DoD:
+`npm test` 1049 pass / 0 fail / 29 RLS-skip, typecheck schoon, `eslint .` 0 errors,
+`mutation-check --since=origin/main` groen. **Rest voor toestel:** stream + markdown +
+stop/retry op de moto (licht/donker), zie AI-5/AI-6.
+
+**2026-07-04 (vervolg 2) — P7 DB-hardening live: migratie 0070.**
+De zwaarste addendum-bevindingen direct gedicht (rij REV-2): (1) **rekey-guard-trigger**
+`prevent_module_rekey` op 16 tabellen — `household_id` + de creator-kolom zijn
+onveranderlijk; dit dicht de Sec-1-omzeiling (0066 hardde alleen INSERT) zonder gedeeld
+bewerken te breken (een `with check creator=auth.uid()` op UPDATE zou huisgenoot B's
+afvinken van A's taak blokkeren — daarom een OLD/NEW-trigger, geen policy). (2) De
+insert-policies op `expenses`/`recurring_expenses` eisen nu `created_by = auth.uid()`
+(Data-10). (3) **Replica identity FULL op 23 extra tabellen** (Data-2, high): DELETE-events
+dragen nu `household_id`, dus het realtime-filter van huisgenoten matcht — geen spook-rijen
+meer na andermans verwijdering (0032 dekte er maar 2). (4) Share-guards in
+`create/update_expense` + `CHECK (amount_cents >= 0)` op `expense_shares` (Data-3).
+Belangrijke nuance uit het live-onderzoek: **som(shares) == bedrag is bewust géén eis** —
+19 van de 56 live uitgaven zijn subset-splits (som < bedrag) en `computeBalances` rekent
+op de shares zelf; de guard is dus ≥ 0 per aandeel én som ≤ bedrag. (5) Indexen op
+`plant_photos`/`pet_log` (household_id, created_at desc) + `household_members(profile_id)`
+(Data-7). Alles via MCP `apply_migration`; per onderdeel live geverifieerd met SQL
+(rekey geblokkeerd ✓, legitiem huisgenoot-bewerken werkt ✓, negatieve/opgeblazen shares
+geweigerd ✓, subset-split blijft werken ✓, testdata opgeruimd). Drie nieuwe scenario's in
+`tests/rls.integration.test.js` bewaken dit voortaan (post-merge in `rls-check.yml`).
+Rest: realtime-DELETE cross-device op toestel zien (REV-2).
+
+**2026-07-04 (vervolg 3) — P8-deel: web-source-maps in de deploy + OTel-opruiming.**
+`npm run deploy:web` exporteert nu mét `--source-maps` en draait
+[`scripts/deploy-web.mjs`](scripts/deploy-web.mjs): Sentry-upload (overslaan + waarschuwing
+zonder `SENTRY_AUTH_TOKEN` — de deploy blokkeert er nooit op), daarna de `.map`-bestanden
+uit `dist` strippen (broncode niet publiek op Cloudflare), dan pas `wrangler pages deploy`.
+Dit vult de INF-4-rest ("web-frames geminified") concreet in; verificatie = de
+eerstvolgende echte deploy mét token. `@opentelemetry/api` verhuisde naar devDependencies
+(alleen supabase-js-onder-Node gebruikt 'm; metro stubt 'm al voor de bundle — comment
+bijgewerkt). Suite/typecheck/lint groen na `npm install`.

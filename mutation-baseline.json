@@ -2,9 +2,9 @@
   "generatedAt": "2026-06-26T08:27:29.928Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 4332,
-    "total": 5214,
-    "score": 83.1
+    "killed": 5388,
+    "total": 6385,
+    "score": 84.4
   },
   "files": {
     "lib/activity.js": {
@@ -137,6 +137,11 @@
       "total": 74,
       "score": 86.5
     },
+    "lib/optimisticList.js": {
+      "killed": 19,
+      "total": 20,
+      "score": 95
+    },
     "lib/pantry.js": {
       "killed": 101,
       "total": 121,
@@ -203,9 +208,9 @@
       "score": 92.3
     },
     "lib/timeline.js": {
-      "killed": 72,
-      "total": 77,
-      "score": 93.5
+      "killed": 105,
+      "total": 112,
+      "score": 93.8
     },
     "lib/visibility.js": {
       "killed": 60,
@@ -326,6 +331,36 @@
       "killed": 45,
       "total": 98,
       "score": 45.9
+    },
+    "lib/assistantUi.js": {
+      "killed": 149,
+      "total": 156,
+      "score": 95.5
+    },
+    "supabase/functions/assistant/core.js": {
+      "killed": 255,
+      "total": 292,
+      "score": 87.3
+    },
+    "supabase/functions/_shared/assistantTools.js": {
+      "killed": 264,
+      "total": 286,
+      "score": 92.3
+    },
+    "lib/assistantStream.js": {
+      "killed": 88,
+      "total": 102,
+      "score": 86.3
+    },
+    "lib/markdownLite.js": {
+      "killed": 117,
+      "total": 136,
+      "score": 86.0
+    },
+    "lib/pushTokenRegistry.js": {
+      "killed": 18,
+      "total": 18,
+      "score": 100.0
     }
   }
 }

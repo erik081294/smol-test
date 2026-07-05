@@ -5,6 +5,10 @@ app/, RLS/migraties, edge functions, test/CI) · **Methode:** multi-agent workfl
 reviewers, elk met eigen onderwerp en bewijs-eis (bestand + regel + citaat), plus roadmap-context.
 Bevindingen zouden daarna adversarieel geverifieerd worden (3-lens-panel bij high/critical).
 
+> ✅ **Aangevuld op 2026-07-04:** de drie ontbrekende dimensies (Security, Datamodel &
+> database, Platform & tooling) zijn alsnog gedraaid — zie het **addendum onderaan** dit
+> rapport, inclusief de live Supabase-advisor-scan. Oorspronkelijke kanttekening:
+>
 > ⚠️ **Onvolledige run — sessielimiet geraakt.** Van de ~76 geplande agents kwamen er 8 klaar
 > vóór de 5-uurs-limiet toesloeg. **Compleet:** 6 dimensies (Performance, Correctheid,
 > Gebruiksvriendelijkheid, Design & toegankelijkheid, Teststrategie, Architectuur) + de
@@ -31,9 +35,9 @@ M ½–2 dagen · L > 2 dagen.
 | Design & toegankelijkheid | ✅ | 2 | 3 | 2 | Echt design-systeem; dynamische/dark-mode kleurcontrasten zakken onder AA |
 | Teststrategie | ✅ | 2 | 4 | 3 | Pure laag voorbeeldig; hele hook/UI-laag + halve RLS ongetest |
 | Architectuur & simpliciteit | ✅ | 0 | 2 | 4 | Gezond, contract wordt nageleefd; pet/plant-duplicatie is de schuld |
-| Security | ❌ niet gedraaid | — | — | — | — |
-| Datamodel & database | ❌ niet gedraaid | — | — | — | — |
-| Platform & tooling | ❌ niet gedraaid | — | — | — | — |
+| Security | ✅ 2026-07-04 | 0 | 1 | 2 | RLS-contract strak nageleefd; restschuld: 0066-attributie via UPDATE te omzeilen |
+| Datamodel & database | ✅ 2026-07-04 | 1 | 6 | 4 | Gedisciplineerd schema; 3 half-doorgevoerde patronen (replica identity, ON DELETE, 0066) |
+| Platform & tooling | ✅ 2026-07-04 | 0 | 5 | 7 | Tooling volwassen; gaten in push-lifecycle en de laatste meters van de release-keten |
 
 **Rode draad:** de app staat er verrassend goed voor — een écht design-systeem, een bewaakte
 drielagen-architectuur, 863 unit-tests met mutatie-ratchet, gedeelde realtime-hub en SWR-cache. De
@@ -160,23 +164,39 @@ de statische tokens dekken en niet de dynamische combinaties.
 
 ---
 
-## Nog te draaien (sessielimiet)
+## Nog te draaien (sessielimiet) — bijgewerkt 2026-07-04
 
-Drie dimensies zijn **niet** beoordeeld. Aanbevolen om ze in een verse sessie alsnog te draaien —
-de workflow-cache herspeelt de 6 voltooide dimensies gratis:
+De drie ontbrekende dimensies zijn in de vervolgsessie (2026-07-04) alsnog gedraaid als losse
+read-only dimensie-agents (niet via de workflow-resume, want die is sessie-gebonden). Uitkomst:
 
-```
-Workflow({ scriptPath: ".../huishoek-app-review-wf_6c4a0932-323.js",
-           resumeFromRunId: "wf_6c4a0932-323", args: {"date":"2026-07-02"} })
-```
+- **Security — ✅ gedraaid (2026-07-04), fixes bewust UITGESTELD naar een aparte sessie.**
+  Geen high-bevindingen; tenant-isolatie + RLS-contract solide na de 0041–0058-remediatiegolven.
+  Geverifieerd tegen de code + de live `get_advisors` security-scan. Openstaand (klein, voor de
+  security-sessie):
+  - **medium · `enable_module_rls` verloor z'n `search_path`-pin** — `0066_module_insert_creator_check.sql`
+    doet `create or replace ... language plpgsql` zónder `set search_path = public`, wat de pin uit
+    `0024` reset. Live-advisor bevestigt: `function_search_path_mutable` WARN op precies deze functie.
+    Fix: pin terugzetten in een nieuwe migratie.
+  - **medium · globale catalogus vervuilbaar** — `insert_catalog_product` (`0031`, DEFINER,
+    `grant ... to authenticated`) slaat client-aangeleverde `p_image_url`/`p_name` ongefilterd op in de
+    cross-tenant `catalog_products`; die thumbnail rendert bij álle huishoudens → hotlink-tracking van
+    elke viewer. Fix: `image_url` allowlisten (OFF-CDN) of weren + naam normaliseren/cappen.
+  - **low** · HIBP-lekwachtwoordbescherming uit (dashboard-toggle) + zwak wachtwoordbeleid (min 8, geen
+    complexiteit); `peek_invite` geeft anoniem de voornaam van de uitnodiger prijs (bewust, 244-bit token
+    dus geen orakel); RLS-helpers (`is_member` e.d.) blijven door `authenticated` direct aanroepbaar
+    (advisor-WARN, `0058` bewust — mogelijk verder in te trekken, vergt live-RLS-test).
+  - Sterke punten (bevestigd): foto-buckets alle `public=false` + `is_member(foldername[1])`-padscoping op
+    alle 4 ops; invite-tokens 244-bit/single-use/24u/niet-gelogd; Sentry `sendDefaultPii:false` geen
+    setUser/breadcrumbs; `notify` constant-time secret-vergelijking fail-closed; geen secrets in git.
+- **Datamodel & database — ⏸ doorgeschoven.** De agent-run van 2026-07-04 werd halverwege
+  afgebroken (interrupt); op verzoek niet herstart — meenemen in de geplande security-sessie
+  (past daar goed bij: RLS-performance/policies raakt beide dimensies).
+- **Platform & tooling — ⏸ doorgeschoven.** Idem; meenemen in dezelfde vervolgsessie.
 
-- **Security** — RLS-gaten buiten het contract, edge-function-auth (notify/scan-receipt), invite/
-  join-token-entropie, foto-bucket-policies, PII naar Sentry, gecommitte secrets. *(De live Supabase
-  `get_advisors` security-scan zat in de opdracht — nog niet uitgevoerd.)*
-- **Datamodel & database** — FK's/ON DELETE, ontbrekende CHECK/NOT NULL, indexen op household_id/
-  created_at-paden, RLS-performance (`(select auth.uid())`-wrapping), realtime-publication-match.
-- **Platform & tooling** — app.config.js/eas.json/permissies, Sentry-source-maps, `@opentelemetry/api`
-  dood of levend, ongebruikte dependencies, web-parity (Platform.OS), notificatie-pijplijn.
+> Naast de dimensie-agent leverde de **live `get_advisors` performance-scan** (2026-07-04): 19×
+> `auth_rls_initplan` (kale `auth.uid()` per rij i.p.v. `(select auth.uid())`), 66× dubbele permissive
+> policies, 42 ongeïndexeerde FK's, 16 ongebruikte indexen. Bundelen in één DB-hardening-migratie
+> (samen met de twee security-mediums) in een vervolgsessie.
 
 > **Overlap met bekende roadmap:** de roadmap-agent vond ~59 reeds bekende open items (backlog §6 +
 > eerdere reviews). Nieuw t.o.v. die stapel zijn vooral: de SWR-foutpad-cascade (P0), de refetch-
@@ -205,3 +225,142 @@ Workflow({ scriptPath: ".../huishoek-app-review-wf_6c4a0932-323.js",
 
 *Bronbestanden van de per-dimensie-agents (volledige evidence/aanbevelingen) staan in het
 workflow-transcript: `.../subagents/workflows/wf_6c4a0932-323/journal.jsonl`.*
+
+---
+
+# Addendum 2026-07-04 — de drie ontbrekende dimensies
+
+De reviews die op de sessielimiet strandden zijn alsnog gedraaid (drie onafhankelijke
+dimensie-agents, zelfde bewijs-eis) + de live Supabase-advisor-scan. De zwaarste
+bevindingen zijn handmatig tegen de code geverifieerd (✓). Items die direct in de
+vervolg-PR zijn gefixt staan onderaan afgevinkt.
+
+## Security — 0 high · 1 medium · 2 low
+
+**Kernoordeel:** de securitybasis is volwassen en het gedeelde RLS-contract wordt
+consequent nageleefd; de restschuld is klein maar reëel.
+
+- **[Sec-1, medium, S] ✓ De 0066-attributie-fix is via een UPDATE te omzeilen.**
+  `0066_module_insert_creator_check.sql:63-67`: de INSERT-policy eist `%I = auth.uid()`
+  op de creator-kolom, maar de UPDATE-policy houdt `with check (is_member(household_id))`.
+  Een lid kan dus ná een nette insert de rij updaten met `created_by = ander lid` (of
+  `visibility`/`household_id` verschuiven). Binnen-huishouden, geen cross-tenant-lek, maar
+  het ondermijnt een als "gedicht" gemarkeerde control. De review van 2026-06-27 flagde
+  dit als aparte P2 die uit de opvolgtabel is gevallen. *Fix:* `enable_module_rls`-UPDATE-
+  `with check` uitbreiden + de 7 tabellen herzetten (patroon 0066), mét live-RLS-test.
+- **[Sec-2, low, S] `assistant` had geen expliciete `verify_jwt` in `config.toml`** —
+  leunde op de impliciete default, terwijl scan-receipt/notify het expliciet vastleggen.
+  **→ Gefixt in deze ronde.**
+- **[Sec-3, low, S] `peek_invite` geeft huishoudnaam + uitnodiger óók voor ingetrokken/
+  verlopen/gebruikte tokens** (`0053:104-124`, geen status-filter, geen throttle). Een ooit
+  gelekte link blijft dus permanent die info onthullen. *Fix:* niet-`valid` → alleen status.
+- **Sterk:** alle 9 module-tabellen via het contract; storage-buckets dicht (member-gated
+  op padsegment); edge-functions fail-closed met drietraps rate-limits; DEFINER-RPC's
+  netjes ingeperkt; geen gecommitte secrets; Sentry PII-arm (`sendDefaultPii:false`);
+  CI SHA-gepind met least-privilege.
+
+## Datamodel & database — 1 high · 6 medium · 4 low
+
+**Kernoordeel:** opvallend gedisciplineerd schema (hele centen, overal `timestamptz`,
+visibility-CHECK + integriteitstrigger, atomaire DEFINER-RPC's) — maar drie systematische
+patronen zijn half doorgevoerd.
+
+- **[Data-2, high, S] ✓ Realtime DELETE-events bereiken huisgenoten niet op ~22 van de
+  ~25 gesubscribede tabellen.** `0032` legt het mechanisme zelf uit (DELETE-event bevat
+  alleen de PK → het `household_id=eq.`-filter matcht nooit) en fixt alleen
+  `expense_shares`+`purchase_items`; `0067` voegde `timeline_reactions` toe. Alle
+  `useCollection`-tabellen (tasks/groceries/plants/pets/vehicles/…) + timeline/purchases/
+  completions missen 'm: verwijdert huisgenoot A een taak of boodschap, dan blijft die bij
+  B als spook-rij staan tot een reload. *Fix:* migratie `replica identity full` op de
+  gesubscribede tabellen (WAL-afweging voor foto-/logtabellen documenteren) + device-test.
+- **[Data-1, medium, M] Account-verwijdering loopt stuk:** elke module ná `0002`
+  herintroduceert FK's naar `profiles` zonder `on delete` (12+ migraties) → één uitgave of
+  plant blokkeert het wissen van `auth.users` (GDPR-pad). *Fix:* sweep-migratie
+  `set null` naar het 0002-patroon.
+- **[Data-3, medium, S] `expense_shares` hoeven niet op te tellen tot `amount_cents`**
+  (en mogen negatief): `create/update_expense` (0025) inserten de client-shares letterlijk.
+  Saldi — de financiële kern — zijn daarmee client-vertrouwend. *Fix:* som+`>=0`-guard in
+  beide RPC's + CHECK.
+- **[Data-4, medium, M] `task_completions` verliest de eerlijkheids-historie via cascade**
+  (taak/plant/huisdier/voertuig verwijderen wist voltooiingen met terugwerkende kracht —
+  strijdig met de eigen motivatie in 0012). Ontwerpkeuze: snapshotten of documenteren.
+- **[Data-5, medium, S] Bonnen/voorraad zonder bereik-CHECKs** (negatieve prijzen,
+  quantity ≤ 0 mogelijk; voertuig- en kosten-domein hebben ze wél).
+- **[Data-7, medium, S] Twee household-brede paden zonder dekkende index:**
+  `plant_photos`/`pet_log` op `(household_id, created_at)` en `household_members(profile_id)`
+  (de boot-query). *Fix:* indexmigratie.
+- **[Data-10, medium, S] 0066 mist `recurring_expenses`** (direct client-geschreven, oude
+  policy) **en liet de directe insert-policy op `expenses` open** (spoofing via REST naast
+  de RPC's om).
+- **Low:** naakte `auth.uid()` i.p.v. `(select auth.uid())` in bijna alle policies
+  (initplan; 0067 doet het al goed) · gedenormaliseerde `household_id` op kindtabellen
+  zonder consistentie-waarborg · polymorfe/array-verwijzingen zonder opruiming
+  (`timeline_reactions.target_id`, `tag_ids`, `eater_ids`) · backlogrijen liepen achter op
+  de gemergde 0067–0069 (in deze ronde bijgewerkt).
+- **Sterk:** geld consequent in hele centen; alle timestamps `timestamptz`; het
+  visibility-contract is hard (CHECK + trigger); idempotente migraties; helpers `STABLE`
+  + `security definer set search_path`.
+
+## Platform & tooling — 0 high · 5 medium · 7 low
+
+**Kernoordeel:** CI/ratchet/dependabot/secrets-discipline zijn voorbeeldig; de gaten
+zitten in de randen van de push-pijplijn en de laatste meters van de release-keten.
+
+- **[Plat-1, medium, S] Push-token werd niet opgeruimd bij uitloggen** → een gedeeld/
+  afgedankt toestel bleef pushes (incl. taaktitels) van het oude account ontvangen.
+  **→ Gefixt in deze ronde** (`lib/pushTokenRegistry.js` + opruiming in `signOut`).
+- **[Plat-2, medium, S] OS-notificatiepermissie wordt "cold" gevraagd bij eerste mount**
+  (`useNotifications.js:42`, default aan) — een weigering is sticky en legt de hele
+  PLT-1-pijplijn plat. *Fix:* pre-prompt bij een notificatie-actie/onboarding.
+- **[Plat-3, medium, S] Web-source-map-upload ontbreekt in `deploy:web`** (concrete
+  invulling van de bekende INF-4-rest): export → `npx sentry-expo-upload-sourcemaps dist`
+  → `.map`-bestanden strippen → dan pas `wrangler pages deploy`.
+- **[Plat-4, medium, S] `/.well-known/assetlinks.json` + `apple-app-site-association`
+  staan (vermoedelijk live) met `REPLACE_`-placeholders** terwijl `app.config.js` op
+  `applinks:huishoek.app` leunt → de native handoff van `/join/<token>` is dood. Stond
+  nergens in §6. *Fix:* keystore-SHA256 + Team ID invullen, herdeployen (Erik-actie:
+  credentials).
+- **[Plat-5, medium, S] `@opentelemetry/api` is prod-dependency én wordt door metro
+  weggestubd** — comment en werkelijkheid spreken elkaar tegen. *Fix:* naar
+  devDependencies + comment bijwerken.
+- **Low (selectie):** CI draaide op Node 20 (EOL) vs. lokaal 22 (**→ gefixt: Node 22 +
+  `engines`**) · `import:catalog` wees naar een verwijderd script (**→ gefixt**) · geen
+  app-icoon/splash/notificatie-icoon geconfigureerd (blokkeert nette store-build, INF-5) ·
+  dode-token-opruiming kijkt alleen naar tickets (niet receipts) + push-kanaal op
+  importance DEFAULT · `Share.share` faalt stil op desktop-web (voertuig-logboek) ·
+  `expo-image-picker`-plugin ontbreekt → Engelse permissieteksten · `tracesSampleRate:0.1`
+  zonder navigatie-instrumentatie (betaalde no-op).
+- **Sterk:** EXPO_PUBLIC-hygiëne schoon; `.gitignore` sluit credentials uit; CI
+  SHA-gepind + least-privilege + doordachte RLS-serialisatie; defensieve native-loads;
+  reanimated-babel-hypothese ontkracht (preset injecteert sinds SDK 50 zelf); versie-/
+  OTA-beleid consistent.
+
+## Live advisor-scan (Supabase, 2026-07-04)
+
+- **Security:** WARNs beperkt tot bekende/bewuste zaken — `peek_invite` anon-callable
+  (by design, zie Sec-3 voor de verscherping), DEFINER-RPC's voor `authenticated`
+  (by design: RLS-helpers + gevalideerde RPC's), `enable_module_rls` mutable search_path
+  (helper, alleen door migraties aangeroepen), en **leaked-password-protection staat nog
+  uit** (bekend: INF-10 B6, dashboard-toggle). INFO: RLS-aan-zonder-policy op de zes
+  tel-/systeemtabellen — bewust (alleen service-role/DEFINER).
+- **Performance:** de scan bevestigt Data-6 (auth-initplan-wrapping) en de
+  ontbrekende-index-klasse van Data-7; volledige lijst te herhalen via MCP
+  `get_advisors(performance)` bij de fixronde.
+
+## Direct gefixt in de vervolg-PR (2026-07-04)
+
+- ✅ Sec-2 — `[functions.assistant] verify_jwt = true` in `supabase/config.toml`.
+- ✅ Plat-1 — push-token-opruiming bij uitloggen (`lib/pushTokenRegistry.js`, 100% mutatie).
+- ✅ Plat-6 — CI naar Node 22 (4 workflows) + `engines` in package.json.
+- ✅ Plat-7 — `npm run import:catalog` wijst weer naar een bestaand script.
+- ✅ Data-D — backlog §6 gesynchroniseerd met de gemergde 0067–0069.
+
+## Aanbevolen fixronde-volgorde (rest)
+
+1. **P7 — DB-hardening-migratie(s)** (Sec-1 + Data-10 samen; Data-2 replica identity;
+   Data-3 share-guards; Data-7 indexen) — elk klein, wél de live-RLS-suite als gate.
+2. **P8 — Release-keten** (Plat-3 web-source-maps in `deploy:web`; Plat-4 applinks-
+   placeholders (Erik: credentials); app-icoon/splash vóór de store-build).
+3. **P9 — Push-pijplijn-poets** (Plat-2 pre-prompt; receipts-check + kanaal HIGH).
+4. Ontwerpkeuzes agenderen: Data-1 (account-verwijdering/GDPR) en Data-4
+   (completions-historie).

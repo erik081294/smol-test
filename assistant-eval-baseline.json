@@ -1,0 +1,7 @@
+{
+  "model": "google/eu.claude-sonnet-5",
+  "cases": 29,
+  "toolF1": 96,
+  "argsAccuracy": 100,
+  "noToolAccuracy": 100
+}

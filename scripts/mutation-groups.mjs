@@ -57,6 +57,9 @@ export const GROUPS = [
   // redenering als i18n) + Timeout-mutanten op de fetch-tak (nondeterministisch op een trage
   // CI-runner). De parse-/mapping-LOGICA wordt wél gemuteerd; StringLiteral eruit dempt de flake.
   { test: 'openFoodFacts', srcs: ['lib/openFoodFacts.js'], exclude: ['StringLiteral'] },
+  // Pure lijst-kern onder de optimistische mutaties van useCollection (patch/remove/
+  // removeMany; review 2026-07-02). De hook zelf blijft React-schil (niet gemuteerd).
+  { test: 'optimisticList', srcs: ['lib/optimisticList.js'] },
   { test: 'pantry', srcs: ['lib/pantry.js'] },
   { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
   { test: 'plantCare', srcs: ['lib/plantCare.js'] },
@@ -90,6 +93,15 @@ export const GROUPS = [
   { test: 'widgets', srcs: ['lib/widgets/grid.js', 'lib/widgets/summaries.js'] },
   // colorSchemes.js is een kleur/stijl-datatabel; StringLiteral = hex/kleurnamen (data).
   { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },
+  // Assistent (AI-1, plan 23): catalog-poortwachter, agent-loop-kern en tool-registry.
+  { test: 'assistantUi', srcs: ['lib/assistantUi.js'] },
+  // SSE-client-laag + markdown-subset van de assistent (AI-5, plan 24 ronde D).
+  { test: 'assistantStream', srcs: ['lib/assistantStream.js'] },
+  { test: 'markdownLite', srcs: ['lib/markdownLite.js'] },
+  // Push-token-administratie bij uitloggen (Plat-1, platform-review 2026-07-04).
+  { test: 'pushTokenRegistry', srcs: ['lib/pushTokenRegistry.js'] },
+  { test: 'assistantCore', srcs: ['supabase/functions/assistant/core.js'] },
+  { test: 'assistantTools', srcs: ['supabase/functions/_shared/assistantTools.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
   { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
   // Voertuig- + geld-laag (V3 "TCO") en huisdier/heatmap/contrast: pure logica met een
@@ -125,7 +137,9 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 //     (scripts/codeEquivalence.mjs), geen lib-module om te muteren.
 //   - moduleGating: meta-test (ARCH-3) die de bron van de data-hooks scant op een
 //     module-gate; bewaakt een patroon, geen muteerbare lib-module.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating'];
+// assistantGolden: meta-test op de golden-set-DATA (tests/assistant-golden.json) —
+// bewaakt structuur/registry-sync; er is geen bronmodule om te muteren.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
