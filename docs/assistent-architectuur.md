@@ -174,6 +174,37 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
 
 - Node-types uitbreiden alleen na expliciete afweging, max +3 per ronde; de renderer
   degradeert onbekende nodes altijd naar tekst; `link`-nodes alleen naar interne routes.
+- **Node-types (AI-12):** `text, card, list, keyvalue, confirm_action, link, recipe`.
+  Een nieuw type whitelist je op vier plekken client-side (`CATALOG_TYPES` +
+  `normalizeNode` + `treeToText` in `lib/assistantUi.js`, renderer in
+  `lib/AssistantMessageView.js`) plus een server-side `render*`-helper; de exacte set
+  ligt vast in `tests/assistantUi.test.js`. `recipe` (titel, porties, ingrediënten,
+  bereiding) is de recept-kaart waarop de gebruiker over een AI-recept beslist.
+- **Rijke preview bij een write-voorstel:** een `propose()` mag naast `items`/`args` een
+  `preview`-array met render-nodes teruggeven; de harness (index.ts) toont die vóór de
+  `confirm_action`-kaart. Zo verschijnt de recept-kaart bij het opslaan-voorstel zonder
+  de HITL-node zelf te verzwaren.
+
+## 10. Actie-orkestratie (stap voor stap, AI-12)
+
+Samengestelde verzoeken worden niet in één klap uitgevoerd; de agent componeert de
+bestaande **atomaire** HITL-tools. Drie compositie-hendels, geen nieuwe transactie:
+
+1. **Multi-item binnen één tool** (`items[]`): veel van dezelfde actie → één kaart.
+2. **Meerdere kaarten in één beurt**: verschillende acties die bij één beslissing horen
+   (elk blijft een losse, undo-bare `role='action'`-rij).
+3. **Chip-ketting over beurten**: echte beslispunten na elkaar; de volgende stap komt via
+   `suggest_replies`, gebruiker-geïnitieerd (geen server-auto-continuation).
+
+De agent-policy (systemprompt) bepaalt bundelen (één beslissing, laag-risico) vs. rijgen
+(gebruiker moet eerst iets goedkeuren). **Recept-flow als kanoniek voorbeeld:** koken/
+recept/boodschappen → éérst `maaltijden_recept_zoeken`; niet gevonden →
+`maaltijden_recept_opslaan` stelt een recept-kaart voor; pas ná goedkeuring inplannen
+(`maaltijden_plannen` mét `recipe_id`) en boodschappen. Kaal inplannen ("plan vrijdag
+lasagne in") blijft één directe `maaltijden_plannen`-titel. Bundelen is een
+**presentatie**-laag: staan er ≥2 voorstellen open, dan biedt de client één *"Akkoord met
+alles"* aan die ze via het bestaande confirm-endpoint na elkaar bevestigt — elke actie
+blijft server-side atomair en los undo-baar (`pendingActionIds` in `lib/assistantUi.js`).
 - Het wire-contract volgt de A2UI v0.9-message-types (`beginRendering`, `surfaceUpdate`,
   `dataModelUpdate`, `deleteSurface`) zodra AI-7 landt; de platte tree blijft als
   compat-vorm werken. Client-acties lopen uitsluitend via de whitelist in

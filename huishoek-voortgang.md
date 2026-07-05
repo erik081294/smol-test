@@ -1472,3 +1472,48 @@ E2E bewezen** (Testmelk → edit → Testhavermelk 2 pakken → AI benoemt de be
 confirm voert exact de bewerkte args uit → undo; kapotte edit → 400). Eval-gate
 100/100/100 nadat het 400-token-reasoning-artefact in de runner is gefixt (eval draait
 nu op het productie-budget van 1500). Rest: device-rooktest van sheet/FAB/edit-flow.
+
+**2026-07-05 — AI-12: recept-flow + stap-voor-stap-actie-orkestratie (+ keyboard-fix chat).**
+Twee gebruikersbevindingen aangepakt. (1) De assistent knalde een gerecht blind als
+vrije tekst op het weekmenu omdat er géén recept-tool bestond (maaltijden_plannen kon
+alleen titels). Nu een echte recept-flow: **maaltijden_recept_zoeken** (read) doorzoekt
+het receptenboek; **maaltijden_recept_opslaan** (write/HITL) laat de AI een volledig
+recept (ingrediënten/porties/bereiding) voorstellen als nieuw gen-UI-kaarttype
+**`recipe`** — via een `preview`-array uit propose(), naast de bevestigingskaart. Een
+goedgekeurd recept wordt gekoppeld ingepland (**maaltijden_plannen** kreeg optioneel
+`recipe_id`, UUID-gevalideerd; undo-whitelist kreeg `recipes`, ingrediënten cascaden mee).
+(2) **Stap-voor-stap-orkestratie** (gebruikerswens "acties aan elkaar rijgen of
+bundelen"): geen nieuwe transactie-machine, maar drie bestaande compositie-hendels +
+een agent-policy in de systemprompt (bundelen bij één beslissing, rijgen over
+beslispunten via suggest_replies). Bundelen is een **presentatie**-laag: bij ≥2 open
+voorstellen toont de client één *"Akkoord met alles"* (`pendingActionIds`) die ze via
+het bestaande confirm-endpoint na elkaar bevestigt — elke actie blijft server-side
+atomair en los undo-baar. De recept-triggering is chirurgisch afgesteld op Sonnet-5
+(drie takken: gebruiker levert recept → direct opslaan; kale titel → direct plannen;
+koken/recept/boodschappen → eerst zoeken) zodat kaal inplannen niet regresseert.
+Guidelines §9 (recipe-kaart + preview) en nieuwe §10 (actie-orkestratie) bijgewerkt;
+5 golden-cases erbij (rec-01..05). **Keyboard-fix:** de volledige-scherm-chat-tab gaf
+Android `behavior={undefined}` → composer onder het toetsenbord; nu `'height'` (zelfde
+patroon als Editor/BottomSheet in lib/ui.js; de overlay-sheet had 'm al via avoidKeyboard).
+Verificatie: hele suite + typecheck groen, eval-gate + mutatie-baseline in de PR-run.
+
+---
+
+**Device-verificatie assistent-rondes (2026-07-05, moto via USB, dev-client).** De
+openstaande toestel-rooktests van AI-5, AI-8 en AI-10 gedraaid op de moto. **AI-8
+(bevestigingskaart, donker):** write via de FAB-chat → bevestigingskaart met per-item
+checkboxes (multi-item testmelk+testkaas togglen), **Doen** → "✓ Gedaan" + item echt in
+de boodschappenlijst (via read-tool én de echte lijst-UI geverifieerd), **Niet doen** →
+"Niet gedaan", toast + undo werken. **AI-10 (assistent overal + edit-flow, donker):** de
+AI-first FAB opent de `AssistantSheet`-overlay die met hetzelfde gesprek over de tabs
+taken/thuis/boodschappen blijft staan (één app-brede gespreksstate bewezen); edit-flow
+end-to-end: "Bewerken" → edit-sheet → Naam Testmelk→Testhavermelk → Bewaren → kaart
+her-valideert → Doen → bewerkte args landen in de echte lijst. **AI-5 (stream + markdown,
+licht+donker):** stream bouwt live op ("Even nadenken…" + stop-knop), voltooit met
+gen-UI-kaarten + chips, prose rendert schoon, thema past kaarten/chips/bubble correct aan;
+app herstelt schoon van een rotatie-Activity-recreatie. **AI-5 en AI-8 → ✅ → archief;**
+AI-10 blijft 🔧 (rest: FAB-uitrol naar overige modules zodra die write-tools krijgen).
+**Twee edge-observaties genoteerd op AI-10:** (a) hardware-back binnen de edit-sheet klapt
+de hele overlay dicht tot het onderliggende scherm en reset het gesprek; (b) een edit die
+de item-identiteit wijzigt (testmelk→testhavermelk) laat het model in vervolgbeurten de
+oorspronkelijke "testmelk" her-opperen (originele vraag geldt als onvervuld).

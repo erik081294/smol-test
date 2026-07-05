@@ -140,7 +140,9 @@ export function selectItems(args, selected) {
 // Tabellen waaruit een undo mag verwijderen — hard begrensd tot wat de
 // write-tools zelf invoegen. Een action-rij met een andere tabel in
 // result.inserted (data-corruptie, oude versie) wordt geweigerd.
-export const UNDO_TABLE_WHITELIST = ['tasks', 'groceries', 'meal_plan_entries'];
+// NB: recipe_ingredients staat er bewust NIET in — die verdwijnen bij het
+// verwijderen van hun recept mee via on delete cascade (migratie 0016).
+export const UNDO_TABLE_WHITELIST = ['tasks', 'groceries', 'meal_plan_entries', 'recipes'];
 
 /**
  * Groepeer result.inserted per tabel voor de undo-verwijdering; valideert elke

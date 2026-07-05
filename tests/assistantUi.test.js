@@ -4,10 +4,10 @@
 // null/ontbrekend veld → drop of degradatie, en de route-whitelist ('/').
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CATALOG_TYPES, ACTION_UI_STATES, normalizeNode, normalizeTree, treeToText } from '../lib/assistantUi.js';
+import { CATALOG_TYPES, ACTION_UI_STATES, normalizeNode, normalizeTree, treeToText, pendingActionIds } from '../lib/assistantUi.js';
 
-test('CATALOG_TYPES blijft de afgesproken vaste set (≤6, plan 23)', () => {
-  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link']);
+test('CATALOG_TYPES blijft de afgesproken vaste set (plan 23, +recipe AI-12)', () => {
+  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link', 'recipe']);
 });
 
 test('normalizeNode: text vereist niet-lege tekst', () => {
@@ -156,4 +156,42 @@ test('normalizeNode: keyvalue overleeft null-paren en niet-array-pairs', () => {
     { type: 'keyvalue', title: null, pairs: [{ k: 'A', v: '1' }] }
   );
   assert.equal(normalizeNode({ type: 'keyvalue', pairs: 'rommel' }), null);
+});
+
+// --- Recept-kaart (AI-12): het nieuwe node-type + de "Akkoord met alles"-selector.
+
+test('normalizeNode: recipe normaliseert titel/porties/ingrediënten/stappen veilig', () => {
+  assert.deepEqual(
+    normalizeNode({
+      type: 'recipe', title: 'Pesto', servings: 4,
+      ingredients: [{ text: 'Penne · 400 gram' }, { text: '' }, 'rommel'],
+      steps: ['Kook', '', 42, 'Meng'],
+    }),
+    { type: 'recipe', title: 'Pesto', servings: 4, ingredients: [{ text: 'Penne · 400 gram' }], steps: ['Kook', 'Meng'] }
+  );
+});
+
+test('normalizeNode: recipe met ongeldige servings → null; zonder titel én ingrediënten → drop', () => {
+  assert.equal(normalizeNode({ type: 'recipe', title: 'X', servings: 0 }).servings, null);
+  assert.equal(normalizeNode({ type: 'recipe', title: 'X', servings: 2.5 }).servings, null);
+  assert.equal(normalizeNode({ type: 'recipe', ingredients: [] }), null);
+  // Titel zonder ingrediënten mag: een kale recept-kaart blijft geldig.
+  assert.equal(normalizeNode({ type: 'recipe', title: 'X' }).type, 'recipe');
+});
+
+test('treeToText: recipe geeft titel + ingrediënten (a11y/preview)', () => {
+  const [node] = normalizeTree([{ type: 'recipe', title: 'Pesto', ingredients: [{ text: 'Penne' }, { text: 'Pesto' }] }]);
+  assert.equal(treeToText([node]), 'Pesto: Penne, Pesto');
+});
+
+test('pendingActionIds: alleen openstaande confirm_action-nodes, ≥2 stuurt de bundel-knop', () => {
+  const tree = [
+    { type: 'text', text: 'hoi' },
+    { type: 'confirm_action', actionId: 'a1', summary: 's', items: [], status: 'pending' },
+    { type: 'confirm_action', actionId: 'a2', summary: 's', items: [], status: 'done' },      // al verwerkt → niet mee
+    { type: 'confirm_action', actionId: 'a3', summary: 's', items: [] },                       // geen status = pending
+  ];
+  assert.deepEqual(pendingActionIds(tree), ['a1', 'a3']);
+  assert.deepEqual(pendingActionIds([]), []);
+  assert.deepEqual(pendingActionIds(), []);
 });

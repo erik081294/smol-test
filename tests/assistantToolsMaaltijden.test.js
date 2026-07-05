@@ -7,8 +7,14 @@ import {
   MAALTIJDEN_TOOLS,
   MAALTIJDEN_BRIEF,
   renderWeekMenu,
+  renderRecipe,
+  renderRecipeMatches,
+  splitSteps,
   proposePlanMeals,
+  proposeSaveRecipes,
   MAX_PROPOSED_MEALS,
+  MAX_PROPOSED_RECIPES,
+  MAX_RECIPE_INGREDIENTS,
   MEAL_TYPES,
 } from '../supabase/functions/_shared/tools/maaltijden.js';
 import { toolCtx } from './fakeAssistantDb.js';
@@ -18,11 +24,11 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
-  assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en recepten; kan het menu tonen en maaltijden voorstellen' });
+  assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en receptenboek; kan menu en recepten tonen, recepten voorstellen en maaltijden inplannen' });
 });
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
-test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {
+test('descriptor-contract: statische vorm van de vier tools ligt exact vast', () => {
   assert.deepEqual(shape(tool('maaltijden_weekmenu')), {
     name: 'maaltijden_weekmenu',
     moduleKey: 'maaltijden',
@@ -43,7 +49,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
-    description: 'Roep dit aan wanneer de gebruiker een maaltijd wil inplannen of op het menu wil zetten (bv. "vrijdag lasagne"). Stelt één of meer maaltijden voor: de gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
+    description: 'Roep dit aan wanneer de gebruiker een maaltijd op het menu wil zetten (bv. "vrijdag lasagne") — een losse titel volstaat. Hoort er een recept bij (de gebruiker wil koken of de boodschappen erbij)? Geef dan het recipe_id uit maaltijden_recept_zoeken mee; voor kaal inplannen is dat niet nodig. Stelt één of meer maaltijden voor: de gebruiker ziet een bevestigingskaart en kan per maaltijd aan- of uitvinken, er wordt nooit direct iets opgeslagen.',
     parameters: {
       type: 'object',
       properties: {
@@ -57,8 +63,66 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
               title: { type: 'string', description: 'Wat er gegeten wordt, bv. "Lasagne"' },
               meal_type: { type: 'string', enum: ['ontbijt', 'lunch', 'diner', 'snack'], description: 'Welk eetmoment (default: diner)' },
               servings: { type: 'integer', description: 'Optioneel aantal eters (1-12)' },
+              recipe_id: { type: 'string', description: 'Optioneel: het id van het recept uit maaltijden_recept_zoeken — koppelt de maaltijd aan het receptenboek' },
             },
             required: ['date', 'title'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  });
+  assert.deepEqual(shape(tool('maaltijden_recept_zoeken')), {
+    name: 'maaltijden_recept_zoeken',
+    moduleKey: 'maaltijden',
+    kind: 'read',
+    statusLabel: 'Receptenboek doorbladeren…',
+    description: 'Roep dit aan wanneer de gebruiker een gerecht wil kóken, of het recept of de boodschappen ervoor wil: kijk eerst of het al in het receptenboek van het huishouden staat vóórdat je zelf een recept voorstelt. Geeft treffers als recept-kaart, met het recipe_id dat maaltijden_plannen nodig heeft om de maaltijd aan het recept te koppelen. Niet nodig als de gebruiker alleen een titel op het menu wil.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Zoekterm op gerechtnaam, bv. "lasagne" (weglaten = de nieuwste recepten)' } },
+      required: [],
+      additionalProperties: false,
+    },
+  });
+  assert.deepEqual(shape(tool('maaltijden_recept_opslaan')), {
+    name: 'maaltijden_recept_opslaan',
+    moduleKey: 'maaltijden',
+    kind: 'write',
+    destructive: false,
+    idempotent: false,
+    statusLabel: 'Recept uitschrijven…',
+    description: 'Roep dit aan om een recept in het receptenboek te zetten — óf wanneer de gebruiker zelf een recept aanlevert om te bewaren ("sla dit recept op: …"), óf wanneer een gevraagd gerecht nog niet bestaat (controleer dat eerst met maaltijden_recept_zoeken) en jij zelf een volledig recept voorstelt met ingrediënten, porties en bereiding. De gebruiker ziet de recept-kaart en beslist; er wordt nooit direct iets opgeslagen. Plan de maaltijd pas in nadat het recept is goedgekeurd.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De op te slaan recepten (meestal één, maximaal 3).',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Naam van het gerecht, bv. "Pasta pesto"' },
+              servings: { type: 'integer', description: 'Aantal porties (1-20, default 2)' },
+              ingredients: {
+                type: 'array',
+                description: 'De ingrediënten (1-30).',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string', description: 'Ingrediëntnaam, bv. "Penne"' },
+                    quantity: { type: 'number', description: 'Hoeveelheid (default 1)' },
+                    unit: { type: 'string', description: 'Eenheid, bv. "gram", "el", "stuk" (default "stuk")' },
+                  },
+                  required: ['name'],
+                  additionalProperties: false,
+                },
+              },
+              instructions: { type: 'string', description: 'De bereiding, één stap per regel' },
+            },
+            required: ['title', 'ingredients'],
             additionalProperties: false,
           },
         },
@@ -198,4 +262,170 @@ test('maaltijden_plannen.execute: één maaltijd → enkelvoud-summary; insert-f
     ),
     /boem/
   );
+});
+
+// --- Recept-koppeling in maaltijden_plannen (AI-12): recipe_id-pad.
+
+const UUID = '11111111-1111-1111-1111-111111111111';
+
+test('proposePlanMeals: geldig recipe_id reist mee; ontbrekend recipe_id blijft weg (schone shape)', () => {
+  const out = proposePlanMeals({ items: [
+    { date: '2026-07-10', title: 'Pesto', recipe_id: UUID },
+    { date: '2026-07-11', title: 'Vrij' },
+  ] });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.args.items[0], { date: '2026-07-10', meal_type: 'diner', title: 'Pesto', servings: null, recipe_id: UUID });
+  // Geen recipe_id → de sleutel bestaat niet (geen recipe_id:null-vervuiling).
+  assert.equal('recipe_id' in out.args.items[1], false);
+});
+
+test('proposePlanMeals: verzonnen/verminkt recipe_id → duidelijke fout (zoek eerst op)', () => {
+  assert.match(proposePlanMeals({ items: [{ date: '2026-07-10', title: 'X', recipe_id: 'niet-een-uuid' }] }).error, /recept-id/);
+  assert.match(proposePlanMeals({ items: [{ date: '2026-07-10', title: 'X', recipe_id: 42 }] }).error, /recept-id/);
+});
+
+test('maaltijden_plannen.execute: recipe_id gaat mee de insert in, alleen indien gezet', async () => {
+  const calls = [];
+  await tool('maaltijden_plannen').execute(toolCtx({}, calls), { items: [
+    { date: '2026-07-10', meal_type: 'diner', title: 'Pesto', servings: null, recipe_id: UUID },
+    { date: '2026-07-11', meal_type: 'diner', title: 'Vrij', servings: null },
+  ] });
+  assert.equal(calls[0].inserted[0].recipe_id, UUID);
+  assert.equal('recipe_id' in calls[0].inserted[1], false);
+});
+
+// --- splitSteps: bereiding → losse stappen (mutantpatroon: grens/nummerprefix).
+
+test('splitSteps: splitst op nieuwe regels, strippt nummerprefix, negeert lege regels en niet-strings', () => {
+  assert.deepEqual(splitSteps('1. Kook pasta\n2) Roer pesto\n\n  3.  Meng '), ['Kook pasta', 'Roer pesto', 'Meng']);
+  assert.deepEqual(splitSteps('Eén stap zonder nummer'), ['Eén stap zonder nummer']);
+  assert.deepEqual(splitSteps(''), []);
+  assert.deepEqual(splitSteps(null), []);
+  assert.deepEqual(splitSteps(undefined), []);
+});
+
+// --- renderRecipe: recept → recept-kaart (contract met de client-poortwachter).
+
+test('renderRecipe: ingrediëntregels met/zonder hoeveelheid, servings-fallback, stappen', () => {
+  const out = renderRecipe({
+    title: 'Pasta pesto', servings: 4, instructions: '1. Kook\n2. Meng',
+    ingredients: [
+      { name: 'Penne', quantity: 400, unit: 'gram' },
+      { name: 'Basilicum' },                          // geen hoeveelheid → kale naam
+      { name: 'Zout', quantity: 0 },                  // 0 telt niet als hoeveelheid
+      { name: '   ' },                                // lege naam vervalt
+    ],
+  });
+  assert.equal(out.type, 'recipe');
+  assert.equal(out.title, 'Pasta pesto');
+  assert.equal(out.servings, 4);
+  assert.deepEqual(out.ingredients, [{ text: 'Penne · 400 gram' }, { text: 'Basilicum' }, { text: 'Zout' }]);
+  assert.deepEqual(out.steps, ['Kook', 'Meng']);
+});
+
+test('renderRecipe: ongeldige servings → null; default-arg geeft lege, veilige kaart', () => {
+  assert.equal(renderRecipe({ title: 'X', servings: 0 }).servings, null);
+  assert.equal(renderRecipe({ title: 'X', servings: 2.5 }).servings, null);
+  assert.deepEqual(renderRecipe(), { type: 'recipe', title: undefined, servings: null, ingredients: [], steps: [] });
+});
+
+// --- renderRecipeMatches: zoekresultaat → data (met ids) + recept-kaarten.
+
+test('renderRecipeMatches: filtert case-insensitief op titel, top 3, data draagt de recipe-ids', () => {
+  const rows = [
+    { id: 'r1', title: 'Pasta Pesto', servings: 4, instructions: 'Kook', recipe_ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }] },
+    { id: 'r2', title: 'Lasagne', servings: 6 },
+    { id: 'r3', title: 'Pesto-toast', servings: 2 },
+  ];
+  const out = renderRecipeMatches(rows, 'PESTO');
+  assert.deepEqual(out.data, { count: 2, matches: [{ id: 'r1', title: 'Pasta Pesto', servings: 4 }, { id: 'r3', title: 'Pesto-toast', servings: 2 }] });
+  assert.equal(out.render.length, 2);
+  assert.equal(out.render[0].type, 'recipe');
+  assert.deepEqual(out.render[0].ingredients, [{ text: 'Penne · 400 gram' }]);
+});
+
+test('renderRecipeMatches: geen query → nieuwste paar; geen treffer → geruststellende kaart', () => {
+  const rows = [{ id: 'r1', title: 'Soep' }, { id: 'r2', title: 'Stamppot' }];
+  assert.equal(renderRecipeMatches(rows).data.count, 2);
+  const leeg = renderRecipeMatches(rows, 'sushi');
+  assert.deepEqual(leeg.data, { count: 0, matches: [] });
+  assert.deepEqual(leeg.render, [{ type: 'card', title: 'Recepten', lines: ['Geen recept gevonden voor "sushi".'] }]);
+  assert.deepEqual(renderRecipeMatches([]).render, [{ type: 'card', title: 'Recepten', lines: ['Er staan nog geen recepten in het boek.'] }]);
+});
+
+test('renderRecipeMatches: kapt af op de top 3, maar telt álle treffers in data.count', () => {
+  const rows = Array.from({ length: 5 }, (_, i) => ({ id: `r${i}`, title: `Soep ${i}` }));
+  const out = renderRecipeMatches(rows, 'soep');
+  assert.equal(out.data.count, 5);           // alle treffers geteld
+  assert.equal(out.data.matches.length, 3);  // maar hooguit 3 kaarten/ids terug
+  assert.equal(out.render.length, 3);
+});
+
+test('maaltijden_recept_zoeken: juiste tabel/kolommen + JS-filter op titel', async () => {
+  const calls = [];
+  const out = await tool('maaltijden_recept_zoeken').run(
+    toolCtx({ recipes: [{ id: 'r1', title: 'Lasagne', servings: 6 }, { id: 'r2', title: 'Soep' }] }, calls),
+    { query: 'lasagne' }
+  );
+  assert.equal(calls[0].table, 'recipes');
+  assert.equal(calls[0].selected, 'id, title, servings, instructions, recipe_ingredients(name, quantity, unit)');
+  assert.deepEqual(calls[0].filters, [['eq', 'household_id', 'h1']]);
+  assert.deepEqual(out.data.matches, [{ id: 'r1', title: 'Lasagne', servings: 6 }]);
+});
+
+// --- proposeSaveRecipes (AI-12): puur, met preview-kaart en items↔args-uitlijning.
+
+test('proposeSaveRecipes: normaliseert ingrediënten/porties, bouwt preview-kaart, lijnt items uit', () => {
+  const out = proposeSaveRecipes({ items: [{
+    title: '  Pasta pesto  ', servings: 4, instructions: '1. Kook\n2. Meng',
+    ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }, { name: 'Pesto' }],
+  }] });
+  assert.equal(out.ok, true);
+  assert.equal(out.summary, 'Recept "Pasta pesto" opslaan');
+  assert.deepEqual(out.items, ['Pasta pesto · 2 ingrediënten · 4p']);
+  assert.deepEqual(out.args.items, [{
+    title: 'Pasta pesto', servings: 4, instructions: '1. Kook\n2. Meng',
+    ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }, { name: 'Pesto', quantity: 1, unit: 'stuk' }],
+  }]);
+  // De preview is de rijke recept-kaart die náást de bevestigingskaart wordt getoond.
+  assert.equal(out.preview.length, 1);
+  assert.equal(out.preview[0].type, 'recipe');
+  assert.equal(out.items.length, out.args.items.length);
+});
+
+test('proposeSaveRecipes: servings-fallback 2 en grenzen 1/20 inclusief', () => {
+  const s = (servings) => proposeSaveRecipes({ items: [{ title: 'X', servings, ingredients: [{ name: 'a' }] }] }).args.items[0].servings;
+  assert.equal(s(undefined), 2);
+  assert.equal(s(0), 2);
+  assert.equal(s(21), 2);
+  assert.equal(s(1), 1);
+  assert.equal(s(20), 20);
+});
+
+test('proposeSaveRecipes: leeg/te veel/titel-loos/ingrediënt-loos/te lang → duidelijke fout', () => {
+  assert.equal(proposeSaveRecipes().ok, false);
+  assert.equal(proposeSaveRecipes({ items: [] }).ok, false);
+  assert.match(proposeSaveRecipes({ items: Array.from({ length: MAX_PROPOSED_RECIPES + 1 }, () => ({ title: 'x', ingredients: [{ name: 'a' }] })) }).error, /Maximaal 3/);
+  assert.match(proposeSaveRecipes({ items: [{ title: ' ', ingredients: [{ name: 'a' }] }] }).error, /titel/);
+  assert.match(proposeSaveRecipes({ items: [{ title: 'x'.repeat(121), ingredients: [{ name: 'a' }] }] }).error, /120/);
+  assert.match(proposeSaveRecipes({ items: [{ title: 'X', ingredients: [] }] }).error, /minstens één ingrediënt/);
+  assert.match(proposeSaveRecipes({ items: [{ title: 'X', ingredients: [{ name: ' ' }] }] }).error, /naam/);
+  const veelIng = Array.from({ length: MAX_RECIPE_INGREDIENTS + 1 }, () => ({ name: 'a' }));
+  assert.match(proposeSaveRecipes({ items: [{ title: 'X', ingredients: veelIng }] }).error, /maximaal 30/i);
+});
+
+test('maaltijden_recept_opslaan.execute: recept + ingrediënten; undo raakt alleen recipes (cascade)', async () => {
+  const calls = [];
+  const out = await tool('maaltijden_recept_opslaan').execute(toolCtx({}, calls), { items: [{
+    title: 'Pesto', servings: 4, instructions: 'Kook',
+    ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }, { name: 'Pesto', quantity: 1, unit: 'stuk' }],
+  }] });
+  assert.equal(calls[0].table, 'recipes');
+  assert.deepEqual(calls[0].inserted, [{ household_id: 'h1', created_by: 'u1', title: 'Pesto', servings: 4, instructions: 'Kook' }]);
+  assert.equal(calls[1].table, 'recipe_ingredients');
+  assert.deepEqual(calls[1].inserted[0], { household_id: 'h1', recipe_id: 'recipes-1', name: 'Penne', quantity: 400, unit: 'gram', sort_order: 0 });
+  assert.equal(calls[1].inserted[1].sort_order, 1);
+  // Undo verwijdert alleen het recept; recipe_ingredients gaan mee via cascade.
+  assert.deepEqual(out.inserted, [{ table: 'recipes', id: 'recipes-1' }]);
+  assert.equal(out.summary, 'Recept opgeslagen in het receptenboek.');
 });

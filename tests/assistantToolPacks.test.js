@@ -31,6 +31,8 @@ test('registry: de verwachte toolset, gesorteerd op naam (cache-hygiëne)', () =
     'boodschappen_toevoegen',
     'kosten_maandoverzicht',
     'maaltijden_plannen',
+    'maaltijden_recept_opslaan',
+    'maaltijden_recept_zoeken',
     'maaltijden_weekmenu',
     'taken_open',
     'taken_toevoegen',
@@ -82,6 +84,7 @@ test('contract: propose houdt items en args.items 1-op-1 uitgelijnd (selectie-in
     taken_toevoegen: { items: [{ title: 'A' }, { title: 'B', due_date: '2026-07-10' }] },
     boodschappen_toevoegen: { items: [{ name: 'Melk' }, { name: 'Kaas', quantity: '2' }] },
     maaltijden_plannen: { items: [{ date: '2026-07-10', title: 'X' }, { date: '2026-07-11', title: 'Y' }] },
+    maaltijden_recept_opslaan: { items: [{ title: 'Pesto', ingredients: [{ name: 'Basilicum' }] }, { title: 'Soep', ingredients: [{ name: 'Ui' }] }] },
   };
   for (const t of ASSISTANT_TOOLS.filter((t) => t.kind === 'write')) {
     assert.ok(samples[t.name], `${t.name}: voeg een propose-sample toe aan deze contract-test`);

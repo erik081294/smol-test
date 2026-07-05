@@ -142,7 +142,7 @@ test('selectItems: lege of volledig ongeldige selectie → fout; buiten bereik v
 });
 
 test('undoPlan: groepeert per tabel binnen de whitelist; alles erbuiten wordt geweigerd', () => {
-  assert.deepEqual(UNDO_TABLE_WHITELIST, ['tasks', 'groceries', 'meal_plan_entries']);
+  assert.deepEqual(UNDO_TABLE_WHITELIST, ['tasks', 'groceries', 'meal_plan_entries', 'recipes']);
   const plan = undoPlan([
     { table: 'tasks', id: 't1' },
     { table: 'groceries', id: 'g1' },

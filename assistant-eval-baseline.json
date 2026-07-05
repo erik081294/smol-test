@@ -1,6 +1,6 @@
 {
   "model": "google/eu.claude-sonnet-5",
-  "cases": 38,
+  "cases": 43,
   "toolF1": 100,
   "argsAccuracy": 100,
   "noToolAccuracy": 100

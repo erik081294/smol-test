@@ -2,9 +2,9 @@
   "generatedAt": "2026-07-05T11:10:58.577Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 6504,
-    "total": 7606,
-    "score": 85.5
+    "killed": 6851,
+    "total": 8036,
+    "score": 85.3
   },
   "files": {
     "lib/activity.js": {
@@ -333,9 +333,9 @@
       "score": 45.9
     },
     "lib/assistantUi.js": {
-      "killed": 172,
-      "total": 180,
-      "score": 95.6
+      "killed": 217,
+      "total": 232,
+      "score": 93.5
     },
     "supabase/functions/assistant/core.js": {
       "killed": 437,
@@ -388,19 +388,19 @@
       "score": 94.2
     },
     "supabase/functions/_shared/tools/maaltijden.js": {
-      "killed": 197,
-      "total": 215,
-      "score": 91.6
+      "killed": 477,
+      "total": 568,
+      "score": 84
     },
     "supabase/functions/assistant/actions.js": {
-      "killed": 186,
-      "total": 207,
+      "killed": 187,
+      "total": 208,
       "score": 89.9
     },
     "lib/assistantActions.js": {
-      "killed": 184,
-      "total": 199,
-      "score": 92.5
+      "killed": 205,
+      "total": 223,
+      "score": 91.9
     }
   }
 }
