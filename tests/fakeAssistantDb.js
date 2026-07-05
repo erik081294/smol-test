@@ -1,0 +1,43 @@
+// Gedeelde fake RLS-client voor de tool-pack-tests (géén .test.js — de runner
+// en groupsCoverage slaan dit bestand over). Honoreert de chain-API van
+// supabase-js voor selects én inserts en registreert elke call zodat tests
+// tabel/kolommen/filters exact kunnen asserteren.
+
+export function fakeDb(rowsByTable, calls, opts = {}) {
+  const chain = (table) => {
+    const rec = { table, filters: [], selected: null, inserted: null };
+    calls.push(rec);
+    const api = {
+      select(cols) {
+        rec.selected = cols;
+        if (rec.inserted) {
+          // insert(...).select('id') → teruggegeven ids (of een geforceerde fout).
+          if (opts.insertError) return Promise.resolve({ data: null, error: opts.insertError });
+          const ids = rec.inserted.map((_, i) => ({ id: `${table}-${i + 1}` }));
+          return Promise.resolve({ data: ids, error: null });
+        }
+        return api;
+      },
+      insert(rows) { rec.inserted = rows; return api; },
+      eq(col, val) { rec.filters.push(['eq', col, val]); return api; },
+      is(col, val) { rec.filters.push(['is', col, val]); return api; },
+      gte(col, val) { rec.filters.push(['gte', col, val]); return api; },
+      lt(col, val) { rec.filters.push(['lt', col, val]); return api; },
+      order(col, o) { rec.order = [col, o]; return api; },
+      limit() {
+        if (opts.queryError) return Promise.resolve({ data: null, error: opts.queryError });
+        return Promise.resolve({ data: rowsByTable[table] ?? [], error: null });
+      },
+    };
+    return api;
+  };
+  return { from: chain };
+}
+
+export const toolCtx = (rowsByTable, calls, opts = {}) => ({
+  db: fakeDb(rowsByTable, calls, opts),
+  householdId: 'h1',
+  userId: 'u1',
+  today: '2026-07-04',
+  memberNames: { u1: 'Erik', u2: 'Sam' },
+});

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/assistantTools.js';
+import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/tools/index.js';
 
 const golden = JSON.parse(readFileSync(new URL('./assistant-golden.json', import.meta.url), 'utf8'));
 const TOOL_BY_NAME = Object.fromEntries(ASSISTANT_TOOLS.map((t) => [t.name, t]));

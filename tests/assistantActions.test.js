@@ -1,0 +1,71 @@
+// Unit-tests voor de pure client-onAction-bridge (lib/assistantActions.js, AI-8):
+// request-bouw (whitelist), status-afleiding met TTL-grens, tree-stempeling
+// (immutable) en de checkbox-toggle.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  ACTION_DECISIONS,
+  ACTION_TTL_SECONDS,
+  buildResolveBody,
+  actionStatusFromRow,
+  actionStatusMap,
+  stampActionStatus,
+  toggleSelection,
+} from '../lib/assistantActions.js';
+
+const CREATED = '2026-07-05T10:00:00.000Z';
+const atSeconds = (s) => new Date(Date.parse(CREATED) + s * 1000).toISOString();
+
+test('buildResolveBody: alleen whitelist-besluiten; selected alleen als array meegegeven', () => {
+  assert.deepEqual(ACTION_DECISIONS, ['confirm', 'reject', 'undo']);
+  assert.deepEqual(buildResolveBody('a1', 'confirm'), { action: { id: 'a1', decision: 'confirm' } });
+  assert.deepEqual(buildResolveBody('a1', 'confirm', [0, 2]), { action: { id: 'a1', decision: 'confirm', selected: [0, 2] } });
+  assert.deepEqual(buildResolveBody('a1', 'reject'), { action: { id: 'a1', decision: 'reject' } });
+  assert.equal(buildResolveBody('a1', 'execute'), null); // geen verzonnen besluiten
+  assert.equal(buildResolveBody('', 'confirm'), null);
+  assert.equal(buildResolveBody(undefined, 'confirm'), null);
+});
+
+test('actionStatusFromRow: niet-pending status telt letterlijk; pending verloopt exact ná de TTL', () => {
+  const row = (status, createdAt = CREATED) => ({ content: { status }, created_at: createdAt });
+  assert.equal(actionStatusFromRow(row('done'), atSeconds(999999)), 'done');
+  assert.equal(actionStatusFromRow(row('rejected'), atSeconds(1)), 'rejected');
+  assert.equal(actionStatusFromRow(row('pending'), atSeconds(ACTION_TTL_SECONDS)), 'pending');
+  assert.equal(actionStatusFromRow(row('pending'), atSeconds(ACTION_TTL_SECONDS + 1)), 'expired');
+  // Status ontbreekt → als pending behandelen; onleesbare tijd → expired (niet bevestigbaar).
+  assert.equal(actionStatusFromRow({ content: {}, created_at: CREATED }, atSeconds(1)), 'pending');
+  assert.equal(actionStatusFromRow({ content: {}, created_at: 'rommel' }, atSeconds(1)), 'expired');
+});
+
+test('actionStatusMap: rijen zonder id vallen weg; default-args geven een leeg object', () => {
+  const rows = [
+    { id: 'a1', content: { status: 'done' }, created_at: CREATED },
+    { id: '', content: { status: 'pending' }, created_at: CREATED },
+    { content: { status: 'pending' }, created_at: CREATED },
+  ];
+  assert.deepEqual(actionStatusMap(rows, atSeconds(1)), { a1: 'done' });
+  assert.deepEqual(actionStatusMap(), {});
+});
+
+test('stampActionStatus: stempelt alleen bekende confirm_action-nodes en muteert de invoer niet', () => {
+  const tree = [
+    { type: 'text', text: 'hoi' },
+    { type: 'confirm_action', actionId: 'a1', summary: 'S', status: 'pending' },
+    { type: 'confirm_action', actionId: 'onbekend', summary: 'T', status: 'pending' },
+  ];
+  const stamped = stampActionStatus(tree, { a1: 'done' });
+  assert.equal(stamped[1].status, 'done');
+  assert.equal(stamped[2].status, 'pending');       // onbekende id blijft staan
+  assert.equal(tree[1].status, 'pending');          // origineel onaangeroerd
+  assert.equal(stamped[0], tree[0]);                // niet-actie-nodes zelfde referentie
+  assert.deepEqual(stampActionStatus(), []);
+  assert.deepEqual(stampActionStatus(tree), tree);
+});
+
+test('toggleSelection: aan/uit, gesorteerd en zonder duplicaten', () => {
+  assert.deepEqual(toggleSelection([0, 2], 1), [0, 1, 2]);
+  assert.deepEqual(toggleSelection([0, 1, 2], 1), [0, 2]);
+  assert.deepEqual(toggleSelection([], 3), [3]);
+  assert.deepEqual(toggleSelection(undefined, 0), [0]);
+  assert.deepEqual(toggleSelection([2, 2, 0], 1), [0, 1, 2]); // dedupliceert de invoer
+});

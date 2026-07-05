@@ -101,7 +101,16 @@ export const GROUPS = [
   // Push-token-administratie bij uitloggen (Plat-1, platform-review 2026-07-04).
   { test: 'pushTokenRegistry', srcs: ['lib/pushTokenRegistry.js'] },
   { test: 'assistantCore', srcs: ['supabase/functions/assistant/core.js'] },
-  { test: 'assistantTools', srcs: ['supabase/functions/_shared/assistantTools.js'] },
+  // Assistent-tool-packs (skill-file per module, guidelines §1) + HITL-lagen (AI-8):
+  // per pack een eigen test zodat de ratchet gericht per module draait.
+  { test: 'assistantToolPacks', srcs: ['supabase/functions/_shared/tools/index.js', 'supabase/functions/_shared/tools/helpers.js'] },
+  { test: 'assistantToolsTaken', srcs: ['supabase/functions/_shared/tools/taken.js'] },
+  { test: 'assistantToolsBoodschappen', srcs: ['supabase/functions/_shared/tools/boodschappen.js'] },
+  { test: 'assistantToolsKosten', srcs: ['supabase/functions/_shared/tools/kosten.js'] },
+  { test: 'assistantToolsVoorraad', srcs: ['supabase/functions/_shared/tools/voorraad.js'] },
+  { test: 'assistantToolsMaaltijden', srcs: ['supabase/functions/_shared/tools/maaltijden.js'] },
+  { test: 'assistantHitl', srcs: ['supabase/functions/assistant/actions.js'] },
+  { test: 'assistantActions', srcs: ['lib/assistantActions.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
   { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
   // Voertuig- + geld-laag (V3 "TCO") en huisdier/heatmap/contrast: pure logica met een

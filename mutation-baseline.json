@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-26T08:27:29.928Z",
+  "generatedAt": "2026-07-05T09:29:30.650Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 5388,
-    "total": 6385,
-    "score": 84.4
+    "killed": 6316,
+    "total": 7407,
+    "score": 85.3
   },
   "files": {
     "lib/activity.js": {
@@ -88,9 +88,9 @@
       "score": 92.1
     },
     "lib/i18n.js": {
-      "killed": 30,
-      "total": 41,
-      "score": 73.2
+      "killed": 77,
+      "total": 93,
+      "score": 82.8
     },
     "lib/insights.js": {
       "killed": 70,
@@ -333,19 +333,14 @@
       "score": 45.9
     },
     "lib/assistantUi.js": {
-      "killed": 149,
-      "total": 156,
-      "score": 95.5
+      "killed": 172,
+      "total": 180,
+      "score": 95.6
     },
     "supabase/functions/assistant/core.js": {
-      "killed": 255,
-      "total": 292,
-      "score": 87.3
-    },
-    "supabase/functions/_shared/assistantTools.js": {
-      "killed": 264,
-      "total": 286,
-      "score": 92.3
+      "killed": 387,
+      "total": 442,
+      "score": 87.6
     },
     "lib/assistantStream.js": {
       "killed": 88,
@@ -355,12 +350,57 @@
     "lib/markdownLite.js": {
       "killed": 117,
       "total": 136,
-      "score": 86.0
+      "score": 86
     },
     "lib/pushTokenRegistry.js": {
       "killed": 18,
       "total": 18,
-      "score": 100.0
+      "score": 100
+    },
+    "supabase/functions/_shared/tools/helpers.js": {
+      "killed": 89,
+      "total": 90,
+      "score": 98.9
+    },
+    "supabase/functions/_shared/tools/index.js": {
+      "killed": 6,
+      "total": 6,
+      "score": 100
+    },
+    "supabase/functions/_shared/tools/taken.js": {
+      "killed": 180,
+      "total": 205,
+      "score": 87.8
+    },
+    "supabase/functions/_shared/tools/boodschappen.js": {
+      "killed": 137,
+      "total": 148,
+      "score": 92.6
+    },
+    "supabase/functions/_shared/tools/kosten.js": {
+      "killed": 65,
+      "total": 68,
+      "score": 95.6
+    },
+    "supabase/functions/_shared/tools/voorraad.js": {
+      "killed": 61,
+      "total": 65,
+      "score": 93.8
+    },
+    "supabase/functions/_shared/tools/maaltijden.js": {
+      "killed": 193,
+      "total": 211,
+      "score": 91.5
+    },
+    "supabase/functions/assistant/actions.js": {
+      "killed": 185,
+      "total": 206,
+      "score": 89.8
+    },
+    "lib/assistantActions.js": {
+      "killed": 74,
+      "total": 83,
+      "score": 89.2
     }
   }
 }
