@@ -1358,4 +1358,7 @@ per-item checkboxes (multi-edit) en `execute` draait uitsluitend de **opgeslagen
 Statusmachine puur in [`assistant/actions.js`](supabase/functions/assistant/actions.js),
 client-bridge [`lib/assistantActions.js`](lib/assistantActions.js) (AI-7-voorschot).
 Mutatie-ratchet: 9 nieuwe modules op 87,8–100%, baseline gericht gepatcht (geen
-full-regen — vehicleTimeline-ruis onaangeroerd). Rest: edge-deploy + device-rooktest.
+full-regen — vehicleTimeline-ruis onaangeroerd). **Edge function v11 gedeployed (MCP)
+en de héle HITL-keten E2E live bewezen** (user-JWT): voorstel-kaart met aanvinkbare
+items → confirm met deelselectie → alleen dát item in de DB → dubbeltik 409 → undo
+verwijdert → tweede undo 409. Rest: device-rooktest van de kaart-UI.
