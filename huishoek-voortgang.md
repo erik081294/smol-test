@@ -1517,3 +1517,38 @@ AI-10 blijft 🔧 (rest: FAB-uitrol naar overige modules zodra die write-tools k
 de hele overlay dicht tot het onderliggende scherm en reset het gesprek; (b) een edit die
 de item-identiteit wijzigt (testmelk→testhavermelk) laat het model in vervolgbeurten de
 oorspronkelijke "testmelk" her-opperen (originele vraag geldt als onvervuld).
+
+---
+
+**2026-07-05 — Assistent-hardening (AI-14): multi-agent review-opvolging op AI-8/10/12.**
+Na het verse assistent-werk drie onafhankelijke reviews gedraaid (HITL-keten server-side /
+client-laag / losse-eindjes-inventaris) + live-verificatie tegen Supabase (geen migratie-drift,
+edge stond al op v14, advisor schoon, `auth_rls_initplan` bevestigd 0). De HITL-keten bleek
+fundamenteel solide: creator-privé RLS-autorisatie (geen cross-member confirm/undo/edit),
+single-winner race-claim (409 bij dubbel), confirm voert de opgeslagen args uit, gen-UI 100%
+server-side gerenderd tegen prompt-injectie. Zeven losse eindjes gedicht (branch
+`claude/assistent-hardening`):
+- **HIGH — dode FAB.** De AI-first FAB opende de sheet zonder te checken of de Assistent-module
+  aanstaat (`core:false` → uitschakelbaar); dan rendert de sheet niets én is "Zelf invoeren"
+  onbereikbaar → geen toevoeg-affordance meer. `openAssistant` valt nu bij `!enabled` direct
+  terug op `onManual` ([`assistantProvider.js`](lib/assistantProvider.js)).
+- **HIGH-data — recept-opslaan niet-atomair.** `maaltijden_recept_opslaan.execute` deed losse
+  per-recept inserts → een partiële fout liet niet-undobare weesrecepten achter. Nu één
+  DEFINER-RPC `save_recipes` (migr. [`0073`](supabase/migrations/0073_assistant_save_recipes_rpc.sql),
+  **live via MCP**, `anon`/`public`-execute ingetrokken, `is_member`-poort) — één transactie,
+  geeft de recipe-ids als undo-spoor terug. Edge **v15 gedeployed via CLI**, RPC + scoping live
+  geverifieerd (zie AI-12).
+- **MED** — gesprek reset bij huishouden-wissel (geen kruisbesmetting van `conversationId`);
+  "Akkoord met alles" stopt bij de eerste fout + unmount-guard (pure `confirmSequence`); retry
+  dedupliceert de user-beurt niet meer (pure `dropStrandedTurn`); AI-13-(1) chip-rij nu
+  horizontaal-scrollend i.p.v. wrappend.
+- **LOW** — anti-injectie: newline-sanitatie van voorstel-tekst die de systemprompt in gaat
+  (`openProposalsNote`); lege-respons → tekst-fallback i.p.v. blanco bubble.
+- **DoD:** 5 nieuwe pure-helper-tests (`confirmSequence`/`dropStrandedTurn` + sanitatie +
+  atomaire recept-execute), `npm test` 1149 pass / 0 fail, mutatie-ratchet groen, typecheck +
+  `eslint .` groen, eval-gate **100/100/100 (43 cases, geen regressie)**.
+- **Weerlegd:** AI-10-observatie (a) — de code houdt het gesprek vast over sheet/tab/thema-remount
+  (`useAssistant` in de root-provider bóven Gate's remount-key); device-hertest aanbevolen.
+- **Device-gated rest (AI-13-(2)/(3)):** sheet-hoogte vs. toetsenbord + navbar-z-index raken het
+  gedeelde `BottomSheet`-primitief (auto-metende `maxHeight`) en zijn niet zonder toestel te
+  verifiëren — bewust niet blind gegokt.

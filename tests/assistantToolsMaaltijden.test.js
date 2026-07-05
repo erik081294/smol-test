@@ -414,18 +414,38 @@ test('proposeSaveRecipes: leeg/te veel/titel-loos/ingrediënt-loos/te lang → d
   assert.match(proposeSaveRecipes({ items: [{ title: 'X', ingredients: veelIng }] }).error, /maximaal 30/i);
 });
 
-test('maaltijden_recept_opslaan.execute: recept + ingrediënten; undo raakt alleen recipes (cascade)', async () => {
+test('maaltijden_recept_opslaan.execute: één atomaire RPC met de genormaliseerde recepten; undo raakt alleen recipes', async () => {
   const calls = [];
-  const out = await tool('maaltijden_recept_opslaan').execute(toolCtx({}, calls), { items: [{
+  const items = [{
     title: 'Pesto', servings: 4, instructions: 'Kook',
     ingredients: [{ name: 'Penne', quantity: 400, unit: 'gram' }, { name: 'Pesto', quantity: 1, unit: 'stuk' }],
-  }] });
-  assert.equal(calls[0].table, 'recipes');
-  assert.deepEqual(calls[0].inserted, [{ household_id: 'h1', created_by: 'u1', title: 'Pesto', servings: 4, instructions: 'Kook' }]);
-  assert.equal(calls[1].table, 'recipe_ingredients');
-  assert.deepEqual(calls[1].inserted[0], { household_id: 'h1', recipe_id: 'recipes-1', name: 'Penne', quantity: 400, unit: 'gram', sort_order: 0 });
-  assert.equal(calls[1].inserted[1].sort_order, 1);
-  // Undo verwijdert alleen het recept; recipe_ingredients gaan mee via cascade.
-  assert.deepEqual(out.inserted, [{ table: 'recipes', id: 'recipes-1' }]);
+  }];
+  const out = await tool('maaltijden_recept_opslaan').execute(toolCtx({}, calls), { items });
+  // Eén transactie i.p.v. losse recipes-/recipe_ingredients-inserts (migr. 0073):
+  // een partiële fout kan zo geen niet-undobare weesrecepten achterlaten.
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].rpc, 'save_recipes');
+  assert.equal(calls[0].args.p_household_id, 'h1');
+  assert.deepEqual(calls[0].args.p_items, items);
+  // De RPC geeft de recipe-ids terug → undo-spoor (alleen recipes; ingrediënten cascaden).
+  assert.deepEqual(out.inserted, [{ table: 'recipes', id: 'recipe-1' }]);
   assert.equal(out.summary, 'Recept opgeslagen in het receptenboek.');
+});
+
+test('maaltijden_recept_opslaan.execute: meerdere recepten → meervoud; een RPC-fout gooit (atomair)', async () => {
+  const out = await tool('maaltijden_recept_opslaan').execute(toolCtx({}, []), { items: [
+    { title: 'A', servings: 2, instructions: null, ingredients: [{ name: 'x', quantity: 1, unit: 'stuk' }] },
+    { title: 'B', servings: 2, instructions: null, ingredients: [{ name: 'y', quantity: 1, unit: 'stuk' }] },
+  ] });
+  assert.equal(out.summary, '2 recepten opgeslagen in het receptenboek.');
+  assert.deepEqual(out.inserted, [{ table: 'recipes', id: 'recipe-1' }, { table: 'recipes', id: 'recipe-2' }]);
+  // Faalt de transactie, dan gooit execute — de agent-schil maakt er een nette
+  // tool-fout van; er blijven geen half-ingevoegde recepten achter (RPC = 1 tx).
+  await assert.rejects(
+    () => tool('maaltijden_recept_opslaan').execute(
+      toolCtx({}, [], { rpcError: { message: 'boem' } }),
+      { items: [{ title: 'A', servings: 2, instructions: null, ingredients: [{ name: 'x', quantity: 1, unit: 'stuk' }] }] }
+    ),
+    /boem/
+  );
 });

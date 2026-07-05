@@ -43,7 +43,7 @@
 | E | AI-6 | UX-poets: stop-knop (partial bewaren), retry, message-actions, tool-statusregels + collapsible, scroll-anchoring, haptics; tool-contract + `statusLabel`. **Deels vervroegd (2026-07-04):** antwoordopties via `suggest_replies`-pseudo-tool (AskUserQuestion-patroon: elke beurt 2–4 tikbare chips, vrij typen blijft altijd de "Other"-route) + BEKNOPT-prompt (1–3 zinnen, data in kaarten, details via deep-link) — zie guidelines §8. |
 | F | AI-7 | A2UI-alignment: surface/patch-model, dataModel-store, `lib/assistantActions.js` (onAction-whitelist), +3 node-types (`progress`, `image`, `chips`) |
 | G | AI-8 | Write-tools `propose_*` + HITL: action-bericht (args+TTL, pending) → bevestigingskaart → `execute_action` (valideert + voert opgeslagen args uit) → toast/undo |
-| H | AI-9 | Geheugen v1: migratie 0071 (`assistant_memories` + hybrid-search-RPC), remember-tool, async extractor, beheer-scherm, memory zichtbaar in chat |
+| H | AI-9 | Geheugen v1: migratie 0074 (`assistant_memories` + hybrid-search-RPC), remember-tool, async extractor, beheer-scherm, memory zichtbaar in chat |
 
 ## Risico's
 
