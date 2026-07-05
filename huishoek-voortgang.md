@@ -1388,3 +1388,12 @@ schoon. Van de 5 Maestro-flows slaagden 01-taak + 04-swipe direct; 02-uitgave,
 05-editor-guard) en **slaagden alle drie op een warme, losse her-run** (21/39/42s, alle
 groen, logcat schoon). Geen regressie uit de assistent-/push-token-/config-wijzigingen van
 deze ronde; de flakes zitten in de flow-state tussen sequentiële launches, niet in app-code.
+
+**2026-07-05 (docs) — AI-4 + AI-5 naar ✅ → archief; eigen AI-sectie.** Beide rondes zijn
+volledig af en device/live-bevestigd (AI-4 persistentie 2026-07-04; AI-5 SSE+markdown nu op
+beide thema's + rooktest-groen), dus per DoD verplaatst naar een nieuwe sectie
+[`## AI — Assistent`](huishoek-backlog-archief.md) in het archief, mét hun volledige
+notitie. §6 houdt de lopende epic-rijen (AI-1 parent + AI-2/3/6…9). Tegelijk een
+nummer-collision weggewerkt: AI-9's geplande `assistant_memories`-migratie stond op `0071`,
+dat inmiddels bezet is door de Sec-3/Data-5-hardening → herbenoemd naar "eerstvolgend vrij
+nummer".
