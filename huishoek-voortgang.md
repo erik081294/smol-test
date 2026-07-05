@@ -1342,3 +1342,20 @@ Dit vult de INF-4-rest ("web-frames geminified") concreet in; verificatie = de
 eerstvolgende echte deploy mét token. `@opentelemetry/api` verhuisde naar devDependencies
 (alleen supabase-js-onder-Node gebruikt 'm; metro stubt 'm al voor de bundle — comment
 bijgewerkt). Suite/typecheck/lint groen na `npm install`.
+
+**2026-07-05 — AI-8 + skill-file-refactor: de assistent kan voorstellen doen (HITL, multi-edit).**
+Na industry-onderzoek (Anthropic tool-guidance, MCP-annotaties, OpenAI/Vercel/LangGraph
+HITL-patronen — samengevat in [guidelines §1](docs/assistent-architectuur.md)) is de
+tool-registry opgesplitst in **skill-files per module** ([`_shared/tools/`](supabase/functions/_shared/tools/index.js):
+taken/boodschappen/kosten/voorraad/**maaltijden nieuw**) met een domme aggregator en een
+contract-metatest die naming (`<moduleKey>_<onderwerp>`), gesloten JSON-schema's en
+risico-annotaties afdwingt. De rename is eval-bevestigd: tool-F1 96,4 → **100** (38 cases,
+baseline herijkt). **HITL (plan 23 §4 / ronde G):** de tool-call ís het voorstel — de
+harness onderschept `kind:'write'`-calls, puur `propose()` bouwt het voorstel, opgeslagen
+als `role='action'`-rij (0068 dekte dit al: geen migratie), de bevestigingskaart toont
+per-item checkboxes (multi-edit) en `execute` draait uitsluitend de **opgeslagen** args
+(single-shot claim tegen dubbeltik, TTL 1u, undo via bewaarde insert-ids + toast).
+Statusmachine puur in [`assistant/actions.js`](supabase/functions/assistant/actions.js),
+client-bridge [`lib/assistantActions.js`](lib/assistantActions.js) (AI-7-voorschot).
+Mutatie-ratchet: 9 nieuwe modules op 87,8–100%, baseline gericht gepatcht (geen
+full-regen — vehicleTimeline-ruis onaangeroerd). Rest: edge-deploy + device-rooktest.

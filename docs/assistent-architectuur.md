@@ -8,30 +8,61 @@ De lagen (zelfde 3-lagen-filosofie als [`docs/architectuur.md`](architectuur.md)
 
 ```
 app: scherm + useAssistant + AssistantMessageView   (dunne React-schil)
-     lib/assistantUi.js                             (pure catalog-poortwachter)
-edge: assistant/index.ts (schil) + core.js (pure loop-kern)
-      _shared/assistantTools.js (tool-packs, RLS-gebonden)
+     lib/assistantUi.js (pure catalog-poortwachter) + lib/assistantActions.js (onAction-bridge)
+edge: assistant/index.ts (schil) + core.js (pure loop-kern) + actions.js (pure HITL-statusmachine)
+      _shared/tools/<moduleKey>.js (skill-file per module) + tools/index.js (aggregator)
 Orq:  deployment (prompt/model/versioning) + traces + evals + experiments
 DB:   assistant_* tabellen (creator-privé RLS) + record_assistant_call (fail-closed)
 ```
 
-## 1. Tool-pack-contract
+## 1. Tool-pack-contract (skill-file per module)
 
-Elke module die de assistent iets wil laten kunnen, levert tools volgens dit contract
-(nu in [`_shared/assistantTools.js`](../supabase/functions/_shared/assistantTools.js);
-bij groei per module een eigen bestand dat de aggregator importeert):
+Elke module levert zijn eigen **skill-file** `_shared/tools/<moduleKey>.js`
+(LangChain-toolkit-patroon); de aggregator [`_shared/tools/index.js`](../supabase/functions/_shared/tools/index.js)
+flatten't, checkt op dubbele namen en sorteert deterministisch op naam
+(cache-hygiëne: tool-definities staan vooraan in de prompt — de set moet binnen
+een gesprek byte-stabiel zijn). Het contract wordt afgedwongen door de
+contract-metatest [`tests/assistantToolPacks.test.js`](../tests/assistantToolPacks.test.js) —
+afwijken faalt in CI, niet pas in productie:
 
-- Descriptor: `{ name, moduleKey, kind: 'read'|'write', description, parameters (JSON-schema), statusLabel, summary?, run(ctx, args) }`.
-- **Naming**: `get_*` voor read; `propose_*` voor write. Een `propose_*` wordt **nooit**
-  door de agent-loop uitgevoerd — hij levert een voorstel op dat pas na expliciete
-  gebruikersbevestiging via `execute_action` draait (HITL, plan 23 §4).
+- Descriptor: `{ name, moduleKey, kind: 'read'|'write', description, parameters
+  (JSON-schema, overal additionalProperties:false), statusLabel }` + voor read
+  `run(ctx, args)`, voor write `propose(args, env)` + `execute(ctx, args)` en de
+  MCP-annotaties `destructive`/`idempotent` (risico-vocabulaire; het HITL-beleid
+  leest die declaratief).
+- **Naming**: `<moduleKey>_<onderwerp>` (bv. `taken_open`, `boodschappen_toevoegen`) —
+  Anthropic-namespacing per module; maakt latere tool-search gratis effectief.
+  Empirisch bevestigd (2026-07-05): rename van `get_*` naar dit schema → tool-F1
+  96,4 → 98,3 op de golden-set.
+- **HITL: de tool-call ís het voorstel** (industry-convergentie: OpenAI
+  `needsApproval` / Vercel AI SDK / LangGraph `interrupt` / Claude Code
+  permissions). De harness (index.ts) onderschept elke `kind:'write'`-call:
+  `propose` (puur!) valideert en normaliseert de args tot een voorstel, dat als
+  `role='action'`-rij wordt opgeslagen (RLS creator-privé, TTL 1u). De gebruiker
+  beslist op de bevestigingskaart (multi-edit: per item aan/uitvinkbaar);
+  `execute` draait daarna uitsluitend de **opgeslagen** args (de client stuurt
+  alleen voorstel-ID + besluit + item-indexen, nooit args). Géén aparte
+  execute-tool die het model kan hallucineren, géén confirmed-flag die het
+  model zelf kan zetten. Statusmachine (single-shot claim, undo via bewaarde
+  insert-ids): [`assistant/actions.js`](../supabase/functions/assistant/actions.js);
+  client-bridge: [`lib/assistantActions.js`](../lib/assistantActions.js).
+- **Multi-edit-contract**: write-args dragen de batch onder `items[]` (verplicht);
+  `propose` houdt de weergaveteksten en `args.items` 1-op-1 uitgelijnd — de
+  aan/uitvink-selectie op de kaart zijn indexen in die array.
 - **RLS-plicht**: `ctx.db` is altijd de RLS-gebonden client (user-JWT). Een tool
   implementeert nooit eigen autorisatie-filtering; de database bepaalt zichtbaarheid.
 - **Render is server-side en deterministisch**: kaarten komen uit `render*`-helpers over
   tool-output, nooit uit modeltekst. Prompt-injectie via data kan zo geen UI fabriceren.
 - **Testplicht**: elke tool-functie en render-helper krijgt een node:test in dezelfde PR
-  en valt onder de mutatie-ratchet (bestaande DoD).
+  en valt onder de mutatie-ratchet (eigen groep per pack). Het descriptor-contract
+  (description, schema, labels) ligt per pack exact vast in de test: een gewijzigde
+  description verandert de tool-selectie en hoort dus een test te breken (en gaat
+  daarna door de eval-gate).
 - Het model krijgt alleen `data` terug (compact); `render` gaat rechtstreeks naar de client.
+- **Consolidatie boven wildgroei**: één read- + hooguit één-à-twee write-tools per
+  module (taak-gericht, niet endpoint-gericht). Tool-search/deferred loading is
+  bewust uitgesteld; herbezoek wanneer de per-huishouden-gefilterde set structureel
+  >20–25 tools of >10K tokens wordt.
 
 ## 2. Tool-budget & lazy loading
 
