@@ -1342,3 +1342,58 @@ Dit vult de INF-4-rest ("web-frames geminified") concreet in; verificatie = de
 eerstvolgende echte deploy mét token. `@opentelemetry/api` verhuisde naar devDependencies
 (alleen supabase-js-onder-Node gebruikt 'm; metro stubt 'm al voor de bundle — comment
 bijgewerkt). Suite/typecheck/lint groen na `npm install`.
+
+**2026-07-05 — Stapel gemerged naar main + migratie 0071 (Sec-3/Data-5).**
+PR #118 (de hele stapel: assistent fase 1 + ronde D/E + review-addendum + 0070-hardening)
+naar `main` gemerged; #116 sloot vanzelf mee, #117 handmatig gesloten (vervat). De nieuwe
+push-trigger op `rls-check.yml` vuurde direct: **live RLS-suite groen op main**, inclusief
+de drie 0070-scenario's. Daarna REV-2 verder afgepeld met migratie `0071` (live via MCP):
+(1) **Sec-3** — `peek_invite` geeft voor ingetrokken/verlopen/gebruikte tokens alleen nog
+de status; huishoudnaam/emoji/uitnodiger/id zijn dan null. Een ooit gelekte join-link
+onthult dus niets blijvends meer. Gedragsneutraal voor de app (het join-scherm gebruikt
+die velden alleen bij `valid` — code-geverifieerd). (2) **Data-5** — bereik-CHECKs op het
+bonnen-/voorraaddomein (quantity > 0, centen ≥ 0), naar het patroon van het kosten- en
+voertuigdomein; de editor klemt quantity al op ≥ 1 en de live data was schoon, dus geen
+migratierisico. Beide live met SQL geverifieerd (valid-preview intact ✓, revoked lekt
+niets ✓, quantity 0 en negatieve prijs geweigerd ✓); nieuw RLS-scenario bewaakt de
+peek-privacy. Suite 1049 pass / 0 fail (33 RLS-skips lokaal).
+
+**2026-07-05 (vervolg) — AI-5 device-bevestigd: de stream werkt op het toestel.**
+Device-rooktest van de SSE-keten op de moto (donkere modus): een beurt streamt zichtbaar —
+eerst de tool-statusregel („Even in de taken kijken…”), dan de „Even nadenken…”-fase, en
+tijdens de beurt vervangt de **stop-knop** de verstuurknop; na afloop verschijnen de
+antwoordoptie-chips. Markdown-bullets renderen correct in een hervat gesprek
+(`lib/markdownLite.js` → `AssistantMessageView`), de gesprekken-sheet toont titels en
+hervatten laadt kaarten mee. Geen crashes of foutbubbels. Aandachtspunten uit de test:
+(1) een adb-deeplink tijdens de cold start raced in expo-routers `useLinking`
+(setState-in-render-warning, kan op de verkeerde tab landen) — puur de dev-testflow, geen
+app-code; (2) een remount van het scherm (bv. door zo'n deeplink) begint bewust op een
+leeg gesprek — het vorige gesprek staat in de sheet; „actief gesprek onthouden” staat
+genoteerd bij de AI-6-rest. NB: de test liep deels gelijktijdig met een tweede
+dev-sessie op hetzelfde toestel (interleaved `adb input`), dus flaky stappen zijn
+gecontroleerd herhaald voordat ze als bevinding telden.
+
+**2026-07-05 (tweede dev-sessie) — AI-5 licht-thema + rooktest-regressie.** Corroboratie
+van bovenstaande op dezelfde moto, aanvullend op twee punten. (1) **Licht thema:** met het
+systeemthema op licht (`cmd uimode night no`) streamt de assistent net zo schoon — de
+tekst-delta is mid-stream gevangen (antwoord groeit letterlijk aan), tool-render-kaarten,
+antwoordoptie-chips en de stop-knop renderen met correcte contrast; de app volgt
+`Appearance` zonder stale Fabric-kleuren. Daarmee is AI-5's laatste "Rest" (licht-thema)
+op toestel bevestigd — beide thema's ✓. De **stop-knop** halverwege een beurt tikken toont
+netjes „Gestopt.” en zet de verstuurknop terug (AI-6 abort-pad). (2) **Rooktest (INF-3):**
+`npm run rooktest` — crash-sweep **15/15 schermen schoon** (geen error-boundary) en logcat
+schoon. Van de 5 Maestro-flows slaagden 01-taak + 04-swipe direct; 02-uitgave,
+03-boodschap-undo en 05-editor-guard flakten in de gebundelde run (bekende oorzaak: een
+ⓘ-help-drawer/verkeerd scherm bleef tussen flows staan — zie de faal-screenshot van
+05-editor-guard) en **slaagden alle drie op een warme, losse her-run** (21/39/42s, alle
+groen, logcat schoon). Geen regressie uit de assistent-/push-token-/config-wijzigingen van
+deze ronde; de flakes zitten in de flow-state tussen sequentiële launches, niet in app-code.
+
+**2026-07-05 (docs) — AI-4 + AI-5 naar ✅ → archief; eigen AI-sectie.** Beide rondes zijn
+volledig af en device/live-bevestigd (AI-4 persistentie 2026-07-04; AI-5 SSE+markdown nu op
+beide thema's + rooktest-groen), dus per DoD verplaatst naar een nieuwe sectie
+[`## AI — Assistent`](huishoek-backlog-archief.md) in het archief, mét hun volledige
+notitie. §6 houdt de lopende epic-rijen (AI-1 parent + AI-2/3/6…9). Tegelijk een
+nummer-collision weggewerkt: AI-9's geplande `assistant_memories`-migratie stond op `0071`,
+dat inmiddels bezet is door de Sec-3/Data-5-hardening → herbenoemd naar "eerstvolgend vrij
+nummer".
