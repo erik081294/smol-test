@@ -1362,3 +1362,19 @@ full-regen — vehicleTimeline-ruis onaangeroerd). **Edge function v11 gedeploye
 en de héle HITL-keten E2E live bewezen** (user-JWT): voorstel-kaart met aanvinkbare
 items → confirm met deelselectie → alleen dát item in de DB → dubbeltik 409 → undo
 verwijdert → tweede undo 409. Rest: device-rooktest van de kaart-UI.
+
+**2026-07-05 — Sonnet-5-afstelling: tool-descriptions + systemprompt aangescherpt (geen gedragsherstructurering).**
+Onderzoek (Anthropic writing-tools-for-agents / context-engineering + de Sonnet-5-
+migratierichtlijnen uit de `claude-api`-naslag) wijst op één ongebruikte winst: het
+productiemodel `eu.claude-sonnet-5` volgt letterlijker en **onder-triggert tools** zodra er
+een systemprompt staat (hoog-precisie/laag-recall). Remedie zonder herstructurering:
+**triggerconditie voorop** in elke tool-`description` (*"Roep dit aan wanneer …"* i.p.v.
+bijzin achteraf) + disambiguatie bij overlappende tools (boodschappen↔voorraad,
+taken↔maaltijden), plus één tool-gebruik-nudge in de systemprompt (róép de tool aan i.p.v.
+uit het geheugen antwoorden). Alle 8 descriptors herschreven; de per-pack descriptor-
+contracttests (die de string exact pinnen) meegevraagd. Systemprompt bleef lean — geen
+secties, geen few-shot; de no-tool-uitzondering (groet/bedankje) intact zodat de
+irrelevantie-bucket in de eval niet verschuift. Doc-accuratessefix: [guidelines §1](docs/assistent-architectuur.md)
+kreeg het trigger-first-principe; §6/§8 gecorrigeerd — de geautomatiseerde eval-gate scoort
+tool-F1/args/no-tool (beurt 1), **niet** NL-toon/groundedness (die zijn handmatige trace-
+review; LLM-as-judge blijft openstaande verbetering). Eval-gate + baseline: zie PR-run.

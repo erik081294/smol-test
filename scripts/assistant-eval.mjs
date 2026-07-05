@@ -68,7 +68,10 @@ async function runCase(c) {
         { role: 'system', content: `${SYSTEM_PROMPT}\n\n${SNAPSHOT}` },
         { role: 'user', content: c.question },
       ],
-      max_output_tokens: 400,
+      // Zelfde budget als productie (index.ts MAX_OUTPUT_TOKENS): Sonnet-5's
+      // reasoning-blok kan bij datum-rekenwerk 400 tokens opeten vóór de
+      // tool-call — dan meet de eval een harnas-artefact, geen modelgedrag.
+      max_output_tokens: 1500,
       tools,
       thread: { id: runId, tags: ['eval'] },
       metadata: { feature: 'assistant-eval', case: c.id },

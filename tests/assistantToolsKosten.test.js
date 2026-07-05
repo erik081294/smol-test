@@ -2,11 +2,16 @@
 // top-3-sortering en de maandgrens-compositie van de query.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KOSTEN_TOOLS, renderExpensesSummary } from '../supabase/functions/_shared/tools/kosten.js';
+import { KOSTEN_TOOLS, KOSTEN_BRIEF, renderExpensesSummary } from '../supabase/functions/_shared/tools/kosten.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = KOSTEN_TOOLS.find((t) => t.name === 'kosten_maandoverzicht');
 const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(KOSTEN_BRIEF, { moduleKey: 'kosten', label: 'Kosten', brief: 'uitgaven van het huishouden; kan maandoverzichten en grootste kostenposten geven' });
+});
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm ligt exact vast', () => {

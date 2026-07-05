@@ -34,6 +34,13 @@ afwijken faalt in CI, niet pas in productie:
   Anthropic-namespacing per module; maakt latere tool-search gratis effectief.
   Empirisch bevestigd (2026-07-05): rename van `get_*` naar dit schema → tool-F1
   96,4 → 98,3 op de golden-set.
+- **`description` = triggerconditie voorop** (Sonnet-5-afstelling, 2026-07-05). Het
+  productiemodel `eu.claude-sonnet-5` volgt letterlijker en onder-triggert tools zodra
+  er een systemprompt staat (hoog-precisie/laag-recall). Schrijf de description daarom
+  als leidende trigger — *"Roep dit aan wanneer de gebruiker …"* — niet als bijzin
+  achteraf, en benoem bij overlappende tools expliciet wanneer je 'm níét gebruikt
+  (bv. boodschappen vs. voorraad). Anthropic meet hier meetbare lift op Sonnet 5 /
+  Opus 4.8; ditzelfde patroon staat als tool-gebruik-nudge in de systemprompt.
 - **HITL: de tool-call ís het voorstel** (industry-convergentie: OpenAI
   `needsApproval` / Vercel AI SDK / LangGraph `interrupt` / Claude Code
   permissions). De harness (index.ts) onderschept elke `kind:'write'`-call:
@@ -104,8 +111,12 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
 ## 6. Eval-gate in de Definition of Done (vanaf AI-3)
 
 - Wijzigt een PR de prompt, een tool(-beschrijving) of het model? Dan draait de
-  golden-set (`tests/assistant-golden.json` → Orq-experiment) en mag er **geen regressie**
-  zijn op tool-selectie-F1, NL-toon en groundedness t.o.v. de baseline.
+  golden-set (`tests/assistant-golden.json` via [`scripts/assistant-eval.mjs`](../scripts/assistant-eval.mjs))
+  en mag er **geen regressie** zijn t.o.v. de baseline
+  ([`assistant-eval-baseline.json`](../assistant-eval-baseline.json)). De geautomatiseerde
+  gate scoort **tool-selectie-F1, args-subset-match en no-tool-accuracy** (beurt 1). NL-toon
+  en groundedness zijn (nog) géén geautomatiseerde judge — die borg je via handmatige
+  trace-review (§7); een LLM-as-judge daarvoor is een openstaande verbetering.
 - Elke productie-failure (uit trace-review, §7) wordt een nieuwe golden-case in de repo.
   De repo is de bron van waarheid; Orq is de runner.
 
@@ -126,7 +137,8 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
   server-gerenderde kaarten, niet in lopende tekst. Details bereiken gebruikers via
   `link`-nodes (deep-link naar het module-scherm). Alleen op expliciet verzoek
   ("geef me een uitgebreid overzicht") mag een lang antwoord. Dit is in de
-  systemprompt verankerd (BEKNOPT-blok) en de NL-toon-judge bestraft breedsprakigheid.
+  systemprompt verankerd (BEKNOPT-blok); breedsprakigheid vang je nu via handmatige
+  trace-review (§6) — een geautomatiseerde NL-toon-judge is nog niet gebouwd.
 - **Elke beurt eindigt met antwoordopties** (AskUserQuestion-patroon): het model sluit
   af met de pseudo-tool `suggest_replies` (2–4 opties, ≤6 woorden); de app toont ze als
   tikbare chips boven de invoer. De opties zijn een versnelling, nooit een beperking:

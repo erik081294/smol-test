@@ -30,7 +30,10 @@ export default function Assistent() {
             <ModuleHelpButton module="assistent" />
           </Row>
         )} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android edge-to-edge duwt de composer niet vanzelf boven het toetsenbord;
+          'height' krimpt de KAV tot het zichtbare gebied zodat het invoerveld zichtbaar
+          blijft (zelfde patroon als de Editor/BottomSheet in lib/ui.js). iOS: 'padding'. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={{ flex: 1 }}>
           <AssistantChat assistant={assistant} />
         </View>

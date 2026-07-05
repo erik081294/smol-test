@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAALTIJDEN_TOOLS,
+  MAALTIJDEN_BRIEF,
   renderWeekMenu,
   proposePlanMeals,
   MAX_PROPOSED_MEALS,
@@ -14,6 +15,11 @@ import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = (name) => MAALTIJDEN_TOOLS.find((t) => t.name === name);
 const shape = ({ run, propose, execute, ...rest }) => rest;
+
+// De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
+test('module-brief: ligt exact vast', () => {
+  assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en recepten; kan het menu tonen en maaltijden voorstellen' });
+});
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm van beide tools ligt exact vast', () => {

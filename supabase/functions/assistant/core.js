@@ -214,7 +214,7 @@ export function openProposalsNote(rows = [], max = 3) {
     const edited = c.edited_by_user ? ' (door de gebruiker bewerkt)' : '';
     return `- ${c.summary}${items}${edited}`;
   });
-  return `Openstaand voorstel, wacht op bevestiging van de gebruiker:\n${lines.join('\n')}\nZeg niet dat dit al is uitgevoerd; bij een vervolgvraag mag je een nieuw, aangepast voorstel doen.`;
+  return `Openstaand voorstel, wacht op bevestiging van de gebruiker:\n${lines.join('\n')}\nDit is de actuele versie — eerdere formuleringen van hetzelfde voorstel in dit gesprek zijn achterhaald. Zeg niet dat dit al is uitgevoerd; bij een vervolgvraag mag je een nieuw, aangepast voorstel doen.`;
 }
 
 // ---------------------------------------------------------------------------
