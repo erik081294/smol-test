@@ -226,11 +226,15 @@ export function openProposalsNote(rows = [], max = 3) {
     .filter((r) => r?.content?.status === 'pending' && typeof r.content.summary === 'string')
     .slice(-max);
   if (pending.length === 0) return '';
+  // Deze regels gaan de system-prompt in: een voorstel-naam met een ingesloten
+  // newline/controlteken mag geen nieuwe instructieregel kunnen fabriceren
+  // (self-scoped prompt-injectie). Normaliseer whitespace naar één spatie.
+  const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
   const lines = pending.map((r) => {
     const c = /** @type {{ summary: string, items?: string[], edited_by_user?: boolean }} */ (r.content);
-    const items = Array.isArray(c.items) && c.items.length > 0 ? ` [${c.items.join(' | ')}]` : '';
+    const items = Array.isArray(c.items) && c.items.length > 0 ? ` [${c.items.map(oneLine).join(' | ')}]` : '';
     const edited = c.edited_by_user ? ' (door de gebruiker bewerkt)' : '';
-    return `- ${c.summary}${items}${edited}`;
+    return `- ${oneLine(c.summary)}${items}${edited}`;
   });
   return `Openstaand voorstel, wacht op bevestiging van de gebruiker:\n${lines.join('\n')}\nDit is de actuele versie — eerdere formuleringen van hetzelfde voorstel in dit gesprek zijn achterhaald. Zeg niet dat dit al is uitgevoerd; bij een vervolgvraag mag je een nieuw, aangepast voorstel doen.`;
 }

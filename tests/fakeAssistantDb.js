@@ -31,7 +31,16 @@ export function fakeDb(rowsByTable, calls, opts = {}) {
     };
     return api;
   };
-  return { from: chain };
+  // DEFINER-RPC (bv. save_recipes): registreer de call + args en geef standaard
+  // één fake id per p_items-element terug (de vorm die save_recipes retourneert),
+  // of een geforceerde fout via opts.rpcError.
+  const rpc = (fn, args) => {
+    calls.push({ rpc: fn, args });
+    if (opts.rpcError) return Promise.resolve({ data: null, error: opts.rpcError });
+    const items = Array.isArray(args?.p_items) ? args.p_items : [];
+    return Promise.resolve({ data: items.map((_, i) => `recipe-${i + 1}`), error: null });
+  };
+  return { from: chain, rpc };
 }
 
 export const toolCtx = (rowsByTable, calls, opts = {}) => ({

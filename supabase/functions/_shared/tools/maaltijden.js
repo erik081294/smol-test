@@ -343,34 +343,19 @@ export const MAALTIJDEN_TOOLS = [
     },
     propose: proposeSaveRecipes,
     async execute(ctx, args) {
-      const inserted = [];
-      for (const it of args.items) {
-        // Recept + ingrediënten; alleen het recept in `inserted` — de
-        // ingrediënten verdwijnen bij undo mee via on delete cascade.
-        const recipeRows = throwOnError(
-          await ctx.db.from('recipes').insert([{
-            household_id: ctx.householdId,
-            created_by: ctx.userId,
-            title: it.title,
-            servings: it.servings,
-            instructions: it.instructions,
-          }]).select('id')
-        );
-        const recipeId = recipeRows[0].id;
-        inserted.push({ table: 'recipes', id: recipeId });
-        const ingRows = it.ingredients.map((ing, i) => ({
-          household_id: ctx.householdId,
-          recipe_id: recipeId,
-          name: ing.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          sort_order: i,
-        }));
-        throwOnError(await ctx.db.from('recipe_ingredients').insert(ingRows).select('id'));
-      }
+      // Recept + ingrediënten voor álle voorgestelde recepten in één transactie
+      // (DEFINER-RPC save_recipes, migr. 0073). De vorige lus deed losse inserts
+      // per recept → een partiële fout liet niet-undobare weesrecepten achter.
+      // De RPC geeft de recipe-ids in volgorde terug; die vormen het undo-spoor
+      // (de ingrediënten cascaden bij undo mee via on delete cascade).
+      const ids = throwOnError(await ctx.db.rpc('save_recipes', {
+        p_household_id: ctx.householdId,
+        p_items: args.items,
+      }));
+      const recipeIds = Array.isArray(ids) ? ids : [];
       return {
-        summary: inserted.length === 1 ? 'Recept opgeslagen in het receptenboek.' : `${inserted.length} recepten opgeslagen in het receptenboek.`,
-        inserted,
+        summary: recipeIds.length === 1 ? 'Recept opgeslagen in het receptenboek.' : `${recipeIds.length} recepten opgeslagen in het receptenboek.`,
+        inserted: recipeIds.map((id) => ({ table: 'recipes', id })),
       };
     },
   },

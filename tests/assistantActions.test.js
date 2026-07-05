@@ -15,6 +15,8 @@ import {
   EDITABLE_FIELDS,
   toEditableItems,
   fromEditableItems,
+  confirmSequence,
+  dropStrandedTurn,
 } from '../lib/assistantActions.js';
 import { ASSISTANT_TOOLS } from '../supabase/functions/_shared/tools/index.js';
 
@@ -183,4 +185,37 @@ test('toggleSelection: aan/uit, gesorteerd en zonder duplicaten', () => {
   assert.deepEqual(toggleSelection([], 3), [3]);
   assert.deepEqual(toggleSelection(undefined, 0), [0]);
   assert.deepEqual(toggleSelection([2, 2, 0], 1), [0, 1, 2]); // dedupliceert de invoer
+});
+
+test('confirmSequence: bevestigt op volgorde en stopt bij de eerste die faalt', async () => {
+  // Alles gelukt → alle id's bevestigd, in volgorde aangeroepen.
+  const okCalls = [];
+  assert.equal(await confirmSequence(['a', 'b', 'c'], (id) => { okCalls.push(id); return Promise.resolve(true); }), 3);
+  assert.deepEqual(okCalls, ['a', 'b', 'c']);
+  // 'b' faalt → 'c' wordt NIET meer aangeroepen (de break), teller stopt op 1.
+  const seen = [];
+  assert.equal(await confirmSequence(['a', 'b', 'c'], (id) => { seen.push(id); return Promise.resolve(id !== 'b'); }), 1);
+  assert.deepEqual(seen, ['a', 'b']);
+  // De eerste faalt → 0 bevestigd, geen tweede aanroep.
+  const seen2 = [];
+  assert.equal(await confirmSequence(['x', 'y'], (id) => { seen2.push(id); return Promise.resolve(false); }), 0);
+  assert.deepEqual(seen2, ['x']);
+  // Lege lijst en default-arg → 0 (geen aanroepen).
+  assert.equal(await confirmSequence([], () => Promise.resolve(true)), 0);
+  assert.equal(await confirmSequence(undefined, () => Promise.resolve(true)), 0);
+});
+
+test('dropStrandedTurn: verwijdert de foutbubble + de vraag eronder; laat de rest ongemoeid', () => {
+  const rest = [{ role: 'assistant', text: 'ok' }, { role: 'user', text: 'eerder' }];
+  const stranded = [{ role: 'assistant', error: true }, { role: 'user', text: 'q' }, ...rest];
+  assert.deepEqual(dropStrandedTurn(stranded), rest);
+  // Foutbubble zonder gebruikersvraag eronder → alleen de foutbubble weg.
+  const noUser = [{ role: 'assistant', error: true }, { role: 'assistant', text: 'x' }];
+  assert.deepEqual(dropStrandedTurn(noUser), [{ role: 'assistant', text: 'x' }]);
+  // Geen foutbubble vooraan → ongewijzigd én dezelfde referentie (geen re-render).
+  const clean = [{ role: 'user', text: 'q' }];
+  assert.equal(dropStrandedTurn(clean), clean);
+  // Leeg en default-arg.
+  assert.deepEqual(dropStrandedTurn([]), []);
+  assert.deepEqual(dropStrandedTurn(), []);
 });
