@@ -1706,3 +1706,14 @@ Antwoord op twee Erik-vragen: "hoe modulair is dit echt?" en "reageert de AI na 
   **100%**, core 87,3% (nieuwe helper + tests), baseline bijgewerkt (totaal 85,8%).
   **Rest:** edge-deploy (v16 → nieuw, samen met AI-17-deploy), device-verificatie
   (confirm→reactie, bundel→één beurt), golden-cases voor de vervolg-beurt via trace-review.
+
+---
+
+**Edge-deploy v18 (2026-07-06, via MCP).** De `assistant`-function draait nu op v18 met de
+volledige AI-16/AI-18-laag (schedule/chart/choice-render, render.js-vocabulaire, de
+followUp-route). Bevinding vooraf: **v17 (08:32 UTC) droeg de AI-17-brug al** — de backlog-
+claim "productie draait v16" was verouderd; de app↔edge-bundel-brug (lib/modules.js +
+lib/aiCapabilities.js in de edge-bundel) was daarmee al live bewezen. Deploy-verificatie:
+alle 13 bundelbestanden byte-vergeleken met HEAD (identiek op de afsluitende newline na),
+status ACTIVE, logs schoon. **Rest:** device-smoke op de moto (app-kant vereist de nieuwe
+client uit deze branch).
