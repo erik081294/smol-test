@@ -168,3 +168,12 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
       }
     });
 });
+
+test('proposeAddPetLog: precies op de cap is oké; foutteksten liggen vast', () => {
+  const vijf = Array.from({ length: 5 }, (_, i) => ({ pet_name: `d${i}`, note: 'x' }));
+  assert.equal(proposeAddPetLog({ items: vijf }).ok, true);
+  assert.equal(proposeAddPetLog({ items: [...vijf, vijf[0]] }).ok, false);
+  assert.equal(proposeAddPetLog({ items: [] }).error, 'Geen logboek-regel om toe te voegen.');
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'Nala' }] }).error, 'Een logboek-regel heeft een notitie of een gewicht (in grammen) nodig.');
+  assert.equal(proposeAddPetLog({ items: [{ note: 'los' }] }).error, 'Zeg erbij over wélk dier het gaat.');
+});

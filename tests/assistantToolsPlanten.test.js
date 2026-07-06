@@ -167,3 +167,10 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
       }
     });
 });
+
+test('proposeAddPlants: precies op de cap is oké; foutteksten liggen vast', () => {
+  assert.equal(proposeAddPlants({ items: Array.from({ length: MAX_PROPOSED_PLANTS }, (_, i) => ({ name: `p${i}` })) }).ok, true);
+  assert.equal(proposeAddPlants({ items: [{ name: '' }] }).error, 'Elke plant heeft een naam nodig.');
+  assert.equal(proposeAddPlants({ items: [] }).error, 'Geen plant om toe te voegen.');
+  assert.equal(proposeAddPlants({ items: [{ name: 'A' }] }).summary, 'Plant "A" toevoegen');
+});

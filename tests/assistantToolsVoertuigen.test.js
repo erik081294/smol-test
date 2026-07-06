@@ -174,3 +174,14 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
       }
     });
 });
+
+test('proposeLogMaintenance: precies op de cap is oké; foutteksten en meervouds-summary liggen vast', () => {
+  const vijf = Array.from({ length: 5 }, (_, i) => ({ vehicle_name: 'V', title: `t${i}` }));
+  const ok = proposeLogMaintenance({ items: vijf }, { today: '2026-07-06' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.summary, '5 onderhouds-regels loggen');
+  assert.equal(proposeLogMaintenance({ items: [...vijf, vijf[0]] }, { today: '2026-07-06' }).ok, false);
+  assert.equal(proposeLogMaintenance({ items: [] }).error, 'Geen onderhoud om te loggen.');
+  assert.equal(proposeLogMaintenance({ items: [{ title: 'x' }] }, { today: '2026-07-06' }).error, 'Zeg erbij om wélk voertuig het gaat.');
+  assert.equal(proposeLogMaintenance({ items: [{ vehicle_name: 'V' }] }, { today: '2026-07-06' }).error, 'Wat voor onderhoud was het? Geef een korte titel.');
+});

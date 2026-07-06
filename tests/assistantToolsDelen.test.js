@@ -183,3 +183,16 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
       }
     });
 });
+
+test('proposeReserve: precies op de cap is oké; foutteksten en meervouds-summary liggen vast', () => {
+  const res = (n) => Array.from({ length: n }, (_, i) => ({ resource_name: 'A', date: '2026-07-11', from: '10:00', to: '11:00' }));
+  const ok = proposeReserve({ items: res(3) }, { tzOffsetMinutes: 0 });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.summary, '3 reserveringen plaatsen');
+  assert.equal(proposeReserve({ items: res(4) }, {}).ok, false);
+  assert.equal(proposeReserve({ items: [] }).error, 'Geen reservering om te plaatsen.');
+  assert.equal(proposeReserve({ items: [{ date: '2026-07-11', from: '10:00', to: '11:00' }] }, {}).error, 'Zeg erbij wát je wilt reserveren (bv. de deelauto).');
+  assert.equal(proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '16:00', to: '14:00' }] }, {}).error, 'De eindtijd moet ná de begintijd liggen.');
+  // Zonder offset in env → tijden als UTC opgeslagen (offset 0).
+  assert.equal(proposeReserve({ items: res(1) }, {}).args.items[0].starts_at, '2026-07-11T10:00:00.000Z');
+});

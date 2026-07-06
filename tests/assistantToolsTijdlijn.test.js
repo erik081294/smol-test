@@ -140,3 +140,12 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
       }
     });
 });
+
+test('proposePost: foutteksten liggen vast; precies 80 tekens knipt niet', () => {
+  assert.equal(proposePost({ items: [] }).error, 'Geen bericht om te plaatsen.');
+  assert.equal(proposePost({ items: [{ body: 'a' }, { body: 'b' }] }).error, 'Eén prikbord-bericht per voorstel.');
+  assert.equal(proposePost({ items: [{ body: '  ' }] }).error, 'Het bericht heeft tekst nodig.');
+  const exact = 'x'.repeat(80);
+  assert.equal(proposePost({ items: [{ body: exact }] }).items[0], exact);
+  assert.equal(proposePost({ items: [{ body: 'x'.repeat(MAX_POST_LENGTH) }] }).ok, true);
+});

@@ -267,6 +267,8 @@ test('isHhmm: 24-uurs grenzen exact', () => {
   assert.equal(isHhmm('12:60'), false);
   assert.equal(isHhmm(''), false);
   assert.equal(isHhmm(), false);
+  assert.equal(isHhmm('x14:00'), false);   // ^-anker
+  assert.equal(isHhmm('14:00x'), false);   // $-anker
 });
 
 test('toUtcIso: NL-zomertijd (+120) schuift terug naar UTC; over de dagrens heen; rommel → null', () => {
@@ -276,6 +278,10 @@ test('toUtcIso: NL-zomertijd (+120) schuift terug naar UTC; over de dagrens heen
   assert.equal(toUtcIso('2026-07-11', '14:00', 9999), '2026-07-11T14:00:00.000Z'); // kapotte offset → 0
   assert.equal(toUtcIso('2026-02-31', '14:00', 120), null);                        // geen echte datum
   assert.equal(toUtcIso('2026-07-11', '25:00', 120), null);
+  // Precies op de offset-grens (±14 uur bestaat echt: Kiribati).
+  assert.equal(toUtcIso('2026-07-11', '14:00', 840), '2026-07-11T00:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '14:00', -840), '2026-07-12T04:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '14:00', 841), '2026-07-11T14:00:00.000Z'); // net erover → 0
 });
 
 test('localHhmm/localDate: round-trip met toUtcIso; onleesbaar → lege string', () => {
@@ -287,4 +293,10 @@ test('localHhmm/localDate: round-trip met toUtcIso; onleesbaar → lege string',
   assert.equal(localDate(nacht, 120), '2026-07-11');  // …maar lokaal blijft het de 11e
   assert.equal(localHhmm('rommel', 120), '');
   assert.equal(localDate(null, 120), '');
+  // Kapotte of niet-gehele offsets vallen ook hier terug op 0 (UTC-bril).
+  assert.equal(localHhmm(iso, 9999), '12:00');
+  assert.equal(localHhmm(iso, 1.5), '12:00');
+  assert.equal(localDate(nacht, 9999), '2026-07-10');
+  assert.equal(localHhmm(iso, 840), '02:00');   // precies op de grens telt mee
+  assert.equal(localDate(iso, -840), '2026-07-10');
 });
