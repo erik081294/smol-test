@@ -191,6 +191,16 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
   `lib/AssistantMessageView.js`) plus een server-side `render*`-helper; de exacte set
   ligt vast in `tests/assistantUi.test.js`. `recipe` (titel, porties, ingrediënten,
   bereiding) is de recept-kaart waarop de gebruiker over een AI-recept beslist.
+- **Componeren, niet opnieuw beginnen (AI-18):** een pack bouwt interactieve
+  nodes uitsluitend via de gedeelde constructors in
+  [`_shared/tools/render.js`](../supabase/functions/_shared/tools/render.js)
+  (`chartNode`/`scheduleNode`/`choiceNode`) — de text-fallback voor oudere
+  clients komt daar automatisch en consistent uit mee. De roundtrip-contracttest
+  ([`tests/assistantRender.test.js`](../tests/assistantRender.test.js)) bewaakt
+  dat elke constructor-output ongeschonden door de client-poortwachter komt: een
+  module kan geen node meer bouwen die client-side stilletjes sneuvelt. Een nieuw
+  component in een module = een paar regels compositie in de `render*`-helper;
+  de client-kant (poortwachter, renderer, interactie) is generiek en blijft dicht.
 - **Interactieve nodes (AI-16):** pure interactie-logica leeft in
   `lib/assistantGenUi.js` (unit-getest + ratchet), de renderer blijft dun. Regels:
   (a) élke nieuwe server-node draagt een `text`-fallback zodat oudere clients
@@ -216,6 +226,17 @@ bestaande **atomaire** HITL-tools. Drie compositie-hendels, geen nieuwe transact
    (elk blijft een losse, undo-bare `role='action'`-rij).
 3. **Chip-ketting over beurten**: echte beslispunten na elkaar; de volgende stap komt via
    `suggest_replies`, gebruiker-geïnitieerd (geen server-auto-continuation).
+4. **Bevestigen is een beurt (AI-18)**: na een geslaagde confirm (bij "Akkoord met
+   alles": één beurt voor de hele bundel) stuurt de client een vervolg-beurt met
+   uitsluitend de action-ids; de server bouwt de beurt-tekst deterministisch uit de
+   OPGESLAGEN done-rijen (`actionFollowUpMessage`, whitespace-gesanitized — nooit
+   client-tekst). De AI bevestigt kort en stelt de logische vervolgstap voor; een
+   vervolg-áctie is altijd wéér een HITL-voorstel. Dit blijft gebruiker-geïnitieerd
+   (de akkoord-tik is de trigger) — de server continueert nooit uit zichzelf. De
+   synthetische beurt is geen chat-bubble (`kind: 'action_follow_up'`, verborgen bij
+   herladen) maar telt wél mee in de LLM-history; hij faalt stil (een gemiste
+   opvolging mag geen foutmelding duwen over een gelukte actie) en valt onder de
+   normale rate-limit.
 
 De agent-policy (systemprompt) bepaalt bundelen (één beslissing, laag-risico) vs. rijgen
 (gebruiker moet eerst iets goedkeuren). **Recept-flow als kanoniek voorbeeld:** koken/

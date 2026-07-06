@@ -141,6 +141,25 @@ Eén-serie staafgrafiek over `react-native-svg` (zit al in de app: `lib/illustra
 4. `npm test` volledig groen.
 5. Docs: backlog §6 (AI-16 ◐, AI-7-notitie), voortgang-logboek, dit plan in 00-overzicht.
 
+## Ronde 2 — vocabulaire + vervolg-beurt (AI-18, gebouwd 2026-07-06)
+
+Direct na ronde 1, op twee gebruikersvragen (Erik): *"hoe modulair is dit echt?"*
+en *"onderneemt de AI actie als ik akkoord ga?"*.
+
+1. **Gedeeld gen-UI-vocabulaire** — [`_shared/tools/render.js`](../../supabase/functions/_shared/tools/render.js):
+   `chartNode`/`scheduleNode`/`choiceNode`-constructors met automatische
+   text-fallback. Packs componeren i.p.v. nodes met de hand te bouwen; de
+   **roundtrip-contracttest** (`tests/assistantRender.test.js`) garandeert dat
+   constructor-output verliesvrij door de client-poortwachter komt. Daarmee is
+   "een grafiek voor module X" één regel compositie in de `render*`-helper —
+   de client-kant is generiek en blijft dicht.
+2. **Bevestigen is een beurt** (guidelines §10-4): confirm (of "Akkoord met
+   alles" als bundel) → één client-geïnitieerde vervolg-beurt met alleen de
+   action-ids; server bouwt de tekst deterministisch uit de opgeslagen
+   done-rijen (pure `actionFollowUpMessage`). De AI bevestigt kort en stelt de
+   vervolgstap voor; vervolgacties blijven HITL. Synthetische beurt: geen
+   bubble, wél LLM-history, stil bij fouten, onder de rate-limit.
+
 ## Rest (na deze ronde, expliciet open)
 
 - **Edge-deploy** (de render-helpers leven server-side; productie draait v16 — de

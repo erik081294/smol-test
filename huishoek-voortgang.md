@@ -1682,3 +1682,27 @@ De gen-UI wordt een volwaardige UI-laag ([plan 26](docs/plans/26-gen-ui-componen
   **98,3**; baseline bijgewerkt, totaal 85,2→85,8%). Guidelines §9 uitgebreid met de
   interactieregels. **Rest:** edge-deploy (samen met de nog open AI-17-deploy — productie draait
   v16), device-verificatie op de moto (chart-tik, rooster, choice→reply, stepper, beide thema's).
+
+---
+
+**AI-18 — gen-UI-vocabulaire + HITL-vervolgbeurt (2026-07-06, ronde 2 van plan 26).**
+Antwoord op twee Erik-vragen: "hoe modulair is dit echt?" en "reageert de AI na mijn akkoord?".
+
+- **Compositie i.p.v. opnieuw beginnen:** [`_shared/tools/render.js`](supabase/functions/_shared/tools/render.js)
+  — `chartNode`/`scheduleNode`/`choiceNode` mét automatische text-fallback; kosten- en
+  maaltijden-pack componeren er nu uit. De **roundtrip-contracttest**
+  ([`tests/assistantRender.test.js`](tests/assistantRender.test.js)) bewaakt dat elke
+  constructor-output ongeschonden door de client-poortwachter komt — een pack kan geen node
+  meer bouwen die client-side stilletjes sneuvelt. Guidelines §9: nieuw component per module
+  = paar regels compositie; de client-kant blijft generiek dicht.
+- **Bevestigen is een beurt (guidelines §10-4):** na een geslaagde confirm — bij "Akkoord
+  met alles" één beurt voor de hele bundel — stuurt de client automatisch een vervolg-beurt
+  met alléén de action-ids. De server bouwt de beurt-tekst deterministisch uit de opgeslagen
+  done-rijen (pure `actionFollowUpMessage`, whitespace-gesanitized; nooit client-tekst).
+  De AI bevestigt kort en stelt de logische vervolgstap voor; een vervolg-áctie is altijd
+  wéér een HITL-voorstel. Synthetische beurt: geen chat-bubble (`kind:'action_follow_up'`,
+  verborgen bij herladen), wél LLM-history; stil bij fouten; valt onder de rate-limit.
+- **DoD:** suite **1214 pass / 0 fail**; typecheck + lint schoon; ratchet groen — render.js
+  **100%**, core 87,3% (nieuwe helper + tests), baseline bijgewerkt (totaal 85,8%).
+  **Rest:** edge-deploy (v16 → nieuw, samen met AI-17-deploy), device-verificatie
+  (confirm→reactie, bundel→één beurt), golden-cases voor de vervolg-beurt via trace-review.

@@ -2,8 +2,8 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 7332,
-    "total": 8546,
+    "killed": 7399,
+    "total": 8623,
     "score": 85.8
   },
   "files": {
@@ -343,9 +343,9 @@
       "score": 98.3
     },
     "supabase/functions/assistant/core.js": {
-      "killed": 437,
-      "total": 497,
-      "score": 87.9
+      "killed": 483,
+      "total": 553,
+      "score": 87.3
     },
     "lib/assistantStream.js": {
       "killed": 88,
@@ -383,9 +383,14 @@
       "score": 88.3
     },
     "supabase/functions/_shared/tools/kosten.js": {
-      "killed": 145,
-      "total": 147,
+      "killed": 139,
+      "total": 141,
       "score": 98.6
+    },
+    "supabase/functions/_shared/tools/render.js": {
+      "killed": 35,
+      "total": 35,
+      "score": 100
     },
     "supabase/functions/_shared/tools/voorraad.js": {
       "killed": 65,
@@ -393,9 +398,9 @@
       "score": 94.2
     },
     "supabase/functions/_shared/tools/maaltijden.js": {
-      "killed": 516,
-      "total": 607,
-      "score": 85
+      "killed": 508,
+      "total": 599,
+      "score": 84.8
     },
     "supabase/functions/assistant/actions.js": {
       "killed": 187,
