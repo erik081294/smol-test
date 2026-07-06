@@ -37,9 +37,9 @@
     "production": {
       "ios": {
         "ascApiKeyPath": "./credentials/asc-api-key.p8",
-        "ascApiKeyId": "REPLACE_ASC_API_KEY_ID",
-        "ascApiKeyIssuerId": "REPLACE_ASC_API_KEY_ISSUER_ID",
-        "ascAppId": "REPLACE_ASC_APP_ID"
+        "ascApiKeyId": "LBMNK76NT6",
+        "ascApiKeyIssuerId": "2eaabb09-0496-433d-ae07-7103f20cfc9d",
+        "ascAppId": "6787762811"
       },
       "android": {
         "serviceAccountKeyPath": "./credentials/google-play-service-account.json",
