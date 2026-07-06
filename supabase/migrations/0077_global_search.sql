@@ -1,5 +1,5 @@
 -- ============================================================================
--- HUISHOEK — 0075: PLT-3 — globaal zoeken over de modules heen (RPC)
+-- HUISHOEK — 0077: PLT-3 — globaal zoeken over de modules heen (RPC)
 -- ============================================================================
 -- Eén zoek-RPC voor het zoekscherm (app/zoeken.js): zoekt in de acht
 -- doorzoekbare module-tabellen en geeft een platte, uniforme hitlijst terug
