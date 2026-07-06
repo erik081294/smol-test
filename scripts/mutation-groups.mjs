@@ -118,6 +118,12 @@ export const GROUPS = [
   { test: 'assistantToolsKosten', srcs: ['supabase/functions/_shared/tools/kosten.js'] },
   { test: 'assistantToolsVoorraad', srcs: ['supabase/functions/_shared/tools/voorraad.js'] },
   { test: 'assistantToolsMaaltijden', srcs: ['supabase/functions/_shared/tools/maaltijden.js'] },
+  // AI-19 fase A (plan 27): de vijf voorheen lege modules.
+  { test: 'assistantToolsPlanten', srcs: ['supabase/functions/_shared/tools/planten.js'] },
+  { test: 'assistantToolsHuisdieren', srcs: ['supabase/functions/_shared/tools/huisdieren.js'] },
+  { test: 'assistantToolsVoertuigen', srcs: ['supabase/functions/_shared/tools/voertuigen.js'] },
+  { test: 'assistantToolsTijdlijn', srcs: ['supabase/functions/_shared/tools/tijdlijn.js'] },
+  { test: 'assistantToolsDelen', srcs: ['supabase/functions/_shared/tools/delen.js'] },
   { test: 'assistantHitl', srcs: ['supabase/functions/assistant/actions.js'] },
   { test: 'assistantActions', srcs: ['lib/assistantActions.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },

@@ -30,13 +30,18 @@ test('registry: de verwachte toolset, gesorteerd op naam (cache-hygiëne)', () =
     'boodschappen_afvinken',
     'boodschappen_lijst',
     'boodschappen_toevoegen',
+    'delen_reserveringen',
+    'huisdieren_overzicht',
     'kosten_maandoverzicht',
     'maaltijden_plannen',
     'maaltijden_recept_opslaan',
     'maaltijden_recept_zoeken',
     'maaltijden_weekmenu',
+    'planten_overzicht',
     'taken_open',
     'taken_toevoegen',
+    'tijdlijn_recent',
+    'voertuigen_overzicht',
     'voorraad_bijna_op',
   ]);
 });

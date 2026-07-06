@@ -498,6 +498,116 @@
           }
         ]
       }
+    },
+    {
+      "id": "pla-01",
+      "question": "Welke planten hebben binnenkort water nodig?",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pla-02",
+      "question": "Hoe staat het met onze planten?",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-01",
+      "question": "Hoe oud zijn onze huisdieren ook alweer?",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-02",
+      "question": "Staat er nog dierverzorging open?",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-01",
+      "question": "Wanneer moet de auto weer naar de APK?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-02",
+      "question": "Wat kost onze auto eigenlijk per maand aan vaste lasten?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-01",
+      "question": "Wat staat er op het prikbord?",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_recent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-02",
+      "question": "Hebben de anderen nog iets gedeeld de laatste dagen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_recent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-01",
+      "question": "Is de deelauto zaterdag vrij?",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveringen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-02",
+      "question": "Wie heeft de aanhanger gereserveerd deze week?",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveringen"
+          }
+        ]
+      }
     }
   ]
 }

@@ -27,3 +27,4 @@ fcm-service-account*.json
 *.jks
 *.keystore
 .env.eas-simulator
+.claude/worktrees/
