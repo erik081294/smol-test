@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   BOODSCHAPPEN_TOOLS,
   BOODSCHAPPEN_BRIEF,
+  BOODSCHAPPEN_MANIFEST,
   renderGroceryList,
   proposeAddGroceries,
   proposeCheckGroceries,
@@ -18,6 +19,10 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
   assert.deepEqual(BOODSCHAPPEN_BRIEF, { moduleKey: 'boodschappen', label: 'Boodschappen', brief: 'de gedeelde boodschappenlijst; kan de lijst tonen, items voorstellen en afvinken' });
+});
+
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(BOODSCHAPPEN_MANIFEST, { moduleKey: 'boodschappen', label: 'Boodschappen', brief: BOODSCHAPPEN_BRIEF.brief, tools: BOODSCHAPPEN_TOOLS });
 });
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).

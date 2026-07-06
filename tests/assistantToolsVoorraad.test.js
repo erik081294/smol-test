@@ -2,7 +2,7 @@
 // houdbaarheids-grenswaarden (<=), default-params en de horizon-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VOORRAAD_TOOLS, VOORRAAD_BRIEF, lowPantryItems, renderPantryLow } from '../supabase/functions/_shared/tools/voorraad.js';
+import { VOORRAAD_TOOLS, VOORRAAD_BRIEF, VOORRAAD_MANIFEST, lowPantryItems, renderPantryLow } from '../supabase/functions/_shared/tools/voorraad.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = VOORRAAD_TOOLS.find((t) => t.name === 'voorraad_bijna_op');
@@ -11,6 +11,10 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
   assert.deepEqual(VOORRAAD_BRIEF, { moduleKey: 'voorraad', label: 'Voorraad', brief: 'wat er in huis is; kan tonen wat bijna op is of tegen de houdbaarheidsdatum aanloopt' });
+});
+
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(VOORRAAD_MANIFEST, { moduleKey: 'voorraad', label: 'Voorraad', brief: VOORRAAD_BRIEF.brief, tools: VOORRAAD_TOOLS });
 });
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).

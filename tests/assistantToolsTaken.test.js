@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   TAKEN_TOOLS,
   TAKEN_BRIEF,
+  TAKEN_MANIFEST,
   renderOpenTasks,
   proposeAddTasks,
   MAX_PROPOSED_TASKS,
@@ -18,6 +19,10 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
   assert.deepEqual(TAKEN_BRIEF, { moduleKey: 'taken', label: 'Taken', brief: 'open taken en klusjes van het huishouden; kan taken bekijken en nieuwe taken voorstellen' });
+});
+
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(TAKEN_MANIFEST, { moduleKey: 'taken', label: 'Taken', brief: TAKEN_BRIEF.brief, tools: TAKEN_TOOLS });
 });
 
 // Het descriptor-contract ligt EXACT vast: naam/annotaties/statusLabel/schema én

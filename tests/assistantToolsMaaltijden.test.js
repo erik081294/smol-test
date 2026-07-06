@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   MAALTIJDEN_TOOLS,
   MAALTIJDEN_BRIEF,
+  MAALTIJDEN_MANIFEST,
   renderWeekMenu,
   renderRecipe,
   renderRecipeMatches,
@@ -25,6 +26,10 @@ const shape = ({ run, propose, execute, ...rest }) => rest;
 // De module-brief gaat 1-op-1 de systemprompt-snapshot in (AI-10) — exact vastpinnen.
 test('module-brief: ligt exact vast', () => {
   assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en receptenboek; kan menu en recepten tonen, recepten voorstellen en maaltijden inplannen' });
+});
+
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(MAALTIJDEN_MANIFEST, { moduleKey: 'maaltijden', label: 'Keuken', brief: MAALTIJDEN_BRIEF.brief, tools: MAALTIJDEN_TOOLS });
 });
 
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
