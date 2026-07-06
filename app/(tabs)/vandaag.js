@@ -13,7 +13,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { HomeHero } from '../../lib/HomeHero';
 import { PendingInviteBanner } from '../../lib/PendingInviteBanner';
 import { dayProgress } from '../../lib/widgets/summaries';
-import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Banner, ListSkeleton, SwipeRow } from '../../lib/ui';
+import { FAB, SectionHeader, ItemRow, SegmentedControl, Button, Banner, ListSkeleton, SwipeRow, IconButton } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import {
   deriveDefaultLayout, moveWidget, removeWidget, resizeWidget, addWidget,
@@ -227,6 +227,14 @@ export default function Home() {
         contentContainerStyle={{ padding: SCREEN_PAD, paddingBottom: editing ? 132 : 100 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
       >
+        {/* Globaal zoeken (PLT-3): een onopvallende zoekknop in de kop-rechts-zone —
+            Thuis heeft geen ScreenHeader (de hero ís de kop), dus de knop staat als
+            rustige rij erboven, zoals de ModuleHelpButton rechtsboven in de modules. */}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: space.xs }}>
+          <IconButton icon="search" accessibilityLabel={t('search.open')} tint={colors.inkSoft}
+            onPress={() => router.push('/zoeken')} />
+        </View>
+
         {/* Hero: huishouden + persoonlijke groet + voortgangsring (stand van vandaag).
             Ring is tikbaar → Taken (UX-22); `loading` voorkomt de misleidende
             "rustige dag" tijdens het koud laden (UX-23). */}

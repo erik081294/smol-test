@@ -84,6 +84,7 @@
     "lib/recurringExpense.js",
     "lib/reservations.js",
     "lib/rotation.js",
+    "lib/searchRank.js",
     "lib/secureStorage.js",
     "lib/timeline.js",
     "lib/vehicleAppearance.js",

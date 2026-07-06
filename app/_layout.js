@@ -104,6 +104,7 @@ function Gate({ themeMode }) {
         <Stack.Screen name="kosten-inzichten" options={{ presentation: 'modal' }} />
         <Stack.Screen name="resource" options={{ presentation: 'modal' }} />
         <Stack.Screen name="tijdlijn" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="zoeken" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );

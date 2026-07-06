@@ -2,9 +2,9 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 6977,
-    "total": 8185,
-    "score": 85.2
+    "killed": 7052,
+    "total": 8266,
+    "score": 85.3
   },
   "files": {
     "lib/activity.js": {
@@ -206,6 +206,11 @@
       "killed": 12,
       "total": 13,
       "score": 92.3
+    },
+    "lib/searchRank.js": {
+      "killed": 75,
+      "total": 81,
+      "score": 92.6
     },
     "lib/timeline.js": {
       "killed": 105,
