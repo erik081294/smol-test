@@ -67,6 +67,14 @@ export default ({ config }) => ({
     'expo-secure-store',
     'expo-font',
     'expo-localization',
+    // expo-image-picker: de config-plugin injecteert de iOS-permissieteksten
+    // (NSCameraUsageDescription/NSPhotoLibraryUsageDescription). Expo past 'm ook zónder deze
+    // regel auto toe — maar met Engelse defaults; hier overschreven met NL-copy (camera + foto,
+    // voor productfoto's en de bonscan). Zie docs/plans/25-ios-readiness.md.
+    ['expo-image-picker', {
+      photosPermission: 'Huishoek gebruikt je foto’s om productfoto’s en bonnen toe te voegen.',
+      cameraPermission: 'Huishoek gebruikt de camera om productfoto’s te maken en bonnen te scannen.',
+    }],
     // Sentry-config-plugin schrijft sentry.properties voor de native source-map-upload.
     // org/project/url staan hier; de auth-token NOOIT hier (zou gecommit worden) → via de
     // SENTRY_AUTH_TOKEN-env op de EAS-build. url = EU-region (project leeft op de.sentry.io).

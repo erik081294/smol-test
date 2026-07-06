@@ -202,6 +202,7 @@ export const MAALTIJDEN_TOOLS = [
     name: 'maaltijden_weekmenu',
     moduleKey: 'maaltijden',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Weekmenu erbij pakken…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er gegeten wordt, wat er op het menu staat of wat er gepland is om te koken. Haalt het weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten.',
     parameters: {
@@ -229,6 +230,7 @@ export const MAALTIJDEN_TOOLS = [
     name: 'maaltijden_plannen',
     moduleKey: 'maaltijden',
     kind: 'write',
+    risk: 'write',
     destructive: false, // additief: zet alleen nieuwe maaltijden op het menu
     idempotent: false,  // nogmaals uitvoeren = dubbele menu-regels
     statusLabel: 'Voorstel klaarzetten…',
@@ -278,6 +280,7 @@ export const MAALTIJDEN_TOOLS = [
     name: 'maaltijden_recept_zoeken',
     moduleKey: 'maaltijden',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Receptenboek doorbladeren…',
     description: 'Roep dit aan wanneer de gebruiker een gerecht wil kóken, of het recept of de boodschappen ervoor wil: kijk eerst of het al in het receptenboek van het huishouden staat vóórdat je zelf een recept voorstelt. Geeft treffers als recept-kaart, met het recipe_id dat maaltijden_plannen nodig heeft om de maaltijd aan het recept te koppelen. Niet nodig als de gebruiker alleen een titel op het menu wil.',
     parameters: {
@@ -302,6 +305,7 @@ export const MAALTIJDEN_TOOLS = [
     name: 'maaltijden_recept_opslaan',
     moduleKey: 'maaltijden',
     kind: 'write',
+    risk: 'write',
     destructive: false, // additief: zet alleen nieuwe recepten in het boek
     idempotent: false,  // nogmaals uitvoeren = dubbele recepten
     statusLabel: 'Recept uitschrijven…',
@@ -360,3 +364,12 @@ export const MAALTIJDEN_TOOLS = [
     },
   },
 ];
+
+// Manifest (fundament AI-actie-laag): de enige declaratie per module — brief + tools
+// in één object. index.js leidt hieruit ASSISTANT_TOOLS/MODULE_BRIEFS af (guidelines §1).
+export const MAALTIJDEN_MANIFEST = {
+  moduleKey: MAALTIJDEN_BRIEF.moduleKey,
+  label: MAALTIJDEN_BRIEF.label,
+  brief: MAALTIJDEN_BRIEF.brief,
+  tools: MAALTIJDEN_TOOLS,
+};

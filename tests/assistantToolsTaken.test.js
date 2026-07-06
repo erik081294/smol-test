@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   TAKEN_TOOLS,
   TAKEN_BRIEF,
+  TAKEN_MANIFEST,
   renderOpenTasks,
   proposeAddTasks,
   MAX_PROPOSED_TASKS,
@@ -20,6 +21,10 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(TAKEN_BRIEF, { moduleKey: 'taken', label: 'Taken', brief: 'open taken en klusjes van het huishouden; kan taken bekijken en nieuwe taken voorstellen' });
 });
 
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(TAKEN_MANIFEST, { moduleKey: 'taken', label: 'Taken', brief: TAKEN_BRIEF.brief, tools: TAKEN_TOOLS });
+});
+
 // Het descriptor-contract ligt EXACT vast: naam/annotaties/statusLabel/schema én
 // de description zijn het gedrag richting het model — een gemuteerde description
 // verandert de tool-selectie en hoort hier te breken (en dan door de eval-gate).
@@ -28,6 +33,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     name: 'taken_open',
     moduleKey: 'taken',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Even in de taken kijken…',
     description: 'Roep dit aan zodra de gebruiker vraagt wat er nog moet gebeuren, naar deadlines, of wie welke taak doet — antwoord niet uit het geheugen. Haalt de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager (only_mine).',
     parameters: {
@@ -41,6 +47,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     name: 'taken_toevoegen',
     moduleKey: 'taken',
     kind: 'write',
+    risk: 'write',
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',

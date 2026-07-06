@@ -1552,3 +1552,104 @@ server-side gerenderd tegen prompt-injectie. Zeven losse eindjes gedicht (branch
 - **Device-gated rest (AI-13-(2)/(3)):** sheet-hoogte vs. toetsenbord + navbar-z-index raken het
   gedeelde `BottomSheet`-primitief (auto-metende `maxHeight`) en zijn niet zonder toestel te
   verifiëren — bewust niet blind gegokt.
+- **Device-rooktest groen (moto, 2026-07-05):** crash-sweep 15/15 schermen ✓, alle 5 Maestro-flows
+  ✓, logcat schoon — AI-14 is regressie-vrij op toestel. **Daarbij een AI-10-los-eindje gedicht:**
+  sinds de FAB's AI-first werden (AI-10) openden `t-fab-task` c.s. de assistent-sheet i.p.v. de
+  editor, maar de Maestro-flows (`01-taak`/`04-swipe`/`05-editor-guard`) waren niet meegegaan → ze
+  faalden en lieten de overlay open, wat de tab-bar voor álle vervolg-flows verborg. Flows nu:
+  FAB → "Zelf invoeren" → editor (dat test meteen de AI-first-uitwijk). De assistent-specifieke
+  gedragingen (chip-scroll, "Akkoord met alles", FAB-terugval bij uitgezette module) blijven
+  handmatig te verifiëren — een LLM-afhankelijke Maestro-flow zou inherent flaky zijn.
+
+---
+
+**IOS-1 — iOS-readiness-enabler (2026-07-05).** Blindevlekken-analyse op iOS (we testen alleen
+Android/web): nooit een `ios/`-prebuild gedraaid, nul testlagen raken iOS. Drie onzekere aannames
+getoetst tegen de echte config/live-host: (1) **geen first-tap crash** — `expo config --type introspect`
+toont de camera/foto-`UsageDescription`-keys in de opgeloste iOS-`Info.plist` óók zónder de plugin te
+lijsten (Expo SDK 56 past module-config-plugins auto toe → Engelse defaults; weerlegt de crash-aanname,
+bevestigt INF-5); (2) **live universal links dood** — huishoek.app AASA serveert live nog
+`REPLACE_APPLE_TEAM_ID`; (3) **cloud-simulator = experimenteel** (`expo:eas-simulator`), buildsleutel
+`ios.simulator` correct. **Gebouwd (enabler):** `eas.json` `development` → `ios:{simulator:true}`;
+`app.config.js` `expo-image-picker`-plugin met NL camera/foto-permissieteksten (introspect-geverifieerd);
+docs: [plan 25](docs/plans/25-ios-readiness.md), backlog §6 IOS-1, `credentials/README.md` (APNs-key +
+uitgestelde checklist), rooktest-runbook iOS-sectie. `eas.json` blijft valide JSON; geen `lib/*.js`
+geraakt (geen mutatie-ratchet). **Strategie:** goedkope observability-enabler nu + lichte periodieke
+EAS-sim reality-check (géén per-PR-CI); config-checklist (APNs/submit/icoon/AASA-herdeploy) uitgesteld
+tot livegang. **Rest:** eerste `eas build -p ios --profile development` + smoke langs de divergentie-
+hotspots (modals/`pageSheet`, KAV-`padding`, gestures, schaduw) → basislijn hier loggen.
+
+**IOS-1 vervolg — eerste iOS-build groen, run uitgesteld (2026-07-05).** `eas build -p ios --profile
+development` → **FINISHED** (SDK56, simulator-`.tar.gz`-artefact): de app compileert/linkt voor iOS,
+config valide (incl. NL-permissie-strings), géén build-blokkade — de eerste keer dat iOS is gebouwd.
+Bonus: EAS-**tunnel v2** komt wél op op ons netwerk (waar ngrok bij Android-testen werd gestript), dus de
+live Mode C-route (dev-client + Metro-tunnel op de cloud-sim) is bewezen haalbaar. **Blokkade op het
+draaien:** cloud-sim-sessie geweigerd — *"device run sessions are not enabled for this account"* (gated
+feature op `evdns-team`) — plus geen lokale simulator (alleen Xcode CLI-tools, geen admin) en geen fysiek
+iOS-toestel. Er is dus geen oppervlak om de visuele hotspot-smoke te draaien → **uitgesteld** tot er één
+is (cloud-sim aanzetten, of TestFlight op device bij livegang; gebruikersbesluit). Parallel gestart op de
+livegang-checklist: Apple App ID `app.huishoek` (Team `J3DDDK3JB2`, = de AASA-Team-ID) met **Push
+Notifications** + **Associated Domains** capabilities.
+
+---
+
+**2026-07-05 — Assistent chat-UX na device-feedback (AI-15).** Vijf punten uit echt gebruik van de
+assistent op toestel:
+- **Chat-overlay herbouwd** (punt 2+5). De overlay was een `BottomSheet` met swipe-to-dismiss: die
+  swipe botste met het scrollen (de drawer "sprong alle kanten op"), de vaste hoogte `height*0.78` liet
+  het toetsenbord over de invoer vallen, de tab-bar schemerde eronder door en er stonden grote lege
+  ruimtes. Nu een opaque full-screen `Modal` met kruisje + `KeyboardAvoidingView` ([`AssistantSheet.js`](lib/AssistantSheet.js)):
+  geen gesture-conflict, invoer altijd boven het toetsenbord, navbar afgedekt. **Device-geverifieerd
+  (moto, screenshots met/zonder toetsenbord):** invoerveld schuift netjes omhoog bij het toetsenbord,
+  kruisje sluit. Lost AI-13-(2)/(3) op.
+- **LLM-response full-width** (punt 4): de assistent-beurt rendert nu op volle breedte zonder bubble
+  (de gebruikersbeurt houdt zijn bubble rechts) → kaarten en tekst krijgen de hele chatruimte ([`AssistantChat.js`](lib/AssistantChat.js)).
+  Device-geverifieerd (de weekmenu-kaart vult nu de breedte).
+- **Boodschappen afvinken** (punt 1): de AI zei terecht dat 'ie het niet kon — geen prompting-bug, de
+  tool ontbrak. Nieuwe HITL-write-tool [`boodschappen_afvinken`](supabase/functions/_shared/tools/boodschappen.js):
+  matcht case-insensitief op naam tegen de onafgevinkte lijst en zet `checked=true`. Bewust géén
+  undo-spoor — afvinken is geen insert (undo verwijdert inserts) en triviaal terug te zetten in de
+  lijst-UI. EDITABLE_FIELDS-entry + descriptor-contract + execute-tests; fake-db kreeg `update`/`in`.
+- **Beslis-opties** (punt 3a): `suggest_replies`-prompt aangescherpt naar concrete, AskUserQuestion-stijl
+  vervolgstappen na een voorstel of actie (bv. "Ja, plan het in", "Zet boodschappen erbij"), zonder de
+  bevestigingskaart-knoppen te herhalen. Server-auto-continuation na een confirm blijft bewust uit
+  (guidelines §10) — de chips zijn de gebruiker-geïnitieerde vervolgroute.
+- **A2UI-plan** (punt 3b): de wens om industry-leading interactieve componenten (grafiek/rooster/recept)
+  is als **AI-16** vastgelegd — bouwt op AI-7 (surface/patch), niet nu gebouwd (bewust uitgesteld).
+- **DoD:** `npm test` 1153 pass, typecheck + `eslint .` groen, **eval-gate 100/100/100 (45 cases)**, edge
+  **v16 gedeployed**. **Rest:** device-verificatie van de afvink-HITL-flow (toestel raakte los tijdens de
+  sessie) + trace-review van de nieuwe beslis-opties.
+
+---
+
+**2026-07-06 — AI-actie-laag fundament: schaalbaar + per-gebruiker afdwingbaar (AI-17).** Antwoord op
+"hoe ontsluiten we alle modules/logica schaalbaar als AI-acties, makkelijk te managen, met per-gebruiker
+controle?" Vier blinde vlekken benoemd (B1 dubbel domein-schema, B2 geen app↔edge-brug, B3 client-gestuurde
+module-poort, B4 geen capability-concept) en de bestuurbare basis gelegd. Gekozen model: **gecureerd +
+scaffold** (géén auto-CRUD-per-tabel — dat blaast het ~12-tool-budget op en laat Sonnet-5 onder-triggeren).
+- **Capability-manifest (B, één bron van waarheid):** elke skill-file exporteert `_MANIFEST`
+  (moduleKey/label/brief/tools); [`tools/index.js`](supabase/functions/_shared/tools/index.js) leidt
+  `ASSISTANT_TOOLS`+`MODULE_BRIEFS` af uit één `MANIFESTS`-lijst. Elke tool draagt een **`risk`-tier**
+  (read/write/financial/destructive). **Byte-identiek** voor het model (golden-set + per-pack-pins groen).
+- **Capability-policy (B4):** pure [`lib/aiCapabilities.js`](lib/aiCapabilities.js) — `requiredCapabilities`
+  /`grantedCapabilities`/`canUseTool`, default-on, tiers `ai:write`/`ai:spend`/`ai:destructive` (reads vrij).
+  13 units, mutatie **91,9%**, in tsconfig.check + mutation-groups.
+- **Server-afgedwongen (B3/B4):** `filterTools` kreeg een `canUse`-poort; [`assistant/index.ts`](supabase/functions/assistant/index.ts)
+  leidt de moduleset nu **server-side** af (household_modules/user_module_prefs) i.p.v. de client-hint te
+  vertrouwen, gate't tools op capability, en her-checkt vóór `execute`. **App↔edge-brug:** de edge importeert
+  nu de pure `lib/modules.js`+`lib/aiCapabilities.js` (eerste gedeelde import over de grens — bundel-
+  verificatie volgt op deploy).
+- **Opslag + RLS:** migratie [`0074`](supabase/migrations/0074_assistant_capabilities.sql) **live via MCP** —
+  `user_ai_capabilities` per lid, owner-beheerd, default-on (advisor: geen nieuwe issues; RLS-scenario in de
+  suite). **Volgende vrije migratienummer = 0075.**
+- **Beheer-UI:** owner-only sectie in het huishouden-scherm (per lid 3 toggles) via
+  [`lib/useAiCapabilities.js`](lib/useAiCapabilities.js) + NL-i18n. **Device-verificatie volgt** (geen
+  draai-oppervlak deze sessie).
+- **Coverage/budget-wachter:** [`tests/assistantCoverage.test.js`](tests/assistantCoverage.test.js) —
+  elke data-module heeft een manifest of staat expliciet op `NO_ASSISTANT`; toolset onder de herbezoek-drempel.
+- **DoD:** volledige suite **1171 pass** / 0 fail (34 skip = live-RLS), typecheck + `eslint .` schoon.
+  Normatieve doc [`docs/assistent-architectuur.md`](docs/assistent-architectuur.md) §1+§11 bijgewerkt.
+  **Bewust uitgesteld → fase 2:** de tool-factory + gedeeld veld-schema (bewijs pas z'n waarde bij de eerste
+  nieuwe tool) en het dichten van de 5 lege modules (planten/huisdieren/voertuigen/tijdlijn/delen). **Rest:**
+  edge-deploy (bundel-brug bevestigen) + device-smoke van de beheer-UI + eval-gate draaien (geen regressie
+  verwacht — tool-facing surface onveranderd).

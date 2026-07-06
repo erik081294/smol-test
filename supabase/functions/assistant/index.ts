@@ -46,6 +46,13 @@ import {
 } from './core.js';
 // @ts-ignore — zie boven.
 import { ASSISTANT_TOOLS, MODULE_BRIEFS } from '../_shared/tools/index.js';
+// @ts-ignore — app↔edge-brug (B2/B3): dezelfde PURE bronmodules die de app gebruikt,
+// nu ook server-side. modules.js → de moduleset zelf server afleiden (niet de client-
+// hint vertrouwen); aiCapabilities.js → de per-lid AI-capability-poort (B4). Beide zijn
+// side-effect-vrij (geen React/Supabase-import) en dus veilig in de edge.
+import { effectiveModules } from '../../../lib/modules.js';
+// @ts-ignore — zie boven.
+import { grantedCapabilities, canUseTool } from '../../../lib/aiCapabilities.js';
 // @ts-ignore — zie boven. Pure HITL-statusmachine (AI-8): de agent-loop voert
 // write-tools nooit uit; de harness maakt er een voorstel van en deze module
 // bepaalt wat er met een besluit (confirm/reject/undo) mag gebeuren.
@@ -87,6 +94,43 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'content-type': 'application/json' } });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Server-afgedwongen moduleset (B3): leidt de ingeschakelde modules af uit de DB
+// (household_modules + user_module_prefs) i.p.v. de client-hint te vertrouwen — de
+// client bepaalt niet langer welke tools de assistent krijgt. Bij een query-fout → null
+// zodat de aanroeper terugvalt op de client-hint (degradatie naar het huidige gedrag,
+// geen kapotte assistent). RLS staat de gebruiker toe zijn eigen toggle-rijen te lezen.
+async function loadEnabledModuleKeys(db: any, householdId: string, userId: string): Promise<string[] | null> {
+  try {
+    const [hh, up] = await Promise.all([
+      db.from('household_modules').select('module_key').eq('household_id', householdId).eq('enabled', false),
+      db.from('user_module_prefs').select('module_key').eq('household_id', householdId).eq('profile_id', userId).eq('enabled', false),
+    ]);
+    if (hh.error || up.error) throw new Error(hh.error?.message ?? up.error?.message ?? 'query mislukt');
+    const householdDisabled = (hh.data ?? []).map((r: { module_key: string }) => r.module_key);
+    const userDisabled = (up.data ?? []).map((r: { module_key: string }) => r.module_key);
+    return effectiveModules({ householdDisabled, userDisabled }).map((m: { key: string }) => m.key);
+  } catch (e) {
+    console.error('[assistant] module-afleiding faalde — val terug op client-hint', String(e));
+    return null;
+  }
+}
+
+// De AI-capability-poort van dit lid (B4): welke risk-tiers de assistent namens hem mag
+// uitvoeren (user_ai_capabilities, 0074). Default-on; bij een query-fout → default-on
+// (fail-open naar het huidige gedrag — RLS beschermt de data hoe dan ook, en een kapotte
+// assistent is erger dan een tijdelijk niet-afgedwongen capability-poort).
+async function loadGrantedCapabilities(db: any, householdId: string, userId: string): Promise<Set<string>> {
+  try {
+    const { data, error } = await db.from('user_ai_capabilities')
+      .select('capability_key').eq('household_id', householdId).eq('profile_id', userId).eq('allowed', false);
+    if (error) throw new Error(error.message);
+    return grantedCapabilities({ userRevoked: (data ?? []).map((r: { capability_key: string }) => r.capability_key) });
+  } catch (e) {
+    console.error('[assistant] capability-afleiding faalde — default-on', String(e));
+    return grantedCapabilities({});
+  }
+}
 
 // Persona/toon: plan 23 §1 — de prompt zelf leeft in core.js (één bron, gedeeld
 // met de eval-runner; guidelines §3).
@@ -227,6 +271,13 @@ Deno.serve(async (req: Request) => {
     // opgeslagen, genormaliseerde args, gefilterd op de aangevinkte items.
     const tool = ASSISTANT_TOOLS.find((t) => t.name === row.content?.tool && t.kind === 'write');
     if (!tool) return json({ error: 'Dit voorstel wordt niet meer ondersteund.' }, 409);
+    // Her-check de capability-poort (B4) op uitvoermoment: een voorstel kan zijn
+    // aangemaakt toen het lid de capability nog had; een intussen ingetrokken recht
+    // mag niet alsnog via een oud voorstel worden uitgevoerd. RLS blijft de backstop.
+    const execGranted = await loadGrantedCapabilities(db, row.household_id, actionUserId);
+    if (!canUseTool(tool, execGranted)) {
+      return json({ error: 'Je mag deze actie niet (meer) via de assistent uitvoeren.' }, 403);
+    }
     const sel = selectItems(row.content?.args, body.action.selected);
     if (!sel.ok) return json({ error: sel.error }, 400);
     if (!(await finish('executing'))) return json({ error: 'Dit voorstel is al verwerkt.' }, 409);
@@ -284,16 +335,25 @@ Deno.serve(async (req: Request) => {
   // "vandaag"); valt terug op servertijd. memberNames is alleen weergave-suiker.
   const today = /^\d{4}-\d{2}-\d{2}$/.test(body.today ?? '') ? body.today! : new Date().toISOString().slice(0, 10);
   const memberNames = body.memberNames && typeof body.memberNames === 'object' ? body.memberNames : {};
-  const enabledKeys = Array.isArray(body.enabledModuleKeys) ? body.enabledModuleKeys : [];
-  // userId uit het (door verify_jwt al gevalideerde) token — voor tools als
-  // get_open_tasks(only_mine).
+  // userId uit het (door verify_jwt al gevalideerde) token — nodig vóór de
+  // entitlement-afleiding, en voor tools als get_open_tasks(only_mine).
   const { data: userData } = await db.auth.getUser();
   const userId = userData?.user?.id ?? '';
+  // Server-afgedwongen entitlements (B3/B4): de moduleset én de capability-poort komen uit
+  // de DB, niet uit de client-body. body.enabledModuleKeys is nog slechts een fallback als
+  // de afleiding faalt (niet-gezaghebbend — de client bepaalt de tools niet meer).
+  const derivedKeys = await loadEnabledModuleKeys(db, householdId, userId);
+  const enabledKeys = derivedKeys ?? (Array.isArray(body.enabledModuleKeys) ? body.enabledModuleKeys : []);
+  const granted = await loadGrantedCapabilities(db, householdId, userId);
   const ctx = { db, householdId, userId, today, memberNames };
 
   // Write-tools doen mee (AI-8): de loop voert ze nooit uit — de interceptie
-  // hieronder maakt er een bevestigingsvoorstel van (HITL).
-  const tools = filterTools(ASSISTANT_TOOLS, enabledKeys, { includeWrite: true });
+  // hieronder maakt er een bevestigingsvoorstel van (HITL). De capability-poort
+  // (canUse) verbergt tools die dit lid niet mag laten uitvoeren (B4).
+  const tools = filterTools(ASSISTANT_TOOLS, enabledKeys, {
+    includeWrite: true,
+    canUse: (t: { kind: string; risk?: string }) => canUseTool(t, granted),
+  });
   const chatTools = toChatTools(tools);
 
   // --- Persistentie (AI-4): het gesprek leeft server-side in assistant_* (RLS,

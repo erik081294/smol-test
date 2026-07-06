@@ -14,8 +14,17 @@ import { Illustration } from '../../lib/illustrations';
 import { Icon } from '../../lib/icons';
 import { colors, type, space } from '../../lib/theme';
 import { TOGGLEABLE_MODULES } from '../../lib/modules';
+import { AI_CAPABILITIES } from '../../lib/aiCapabilities';
+import { useAiCapabilities } from '../../lib/useAiCapabilities';
 import { inviteUrl, inviteStatus, hoursUntilExpiry, WEB_BASE_URL } from '../../lib/invites';
 import { t, plural } from '../../lib/i18n';
+
+// Weergavelabels per AI-capability (i18n). De policy-sleutels leven in lib/aiCapabilities.js.
+const AI_CAP_LABEL = {
+  'ai:write': 'household.aiCap.write',
+  'ai:spend': 'household.aiCap.spend',
+  'ai:destructive': 'household.aiCap.destructive',
+};
 
 export default function HuishoudenTab() {
   const dialog = useDialog();
@@ -41,6 +50,11 @@ export default function HuishoudenTab() {
     setHouseholdModule(key, enabled).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
   const toggleUserModule = (key, enabled) =>
     setUserModule(key, enabled).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
+
+  // Per-lid AI-capabilities (B4): alleen de owner beheert; RLS dwingt het af.
+  const { isAllowed, setCapability } = useAiCapabilities(active?.id);
+  const toggleAiCap = (profileId, cap, allowed) =>
+    setCapability(profileId, cap, allowed).catch((e) => dialog.alert({ title: t('common.failed'), body: e.message }));
 
   // Subgroep-editor (inline modal)
   const [editorOpen, setEditorOpen] = useState(false);
@@ -263,6 +277,29 @@ export default function HuishoudenTab() {
             ))}
             <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
               {t('household.householdModules.hint')}
+            </Text>
+
+            {/* AI-permissies per lid (B4): default-on; hier trek je acties in per lid. */}
+            <SectionHeader title={t('household.section.aiCapabilities')} />
+            {members.map((m) => (
+              <View key={m.id} style={{ marginBottom: space.sm }}>
+                <Text style={[type.label, { marginTop: space.sm, marginBottom: space.xs }]}>
+                  {m.display_name}{m.id === profile?.id ? `  ${t('household.you')}` : ''}
+                </Text>
+                {AI_CAPABILITIES.map((cap) => (
+                  <ItemRow
+                    key={cap}
+                    title={t(AI_CAP_LABEL[cap])}
+                    trailing={
+                      <Switch value={isAllowed(m.id, cap)}
+                        onValueChange={(v) => toggleAiCap(m.id, cap, v)} trackColor={{ true: colors.forest }} />
+                    }
+                  />
+                ))}
+              </View>
+            ))}
+            <Text style={[type.caption, { marginTop: space.xs, marginBottom: space.lg }]}>
+              {t('household.aiCapabilities.hint')}
             </Text>
           </>
         )}

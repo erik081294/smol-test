@@ -65,3 +65,24 @@ service-key, dan slaat 'ie over (en laten de flows hooguit een paar `E2E…`-rij
 
 Zie [`../.maestro/README.md`](../.maestro/README.md) voor de flow-lijst en de `id:`-conventie
 (`t-…`, gezet op de gedeelde componenten in [`../lib/ui.js`](../lib/ui.js)).
+
+## iOS — handmatige smoke (bewust géén deel van deze runner)
+
+Deze runner is **Android-only** (`adb`/`uiautomator`/`logcat`/`am start`); een macOS-runner + iOS-Maestro
+op elke PR zou het dubbele onderhoud opleveren dat we tijdens de Android-fase vermijden. iOS-observability
+loopt daarom via een **lichte, periodieke handmatige smoke** op de (EAS-cloud-)simulator, niet via dit
+script. Kort recept — volledige rationale in [`plans/25-ios-readiness.md`](plans/25-ios-readiness.md)
+(backlog §6 **IOS-1**):
+
+1. `eas build -p ios --profile development` (simulator-build; `development` heeft `ios.simulator:true`,
+   geen Apple-signing nodig).
+2. Draaien via de **`expo:eas-simulator`**-skill (cloud; experimenteel) — of gratis op een Mac met Xcode:
+   `eas build:run -p ios --latest` op de lokale Simulator.
+3. **Loop de divergentie-hotspots langs** (de dingen die op iOS afwijken en die Android nooit uitvoert):
+   een `presentation:'modal'`-scherm (opent als iOS-sheet, swipe-omlaag-dismiss) + de `pageSheet` in
+   `huishouden`; een formulier met `KeyboardAvoidingView behavior='padding'` (veld niet achter het
+   toetsenbord); een fotoscherm (NL-permissie-prompt, geen crash); schaduwen + pull-to-refresh.
+
+**Wanneer draaien:** bij elke milestone / vóór een release-candidate, én direct ná het aanraken van een
+hotspot (modals, KAV, gestures, `lib/theme.js`-schaduwen, safe-area). Zo blijft iOS-divergentie klein en
+toewijsbaar aan één wijziging.

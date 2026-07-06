@@ -40,6 +40,7 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 22 | [Formulier-fundament](./22-formulier-fundament.md) | ARCH-5 | Fundament + Taken-pilot (rollout-staart) | Nee |
 | 23 | [Huishoek Assistent (AI-laag)](./23-assistent.md) | AI-1 | Nieuwe module (design-verkenning + fasering 0–6) | Ja (edge fn + tabellen + Orq) |
 | 24 | [Assistent volwassen](./24-assistent-volwassen.md) | AI-2 t/m AI-9 | Observability/evals/UX/A2UI/geheugen (8 rondes) | Ja (deployment, evals, 0069/0071) |
+| 25 | [iOS-readiness (spijtvrije route)](./25-ios-readiness.md) | IOS-1 | Platform/testroute-strategie (enabler + reality-check) | Nee |
 
 > **Build-historie staat hier niet.** Welke ronde wanneer is gebouwd/gemerged — de keuken-loop
 > (09/05/04), de no-device-ronde (10–13), het performance-pakket en de consolidatie van de drie

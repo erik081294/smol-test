@@ -59,9 +59,13 @@ Recepten (Keuken) — kies de juiste tak:
   voor (ingrediënten, porties, bereiding) als recept-kaart, en plan het in en zet de
   boodschappen pas op de lijst nádat de gebruiker het recept heeft goedgekeurd.
 
-Sluit ELKE beurt af met een aanroep van suggest_replies: 2 tot 4 korte vervolgopties
-(elk maximaal 6 woorden) die logisch passen bij dit gesprek — aanvullende vragen, een
-verdieping, of een volgende stap. De gebruiker kan daarnaast altijd zelf vrij typen.`;
+Sluit ELKE beurt af met een aanroep van suggest_replies: 2 tot 4 korte, CONCRETE
+vervolgopties (elk maximaal 6 woorden) als tikbare keuzes in AskUserQuestion-stijl.
+Maak ze specifiek voor dit moment, niet algemeen. Doe je een voorstel of heb je net
+iets gedaan, bied dan de logische volgende stappen of varianten aan — bv. na een
+recept-voorstel "Ja, plan het in", "Zet boodschappen erbij", "Maak voor 4 personen".
+Herhaal niet de knoppen die al op de bevestigingskaart staan (Doen / Niet doen /
+Bewerken). De gebruiker kan daarnaast altijd zelf vrij typen.`;
 
 // Pseudo-tool voor het antwoordopties-patroon (à la AskUserQuestion): het model
 // levert er zijn vervolgopties mee af; de schil voert 'm nooit uit maar licht de
@@ -102,15 +106,22 @@ export function splitSuggestions(toolCalls = []) {
 
 /**
  * Filter de tool-registry op wat deze beurt mee mag: alleen tools van modules die
- * in het huishouden aan staan, en write-tools alleen als de beurt dat toestaat
- * (fase 3). Minder tools = minder tokens én geen acties op uitgezette modules.
+ * in het huishouden aan staan, write-tools alleen als de beurt dat toestaat (fase 3),
+ * én — als er een capability-poort meegegeven is — alleen tools die de gebruiker
+ * volgens zijn AI-capabilities mag laten uitvoeren (B4; lib/aiCapabilities.js levert
+ * de predicate). Minder tools = minder tokens, geen acties op uitgezette modules, en
+ * geen tool die de gebruiker toch niet mag gebruiken. `canUse` default = alles mag,
+ * zodat bestaande aanroepers (zonder capability-laag) onveranderd blijven werken.
  * @param {Array<{name:string, moduleKey:string, kind:string}>} tools
  * @param {string[]} [enabledModuleKeys]
- * @param {{includeWrite?: boolean}} [opts]
+ * @param {{includeWrite?: boolean, canUse?: (tool: {kind:string}) => boolean}} [opts]
  */
 export function filterTools(tools, enabledModuleKeys = [], opts = {}) {
   const enabled = new Set(enabledModuleKeys);
-  return tools.filter((t) => enabled.has(t.moduleKey) && (opts.includeWrite === true || t.kind === 'read'));
+  const canUse = typeof opts.canUse === 'function' ? opts.canUse : () => true;
+  return tools.filter(
+    (t) => enabled.has(t.moduleKey) && (opts.includeWrite === true || t.kind === 'read') && canUse(t)
+  );
 }
 
 /**

@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-05T11:10:58.577Z",
+  "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 6851,
-    "total": 8036,
-    "score": 85.3
+    "killed": 6977,
+    "total": 8185,
+    "score": 85.2
   },
   "files": {
     "lib/activity.js": {
@@ -373,9 +373,9 @@
       "score": 88
     },
     "supabase/functions/_shared/tools/boodschappen.js": {
-      "killed": 141,
-      "total": 152,
-      "score": 92.8
+      "killed": 233,
+      "total": 264,
+      "score": 88.3
     },
     "supabase/functions/_shared/tools/kosten.js": {
       "killed": 69,
@@ -400,6 +400,11 @@
     "lib/assistantActions.js": {
       "killed": 205,
       "total": 223,
+      "score": 91.9
+    },
+    "lib/aiCapabilities.js": {
+      "killed": 34,
+      "total": 37,
       "score": 91.9
     }
   }

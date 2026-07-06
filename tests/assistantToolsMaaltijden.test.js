@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   MAALTIJDEN_TOOLS,
   MAALTIJDEN_BRIEF,
+  MAALTIJDEN_MANIFEST,
   renderWeekMenu,
   renderRecipe,
   renderRecipeMatches,
@@ -27,12 +28,17 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(MAALTIJDEN_BRIEF, { moduleKey: 'maaltijden', label: 'Keuken', brief: 'weekmenu en receptenboek; kan menu en recepten tonen, recepten voorstellen en maaltijden inplannen' });
 });
 
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(MAALTIJDEN_MANIFEST, { moduleKey: 'maaltijden', label: 'Keuken', brief: MAALTIJDEN_BRIEF.brief, tools: MAALTIJDEN_TOOLS });
+});
+
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm van de vier tools ligt exact vast', () => {
   assert.deepEqual(shape(tool('maaltijden_weekmenu')), {
     name: 'maaltijden_weekmenu',
     moduleKey: 'maaltijden',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Weekmenu erbij pakken…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er gegeten wordt, wat er op het menu staat of wat er gepland is om te koken. Haalt het weekmenu op (vandaag + de komende dagen), inclusief gekoppelde recepten.',
     parameters: {
@@ -46,6 +52,7 @@ test('descriptor-contract: statische vorm van de vier tools ligt exact vast', ()
     name: 'maaltijden_plannen',
     moduleKey: 'maaltijden',
     kind: 'write',
+    risk: 'write',
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',
@@ -78,6 +85,7 @@ test('descriptor-contract: statische vorm van de vier tools ligt exact vast', ()
     name: 'maaltijden_recept_zoeken',
     moduleKey: 'maaltijden',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Receptenboek doorbladeren…',
     description: 'Roep dit aan wanneer de gebruiker een gerecht wil kóken, of het recept of de boodschappen ervoor wil: kijk eerst of het al in het receptenboek van het huishouden staat vóórdat je zelf een recept voorstelt. Geeft treffers als recept-kaart, met het recipe_id dat maaltijden_plannen nodig heeft om de maaltijd aan het recept te koppelen. Niet nodig als de gebruiker alleen een titel op het menu wil.',
     parameters: {
@@ -91,6 +99,7 @@ test('descriptor-contract: statische vorm van de vier tools ligt exact vast', ()
     name: 'maaltijden_recept_opslaan',
     moduleKey: 'maaltijden',
     kind: 'write',
+    risk: 'write',
     destructive: false,
     idempotent: false,
     statusLabel: 'Recept uitschrijven…',

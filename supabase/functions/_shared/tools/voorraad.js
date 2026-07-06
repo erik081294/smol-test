@@ -44,6 +44,7 @@ export const VOORRAAD_TOOLS = [
     name: 'voorraad_bijna_op',
     moduleKey: 'voorraad',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Voorraad nalopen…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er in huis is, wat bijna op is, of wat tegen de houdbaarheid aanloopt. Toont voorraad-items onder de drempel of die binnen een week over datum zijn. Voor de boodschappenlijst zelf: gebruik boodschappen_lijst.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
@@ -59,3 +60,12 @@ export const VOORRAAD_TOOLS = [
     },
   },
 ];
+
+// Manifest (fundament AI-actie-laag): de enige declaratie per module — brief + tools
+// in één object. index.js leidt hieruit ASSISTANT_TOOLS/MODULE_BRIEFS af (guidelines §1).
+export const VOORRAAD_MANIFEST = {
+  moduleKey: VOORRAAD_BRIEF.moduleKey,
+  label: VOORRAAD_BRIEF.label,
+  brief: VOORRAAD_BRIEF.brief,
+  tools: VOORRAAD_TOOLS,
+};

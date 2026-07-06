@@ -476,6 +476,28 @@
           }
         ]
       }
+    },
+    {
+      "id": "boo-05",
+      "question": "Ik heb melk en brood gehaald, vink ze maar af van de lijst",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_afvinken"
+          }
+        ]
+      }
+    },
+    {
+      "id": "boo-06",
+      "question": "Haal de eieren maar van het boodschappenlijstje, die hebben we al",
+      "expect": {
+        "tools": [
+          {
+            "name": "boodschappen_afvinken"
+          }
+        ]
+      }
     }
   ]
 }

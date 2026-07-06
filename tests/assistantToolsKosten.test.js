@@ -2,7 +2,7 @@
 // top-3-sortering en de maandgrens-compositie van de query.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KOSTEN_TOOLS, KOSTEN_BRIEF, renderExpensesSummary } from '../supabase/functions/_shared/tools/kosten.js';
+import { KOSTEN_TOOLS, KOSTEN_BRIEF, KOSTEN_MANIFEST, renderExpensesSummary } from '../supabase/functions/_shared/tools/kosten.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = KOSTEN_TOOLS.find((t) => t.name === 'kosten_maandoverzicht');
@@ -13,12 +13,18 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(KOSTEN_BRIEF, { moduleKey: 'kosten', label: 'Kosten', brief: 'uitgaven van het huishouden; kan maandoverzichten en grootste kostenposten geven' });
 });
 
+// Manifest = de bron waaruit index.js ASSISTANT_TOOLS/MODULE_BRIEFS afleidt — pin de compositie.
+test('manifest: composeert moduleKey/label/brief + tools', () => {
+  assert.deepEqual(KOSTEN_MANIFEST, { moduleKey: 'kosten', label: 'Kosten', brief: KOSTEN_BRIEF.brief, tools: KOSTEN_TOOLS });
+});
+
 // Descriptor-contract exact (zie assistantToolsTaken.test.js voor het waarom).
 test('descriptor-contract: statische vorm ligt exact vast', () => {
   assert.deepEqual(shape(tool), {
     name: 'kosten_maandoverzicht',
     moduleKey: 'kosten',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Uitgaven op een rijtje zetten…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er is uitgegeven, hoeveel iets kostte of waar het geld heen ging. Geeft een uitgaven-samenvatting van één maand (default: de maand van vandaag); geef month als "YYYY-MM" voor een andere maand.',
     parameters: {

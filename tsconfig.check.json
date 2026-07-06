@@ -30,6 +30,7 @@
   "include": [
     "lib/activity.js",
     "lib/agenda.js",
+    "lib/aiCapabilities.js",
     "lib/appRoute.js",
     "lib/assistantStream.js",
     "lib/assistantUi.js",
