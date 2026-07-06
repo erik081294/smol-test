@@ -2,9 +2,9 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 8005,
-    "total": 9360,
-    "score": 85.5
+    "killed": 8046,
+    "total": 9401,
+    "score": 85.6
   },
   "files": {
     "lib/activity.js": {
@@ -446,6 +446,11 @@
       "killed": 75,
       "total": 81,
       "score": 92.6
+    },
+    "lib/otp.js": {
+      "killed": 41,
+      "total": 41,
+      "score": 100
     }
   }
 }
