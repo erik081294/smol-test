@@ -76,6 +76,9 @@ export const GROUPS = [
   { test: 'reservations', srcs: ['lib/reservations.js'] },
   { test: 'rotation', srcs: ['lib/rotation.js'] },
   { test: 'timeline', srcs: ['lib/timeline.js'] },
+  // Pure filterkern van de tijdlijn (TML-6, plan 19): DEFAULT-ON + twee lagen
+  // (huishouden wint). De hook (useTimelineFilters) blijft React-schil.
+  { test: 'timelineFilter', srcs: ['lib/timelineFilter.js'] },
   { test: 'visibility', srcs: ['lib/visibility.js'] },
   // offCategoryMap.js is een token-regeltabel (data); StringLiteral-mutaties op die
   // tokens zijn ruis — de test dekt de match-LOGICA + representatieve mappings, niet

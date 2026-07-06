@@ -86,6 +86,7 @@
     "lib/rotation.js",
     "lib/secureStorage.js",
     "lib/timeline.js",
+    "lib/timelineFilter.js",
     "lib/vehicleAppearance.js",
     "lib/vehicleCare.js",
     "lib/vehicleCosts.js",
