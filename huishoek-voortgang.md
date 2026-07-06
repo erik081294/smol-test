@@ -1619,3 +1619,37 @@ assistent op toestel:
 - **DoD:** `npm test` 1153 pass, typecheck + `eslint .` groen, **eval-gate 100/100/100 (45 cases)**, edge
   **v16 gedeployed**. **Rest:** device-verificatie van de afvink-HITL-flow (toestel raakte los tijdens de
   sessie) + trace-review van de nieuwe beslis-opties.
+
+---
+
+**2026-07-06 — AI-actie-laag fundament: schaalbaar + per-gebruiker afdwingbaar (AI-17).** Antwoord op
+"hoe ontsluiten we alle modules/logica schaalbaar als AI-acties, makkelijk te managen, met per-gebruiker
+controle?" Vier blinde vlekken benoemd (B1 dubbel domein-schema, B2 geen app↔edge-brug, B3 client-gestuurde
+module-poort, B4 geen capability-concept) en de bestuurbare basis gelegd. Gekozen model: **gecureerd +
+scaffold** (géén auto-CRUD-per-tabel — dat blaast het ~12-tool-budget op en laat Sonnet-5 onder-triggeren).
+- **Capability-manifest (B, één bron van waarheid):** elke skill-file exporteert `_MANIFEST`
+  (moduleKey/label/brief/tools); [`tools/index.js`](supabase/functions/_shared/tools/index.js) leidt
+  `ASSISTANT_TOOLS`+`MODULE_BRIEFS` af uit één `MANIFESTS`-lijst. Elke tool draagt een **`risk`-tier**
+  (read/write/financial/destructive). **Byte-identiek** voor het model (golden-set + per-pack-pins groen).
+- **Capability-policy (B4):** pure [`lib/aiCapabilities.js`](lib/aiCapabilities.js) — `requiredCapabilities`
+  /`grantedCapabilities`/`canUseTool`, default-on, tiers `ai:write`/`ai:spend`/`ai:destructive` (reads vrij).
+  13 units, mutatie **91,9%**, in tsconfig.check + mutation-groups.
+- **Server-afgedwongen (B3/B4):** `filterTools` kreeg een `canUse`-poort; [`assistant/index.ts`](supabase/functions/assistant/index.ts)
+  leidt de moduleset nu **server-side** af (household_modules/user_module_prefs) i.p.v. de client-hint te
+  vertrouwen, gate't tools op capability, en her-checkt vóór `execute`. **App↔edge-brug:** de edge importeert
+  nu de pure `lib/modules.js`+`lib/aiCapabilities.js` (eerste gedeelde import over de grens — bundel-
+  verificatie volgt op deploy).
+- **Opslag + RLS:** migratie [`0074`](supabase/migrations/0074_assistant_capabilities.sql) **live via MCP** —
+  `user_ai_capabilities` per lid, owner-beheerd, default-on (advisor: geen nieuwe issues; RLS-scenario in de
+  suite). **Volgende vrije migratienummer = 0075.**
+- **Beheer-UI:** owner-only sectie in het huishouden-scherm (per lid 3 toggles) via
+  [`lib/useAiCapabilities.js`](lib/useAiCapabilities.js) + NL-i18n. **Device-verificatie volgt** (geen
+  draai-oppervlak deze sessie).
+- **Coverage/budget-wachter:** [`tests/assistantCoverage.test.js`](tests/assistantCoverage.test.js) —
+  elke data-module heeft een manifest of staat expliciet op `NO_ASSISTANT`; toolset onder de herbezoek-drempel.
+- **DoD:** volledige suite **1171 pass** / 0 fail (34 skip = live-RLS), typecheck + `eslint .` schoon.
+  Normatieve doc [`docs/assistent-architectuur.md`](docs/assistent-architectuur.md) §1+§11 bijgewerkt.
+  **Bewust uitgesteld → fase 2:** de tool-factory + gedeeld veld-schema (bewijs pas z'n waarde bij de eerste
+  nieuwe tool) en het dichten van de 5 lege modules (planten/huisdieren/voertuigen/tijdlijn/delen). **Rest:**
+  edge-deploy (bundel-brug bevestigen) + device-smoke van de beheer-UI + eval-gate draaien (geen regressie
+  verwacht — tool-facing surface onveranderd).

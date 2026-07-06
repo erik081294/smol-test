@@ -83,7 +83,17 @@ afwijken faalt in CI, niet pas in productie:
 - **Consolidatie boven wildgroei**: één read- + hooguit één-à-twee write-tools per
   module (taak-gericht, niet endpoint-gericht). Tool-search/deferred loading is
   bewust uitgesteld; herbezoek wanneer de per-huishouden-gefilterde set structureel
-  >20–25 tools of >10K tokens wordt.
+  >20–25 tools of >10K tokens wordt. De meta-test
+  [`tests/assistantCoverage.test.js`](../tests/assistantCoverage.test.js) bewaakt beide:
+  elke `kind:'data'`-module heeft een manifest of staat expliciet op `NO_ASSISTANT`
+  (geen stil dekkingsgat), en de totale set blijft onder de herbezoek-drempel.
+- **Manifest = de enige declaratie per module.** Elke skill-file exporteert één
+  `<MODULE>_MANIFEST { moduleKey, label, brief, tools }`;
+  [`tools/index.js`](../supabase/functions/_shared/tools/index.js) leidt `ASSISTANT_TOOLS`
+  + `MODULE_BRIEFS` af uit de `MANIFESTS`-lijst — een nieuwe module = één import + één
+  regel, geen tweede hand-gelijstte array die kan uitlopen. Elke tool draagt daarnaast
+  een **`risk`-tier** (`read` | `write` | `financial` | `destructive`) die de
+  capability-laag (§11) voedt; het contract-testbestand pint de tier per tool exact vast.
 
 ## 2. Tool-budget & lazy loading
 
@@ -209,3 +219,35 @@ blijft server-side atomair en los undo-baar (`pendingActionIds` in `lib/assistan
   `dataModelUpdate`, `deleteSurface`) zodra AI-7 landt; de platte tree blijft als
   compat-vorm werken. Client-acties lopen uitsluitend via de whitelist in
   `lib/assistantActions.js` (onAction-bridge).
+
+## 11. Capability-laag — wie mag de assistent wat laten doen (B4)
+
+Een aparte autorisatielaag **náást** RLS en de module-toggle, want geen van beide dekt
+"mag de assistent namens dít lid een actie van dit risico uitvoeren" (use-case: parental
+control — kinderen mogen niets laten boeken/verwijderen).
+
+- **Drie lagen, niet één:** RLS regelt rij-toegang; de module-toggle regelt óf een
+  module meedoet; de capability-laag regelt welke **acties** een lid mag laten uitvoeren.
+- **Pure policy:** [`lib/aiCapabilities.js`](../lib/aiCapabilities.js) — `requiredCapabilities`
+  (tool → benodigde capabilities uit de `risk`-tier), `grantedCapabilities` (default-on;
+  `AI_CAPABILITIES` = `ai:write` / `ai:spend` / `ai:destructive`) en `canUseTool`. Reads
+  vereisen niets; een write vraagt `ai:write`, financieel ook `ai:spend`, destructief ook
+  `ai:destructive`. Unit-getest + mutatie-ratchet.
+- **Opslag:** migratie `0074` — `user_ai_capabilities(household_id, profile_id,
+  capability_key, allowed)`, **default-on** (alleen intrekkingen opgeslagen, spiegelt de
+  module-toggles). RLS: de **owner** beheert per lid; een lid **leest** zijn eigen stand
+  maar wijzigt niet (parental control mag een lid niet terugdraaien).
+- **Server-afgedwongen, twee punten** (fail-open naar het huidige gedrag bij een
+  query-fout — RLS blijft de backstop): `filterTools` krijgt in
+  [`assistant/index.ts`](../supabase/functions/assistant/index.ts) een `canUse`-poort zodat
+  het model een verboden tool niet eens ziet, én er is een her-check vóór `execute` zodat
+  een intussen ingetrokken recht niet via een oud voorstel doorglipt. Dezelfde harness
+  leidt nu óók de **moduleset server-side** af (uit `household_modules`/`user_module_prefs`)
+  i.p.v. de client-`enabledModuleKeys` te vertrouwen — de client bepaalt de tools niet meer.
+- **App↔edge-brug:** de edge importeert hiervoor de pure `lib/modules.js` +
+  `lib/aiCapabilities.js` (dezelfde bronmodules als de app). Beide zijn side-effect-vrij;
+  dit is de eerste gedeelde import over de app/edge-grens.
+- **Beheer:** owner-only sectie in het huishouden-scherm (per lid drie toggles) via de
+  dunne hook [`lib/useAiCapabilities.js`](../lib/useAiCapabilities.js).
+- **Nog niet:** een household-brede capability-laag (de seam `householdRevoked` in
+  `grantedCapabilities` staat klaar) en zelf-restrictie door een lid — bewust uitgesteld.
