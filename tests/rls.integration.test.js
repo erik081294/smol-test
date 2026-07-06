@@ -205,6 +205,47 @@ test('RLS: SEC-4 — alleen de owner mag het huishouden bewerken (naam/budget)',
   assert.equal(aliceUpd?.length, 1, 'de owner mag het huishouden bewerken');
 });
 
+// --- AI-capabilities (0074): owner beheert per lid, lid leest eigen maar wijzigt niet --
+test('RLS 0074: owner zet AI-capability per lid; lid leest eigen maar wijzigt niet; buitenstaander/niet-lid buitenspel', opts, async () => {
+  const alice = await makeUser('alice_cap'); // owner
+  const bob = await makeUser('bob_cap');     // lid (het "kind")
+  const eve = await makeUser('eve_cap');     // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Caphuis');
+  await addMember(alice, bob, hh.id);
+
+  // Owner trekt ai:spend in voor Bob (parental control).
+  const { error: setErr } = await alice.client.from('user_ai_capabilities')
+    .insert({ household_id: hh.id, profile_id: bob.id, capability_key: 'ai:spend', allowed: false });
+  assert.ok(!setErr, `owner mag een AI-capability per lid zetten: ${setErr?.message}`);
+
+  // Bob ziet zijn eigen intrekking.
+  const bobSees = await bob.client.from('user_ai_capabilities')
+    .select('capability_key, allowed').eq('household_id', hh.id).eq('profile_id', bob.id);
+  assert.equal(bobSees.data?.length, 1, 'lid ziet zijn eigen AI-capability-stand');
+  assert.equal(bobSees.data?.[0]?.allowed, false);
+
+  // Bob mag zichzelf NIET terug-toestaan (write is owner-only) → RLS-using filtert de update weg.
+  const bobUpd = await bob.client.from('user_ai_capabilities')
+    .update({ allowed: true }).eq('household_id', hh.id).eq('profile_id', bob.id).select();
+  assert.equal(bobUpd.data?.length ?? 0, 0, 'een lid mag zijn eigen AI-capability niet terugzetten (parental control)');
+
+  // Bob mag ook geen eigen rij aanmaken (geen owner) → geweigerd.
+  const bobIns = await bob.client.from('user_ai_capabilities')
+    .insert({ household_id: hh.id, profile_id: bob.id, capability_key: 'ai:write', allowed: false });
+  assert.ok(bobIns.error, 'een lid mag geen eigen AI-capability-rij aanmaken');
+
+  // Buitenstaander ziet niets.
+  const eveSees = await eve.client.from('user_ai_capabilities')
+    .select('capability_key').eq('household_id', hh.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet geen AI-capabilities');
+
+  // Owner mag geen capability zetten voor een niet-lid (with-check membership) → geweigerd.
+  const orphan = await alice.client.from('user_ai_capabilities')
+    .insert({ household_id: hh.id, profile_id: eve.id, capability_key: 'ai:write', allowed: false });
+  assert.ok(orphan.error, 'owner mag geen AI-capability zetten voor een niet-lid');
+});
+
 // --- Kosten-module: expenses (via de create_expense RPC) + expense_shares ----
 // Verifieert dat (a) de atomaire RPC werkt, (b) de hoofdtabel het contract volgt
 // en (c) de kindtabel expense_shares de zichtbaarheid van zijn parent erft.
