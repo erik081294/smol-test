@@ -12,28 +12,52 @@ import { addDays, dayLabel, isIsoDate, throwOnError } from './helpers.js';
 export const MEAL_TYPES = ['ontbijt', 'lunch', 'diner', 'snack'];
 
 /**
- * Weekmenu-regels → data + kaart. Verwacht rows gesorteerd op plan_date; de
+ * Weekmenu-regels → data + rooster. Verwacht rows gesorteerd op plan_date; de
  * titel komt uit vrije tekst (title) of het gekoppelde recept (recipes.title).
+ * Rendert een schedule-node (AI-16, plan 26) met álle dagen van het venster —
+ * lege dagen zijn informatie (gaten in het menu). `today` (ctx.today) bepaalt
+ * server-side de dagmarkering én het venster; zonder geldige startdatum vallen
+ * we terug op alleen de dagen die entries hebben (puur, nooit crashen op data).
+ * De `data` naar het model is byte-identiek aan vóór AI-16.
  * @param {Array<{plan_date:string, meal_type?:string|null, title?:string|null, servings?:number|null, recipes?:{title?:string|null}|null}>} [rows]
- * @param {number} [days] hoeveel dagen vooruit er is gekeken (voor de kaarttitel)
+ * @param {number} [days] hoeveel dagen vooruit er is gekeken (voor de roostertitel)
+ * @param {string} [today] startdag van het venster als YYYY-MM-DD (ctx.today)
  */
-export function renderWeekMenu(rows = [], days = 7) {
+export function renderWeekMenu(rows = [], days = 7, today = '') {
   const entries = rows.map((r) => ({
     date: r.plan_date,
     meal_type: r.meal_type ?? 'diner',
     title: r.title ?? r.recipes?.title ?? 'Maaltijd',
     servings: r.servings ?? null,
   }));
-  const items = entries.map((e) => {
+  const data = { count: entries.length, entries };
+  if (entries.length === 0) {
+    return { data, render: [{ type: 'card', title: 'Weekmenu', lines: ['Er staat nog niets op het menu.'] }] };
+  }
+  const entryText = (/** @type {typeof entries[0]} */ e) => {
     const meal = e.meal_type === 'diner' ? '' : ` · ${e.meal_type}`;
     const servings = e.servings ? ` (${e.servings}p)` : '';
-    return { text: `${dayLabel(e.date)}${meal} — ${e.title}${servings}` };
-  });
-  const data = { count: entries.length, entries };
-  const render = items.length > 0
-    ? [{ type: 'list', title: `Weekmenu (komende ${days} dagen)`, items }]
-    : [{ type: 'card', title: 'Weekmenu', lines: ['Er staat nog niets op het menu.'] }];
-  return { data, render };
+    return `${e.title}${servings}${meal}`;
+  };
+  // Het dag-raster: bij een geldige startdatum álle dagen van het venster
+  // (gaten zichtbaar), anders alleen de dagen waarop iets gepland staat.
+  const dates = isIsoDate(today)
+    ? Array.from({ length: days }, (_, i) => addDays(today, i))
+    : [...new Set(entries.map((e) => e.date))];
+  const dayRows = dates.map((date) => ({
+    label: dayLabel(date),
+    today: date === today,
+    entries: entries.filter((e) => e.date === date).map((e) => ({ text: entryText(e) })),
+  }));
+  // Tekst-fallback voor oudere clients (poortwachter degradeert onbekende
+  // node-types naar node.text): het oude lijstformaat, regel per maaltijd.
+  const text = entries
+    .map((e) => `${dayLabel(e.date)} — ${entryText(e)}`)
+    .join('\n');
+  return {
+    data,
+    render: [{ type: 'schedule', title: `Weekmenu (komende ${days} dagen)`, days: dayRows, text }],
+  };
 }
 
 export const MAX_RECIPE_INGREDIENTS = 30;
@@ -66,7 +90,12 @@ export function renderRecipe(recipe = {}) {
       if (!name) return null;
       const qty = Number.isFinite(ing?.quantity) && /** @type {number} */ (ing.quantity) > 0 ? ing.quantity : null;
       const unit = typeof ing?.unit === 'string' && ing.unit.trim() ? ing.unit.trim() : null;
-      return { text: qty ? `${name} · ${qty}${unit ? ` ${unit}` : ''}` : name };
+      // Naast de tekstregel reizen de gestructureerde velden mee (AI-16): die
+      // voeden de porties-stepper met live herrekening op de client. Zonder
+      // hoeveelheid ("naar smaak") blijft het een kale tekstregel.
+      return qty
+        ? { text: `${name} · ${qty}${unit ? ` ${unit}` : ''}`, name, quantity: qty, unit }
+        : { text: name };
     })
     .filter(Boolean);
   return {
@@ -95,7 +124,24 @@ export function renderRecipeMatches(rows = [], query = '') {
     const line = q ? `Geen recept gevonden voor "${query}".` : 'Er staan nog geen recepten in het boek.';
     return { data, render: [{ type: 'card', title: 'Recepten', lines: [line] }] };
   }
-  const render = top.map((r) => renderRecipe({ title: r.title, servings: r.servings, instructions: r.instructions, ingredients: r.recipe_ingredients }));
+  const render = /** @type {object[]} */ (top.map((r) => renderRecipe({ title: r.title, servings: r.servings, instructions: r.instructions, ingredients: r.recipe_ingredients })));
+  if (top.length >= 2) {
+    // Meerdere treffers → beslis-kaart (AI-16): een tik stuurt de keuze als
+    // gewone gebruikersbeurt, zodat het model met dát recept verder gaat.
+    // Deterministisch server-side gerenderd — het model fabriceert geen opties.
+    const options = top.map((r) => ({
+      label: r.title ?? 'Recept',
+      description: r.servings ? `voor ${r.servings} personen` : null,
+      reply: `Gebruik het recept "${r.title ?? 'Recept'}"`,
+    }));
+    render.push({
+      type: 'choice',
+      prompt: 'Welk recept bedoel je?',
+      options,
+      // Fallback voor oudere clients: prompt + opties als leesbare regel.
+      text: `Welk recept bedoel je? ${options.map((o) => o.label).join(' / ')}`,
+    });
+  }
   return { data, render };
 }
 
@@ -223,7 +269,7 @@ export const MAALTIJDEN_TOOLS = [
           .order('plan_date', { ascending: true })
           .limit(60)
       );
-      return renderWeekMenu(rows, days);
+      return renderWeekMenu(rows, days, ctx.today);
     },
   },
   {

@@ -2,7 +2,7 @@
 // top-3-sortering en de maandgrens-compositie van de query.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KOSTEN_TOOLS, KOSTEN_BRIEF, KOSTEN_MANIFEST, renderExpensesSummary } from '../supabase/functions/_shared/tools/kosten.js';
+import { KOSTEN_TOOLS, KOSTEN_BRIEF, KOSTEN_MANIFEST, renderExpensesSummary, weeklyExpensePoints } from '../supabase/functions/_shared/tools/kosten.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = KOSTEN_TOOLS.find((t) => t.name === 'kosten_maandoverzicht');
@@ -58,6 +58,54 @@ test('renderExpensesSummary: ontbrekend amount_cents telt als 0; leeg/default �
   assert.equal(data.total_cents, 0);
   const empty = renderExpensesSummary();
   assert.deepEqual(empty.render, [{ type: 'card', title: 'Uitgaven', lines: ['Geen uitgaven gevonden.'] }]);
+});
+
+// --- Weekgrafiek (AI-16, plan 26): pure bucketing + de chart-node op de samenvatting.
+
+test('weeklyExpensePoints: vaste 7-daagse buckets, lege weken blijven staan, laatste bucket tot maandeinde', () => {
+  const rows = [
+    { amount_cents: 100, spent_on: '2026-07-01' },   // bucket 1–7
+    { amount_cents: 250, spent_on: '2026-07-07' },   // precies op de bucketgrens → 1–7
+    { amount_cents: 400, spent_on: '2026-07-08' },   // precies erover → 8–14
+    { amount_cents: 999, spent_on: '2026-07-31' },   // maandeinde → 29–31
+    { amount_cents: 555, spent_on: '2026-06-30' },   // andere maand → telt niet mee
+    { spent_on: '2026-07-02' },                       // ontbrekend bedrag telt als 0
+  ];
+  assert.deepEqual(weeklyExpensePoints(rows, '2026-07'), [
+    { label: '1–7', value: 350 },
+    { label: '8–14', value: 400 },
+    { label: '15–21', value: 0 },
+    { label: '22–28', value: 0 },
+    { label: '29–31', value: 999 },
+  ]);
+});
+
+test('weeklyExpensePoints: maandlengte bepaalt de buckets (feb = 4, geen loze vijfde)', () => {
+  assert.deepEqual(weeklyExpensePoints([], '2026-02').map((p) => p.label), ['1–7', '8–14', '15–21', '22–28']);
+  assert.deepEqual(weeklyExpensePoints([], '2026-09').map((p) => p.label), ['1–7', '8–14', '15–21', '22–28', '29–30']);
+});
+
+test('weeklyExpensePoints: ongeldige maand of default → [] (geen grafiek)', () => {
+  assert.deepEqual(weeklyExpensePoints([{ amount_cents: 100, spent_on: '2026-07-01' }], 'juli 2026'), []);
+  assert.deepEqual(weeklyExpensePoints([], '2026-13'), []);
+  assert.deepEqual(weeklyExpensePoints(), []);
+});
+
+test('renderExpensesSummary: hangt de weekgrafiek (unit euro, centen) achter de keyvalue-kaart', () => {
+  const { data, render } = renderExpensesSummary([{ description: 'Boodschappen', amount_cents: 12500, spent_on: '2026-07-02' }], '2026-07');
+  // De data naar het model blijft byte-identiek aan vóór AI-16.
+  assert.deepEqual(data, { count: 1, total_cents: 12500 });
+  assert.deepEqual(render.map((n) => n.type), ['keyvalue', 'chart']);
+  assert.equal(render[1].title, 'Per week');
+  assert.equal(render[1].unit, 'euro');
+  assert.deepEqual(render[1].points[0], { label: '1–7', value: 12500 });
+  // Tekst-fallback voor oude clients: leesbaar, met euro-notatie.
+  assert.match(render[1].text, /^Per week: 1–7: € 125,00/);
+});
+
+test('renderExpensesSummary: zonder geldig maand-label wél de samenvatting, geen grafiek', () => {
+  const { render } = renderExpensesSummary([{ description: 'x', amount_cents: 100, spent_on: '2026-07-01' }], '');
+  assert.deepEqual(render.map((n) => n.type), ['keyvalue']);
 });
 
 test('kosten_maandoverzicht: default-maand uit ctx.today, ongeldige month-arg genegeerd', async () => {

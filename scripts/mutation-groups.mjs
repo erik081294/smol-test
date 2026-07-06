@@ -98,6 +98,9 @@ export const GROUPS = [
   { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },
   // Assistent (AI-1, plan 23): catalog-poortwachter, agent-loop-kern en tool-registry.
   { test: 'assistantUi', srcs: ['lib/assistantUi.js'] },
+  // Pure interactie-logica van de gen-UI-componenten (AI-16, plan 26): grafiek-
+  // layout/as-schaal en de porties-herrekening van de recept-kaart.
+  { test: 'assistantGenUi', srcs: ['lib/assistantGenUi.js'] },
   // SSE-client-laag + markdown-subset van de assistent (AI-5, plan 24 ronde D).
   { test: 'assistantStream', srcs: ['lib/assistantStream.js'] },
   { test: 'markdownLite', srcs: ['lib/markdownLite.js'] },
