@@ -88,19 +88,50 @@ test('weeklyExpensePoints: maandlengte bepaalt de buckets (feb = 4, geen loze vi
 test('weeklyExpensePoints: ongeldige maand of default → [] (geen grafiek)', () => {
   assert.deepEqual(weeklyExpensePoints([{ amount_cents: 100, spent_on: '2026-07-01' }], 'juli 2026'), []);
   assert.deepEqual(weeklyExpensePoints([], '2026-13'), []);
+  assert.deepEqual(weeklyExpensePoints([], '2026-00'), []);        // maand 0 bestaat niet
+  assert.deepEqual(weeklyExpensePoints([], 'x2026-07'), []);        // ^-anker: geen prefix-rommel
+  assert.deepEqual(weeklyExpensePoints([], '2026-070'), []);        // $-anker: geen suffix-rommel
   assert.deepEqual(weeklyExpensePoints(), []);
 });
 
+test('weeklyExpensePoints: maandgrenzen exact — januari en december zijn gewone maanden', () => {
+  assert.equal(weeklyExpensePoints([{ amount_cents: 100, spent_on: '2026-01-15' }], '2026-01')[2].value, 100);
+  assert.equal(weeklyExpensePoints([{ amount_cents: 100, spent_on: '2026-12-31' }], '2026-12')[4].value, 100);
+});
+
+test('weeklyExpensePoints: kapotte dagen en rommel-rijen vervallen zonder crash', () => {
+  const points = weeklyExpensePoints([
+    null,                                            // rommel-rij
+    { amount_cents: 100, spent_on: '2026-07-ab' },   // geen dag-getal
+    { amount_cents: 100, spent_on: '2026-07-00' },   // dag 0 bestaat niet
+    { amount_cents: 100, spent_on: '2026-02-30' },   // voorbij het maandeinde… van een andere maand
+    { amount_cents: 100, spent_on: '2026-07-32' },   // voorbij het maandeinde
+    { amount_cents: 700, spent_on: '2026-07-15' },   // de enige geldige
+  ], '2026-07');
+  assert.deepEqual(points.map((p) => p.value), [0, 0, 700, 0, 0]);
+  // Voorbij het maandeinde binnen de eigen maand: 30 feb telt ook in februari niet mee.
+  assert.deepEqual(weeklyExpensePoints([{ amount_cents: 100, spent_on: '2026-02-30' }], '2026-02').map((p) => p.value), [0, 0, 0, 0]);
+});
+
 test('renderExpensesSummary: hangt de weekgrafiek (unit euro, centen) achter de keyvalue-kaart', () => {
-  const { data, render } = renderExpensesSummary([{ description: 'Boodschappen', amount_cents: 12500, spent_on: '2026-07-02' }], '2026-07');
+  const { data, render } = renderExpensesSummary([
+    { description: 'Boodschappen', amount_cents: 12500, spent_on: '2026-07-02' },
+    { description: 'Tuin', amount_cents: 800, spent_on: '2026-07-10' },
+    { description: 'Zonder bedrag', spent_on: '2026-07-11' },
+  ], '2026-07');
   // De data naar het model blijft byte-identiek aan vóór AI-16.
-  assert.deepEqual(data, { count: 1, total_cents: 12500 });
+  assert.deepEqual(data, { count: 3, total_cents: 13300 });
   assert.deepEqual(render.map((n) => n.type), ['keyvalue', 'chart']);
+  // Ontbrekend bedrag rendert als € 0,00 in de top-3 (nooit NaN de kaart in).
+  assert.deepEqual(render[0].pairs[4], { k: 'Zonder bedrag', v: '€ 0,00' });
   assert.equal(render[1].title, 'Per week');
   assert.equal(render[1].unit, 'euro');
-  assert.deepEqual(render[1].points[0], { label: '1–7', value: 12500 });
-  // Tekst-fallback voor oude clients: leesbaar, met euro-notatie.
-  assert.match(render[1].text, /^Per week: 1–7: € 125,00/);
+  assert.deepEqual(render[1].points.slice(0, 2), [{ label: '1–7', value: 12500 }, { label: '8–14', value: 800 }]);
+  // Tekst-fallback voor oude clients: leesbaar, met euro-notatie en ·-scheiding.
+  assert.equal(
+    render[1].text,
+    'Per week: 1–7: € 125,00 · 8–14: € 8,00 · 15–21: € 0,00 · 22–28: € 0,00 · 29–31: € 0,00'
+  );
 });
 
 test('renderExpensesSummary: zonder geldig maand-label wél de samenvatting, geen grafiek', () => {
@@ -109,8 +140,9 @@ test('renderExpensesSummary: zonder geldig maand-label wél de samenvatting, gee
 });
 
 test('kosten_maandoverzicht: default-maand uit ctx.today, ongeldige month-arg genegeerd', async () => {
-  // '2026-07-12' matcht wél een regex zonder $-anker — bewaakt het exacte YYYY-MM-formaat.
-  for (const args of [{}, { month: 'onzin' }, { month: '2026-07-12' }]) {
+  // '2026-07-12' matcht wél een regex zonder $-anker en 'x2026-06' wél één
+  // zonder ^-anker — samen bewaken ze het exacte YYYY-MM-formaat.
+  for (const args of [{}, { month: 'onzin' }, { month: '2026-07-12' }, { month: 'x2026-06' }]) {
     const calls = [];
     await tool.run(toolCtx({ expenses: [] }, calls), args);
     assert.deepEqual(calls[0].filters, [

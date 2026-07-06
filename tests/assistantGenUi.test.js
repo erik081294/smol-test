@@ -46,10 +46,18 @@ test('chartLayout: negatieve/kapotte waarden klemmen op 0; leeg of zonder argume
   assert.deepEqual(layout.bars.map((b) => b.value), [0, 40]);
   assert.equal(chartLayout([]), null);
   assert.equal(chartLayout(), null);
+  assert.equal(chartLayout('rommel'), null);   // niet-array → null, geen verzonnen staaf
   // Alleen nullen: de as valt terug op 1 zodat de fracties 0 blijven (geen NaN).
   const zeros = chartLayout([{ label: 'a', value: 0 }]);
   assert.equal(zeros.max, 1);
   assert.deepEqual(zeros.bars.map((b) => b.frac), [0]);
+});
+
+test('chartLayout: kapotte velden degraderen per veld (label → \'\', niet-getal → 0)', () => {
+  const layout = chartLayout([null, { value: 5 }, { label: 'ok', value: '5' }]);
+  assert.deepEqual(layout.bars.map((b) => b.label), ['', '', 'ok']);
+  // Ontbrekend label laat de waarde intact; een string-waarde is type-strikt geen getal.
+  assert.deepEqual(layout.bars.map((b) => b.value), [0, 5, 0]);
 });
 
 test('formatChartValue: euro = centen → hele euro\'s met duizendtallen-punt', () => {
@@ -110,7 +118,24 @@ test('scaleIngredients: gelijke porties of onbruikbare invoer → dezelfde refer
   const input = [{ text: 'Penne · 400 gram', name: 'Penne', quantity: 400, unit: 'gram' }];
   assert.equal(scaleIngredients(input, 4, 4), input);
   assert.equal(scaleIngredients(input, null, 6), input);
-  assert.equal(scaleIngredients(input, 0, 6), input);
+  assert.equal(scaleIngredients(input, 0, 6), input);     // precies op de grens (0 porties bestaat niet)
+  assert.equal(scaleIngredients(input, 2.5, 6), input);   // geen geheel getal
   assert.equal(scaleIngredients(input, 4, 0), input);
+  assert.equal(scaleIngredients(input, 4, 2.5), input);
   assert.deepEqual(scaleIngredients(undefined, 4, 6), []);
+});
+
+test('scaleIngredients: incomplete of kapotte regels blijven exact ongemoeid (zelfde poort als de poortwachter)', () => {
+  const input = [
+    { text: 'Raar · -2', name: 'Raar', quantity: -2 },      // negatief → niet schalen
+    { text: 'Nul · 0', name: 'Nul', quantity: 0 },          // 0 → niet schalen (grenswaarde)
+    { text: 'X · 2', name: '', quantity: 2 },               // lege naam → niet schalen
+    { text: 'Y · 2', name: 7, quantity: 2 },                // niet-string-naam → niet schalen
+    null,                                                    // rommel-regel → ongemoeid, geen crash
+    { text: 'Ei · 2', name: 'Ei', quantity: 2 },            // de enige die schaalt
+  ];
+  assert.deepEqual(scaleIngredients(input, 2, 4), [
+    input[0], input[1], input[2], input[3], null,
+    { text: 'Ei · 4', name: 'Ei', quantity: 4 },
+  ]);
 });

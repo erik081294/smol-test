@@ -15,24 +15,28 @@ import { fmtEuro, nextMonth, throwOnError } from './helpers.js';
  * @param {string} [month] "YYYY-MM"
  * @returns {Array<{label:string, value:number}>}
  */
+// Stryker disable next-line all -- default-params: elk niet-"YYYY-MM"-argument
+// (ook een gemuteerde default) faalt de maand-parse en geeft [], en junk-rows
+// vallen op de typeof-check; de mutanten zijn equivalent.
 export function weeklyExpensePoints(rows = [], month = '') {
-  if (!/^\d{4}-\d{2}$/.test(month)) return [];
-  const y = Number(month.slice(0, 4));
-  const m = Number(month.slice(5, 7));
+  const parsed = /^(\d{4})-(\d{2})$/.exec(month ?? '');
+  if (!parsed) return [];
+  const y = Number(parsed[1]);
+  const m = Number(parsed[2]);
   if (m < 1 || m > 12) return [];
   // Date.UTC(y, m, 0) = de laatste dag van maand m (1-based) — geen lokale tz.
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const bucketCount = Math.ceil(lastDay / 7);
-  const points = Array.from({ length: bucketCount }, (_, i) => ({
+  const points = Array.from({ length: Math.ceil(lastDay / 7) }, (_, i) => ({
     label: `${i * 7 + 1}–${Math.min(i * 7 + 7, lastDay)}`,
     value: 0,
   }));
   for (const row of rows) {
-    const spentOn = row?.spent_on ?? '';
-    if (!spentOn.startsWith(`${month}-`)) continue; // andere maand hoort niet in deze grafiek
-    const day = Number(spentOn.slice(8, 10));
+    // Andere maand (of rommel) hoort niet in deze grafiek.
+    if (typeof row?.spent_on !== 'string' || !row.spent_on.startsWith(`${month}-`)) continue;
+    const day = Number(row.spent_on.slice(8, 10));
     if (!Number.isInteger(day) || day < 1 || day > lastDay) continue;
-    points[Math.min(Math.floor((day - 1) / 7), bucketCount - 1)].value += row.amount_cents ?? 0;
+    // day ≤ lastDay borgt dat de bucket-index binnen points valt (geen clamp nodig).
+    points[Math.floor((day - 1) / 7)].value += row.amount_cents ?? 0;
   }
   return points;
 }
