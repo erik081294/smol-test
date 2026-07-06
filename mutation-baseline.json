@@ -2,9 +2,9 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 8046,
-    "total": 9401,
-    "score": 85.6
+    "killed": 8140,
+    "total": 9499,
+    "score": 85.7
   },
   "files": {
     "lib/activity.js": {
@@ -208,9 +208,9 @@
       "score": 92.3
     },
     "lib/timeline.js": {
-      "killed": 105,
-      "total": 112,
-      "score": 93.8
+      "killed": 139,
+      "total": 146,
+      "score": 95.2
     },
     "lib/visibility.js": {
       "killed": 60,
@@ -451,6 +451,11 @@
       "killed": 41,
       "total": 41,
       "score": 100
+    },
+    "lib/timelineFilter.js": {
+      "killed": 60,
+      "total": 64,
+      "score": 93.8
     }
   }
 }

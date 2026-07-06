@@ -4,10 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTimeline, TIMELINE_BUCKET } from '../../lib/useTimeline';
 import { useReactions } from '../../lib/useReactions';
+import { useComments } from '../../lib/useComments';
 import { useActivity } from '../../lib/useActivity';
+import { useTimelineFilters } from '../../lib/useTimelineFilters';
+import { visibleOnTimeline, moduleForEventType } from '../../lib/timelineFilter';
 import { useSignedUrl } from '../../lib/photoStorage';
 import { relativeTime } from '../../lib/activity';
-import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton, Collapsible, Banner } from '../../lib/ui';
+import { commentCountLabel } from '../../lib/timeline';
+import { ScreenHeader, Card, Avatar, FAB, Empty, ModuleHelpButton, ListSkeleton, Collapsible, Banner, IconButton, Row } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type, space, radius } from '../../lib/theme';
 import { t } from '../../lib/i18n';
@@ -61,7 +65,7 @@ function ReactionSummary({ reactions }) {
   );
 }
 
-function PostCard({ post, author, reactions, onPress }) {
+function PostCard({ post, author, reactions, commentCount = 0, onPress }) {
   const body = (post.body ?? '').trim();
   const name = author?.display_name ?? 'Lid';
   const pinned = post.pinned_at != null;
@@ -79,6 +83,10 @@ function PostCard({ post, author, reactions, onPress }) {
       {body ? <Text style={[type.body, { marginTop: space.sm }]} numberOfLines={6}>{body}</Text> : null}
       <PhotoStrip photos={post.photos} />
       <ReactionSummary reactions={reactions} />
+      {/* Comment-teller (TML-4): het gesprek zelf leeft op het detail-scherm. */}
+      {commentCount > 0 ? (
+        <Text style={[type.caption, { marginTop: space.sm }]}>{commentCountLabel(commentCount)}</Text>
+      ) : null}
     </Card>
   );
 }
@@ -101,7 +109,18 @@ export default function Tijdlijn() {
   const router = useRouter();
   const { posts, loading, error, reload, loadMore, hasMore, members } = useTimeline();
   const { reactionsFor } = useReactions();
+  const { commentCountFor } = useComments();
   const { feed: activity } = useActivity();
+  // Tijdlijn-filter (TML-6): de twee prefs-lagen bepalen welke systeem-events de
+  // activiteit-laag toont — puur beslist door visibleOnTimeline (module + event-type).
+  const { householdDisabled, userDisabled } = useTimelineFilters();
+  const visibleActivity = useMemo(
+    () => activity.filter((a) => visibleOnTimeline(
+      { module: moduleForEventType(a.type), eventType: a.type },
+      { householdDisabled, userDisabled },
+    )),
+    [activity, householdDisabled, userDisabled],
+  );
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
     [members],
@@ -115,7 +134,14 @@ export default function Tijdlijn() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('timeline.title')} subtitle={t('timeline.subtitle')}
-        right={<ModuleHelpButton module="tijdlijn" />} />
+        right={
+          <Row gap={space.xs}>
+            {/* Filterinstellingen (TML-6): wat verschijnt er op de tijdlijn? */}
+            <IconButton icon="filter" accessibilityLabel={t('timeline.filters.open')}
+              onPress={() => router.push('/tijdlijn/filters')} />
+            <ModuleHelpButton module="tijdlijn" />
+          </Row>
+        } />
       {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met
           opnieuw-proberen i.p.v. een stille lege lijst. */}
       {error && !loading ? (
@@ -136,7 +162,8 @@ export default function Tijdlijn() {
         onEndReached={hasMore ? loadMore : undefined}
         onEndReachedThreshold={0.5}
         renderItem={({ item }) => (
-          <PostCard post={item} author={byId[item.author_id]} reactions={reactionsFor('post', item.id)} onPress={() => router.push(`/tijdlijn/${item.id}`)} />
+          <PostCard post={item} author={byId[item.author_id]} reactions={reactionsFor('post', item.id)}
+            commentCount={commentCountFor(item.id)} onPress={() => router.push(`/tijdlijn/${item.id}`)} />
         )}
         ListEmptyComponent={loading ? (
           <ListSkeleton count={4} />
@@ -149,9 +176,9 @@ export default function Tijdlijn() {
             onAction={() => router.push('/tijdlijn/compose')}
           />
         )}
-        ListFooterComponent={activity.length ? (
+        ListFooterComponent={visibleActivity.length ? (
           <Collapsible label={t('timeline.activity')} summary={t('timeline.activity.summary')} style={{ marginTop: space.md }}>
-            {activity.map((a) => <ActivityRow key={a.id} item={a} />)}
+            {visibleActivity.map((a) => <ActivityRow key={a.id} item={a} />)}
           </Collapsible>
         ) : null}
       />
