@@ -63,6 +63,9 @@ export const GROUPS = [
   // Pure lijst-kern onder de optimistische mutaties van useCollection (patch/remove/
   // removeMany; review 2026-07-02). De hook zelf blijft React-schil (niet gemuteerd).
   { test: 'optimisticList', srcs: ['lib/optimisticList.js'] },
+  // Wachtwoordloze e-mail-OTP-login (PLT-8): code-validatie, resend-afkoeltijd en
+  // de naam-check na de eerste login. De welcome-/naam-schermen zijn dunne schil.
+  { test: 'otp', srcs: ['lib/otp.js'] },
   { test: 'pantry', srcs: ['lib/pantry.js'] },
   { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
   { test: 'plantCare', srcs: ['lib/plantCare.js'] },

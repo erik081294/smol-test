@@ -117,7 +117,14 @@ export default function JoinInvite() {
     }
   }, [token, acceptInvite, dialog]);
 
-  const goLogin = useCallback(() => router.push('/(auth)/welcome'), [router]);
+  // Nieuwe genodigden gaan expliciet naar de OTP-variant van het welkomscherm
+  // (PLT-8): inloggen/registreren met een e-mailcode, zonder wachtwoord. De
+  // pending-invite (AsyncStorage, hierboven gezet bij een geldige preview)
+  // overleeft die login gewoon — de banner verschijnt daarna in onboarding.
+  const goLogin = useCallback(
+    () => router.push({ pathname: '/(auth)/welcome', params: { mode: 'otp' } }),
+    [router],
+  );
   const goApp = useCallback(() => router.replace('/(tabs)/vandaag'), [router]);
   const dismiss = useCallback(() => { clearPendingInvite(); router.replace('/'); }, [clearPendingInvite, router]);
   const showDownloadSoon = useCallback(
