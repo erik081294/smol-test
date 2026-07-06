@@ -99,6 +99,7 @@
     "lib/widgets/colorSchemes.js",
     "lib/assistantActions.js",
     "supabase/functions/_shared/tools/helpers.js",
+    "supabase/functions/_shared/tools/render.js",
     "supabase/functions/_shared/tools/taken.js",
     "supabase/functions/_shared/tools/boodschappen.js",
     "supabase/functions/_shared/tools/kosten.js",

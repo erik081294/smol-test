@@ -110,6 +110,9 @@ export const GROUPS = [
   // Assistent-tool-packs (skill-file per module, guidelines §1) + HITL-lagen (AI-8):
   // per pack een eigen test zodat de ratchet gericht per module draait.
   { test: 'assistantToolPacks', srcs: ['supabase/functions/_shared/tools/index.js', 'supabase/functions/_shared/tools/helpers.js'] },
+  // Gedeeld gen-UI-vocabulaire (AI-16 ronde 2): node-constructors + fallback-
+  // generatie; het roundtrip-contract met de poortwachter zit in dezelfde test.
+  { test: 'assistantRender', srcs: ['supabase/functions/_shared/tools/render.js'] },
   { test: 'assistantToolsTaken', srcs: ['supabase/functions/_shared/tools/taken.js'] },
   { test: 'assistantToolsBoodschappen', srcs: ['supabase/functions/_shared/tools/boodschappen.js'] },
   { test: 'assistantToolsKosten', srcs: ['supabase/functions/_shared/tools/kosten.js'] },

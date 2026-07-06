@@ -4,6 +4,7 @@
 // daar een use-case voor is — consolidatie boven tool-wildgroei. Contract: zie taken.js.
 
 import { fmtEuro, nextMonth, throwOnError } from './helpers.js';
+import { chartNode } from './render.js';
 
 /**
  * Uitgaven van één maand → weekpunten voor de staafgrafiek (AI-16, plan 26):
@@ -62,16 +63,9 @@ export function renderExpensesSummary(rows = [], monthLabel = '') {
     pairs: [{ k: 'Totaal', v: fmtEuro(total) }, { k: 'Aantal', v: String(rows.length) }, ...top],
   }]);
   const points = weeklyExpensePoints(rows, monthLabel);
-  if (points.length > 0) {
-    render.push({
-      type: 'chart',
-      title: 'Per week',
-      unit: 'euro',
-      points,
-      // Fallback voor oudere clients (poortwachter degradeert naar node.text).
-      text: `Per week: ${points.map((p) => `${p.label}: ${fmtEuro(p.value)}`).join(' · ')}`,
-    });
-  }
+  // Compositie uit het gedeelde vocabulaire (render.js): text-fallback voor
+  // oudere clients komt uit de constructor mee.
+  if (points.length > 0) render.push(chartNode({ title: 'Per week', unit: 'euro', points }));
   return { data, render };
 }
 

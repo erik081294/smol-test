@@ -8,6 +8,7 @@
 // Contract: zie taken.js.
 
 import { addDays, dayLabel, isIsoDate, throwOnError } from './helpers.js';
+import { choiceNode, scheduleNode } from './render.js';
 
 export const MEAL_TYPES = ['ontbijt', 'lunch', 'diner', 'snack'];
 
@@ -49,14 +50,11 @@ export function renderWeekMenu(rows = [], days = 7, today = '') {
     today: date === today,
     entries: entries.filter((e) => e.date === date).map((e) => ({ text: entryText(e) })),
   }));
-  // Tekst-fallback voor oudere clients (poortwachter degradeert onbekende
-  // node-types naar node.text): het oude lijstformaat, regel per maaltijd.
-  const text = entries
-    .map((e) => `${dayLabel(e.date)} — ${entryText(e)}`)
-    .join('\n');
+  // Compositie uit het gedeelde vocabulaire (render.js): de text-fallback voor
+  // oudere clients (regel per dag mét maaltijden) komt uit de constructor mee.
   return {
     data,
-    render: [{ type: 'schedule', title: `Weekmenu (komende ${days} dagen)`, days: dayRows, text }],
+    render: [scheduleNode({ title: `Weekmenu (komende ${days} dagen)`, days: dayRows })],
   };
 }
 
@@ -129,18 +127,14 @@ export function renderRecipeMatches(rows = [], query = '') {
     // Meerdere treffers → beslis-kaart (AI-16): een tik stuurt de keuze als
     // gewone gebruikersbeurt, zodat het model met dát recept verder gaat.
     // Deterministisch server-side gerenderd — het model fabriceert geen opties.
-    const options = top.map((r) => ({
-      label: r.title ?? 'Recept',
-      description: r.servings ? `voor ${r.servings} personen` : null,
-      reply: `Gebruik het recept "${r.title ?? 'Recept'}"`,
-    }));
-    render.push({
-      type: 'choice',
+    render.push(choiceNode({
       prompt: 'Welk recept bedoel je?',
-      options,
-      // Fallback voor oudere clients: prompt + opties als leesbare regel.
-      text: `Welk recept bedoel je? ${options.map((o) => o.label).join(' / ')}`,
-    });
+      options: top.map((r) => ({
+        label: r.title ?? 'Recept',
+        description: r.servings ? `voor ${r.servings} personen` : null,
+        reply: `Gebruik het recept "${r.title ?? 'Recept'}"`,
+      })),
+    }));
   }
   return { data, render };
 }

@@ -250,6 +250,32 @@ export function openProposalsNote(rows = [], max = 3) {
   return `Openstaand voorstel, wacht op bevestiging van de gebruiker:\n${lines.join('\n')}\nDit is de actuele versie — eerdere formuleringen van hetzelfde voorstel in dit gesprek zijn achterhaald. Zeg niet dat dit al is uitgevoerd; bij een vervolgvraag mag je een nieuw, aangepast voorstel doen.`;
 }
 
+/**
+ * Vervolgbeurt-nota na een bevestigd voorstel (AI-18, plan 26 ronde 2):
+ * "bevestigen is een beurt". De client stuurt na een geslaagde confirm alleen
+ * de action-ids; de server bouwt hier — deterministisch, uit de OPGESLAGEN
+ * rijen — de synthetische gebruikersbeurt waarmee het model kort bevestigt en
+ * de logische vervolgstap voorstelt. Alleen daadwerkelijk uitgevoerde (done)
+ * rijen tellen; samenvattingen worden whitespace-genormaliseerd (zelfde
+ * anti-injectie-regel als openProposalsNote). Niets uitgevoerd → '' (geen beurt).
+ * @param {Array<{ content?: { status?: string, summary?: string, result?: { summary?: string } } }>} [rows]
+ * @param {number} [max] hooguit zoveel voorstellen benoemen (token-budget)
+ * @returns {string}
+ */
+export function actionFollowUpMessage(rows = [], max = 5) {
+  const done = rows
+    .filter((r) => r?.content?.status === 'done' && typeof r.content.summary === 'string')
+    .slice(-max);
+  if (done.length === 0) return '';
+  const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const lines = done.map((r) => {
+    const c = /** @type {{ summary: string, result?: { summary?: string } }} */ (r.content);
+    const result = typeof c.result?.summary === 'string' && c.result.summary ? ` — ${oneLine(c.result.summary)}` : '';
+    return `- ${oneLine(c.summary)}${result}`;
+  });
+  return `[De gebruiker heeft zojuist op de bevestigingskaart akkoord gegeven; dit is uitgevoerd:\n${lines.join('\n')}\nBevestig dit in één korte zin. Ligt er een logische vervolgstap voor de hand (bv. de boodschappen voor een ingepland recept, of de volgende stap uit het gesprek), stel die dan voor — als antwoordoptie of als nieuw voorstel. Verzin geen vervolgstap als er geen voor de hand ligt.]`;
+}
+
 // ---------------------------------------------------------------------------
 // Orq v3-router (Responses API) — de route met dynamische tools + thread/metadata
 // (AI-2; empirisch bewezen: deployments/invoke en agents negeren per-request tools).
