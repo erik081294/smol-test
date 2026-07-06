@@ -75,6 +75,8 @@ export const GROUPS = [
   { test: 'recurringExpense', srcs: ['lib/recurringExpense.js'] },
   { test: 'reservations', srcs: ['lib/reservations.js'] },
   { test: 'rotation', srcs: ['lib/rotation.js'] },
+  // Globaal zoeken (PLT-3): rangschikken van RPC-hits + kind→route/module-mapping.
+  { test: 'searchRank', srcs: ['lib/searchRank.js'] },
   { test: 'timeline', srcs: ['lib/timeline.js'] },
   { test: 'visibility', srcs: ['lib/visibility.js'] },
   // offCategoryMap.js is een token-regeltabel (data); StringLiteral-mutaties op die

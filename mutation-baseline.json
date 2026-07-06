@@ -2,8 +2,8 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 7930,
-    "total": 9279,
+    "killed": 8005,
+    "total": 9360,
     "score": 85.5
   },
   "files": {
@@ -441,6 +441,11 @@
       "killed": 34,
       "total": 37,
       "score": 91.9
+    },
+    "lib/searchRank.js": {
+      "killed": 75,
+      "total": 81,
+      "score": 92.6
     }
   }
 }

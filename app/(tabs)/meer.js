@@ -30,6 +30,15 @@ export default function Meer() {
       <ScreenHeader title={t('more.title')} subtitle={t('more.subtitle')} />
 
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm }}>
+        {/* Globaal zoeken (PLT-3): één ingang naar het zoekscherm over alle
+            modules heen — bovenaan, vóór de module-groepen. */}
+        <ItemRow
+          leading={<Icon name="search" size={26} color={colors.forest} />}
+          title={t('search.title')}
+          chevron
+          onPress={() => router.push('/zoeken')}
+        />
+
         {groups.map((g) => (
           <View key={g.key} style={{ marginTop: space.sm }}>
             <SectionHeader title={t(`more.group.${g.key}`)} />
