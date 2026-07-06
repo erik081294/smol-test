@@ -43,6 +43,7 @@ export const KOSTEN_TOOLS = [
     name: 'kosten_maandoverzicht',
     moduleKey: 'kosten',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Uitgaven op een rijtje zetten…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er is uitgegeven, hoeveel iets kostte of waar het geld heen ging. Geeft een uitgaven-samenvatting van één maand (default: de maand van vandaag); geef month als "YYYY-MM" voor een andere maand.',
     parameters: {
@@ -66,3 +67,12 @@ export const KOSTEN_TOOLS = [
     },
   },
 ];
+
+// Manifest (fundament AI-actie-laag): de enige declaratie per module — brief + tools
+// in één object. index.js leidt hieruit ASSISTANT_TOOLS/MODULE_BRIEFS af (guidelines §1).
+export const KOSTEN_MANIFEST = {
+  moduleKey: KOSTEN_BRIEF.moduleKey,
+  label: KOSTEN_BRIEF.label,
+  brief: KOSTEN_BRIEF.brief,
+  tools: KOSTEN_TOOLS,
+};

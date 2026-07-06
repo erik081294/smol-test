@@ -11,11 +11,22 @@
 // dus de set moet binnen een gesprek byte-stabiel zijn — nooit afhangen van
 // import- of Object.keys-volgorde.
 
-import { TAKEN_TOOLS, TAKEN_BRIEF } from './taken.js';
-import { BOODSCHAPPEN_TOOLS, BOODSCHAPPEN_BRIEF } from './boodschappen.js';
-import { KOSTEN_TOOLS, KOSTEN_BRIEF } from './kosten.js';
-import { VOORRAAD_TOOLS, VOORRAAD_BRIEF } from './voorraad.js';
-import { MAALTIJDEN_TOOLS, MAALTIJDEN_BRIEF } from './maaltijden.js';
+import { TAKEN_MANIFEST } from './taken.js';
+import { BOODSCHAPPEN_MANIFEST } from './boodschappen.js';
+import { KOSTEN_MANIFEST } from './kosten.js';
+import { VOORRAAD_MANIFEST } from './voorraad.js';
+import { MAALTIJDEN_MANIFEST } from './maaltijden.js';
+
+// De enige registratie-plek: één manifest per module. Alles hieronder is afgeleid
+// (tools, briefs, later editable-fields/coverage) — een nieuwe module = hier één
+// import + één regel in MANIFESTS, geen tweede hand-lijst meer die kan uitlopen.
+export const MANIFESTS = [
+  TAKEN_MANIFEST,
+  BOODSCHAPPEN_MANIFEST,
+  KOSTEN_MANIFEST,
+  VOORRAAD_MANIFEST,
+  MAALTIJDEN_MANIFEST,
+];
 
 /**
  * Voeg packs samen tot één registry: gesorteerd op naam, met een harde fout op
@@ -35,13 +46,7 @@ export function aggregateToolPacks(packs) {
   return [...all].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-export const ASSISTANT_TOOLS = aggregateToolPacks([
-  TAKEN_TOOLS,
-  BOODSCHAPPEN_TOOLS,
-  KOSTEN_TOOLS,
-  VOORRAAD_TOOLS,
-  MAALTIJDEN_TOOLS,
-]);
+export const ASSISTANT_TOOLS = aggregateToolPacks(MANIFESTS.map((m) => m.tools));
 
 /**
  * Voeg module-briefs samen tot één map moduleKey → { label, brief } (AI-10):
@@ -59,10 +64,6 @@ export function aggregateBriefs(briefs) {
   return map;
 }
 
-export const MODULE_BRIEFS = aggregateBriefs([
-  TAKEN_BRIEF,
-  BOODSCHAPPEN_BRIEF,
-  KOSTEN_BRIEF,
-  VOORRAAD_BRIEF,
-  MAALTIJDEN_BRIEF,
-]);
+export const MODULE_BRIEFS = aggregateBriefs(
+  MANIFESTS.map((m) => ({ moduleKey: m.moduleKey, label: m.label, brief: m.brief }))
+);

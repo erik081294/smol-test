@@ -81,6 +81,7 @@ export const TAKEN_TOOLS = [
     name: 'taken_open',
     moduleKey: 'taken',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Even in de taken kijken…',
     description: 'Roep dit aan zodra de gebruiker vraagt wat er nog moet gebeuren, naar deadlines, of wie welke taak doet — antwoord niet uit het geheugen. Haalt de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager (only_mine).',
     parameters: {
@@ -104,6 +105,7 @@ export const TAKEN_TOOLS = [
     name: 'taken_toevoegen',
     moduleKey: 'taken',
     kind: 'write',
+    risk: 'write',
     destructive: false, // additief: voegt alleen nieuwe taken toe
     idempotent: false,  // nogmaals uitvoeren = dubbele taken
     statusLabel: 'Voorstel klaarzetten…',
@@ -146,3 +148,12 @@ export const TAKEN_TOOLS = [
     },
   },
 ];
+
+// Manifest (fundament AI-actie-laag): de enige declaratie per module — brief + tools
+// in één object. index.js leidt hieruit ASSISTANT_TOOLS/MODULE_BRIEFS af (guidelines §1).
+export const TAKEN_MANIFEST = {
+  moduleKey: TAKEN_BRIEF.moduleKey,
+  label: TAKEN_BRIEF.label,
+  brief: TAKEN_BRIEF.brief,
+  tools: TAKEN_TOOLS,
+};

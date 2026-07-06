@@ -85,6 +85,7 @@ export const BOODSCHAPPEN_TOOLS = [
     name: 'boodschappen_lijst',
     moduleKey: 'boodschappen',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Boodschappenlijstje erbij pakken…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er nog gehaald moet worden of wat er op de boodschappenlijst staat. Haalt de actuele (onafgevinkte) lijst op. Voor "wat is er in huis / bijna op" is dit niet de juiste tool — gebruik voorraad_bijna_op.',
     parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
@@ -105,6 +106,7 @@ export const BOODSCHAPPEN_TOOLS = [
     name: 'boodschappen_toevoegen',
     moduleKey: 'boodschappen',
     kind: 'write',
+    risk: 'write',
     destructive: false, // additief: zet alleen items op de lijst
     idempotent: false,  // nogmaals uitvoeren = dubbele items
     statusLabel: 'Voorstel klaarzetten…',
@@ -149,6 +151,7 @@ export const BOODSCHAPPEN_TOOLS = [
     name: 'boodschappen_afvinken',
     moduleKey: 'boodschappen',
     kind: 'write',
+    risk: 'write',
     destructive: false, // haalt items van de actieve lijst; omkeerbaar in de lijst-UI
     idempotent: true,   // al afgevinkt = geen effect
     statusLabel: 'Voorstel klaarzetten…',
@@ -195,3 +198,12 @@ export const BOODSCHAPPEN_TOOLS = [
     },
   },
 ];
+
+// Manifest (fundament AI-actie-laag): de enige declaratie per module — brief + tools
+// in één object. index.js leidt hieruit ASSISTANT_TOOLS/MODULE_BRIEFS af (guidelines §1).
+export const BOODSCHAPPEN_MANIFEST = {
+  moduleKey: BOODSCHAPPEN_BRIEF.moduleKey,
+  label: BOODSCHAPPEN_BRIEF.label,
+  brief: BOODSCHAPPEN_BRIEF.brief,
+  tools: BOODSCHAPPEN_TOOLS,
+};

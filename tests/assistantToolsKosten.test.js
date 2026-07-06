@@ -19,6 +19,7 @@ test('descriptor-contract: statische vorm ligt exact vast', () => {
     name: 'kosten_maandoverzicht',
     moduleKey: 'kosten',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Uitgaven op een rijtje zetten…',
     description: 'Roep dit aan wanneer de gebruiker vraagt wat er is uitgegeven, hoeveel iets kostte of waar het geld heen ging. Geeft een uitgaven-samenvatting van één maand (default: de maand van vandaag); geef month als "YYYY-MM" voor een andere maand.',
     parameters: {

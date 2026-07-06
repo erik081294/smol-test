@@ -28,6 +28,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     name: 'taken_open',
     moduleKey: 'taken',
     kind: 'read',
+    risk: 'read',
     statusLabel: 'Even in de taken kijken…',
     description: 'Roep dit aan zodra de gebruiker vraagt wat er nog moet gebeuren, naar deadlines, of wie welke taak doet — antwoord niet uit het geheugen. Haalt de open (niet-afgeronde) taken van het huishouden op, optioneel alleen die van de vrager (only_mine).',
     parameters: {
@@ -41,6 +42,7 @@ test('descriptor-contract: statische vorm van beide tools ligt exact vast', () =
     name: 'taken_toevoegen',
     moduleKey: 'taken',
     kind: 'write',
+    risk: 'write',
     destructive: false,
     idempotent: false,
     statusLabel: 'Voorstel klaarzetten…',

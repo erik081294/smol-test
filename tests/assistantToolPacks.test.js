@@ -5,7 +5,7 @@
 // mutatietest aan te pas komt.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSISTANT_TOOLS, MODULE_BRIEFS, aggregateToolPacks, aggregateBriefs } from '../supabase/functions/_shared/tools/index.js';
+import { ASSISTANT_TOOLS, MODULE_BRIEFS, MANIFESTS, aggregateToolPacks, aggregateBriefs } from '../supabase/functions/_shared/tools/index.js';
 import { fmtEuro, nextMonth, addDays, isIsoDate, dayLabel, resolveMemberId } from '../supabase/functions/_shared/tools/helpers.js';
 import { MODULES } from '../lib/modules.js';
 
@@ -78,6 +78,32 @@ test('contract: read-tools hebben run; write-tools hebben propose+execute + risi
       assert.deepEqual(t.parameters.required, ['items'], `${t.name}: items is verplicht`);
     }
   }
+});
+
+test('contract: elke tool draagt een risk-tier consistent met kind (voedt de capability-policy)', () => {
+  // De policy-laag (lib/aiCapabilities.js) gate't writes op deze tier: 'write' vraagt
+  // ai:write, 'financial' vraagt ai:spend, 'destructive' vraagt ai:destructive.
+  const ALLOWED = { read: new Set(['read']), write: new Set(['write', 'financial', 'destructive']) };
+  for (const t of ASSISTANT_TOOLS) {
+    assert.ok(typeof t.risk === 'string', `${t.name}: risk-tier ontbreekt`);
+    assert.ok(ALLOWED[t.kind]?.has(t.risk), `${t.name}: risk '${t.risk}' past niet bij kind '${t.kind}'`);
+  }
+});
+
+test('manifest: één per module (moduleKey/label/brief/tools) en dekt exact ASSISTANT_TOOLS', () => {
+  const seen = new Set();
+  const fromManifests = [];
+  for (const m of MANIFESTS) {
+    assert.ok(MODULE_KEYS.has(m.moduleKey), `manifest-moduleKey onbekend: ${m.moduleKey}`);
+    assert.ok(!seen.has(m.moduleKey), `dubbel manifest voor ${m.moduleKey}`);
+    seen.add(m.moduleKey);
+    assert.ok(typeof m.label === 'string' && m.label.length > 0, `${m.moduleKey}: label`);
+    assert.ok(typeof m.brief === 'string' && m.brief.length > 0, `${m.moduleKey}: brief`);
+    assert.ok(Array.isArray(m.tools) && m.tools.length > 0, `${m.moduleKey}: tools-array`);
+    for (const t of m.tools) fromManifests.push(t.name);
+  }
+  // De afgeleide registry bevat exact de tools uit de manifests — geen tool buiten een manifest om.
+  assert.deepEqual(fromManifests.sort(), ASSISTANT_TOOLS.map((t) => t.name).sort());
 });
 
 test('contract: propose houdt items en args.items 1-op-1 uitgelijnd (selectie-indexen)', () => {
