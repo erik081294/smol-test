@@ -184,12 +184,23 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
 
 - Node-types uitbreiden alleen na expliciete afweging, max +3 per ronde; de renderer
   degradeert onbekende nodes altijd naar tekst; `link`-nodes alleen naar interne routes.
-- **Node-types (AI-12):** `text, card, list, keyvalue, confirm_action, link, recipe`.
+- **Node-types (AI-12 + AI-16 ronde 1, [plan 26](plans/26-gen-ui-componenten.md)):**
+  `text, card, list, keyvalue, confirm_action, link, recipe, chart, schedule, choice`.
   Een nieuw type whitelist je op vier plekken client-side (`CATALOG_TYPES` +
   `normalizeNode` + `treeToText` in `lib/assistantUi.js`, renderer in
   `lib/AssistantMessageView.js`) plus een server-side `render*`-helper; de exacte set
   ligt vast in `tests/assistantUi.test.js`. `recipe` (titel, porties, ingrediënten,
   bereiding) is de recept-kaart waarop de gebruiker over een AI-recept beslist.
+- **Interactieve nodes (AI-16):** pure interactie-logica leeft in
+  `lib/assistantGenUi.js` (unit-getest + ratchet), de renderer blijft dun. Regels:
+  (a) élke nieuwe server-node draagt een `text`-fallback zodat oudere clients
+  leesbaar degraderen; (b) een `choice`-tik stuurt zijn `reply` als gewone
+  gebruikersbeurt — nooit args of tool-calls vanaf een kaart (HITL blijft de enige
+  schrijfroute); (c) `chart` is één-serie/één-hue met verplicht relief (waarde-labels
+  + a11y-label per staaf + `treeToText` als tabelvorm); (d) live herrekening (zoals
+  de porties-stepper op `recipe`) is client-lokaal en puur — het opgeslagen voorstel
+  verandert er niet door mee; (e) `schedule`-`today` komt van de server (`ctx.today`),
+  de client rekent niet met klok/tijdzone.
 - **Rijke preview bij een write-voorstel:** een `propose()` mag naast `items`/`args` een
   `preview`-array met render-nodes teruggeven; de harness (index.ts) toont die vóór de
   `confirm_action`-kaart. Zo verschijnt de recept-kaart bij het opslaan-voorstel zonder

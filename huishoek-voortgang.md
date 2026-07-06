@@ -1653,3 +1653,32 @@ scaffold** (géén auto-CRUD-per-tabel — dat blaast het ~12-tool-budget op en 
   nieuwe tool) en het dichten van de 5 lege modules (planten/huisdieren/voertuigen/tijdlijn/delen). **Rest:**
   edge-deploy (bundel-brug bevestigen) + device-smoke van de beheer-UI + eval-gate draaien (geen regressie
   verwacht — tool-facing surface onveranderd).
+
+---
+
+**AI-16 ronde 1 — interactieve gen-UI: chart, schedule, choice + porties-stepper (2026-07-06).**
+De gen-UI wordt een volwaardige UI-laag ([plan 26](docs/plans/26-gen-ui-componenten.md); AI-16-rij §6):
+
+- **+3 node-types (§9-max):** **`chart`** — één-serie staafgrafiek (dataviz-methode: één hue,
+  nice-as, recessief grid, tik-inspectie; relief verplicht in donker thema → waarde-labels +
+  a11y-label per staaf + `treeToText` als tabelvorm), gevoed door `kosten_maandoverzicht`
+  (pure [`weeklyExpensePoints`](supabase/functions/_shared/tools/kosten.js), uitgaven per week).
+  **`schedule`** — het weekmenu als rooster met álle vensterdagen (lege dagen zichtbaar als gat,
+  `today` server-side uit `ctx.today`). **`choice`** — AskUserQuestion-beslis-kaart bij ≥2
+  recept-treffers: tik stuurt de reply als gewone gebruikersbeurt (geen args/tools vanaf een
+  kaart — HITL blijft de enige schrijfroute).
+- **Verrijkte `recipe`:** ingrediënten dragen gestructureerd `name/quantity/unit` naast `text`;
+  de kaart krijgt een porties-`Stepper` met **live herrekening** — puur en client-lokaal in het
+  nieuwe [`lib/assistantGenUi.js`](lib/assistantGenUi.js) (`niceMax`/`chartLayout`/
+  `formatChartValue`/`formatQuantity`/`scaleIngredients`).
+- **AI-7-beslissing:** het A2UI-wire-protocol bleek voor deze interactie niet nodig (blijft
+  `Later`); de platte tree is de compat-vorm, live updates zijn client-lokale pure functies.
+- **Veiligheids-invariants intact:** render server-side deterministisch; poortwachter valideert
+  streng (caps 12 punten/6 opties/14 dagen, type-strikt via `Number.isFinite`); élke nieuwe
+  server-node draagt een `text`-fallback voor oudere clients. Tool-descriptions/prompt/`data`
+  **byte-identiek** → geen eval-gate nodig.
+- **DoD:** suite **1204 pass / 0 fail**; typecheck + `eslint .` schoon; mutatie-ratchet groen
+  mét gestegen scores (assistantUi 93,5→**94,5** · kosten 95,8→**98,6** · nieuw assistantGenUi
+  **98,3**; baseline bijgewerkt, totaal 85,2→85,8%). Guidelines §9 uitgebreid met de
+  interactieregels. **Rest:** edge-deploy (samen met de nog open AI-17-deploy — productie draait
+  v16), device-verificatie op de moto (chart-tik, rooster, choice→reply, stepper, beide thema's).
