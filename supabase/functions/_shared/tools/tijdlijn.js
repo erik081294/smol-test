@@ -49,11 +49,32 @@ export function renderTimelineRecent(rows = [], names = {}) {
   return { data, render: [{ type: 'list', title: 'Prikbord', items }] };
 }
 
+export const MAX_POST_LENGTH = 2000;
+
+/**
+ * Puur voorstel-bouwwerk van tijdlijn_plaatsen (fase B, HITL). Post-tekst
+ * verplicht (1-2000); zichtbaarheid is ALTIJD 'household' — de assistent
+ * verzint nooit subgroup/custom (dat vergt geldige subgroep-ids en is een
+ * bewuste mens-keuze in de app). Eén post per voorstel (items[0]).
+ * @param {{ items?: Array<{body?:string}> }} [args]
+ * @returns {{ ok:true, summary:string, items:string[], args:{items:object[]} } | { ok:false, error:string }}
+ */
+export function proposePost(args = {}) {
+  const raw = Array.isArray(args.items) ? args.items : [];
+  if (raw.length === 0) return { ok: false, error: 'Geen bericht om te plaatsen.' };
+  if (raw.length > 1) return { ok: false, error: 'Eén prikbord-bericht per voorstel.' };
+  const body = typeof raw[0]?.body === 'string' ? raw[0].body.trim() : '';
+  if (!body) return { ok: false, error: 'Het bericht heeft tekst nodig.' };
+  if (body.length > MAX_POST_LENGTH) return { ok: false, error: `Een bericht mag maximaal ${MAX_POST_LENGTH} tekens zijn.` };
+  const preview = body.length > 80 ? `${body.slice(0, 79)}…` : body;
+  return { ok: true, summary: 'Bericht op het prikbord plaatsen', items: [preview], args: { items: [{ body }] } };
+}
+
 // Module-brief (guidelines §1).
 export const TIJDLIJN_BRIEF = {
   moduleKey: 'tijdlijn',
   label: 'Tijdlijn',
-  brief: 'het prikbord van het huishouden; kan de recente berichten tonen',
+  brief: 'het prikbord van het huishouden; kan de recente berichten tonen en een bericht plaatsen',
 };
 
 export const TIJDLIJN_TOOLS = [
@@ -74,6 +95,49 @@ export const TIJDLIJN_TOOLS = [
           .limit(15)
       );
       return renderTimelineRecent(rows, ctx.memberNames ?? {});
+    },
+  },
+  {
+    name: 'tijdlijn_plaatsen',
+    moduleKey: 'tijdlijn',
+    kind: 'write',
+    risk: 'write',
+    destructive: false, // additief: alleen een nieuw bericht
+    idempotent: false,  // nogmaals uitvoeren = dubbel bericht
+    statusLabel: 'Bericht klaarzetten…',
+    description: 'Roep dit aan wanneer de gebruiker een bericht op het prikbord/de tijdlijn wil zetten voor de huisgenoten (bv. "zet op het prikbord dat de cv-monteur dinsdag komt"). Het bericht wordt zichtbaar voor het hele huishouden; de gebruiker beslist op de bevestigingskaart.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'Het te plaatsen bericht (precies één).',
+          items: {
+            type: 'object',
+            properties: {
+              body: { type: 'string', description: 'De tekst van het bericht' },
+            },
+            required: ['body'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+    propose: proposePost,
+    async execute(ctx, args) {
+      const rows = throwOnError(
+        await ctx.db.from('timeline_posts').insert({
+          household_id: ctx.householdId,
+          author_id: ctx.userId,
+          body: args.items[0].body,
+        }).select('id')
+      );
+      return {
+        summary: 'Op het prikbord gezet.',
+        inserted: rows.map((r) => ({ table: 'timeline_posts', id: r.id })),
+      };
     },
   },
 ];

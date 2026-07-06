@@ -25,7 +25,7 @@ export function fakeDb(rowsByTable, calls, opts = {}) {
         }
         return api;
       },
-      insert(rows) { rec.inserted = rows; return api; },
+      insert(rows) { rec.inserted = Array.isArray(rows) ? rows : [rows]; return api; },
       update(patch) { rec.updated = patch; return api; },
       eq(col, val) { rec.filters.push(['eq', col, val]); return api; },
       in(col, vals) { rec.filters.push(['in', col, vals]); return api; },

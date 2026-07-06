@@ -66,11 +66,43 @@ export function renderPetsOverview(pets = [], logs = [], openTasks = [], today =
   return { data, render: [{ type: 'list', title: `Huisdieren (${entries.length})`, items }] };
 }
 
+export const MAX_PROPOSED_PET_LOGS = 5;
+
+/**
+ * Puur voorstel-bouwwerk van huisdieren_logboek_toevoegen (fase B, HITL).
+ * Spiegelt de DB-CHECK van pet_log: minstens één van notitie/gewicht, gewicht
+ * in grammen (> 0). De naam→dier-koppeling gebeurt bij execute.
+ * @param {{ items?: Array<{pet_name?:string, note?:string, weight_grams?:number}> }} [args]
+ * @returns {{ ok:true, summary:string, items:string[], args:{items:object[]} } | { ok:false, error:string }}
+ */
+export function proposeAddPetLog(args = {}) {
+  const raw = Array.isArray(args.items) ? args.items : [];
+  if (raw.length === 0) return { ok: false, error: 'Geen logboek-regel om toe te voegen.' };
+  if (raw.length > MAX_PROPOSED_PET_LOGS) return { ok: false, error: `Maximaal ${MAX_PROPOSED_PET_LOGS} regels per voorstel.` };
+  const items = [];
+  const norm = [];
+  for (const it of raw) {
+    const petName = typeof it?.pet_name === 'string' ? it.pet_name.trim() : '';
+    if (!petName) return { ok: false, error: 'Zeg erbij over wélk dier het gaat.' };
+    const note = typeof it?.note === 'string' && it.note.trim() ? it.note.trim().slice(0, 500) : null;
+    const weight = Number.isInteger(it?.weight_grams) && /** @type {number} */ (it.weight_grams) > 0 && /** @type {number} */ (it.weight_grams) <= 200000
+      ? /** @type {number} */ (it.weight_grams)
+      : null;
+    if (!note && !weight) return { ok: false, error: 'Een logboek-regel heeft een notitie of een gewicht (in grammen) nodig.' };
+    norm.push({ pet_name: petName, note, weight_grams: weight });
+    items.push([petName, weight ? `${(weight / 1000).toFixed(1).replace('.', ',')} kg` : null, note].filter(Boolean).join(' · '));
+  }
+  const summary = norm.length === 1
+    ? `Logboek-regel voor ${norm[0].pet_name} toevoegen`
+    : `${norm.length} logboek-regels toevoegen`;
+  return { ok: true, summary, items, args: { items: norm } };
+}
+
 // Module-brief (guidelines §1).
 export const HUISDIEREN_BRIEF = {
   moduleKey: 'huisdieren',
   label: 'Huisdieren',
-  brief: 'de huisdieren en hun verzorging; kan het dierenoverzicht en open verzorgingstaken tonen',
+  brief: 'de huisdieren en hun verzorging; kan het dierenoverzicht tonen en logboek-regels (gewicht/notitie) toevoegen',
 };
 
 export const HUISDIEREN_TOOLS = [
@@ -92,6 +124,64 @@ export const HUISDIEREN_TOOLS = [
           .not('pet_id', 'is', null).limit(200),
       ]);
       return renderPetsOverview(throwOnError(pets), throwOnError(logs), throwOnError(tasks), ctx.today);
+    },
+  },
+  {
+    name: 'huisdieren_logboek_toevoegen',
+    moduleKey: 'huisdieren',
+    kind: 'write',
+    risk: 'write',
+    destructive: false, // additief: alleen nieuwe logboek-regels
+    idempotent: false,  // nogmaals uitvoeren = dubbele regels
+    statusLabel: 'Logboek-regel klaarzetten…',
+    description: 'Roep dit aan wanneer de gebruiker iets over een huisdier wil vastleggen: een gewicht ("Nala weegt 12,5 kilo") of een notitie ("dierenarts zei dat alles goed is"). Geef het gewicht in GRAMMEN. De gebruiker beslist op de bevestigingskaart.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De logboek-regels (meestal één, maximaal 5).',
+          items: {
+            type: 'object',
+            properties: {
+              pet_name: { type: 'string', description: 'De naam van het dier, zoals het in de app heet' },
+              note: { type: 'string', description: 'Optionele notitie' },
+              weight_grams: { type: 'integer', description: 'Optioneel gewicht in grammen (bv. 12500 voor 12,5 kg)' },
+            },
+            required: ['pet_name'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+    propose: proposeAddPetLog,
+    async execute(ctx, args) {
+      // Naam → dier (case-insensitief, exact) — een onbekende of dubbelzinnige
+      // naam faalt liever luid dan dat de regel bij het verkeerde dier belandt.
+      const pets = throwOnError(
+        await ctx.db.from('pets').select('id, name').eq('household_id', ctx.householdId).limit(50)
+      );
+      const inserted = [];
+      for (const it of args.items) {
+        const wanted = it.pet_name.trim().toLowerCase();
+        const hits = pets.filter((p) => (p.name ?? '').trim().toLowerCase() === wanted);
+        if (hits.length !== 1) throw new Error(`"${it.pet_name}" is niet (eenduidig) gevonden bij de huisdieren.`);
+        const rows = throwOnError(
+          await ctx.db.from('pet_log').insert({
+            pet_id: hits[0].id,
+            created_by: ctx.userId,
+            ...(it.note ? { note: it.note } : {}),
+            ...(it.weight_grams ? { weight_grams: it.weight_grams } : {}),
+          }).select('id')
+        );
+        inserted.push(...rows.map((r) => ({ table: 'pet_log', id: r.id })));
+      }
+      return {
+        summary: inserted.length === 1 ? 'In het logboek gezet.' : `${inserted.length} logboek-regels toegevoegd.`,
+        inserted,
+      };
     },
   },
 ];

@@ -152,6 +152,9 @@ Deno.serve(async (req: Request) => {
     enabledModuleKeys?: string[];
     memberNames?: Record<string, string>;
     today?: string;
+    // Client-tijdzone (minuten oost van UTC, bv. 120 voor NL-zomertijd): nodig om
+    // reserverings-tijden als échte UTC-instants op te slaan en lokaal te tonen.
+    tzOffsetMinutes?: number;
     stream?: boolean;
     // Scherm-context (AI-10): moduleKey van het scherm waar de assistent is
     // geopend — een aanwijzing voor het model, nooit een beperking.
@@ -372,7 +375,10 @@ Deno.serve(async (req: Request) => {
   const derivedKeys = await loadEnabledModuleKeys(db, householdId, userId);
   const enabledKeys = derivedKeys ?? (Array.isArray(body.enabledModuleKeys) ? body.enabledModuleKeys : []);
   const granted = await loadGrantedCapabilities(db, householdId, userId);
-  const ctx = { db, householdId, userId, today, memberNames };
+  const tzOffsetMinutes = Number.isInteger(body.tzOffsetMinutes) && Math.abs(body.tzOffsetMinutes as number) <= 840
+    ? (body.tzOffsetMinutes as number)
+    : 0;
+  const ctx = { db, householdId, userId, today, memberNames, tzOffsetMinutes };
 
   // Write-tools doen mee (AI-8): de loop voert ze nooit uit — de interceptie
   // hieronder maakt er een bevestigingsvoorstel van (HITL). De capability-poort
@@ -569,7 +575,7 @@ Deno.serve(async (req: Request) => {
           // tool bouwt puur een voorstel (propose), dat als role='action'-rij
           // wordt opgeslagen; de gebruiker beslist op de bevestigingskaart en
           // pas dán draait tool.execute — met de hier opgeslagen args.
-          const proposal = tool.propose(call.args, { today, memberNames });
+          const proposal = tool.propose(call.args, { today, memberNames, tzOffsetMinutes });
           if (!proposal.ok) {
             result = { error: proposal.error };
           } else {

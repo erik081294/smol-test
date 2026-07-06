@@ -2,7 +2,7 @@
 // maand-equivalent-spiegel (monthlyCents), overzicht-render en query-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VOERTUIGEN_TOOLS, VOERTUIGEN_BRIEF, VOERTUIGEN_MANIFEST, monthlyCents, renderVehiclesOverview } from '../supabase/functions/_shared/tools/voertuigen.js';
+import { VOERTUIGEN_TOOLS, VOERTUIGEN_BRIEF, VOERTUIGEN_MANIFEST, monthlyCents, renderVehiclesOverview, proposeLogMaintenance } from '../supabase/functions/_shared/tools/voertuigen.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = VOERTUIGEN_TOOLS.find((t) => t.name === 'voertuigen_overzicht');
@@ -12,7 +12,7 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(VOERTUIGEN_BRIEF, {
     moduleKey: 'voertuigen',
     label: 'Voertuigen',
-    brief: 'de voertuigen van het huishouden; kan km-stand, APK, vaste lasten en laatste onderhoud tonen',
+    brief: 'de voertuigen van het huishouden; kan km-stand, APK en kosten tonen en onderhoud loggen',
   });
 });
 
@@ -89,4 +89,32 @@ test('voertuigen_overzicht: juiste tabellen/filters (alleen actieve voertuig-las
     ['not', 'vehicle_id', 'is', null],
   ]);
   assert.deepEqual(calls.find((c) => c.table === 'vehicle_log').order, ['performed_on', { ascending: false }]);
+});
+
+// --- Fase B: voertuigen_onderhoud_loggen (HITL, bewust zonder kosten/expense).
+
+test('proposeLogMaintenance: datum default vandaag (env), km optioneel, grenzen', () => {
+  const out = proposeLogMaintenance(
+    { items: [{ vehicle_name: 'Volvo', title: 'Grote beurt', mileage: 123456 }] },
+    { today: '2026-07-06' }
+  );
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.args.items, [{ vehicle_name: 'Volvo', title: 'Grote beurt', performed_on: '2026-07-06', mileage: 123456 }]);
+  assert.deepEqual(out.items, ['Volvo · Grote beurt · ma 6 jul · 123456 km']);
+  assert.equal(proposeLogMaintenance({ items: [{ title: 'x' }] }, { today: '2026-07-06' }).ok, false);   // geen voertuig
+  assert.equal(proposeLogMaintenance({ items: [{ vehicle_name: 'V' }] }, { today: '2026-07-06' }).ok, false); // geen titel
+  assert.equal(proposeLogMaintenance({ items: [{ vehicle_name: 'V', title: 'x', mileage: -1 }] }, { today: '2026-07-06' }).args.items[0].mileage, null);
+  assert.equal(proposeLogMaintenance().ok, false);
+});
+
+test('voertuigen_onderhoud_loggen: execute matcht voertuig en logt zonder kosten-koppeling', async () => {
+  const tool2 = VOERTUIGEN_TOOLS.find((t) => t.name === 'voertuigen_onderhoud_loggen');
+  const calls = [];
+  const out = await tool2.execute(
+    toolCtx({ vehicles: [{ id: 'v1', name: 'Volvo' }] }, calls),
+    { items: [{ vehicle_name: 'volvo', title: 'Banden', performed_on: '2026-07-01', mileage: null }] }
+  );
+  const ins = calls.find((c) => c.table === 'vehicle_log');
+  assert.deepEqual(ins.inserted, [{ vehicle_id: 'v1', created_by: 'u1', title: 'Banden', performed_on: '2026-07-01' }]);
+  assert.deepEqual(out.inserted, [{ table: 'vehicle_log', id: 'vehicle_log-1' }]);
 });

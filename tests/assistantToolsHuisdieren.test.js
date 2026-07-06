@@ -2,7 +2,7 @@
 // leeftijd-spiegel (petAgeLabel), overzicht-render en query-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HUISDIEREN_TOOLS, HUISDIEREN_BRIEF, HUISDIEREN_MANIFEST, petAgeLabel, renderPetsOverview } from '../supabase/functions/_shared/tools/huisdieren.js';
+import { HUISDIEREN_TOOLS, HUISDIEREN_BRIEF, HUISDIEREN_MANIFEST, petAgeLabel, renderPetsOverview, proposeAddPetLog } from '../supabase/functions/_shared/tools/huisdieren.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = HUISDIEREN_TOOLS.find((t) => t.name === 'huisdieren_overzicht');
@@ -12,7 +12,7 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(HUISDIEREN_BRIEF, {
     moduleKey: 'huisdieren',
     label: 'Huisdieren',
-    brief: 'de huisdieren en hun verzorging; kan het dierenoverzicht en open verzorgingstaken tonen',
+    brief: 'de huisdieren en hun verzorging; kan het dierenoverzicht tonen en logboek-regels (gewicht/notitie) toevoegen',
   });
 });
 
@@ -86,4 +86,34 @@ test('huisdieren_overzicht: juiste tabellen/kolommen/filters', async () => {
     ['is', 'completed_at', null],
     ['not', 'pet_id', 'is', null],
   ]);
+});
+
+// --- Fase B: huisdieren_logboek_toevoegen (HITL).
+
+test('proposeAddPetLog: spiegelt de DB-CHECK — minstens notitie of gewicht; gewicht in grammen', () => {
+  const out = proposeAddPetLog({ items: [{ pet_name: ' Nala ', weight_grams: 12500 }] });
+  assert.equal(out.ok, true);
+  assert.equal(out.summary, 'Logboek-regel voor Nala toevoegen');
+  assert.deepEqual(out.items, ['Nala · 12,5 kg']);
+  assert.deepEqual(out.args.items, [{ pet_name: 'Nala', note: null, weight_grams: 12500 }]);
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'Nala' }] }).ok, false);            // niets te loggen
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'Nala', weight_grams: 0 }] }).ok, false);
+  assert.equal(proposeAddPetLog({ items: [{ note: 'zonder dier' }] }).ok, false);
+  assert.equal(proposeAddPetLog().ok, false);
+});
+
+test('huisdieren_logboek_toevoegen: execute matcht dier case-insensitief; onbekend → duidelijke fout', async () => {
+  const tool2 = HUISDIEREN_TOOLS.find((t) => t.name === 'huisdieren_logboek_toevoegen');
+  const calls = [];
+  const out = await tool2.execute(
+    toolCtx({ pets: [{ id: 'd1', name: 'Nala' }] }, calls),
+    { items: [{ pet_name: 'nala', note: 'alles goed', weight_grams: null }] }
+  );
+  const ins = calls.find((c) => c.table === 'pet_log');
+  assert.deepEqual(ins.inserted, [{ pet_id: 'd1', created_by: 'u1', note: 'alles goed' }]);
+  assert.deepEqual(out.inserted, [{ table: 'pet_log', id: 'pet_log-1' }]);
+  await assert.rejects(
+    () => tool2.execute(toolCtx({ pets: [] }, []), { items: [{ pet_name: 'Spook', note: 'x', weight_grams: null }] }),
+    /niet \(eenduidig\) gevonden/
+  );
 });

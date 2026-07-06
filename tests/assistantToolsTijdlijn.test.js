@@ -2,7 +2,7 @@
 // orderTimeline-spiegel (gepind eerst), snippet-knip en query-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TIJDLIJN_TOOLS, TIJDLIJN_BRIEF, TIJDLIJN_MANIFEST, renderTimelineRecent } from '../supabase/functions/_shared/tools/tijdlijn.js';
+import { TIJDLIJN_TOOLS, TIJDLIJN_BRIEF, TIJDLIJN_MANIFEST, renderTimelineRecent, proposePost, MAX_POST_LENGTH } from '../supabase/functions/_shared/tools/tijdlijn.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = TIJDLIJN_TOOLS.find((t) => t.name === 'tijdlijn_recent');
@@ -12,7 +12,7 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(TIJDLIJN_BRIEF, {
     moduleKey: 'tijdlijn',
     label: 'Tijdlijn',
-    brief: 'het prikbord van het huishouden; kan de recente berichten tonen',
+    brief: 'het prikbord van het huishouden; kan de recente berichten tonen en een bericht plaatsen',
   });
 });
 
@@ -71,4 +71,29 @@ test('tijdlijn_recent: juiste tabel/kolommen (RLS filtert zichtbaarheid — geen
   const call = calls.find((c) => c.table === 'timeline_posts');
   assert.equal(call.selected, 'id, body, author_id, pinned_at, created_at');
   assert.deepEqual(call.filters, [['eq', 'household_id', 'h1']]);
+});
+
+// --- Fase B: tijdlijn_plaatsen (HITL; zichtbaarheid altijd household).
+
+test('proposePost: één bericht per voorstel, tekst verplicht, preview geknipt op 80', () => {
+  const lang = 'x'.repeat(200);
+  const out = proposePost({ items: [{ body: `  ${lang}  ` }] });
+  assert.equal(out.ok, true);
+  assert.equal(out.summary, 'Bericht op het prikbord plaatsen');
+  assert.equal(out.items[0].length, 80);
+  assert.equal(out.items[0].endsWith('…'), true);
+  assert.deepEqual(out.args.items, [{ body: lang }]);
+  assert.equal(proposePost({ items: [{ body: '' }] }).ok, false);
+  assert.equal(proposePost({ items: [{ body: 'a' }, { body: 'b' }] }).ok, false);
+  assert.equal(proposePost({ items: [{ body: 'x'.repeat(MAX_POST_LENGTH + 1) }] }).ok, false);
+  assert.equal(proposePost().ok, false);
+});
+
+test('tijdlijn_plaatsen: execute schrijft de post op eigen naam (author = vrager, geen visibility-args)', async () => {
+  const tool2 = TIJDLIJN_TOOLS.find((t) => t.name === 'tijdlijn_plaatsen');
+  const calls = [];
+  const out = await tool2.execute(toolCtx({}, calls), { items: [{ body: 'De cv-monteur komt dinsdag' }] });
+  const ins = calls.find((c) => c.table === 'timeline_posts');
+  assert.deepEqual(ins.inserted, [{ household_id: 'h1', author_id: 'u1', body: 'De cv-monteur komt dinsdag' }]);
+  assert.deepEqual(out.inserted, [{ table: 'timeline_posts', id: 'timeline_posts-1' }]);
 });

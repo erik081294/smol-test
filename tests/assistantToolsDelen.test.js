@@ -2,7 +2,7 @@
 // reserveringen-rooster (dag-groepering, tijd-notatie) en query-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DELEN_TOOLS, DELEN_BRIEF, DELEN_MANIFEST, renderUpcomingReservations } from '../supabase/functions/_shared/tools/delen.js';
+import { DELEN_TOOLS, DELEN_BRIEF, DELEN_MANIFEST, renderUpcomingReservations, proposeReserve } from '../supabase/functions/_shared/tools/delen.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = DELEN_TOOLS.find((t) => t.name === 'delen_reserveringen');
@@ -12,7 +12,7 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(DELEN_BRIEF, {
     moduleKey: 'delen',
     label: 'Samen',
-    brief: 'gedeelde spullen (auto, gereedschap) en hun reserveringen; kan tonen wat wanneer bezet of vrij is',
+    brief: 'gedeelde spullen (auto, gereedschap) en hun reserveringen; kan tonen wat bezet is en kan reserveren',
   });
 });
 
@@ -77,4 +77,47 @@ test('delen_reserveringen: juiste tabellen/filters (alleen nog-lopende boekingen
     ['gt', 'ends_at', '2026-07-04T00:00:00Z'],
   ]);
   assert.deepEqual(resCall.order, ['starts_at', { ascending: true }]);
+});
+
+// --- Fase B: delen_reserveren (HITL; conflictcheck verplicht in execute).
+
+test('proposeReserve: componeert UTC-instants via de client-offset; eindtijd na begintijd', () => {
+  const out = proposeReserve(
+    { items: [{ resource_name: ' Deelauto ', date: '2026-07-11', from: '14:00', to: '16:00', note: ' ophalen ' }] },
+    { today: '2026-07-06', tzOffsetMinutes: 120 }
+  );
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.args.items, [{
+    resource_name: 'Deelauto',
+    starts_at: '2026-07-11T12:00:00.000Z',   // 14:00 NL-zomertijd = 12:00 UTC
+    ends_at: '2026-07-11T14:00:00.000Z',
+    note: 'ophalen',
+  }]);
+  assert.deepEqual(out.items, ['Deelauto — za 11 jul 14:00–16:00']);
+  assert.equal(proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '16:00', to: '14:00' }] }, {}).ok, false);
+  assert.equal(proposeReserve({ items: [{ resource_name: 'A', date: 'morgen', from: '14:00', to: '16:00' }] }, {}).ok, false);
+  assert.equal(proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '25:00', to: '26:00' }] }, {}).ok, false);
+  assert.equal(proposeReserve().ok, false);
+});
+
+test('delen_reserveren: execute weigert een overlappend tijdvak (de DB dwingt dit niet af)', async () => {
+  const tool2 = DELEN_TOOLS.find((t) => t.name === 'delen_reserveren');
+  const bezet = {
+    shared_resources: [{ id: 'r1', name: 'Deelauto' }],
+    reservations: [{ id: 'x', starts_at: '2026-07-11T11:00:00.000Z', ends_at: '2026-07-11T13:00:00.000Z' }],
+  };
+  await assert.rejects(
+    () => tool2.execute(toolCtx(bezet, []), { items: [{ resource_name: 'deelauto', starts_at: '2026-07-11T12:00:00.000Z', ends_at: '2026-07-11T14:00:00.000Z', note: null }] }),
+    /al gereserveerd/
+  );
+  // Rakend (eind == begin) telt niet als conflict — half-open interval.
+  const calls = [];
+  const vrij = {
+    shared_resources: [{ id: 'r1', name: 'Deelauto' }],
+    reservations: [{ id: 'x', starts_at: '2026-07-11T10:00:00.000Z', ends_at: '2026-07-11T12:00:00.000Z' }],
+  };
+  const out = await tool2.execute(toolCtx(vrij, calls), { items: [{ resource_name: 'Deelauto', starts_at: '2026-07-11T12:00:00.000Z', ends_at: '2026-07-11T14:00:00.000Z', note: null }] });
+  assert.deepEqual(out.inserted, [{ table: 'reservations', id: 'reservations-1' }]);
+  const ins = calls.find((c) => c.table === 'reservations' && c.inserted);
+  assert.equal(ins.inserted[0].profile_id, 'u1');
 });

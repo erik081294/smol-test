@@ -76,11 +76,47 @@ export function renderVehiclesOverview(vehicles = [], recurring = [], logs = [],
   return { data, render };
 }
 
+export const MAX_PROPOSED_MAINTENANCE = 5;
+
+/**
+ * Puur voorstel-bouwwerk van voertuigen_onderhoud_loggen (fase B, HITL).
+ * Bewust GEEN kosten/expense-koppeling: geld boeken blijft buiten de assistent
+ * (plan 27). performed_on default = vandaag (env.today).
+ * @param {{ items?: Array<{vehicle_name?:string, title?:string, performed_on?:string, mileage?:number}> }} [args]
+ * @param {{ today?: string }} [env]
+ * @returns {{ ok:true, summary:string, items:string[], args:{items:object[]} } | { ok:false, error:string }}
+ */
+export function proposeLogMaintenance(args = {}, env = {}) {
+  const raw = Array.isArray(args.items) ? args.items : [];
+  if (raw.length === 0) return { ok: false, error: 'Geen onderhoud om te loggen.' };
+  if (raw.length > MAX_PROPOSED_MAINTENANCE) return { ok: false, error: `Maximaal ${MAX_PROPOSED_MAINTENANCE} regels per voorstel.` };
+  const items = [];
+  const norm = [];
+  for (const it of raw) {
+    const vehicleName = typeof it?.vehicle_name === 'string' ? it.vehicle_name.trim() : '';
+    if (!vehicleName) return { ok: false, error: 'Zeg erbij om wélk voertuig het gaat.' };
+    const title = typeof it?.title === 'string' ? it.title.trim() : '';
+    if (!title) return { ok: false, error: 'Wat voor onderhoud was het? Geef een korte titel.' };
+    if (title.length > 120) return { ok: false, error: 'Een onderhouds-titel mag maximaal 120 tekens zijn.' };
+    const performedOn = typeof it?.performed_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.performed_on)
+      ? it.performed_on
+      : (env.today ?? null);
+    if (!performedOn) return { ok: false, error: 'Ongeldige datum (gebruik YYYY-MM-DD).' };
+    const mileage = Number.isInteger(it?.mileage) && /** @type {number} */ (it.mileage) >= 0 ? /** @type {number} */ (it.mileage) : null;
+    norm.push({ vehicle_name: vehicleName, title, performed_on: performedOn, mileage });
+    items.push([vehicleName, title, dayLabel(performedOn), mileage != null ? `${mileage} km` : null].filter(Boolean).join(' · '));
+  }
+  const summary = norm.length === 1
+    ? `Onderhoud "${norm[0].title}" loggen (${norm[0].vehicle_name})`
+    : `${norm.length} onderhouds-regels loggen`;
+  return { ok: true, summary, items, args: { items: norm } };
+}
+
 // Module-brief (guidelines §1).
 export const VOERTUIGEN_BRIEF = {
   moduleKey: 'voertuigen',
   label: 'Voertuigen',
-  brief: 'de voertuigen van het huishouden; kan km-stand, APK, vaste lasten en laatste onderhoud tonen',
+  brief: 'de voertuigen van het huishouden; kan km-stand, APK en kosten tonen en onderhoud loggen',
 };
 
 export const VOERTUIGEN_TOOLS = [
@@ -101,6 +137,64 @@ export const VOERTUIGEN_TOOLS = [
       ]);
       // APK-attentiegrens: binnen ~2 maanden.
       return renderVehiclesOverview(throwOnError(vehicles), throwOnError(recurring), throwOnError(logs), addDays(ctx.today, 60));
+    },
+  },
+  {
+    name: 'voertuigen_onderhoud_loggen',
+    moduleKey: 'voertuigen',
+    kind: 'write',
+    risk: 'write',
+    destructive: false, // additief: alleen nieuwe historie-regels
+    idempotent: false,  // nogmaals uitvoeren = dubbele regels
+    statusLabel: 'Onderhoud klaarzetten…',
+    description: 'Roep dit aan wanneer de gebruiker uitgevoerd onderhoud aan een voertuig wil vastleggen (bv. "de Volvo heeft nieuwe banden gekregen op 123456 km"). Alleen de historie-regel — kosten boeken hoort hier niet bij. De gebruiker beslist op de bevestigingskaart.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'De te loggen onderhouds-regels (meestal één, maximaal 5).',
+          items: {
+            type: 'object',
+            properties: {
+              vehicle_name: { type: 'string', description: 'De naam van het voertuig, zoals het in de app heet' },
+              title: { type: 'string', description: 'Wat er is gedaan, bv. "Grote beurt" of "Nieuwe banden"' },
+              performed_on: { type: 'string', description: 'Optioneel: de datum als YYYY-MM-DD (default vandaag)' },
+              mileage: { type: 'integer', description: 'Optioneel: de km-stand op dat moment' },
+            },
+            required: ['vehicle_name', 'title'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+    propose: proposeLogMaintenance,
+    async execute(ctx, args) {
+      const vehicles = throwOnError(
+        await ctx.db.from('vehicles').select('id, name').eq('household_id', ctx.householdId).limit(20)
+      );
+      const inserted = [];
+      for (const it of args.items) {
+        const wanted = it.vehicle_name.trim().toLowerCase();
+        const hits = vehicles.filter((v) => (v.name ?? '').trim().toLowerCase() === wanted);
+        if (hits.length !== 1) throw new Error(`"${it.vehicle_name}" is niet (eenduidig) gevonden bij de voertuigen.`);
+        const rows = throwOnError(
+          await ctx.db.from('vehicle_log').insert({
+            vehicle_id: hits[0].id,
+            created_by: ctx.userId,
+            title: it.title,
+            performed_on: it.performed_on,
+            ...(it.mileage != null ? { mileage: it.mileage } : {}),
+          }).select('id')
+        );
+        inserted.push(...rows.map((r) => ({ table: 'vehicle_log', id: r.id })));
+      }
+      return {
+        summary: inserted.length === 1 ? 'Onderhoud gelogd.' : `${inserted.length} onderhouds-regels gelogd.`,
+        inserted,
+      };
     },
   },
 ];

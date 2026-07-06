@@ -2,7 +2,7 @@
 // overzicht-render (eerstvolgende verzorgingstaak per plant) + query-compositie.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLANTEN_TOOLS, PLANTEN_BRIEF, PLANTEN_MANIFEST, renderPlantsOverview } from '../supabase/functions/_shared/tools/planten.js';
+import { PLANTEN_TOOLS, PLANTEN_BRIEF, PLANTEN_MANIFEST, renderPlantsOverview, proposeAddPlants, MAX_PROPOSED_PLANTS } from '../supabase/functions/_shared/tools/planten.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = PLANTEN_TOOLS.find((t) => t.name === 'planten_overzicht');
@@ -12,7 +12,7 @@ test('module-brief: ligt exact vast', () => {
   assert.deepEqual(PLANTEN_BRIEF, {
     moduleKey: 'planten',
     label: 'Planten',
-    brief: 'de kamerplanten en hun verzorging; kan tonen welke plant wanneer water of voeding nodig heeft',
+    brief: 'de kamerplanten en hun verzorging; kan het overzicht tonen en planten toevoegen',
   });
 });
 
@@ -76,4 +76,43 @@ test('planten_overzicht: juiste tabellen/kolommen/filters (RLS-scoped, category 
     ['is', 'completed_at', null],
     ['not', 'plant_id', 'is', null],
   ]);
+});
+
+// --- Fase B: planten_toevoegen (HITL).
+
+test('proposeAddPlants: normaliseert naam/locatie/water_days, items 1-op-1 met args', () => {
+  const out = proposeAddPlants({ items: [
+    { name: '  Monstera  ', location: ' woonkamer ', water_days: 7 },
+    { name: 'Ficus' },
+  ] });
+  assert.equal(out.ok, true);
+  assert.equal(out.summary, '2 planten toevoegen');
+  assert.deepEqual(out.items, ['Monstera · woonkamer · water elke 7 dgn', 'Ficus']);
+  assert.deepEqual(out.args.items, [
+    { name: 'Monstera', location: 'woonkamer', water_days: 7 },
+    { name: 'Ficus', location: null, water_days: null },
+  ]);
+});
+
+test('proposeAddPlants: grenzen — lege naam, te lang, water_days buiten 1-60, cap en default-arg', () => {
+  assert.equal(proposeAddPlants({ items: [{ name: '' }] }).ok, false);
+  assert.equal(proposeAddPlants({ items: [{ name: 'x'.repeat(81) }] }).ok, false);
+  assert.deepEqual(proposeAddPlants({ items: [{ name: 'A', water_days: 0 }] }).args.items[0].water_days, null);
+  assert.deepEqual(proposeAddPlants({ items: [{ name: 'A', water_days: 61 }] }).args.items[0].water_days, null);
+  assert.equal(proposeAddPlants({ items: [{ name: 'A', water_days: 1 }] }).args.items[0].water_days, 1);
+  assert.equal(proposeAddPlants({ items: Array.from({ length: MAX_PROPOSED_PLANTS + 1 }, () => ({ name: 'p' })) }).ok, false);
+  assert.equal(proposeAddPlants().ok, false);
+});
+
+test('planten_toevoegen: execute schrijft plant + eerste water-taak (undo-spoor beide)', async () => {
+  const calls = [];
+  const tool2 = PLANTEN_TOOLS.find((t) => t.name === 'planten_toevoegen');
+  const out = await tool2.execute(toolCtx({}, calls), { items: [{ name: 'Monstera', location: 'woonkamer', water_days: 7 }] });
+  const plantIns = calls.find((c) => c.table === 'plants');
+  const taskIns = calls.find((c) => c.table === 'tasks');
+  assert.deepEqual(plantIns.inserted, [{ household_id: 'h1', created_by: 'u1', name: 'Monstera', location: 'woonkamer', water_days: 7 }]);
+  assert.equal(taskIns.inserted[0].plant_id, 'plants-1');
+  assert.equal(taskIns.inserted[0].due_date, '2026-07-11'); // today (2026-07-04) + 7
+  assert.equal(taskIns.inserted[0].recur_interval, 7);
+  assert.deepEqual(out.inserted, [{ table: 'plants', id: 'plants-1' }, { table: 'tasks', id: 'tasks-1' }]);
 });
