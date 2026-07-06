@@ -1717,3 +1717,20 @@ lib/aiCapabilities.js in de edge-bundel) was daarmee al live bewezen. Deploy-ver
 alle 13 bundelbestanden byte-vergeleken met HEAD (identiek op de afsluitende newline na),
 status ACTIVE, logs schoon. **Rest:** device-smoke op de moto (app-kant vereist de nieuwe
 client uit deze branch).
+
+---
+
+**Parallelle golf-uitvoering plan 27 (2026-07-06, drie worktree-streams + main).**
+Vier workstreams tegelijk gebouwd en samengevoegd (alles groen: suite 1294 pass / 0 fail,
+typecheck, lint, ratchet):
+
+- **AI-19 fase A (main):** de assistent dekt nu álle 10 datamodules — 5 nieuwe read-tool-packs
+  (planten/huisdieren/voertuigen/tijdlijn/delen) op de bestaande pure logica, bewust
+  zelfstandig (geen date-fns/extensieloze imports in de edge-bundel). Toolset 11→16,
+  `NO_ASSISTANT` leeg, 10 golden-cases erbij (55 totaal). **Rest:** edge-deploy (bundelt
+  straks mee met fase B) + eval-gate-run (ORQ-key).
+- **TML-4 + TML-6 (stream):** comments + filters, migraties **0075/0076 LIVE** (advisor schoon).
+- **PLT-3 (stream):** globaal zoeken, migratie **0077 LIVE**; `searchRank` 92,6%.
+- **PLT-8 (stream):** OTP-code-login (lib/otp.js 100%); **Erik-actie:** dashboard-config.
+
+Migratienummers verschoven t.o.v. plan 27 (PLT-3 nam 0077; AI-9 → eerstvolgend vrij).
