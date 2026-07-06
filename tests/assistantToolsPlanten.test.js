@@ -116,3 +116,54 @@ test('planten_toevoegen: execute schrijft plant + eerste water-taak (undo-spoor 
   assert.equal(taskIns.inserted[0].recur_interval, 7);
   assert.deepEqual(out.inserted, [{ table: 'plants', id: 'plants-1' }, { table: 'tasks', id: 'tasks-1' }]);
 });
+
+// Descriptor-contract van de write-tool exact vastpinnen (zelfde reden als bij
+// de read-tool: een gewijzigde description verandert de tool-selectie en hoort
+// een test te breken — en gaat daarna door de eval-gate).
+test('descriptor-contract (write): statische vorm ligt exact vast', () => {
+  const w = PLANTEN_TOOLS.find((t) => t.name === 'planten_toevoegen');
+  assert.deepEqual(shape(w), {
+      "name": "planten_toevoegen",
+      "moduleKey": "planten",
+      "kind": "write",
+      "risk": "write",
+      "destructive": false,
+      "idempotent": false,
+      "statusLabel": "Plant klaarzetten…",
+      "description": "Roep dit aan wanneer de gebruiker een plant in de app wil zetten (bv. \"we hebben een nieuwe monstera\"). Stelt de plant voor, optioneel met locatie en een water-interval — bij een interval maakt de app na bevestiging meteen de eerste water-taak aan. De gebruiker beslist op de bevestigingskaart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "De toe te voegen planten (maximaal 5).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Naam van de plant, bv. \"Monstera\""
+                },
+                "location": {
+                  "type": "string",
+                  "description": "Optionele plek, bv. \"woonkamer\""
+                },
+                "water_days": {
+                  "type": "integer",
+                  "description": "Optioneel: om de hoeveel dagen water (1-60)"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    });
+});

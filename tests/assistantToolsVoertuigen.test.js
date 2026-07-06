@@ -118,3 +118,59 @@ test('voertuigen_onderhoud_loggen: execute matcht voertuig en logt zonder kosten
   assert.deepEqual(ins.inserted, [{ vehicle_id: 'v1', created_by: 'u1', title: 'Banden', performed_on: '2026-07-01' }]);
   assert.deepEqual(out.inserted, [{ table: 'vehicle_log', id: 'vehicle_log-1' }]);
 });
+
+// Descriptor-contract van de write-tool exact vastpinnen (zelfde reden als bij
+// de read-tool: een gewijzigde description verandert de tool-selectie en hoort
+// een test te breken — en gaat daarna door de eval-gate).
+test('descriptor-contract (write): statische vorm ligt exact vast', () => {
+  const w = VOERTUIGEN_TOOLS.find((t) => t.name === 'voertuigen_onderhoud_loggen');
+  assert.deepEqual(shape(w), {
+      "name": "voertuigen_onderhoud_loggen",
+      "moduleKey": "voertuigen",
+      "kind": "write",
+      "risk": "write",
+      "destructive": false,
+      "idempotent": false,
+      "statusLabel": "Onderhoud klaarzetten…",
+      "description": "Roep dit aan wanneer de gebruiker uitgevoerd onderhoud aan een voertuig wil vastleggen (bv. \"de Volvo heeft nieuwe banden gekregen op 123456 km\"). Alleen de historie-regel — kosten boeken hoort hier niet bij. De gebruiker beslist op de bevestigingskaart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "De te loggen onderhouds-regels (meestal één, maximaal 5).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "vehicle_name": {
+                  "type": "string",
+                  "description": "De naam van het voertuig, zoals het in de app heet"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Wat er is gedaan, bv. \"Grote beurt\" of \"Nieuwe banden\""
+                },
+                "performed_on": {
+                  "type": "string",
+                  "description": "Optioneel: de datum als YYYY-MM-DD (default vandaag)"
+                },
+                "mileage": {
+                  "type": "integer",
+                  "description": "Optioneel: de km-stand op dat moment"
+                }
+              },
+              "required": [
+                "vehicle_name",
+                "title"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    });
+});

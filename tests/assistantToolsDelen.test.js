@@ -121,3 +121,65 @@ test('delen_reserveren: execute weigert een overlappend tijdvak (de DB dwingt di
   const ins = calls.find((c) => c.table === 'reservations' && c.inserted);
   assert.equal(ins.inserted[0].profile_id, 'u1');
 });
+
+// Descriptor-contract van de write-tool exact vastpinnen (zelfde reden als bij
+// de read-tool: een gewijzigde description verandert de tool-selectie en hoort
+// een test te breken — en gaat daarna door de eval-gate).
+test('descriptor-contract (write): statische vorm ligt exact vast', () => {
+  const w = DELEN_TOOLS.find((t) => t.name === 'delen_reserveren');
+  assert.deepEqual(shape(w), {
+      "name": "delen_reserveren",
+      "moduleKey": "delen",
+      "kind": "write",
+      "risk": "write",
+      "destructive": false,
+      "idempotent": false,
+      "statusLabel": "Reservering klaarzetten…",
+      "description": "Roep dit aan wanneer de gebruiker de deelauto of iets anders gedeelds wil reserveren of vastleggen voor een tijdvak (bv. \"reserveer de auto zaterdag van 14 tot 16\"). Kijk zo nodig eerst met delen_reserveringen wat er al bezet is. Stelt de reservering voor: de gebruiker beslist op de bevestigingskaart; een tijdvak dat toch al bezet blijkt wordt bij uitvoeren geweigerd. Rit-kosten boeken hoort hier niet bij.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "De te plaatsen reserveringen (meestal één, maximaal 3).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource_name": {
+                  "type": "string",
+                  "description": "Wat er gereserveerd wordt, zoals het in de app heet (bv. \"Deelauto\")"
+                },
+                "date": {
+                  "type": "string",
+                  "description": "De dag als YYYY-MM-DD"
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Begintijd als HH:MM (24-uurs, lokale tijd)"
+                },
+                "to": {
+                  "type": "string",
+                  "description": "Eindtijd als HH:MM (24-uurs, lokale tijd)"
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Optionele notitie, bv. het doel van de rit"
+                }
+              },
+              "required": [
+                "resource_name",
+                "date",
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    });
+});

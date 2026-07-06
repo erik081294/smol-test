@@ -97,3 +97,46 @@ test('tijdlijn_plaatsen: execute schrijft de post op eigen naam (author = vrager
   assert.deepEqual(ins.inserted, [{ household_id: 'h1', author_id: 'u1', body: 'De cv-monteur komt dinsdag' }]);
   assert.deepEqual(out.inserted, [{ table: 'timeline_posts', id: 'timeline_posts-1' }]);
 });
+
+// Descriptor-contract van de write-tool exact vastpinnen (zelfde reden als bij
+// de read-tool: een gewijzigde description verandert de tool-selectie en hoort
+// een test te breken — en gaat daarna door de eval-gate).
+test('descriptor-contract (write): statische vorm ligt exact vast', () => {
+  const w = TIJDLIJN_TOOLS.find((t) => t.name === 'tijdlijn_plaatsen');
+  assert.deepEqual(shape(w), {
+      "name": "tijdlijn_plaatsen",
+      "moduleKey": "tijdlijn",
+      "kind": "write",
+      "risk": "write",
+      "destructive": false,
+      "idempotent": false,
+      "statusLabel": "Bericht klaarzetten…",
+      "description": "Roep dit aan wanneer de gebruiker een bericht op het prikbord/de tijdlijn wil zetten voor de huisgenoten (bv. \"zet op het prikbord dat de cv-monteur dinsdag komt\"). Het bericht wordt zichtbaar voor het hele huishouden; de gebruiker beslist op de bevestigingskaart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "Het te plaatsen bericht (precies één).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "body": {
+                  "type": "string",
+                  "description": "De tekst van het bericht"
+                }
+              },
+              "required": [
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    });
+});

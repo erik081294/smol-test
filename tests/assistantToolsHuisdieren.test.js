@@ -117,3 +117,54 @@ test('huisdieren_logboek_toevoegen: execute matcht dier case-insensitief; onbeke
     /niet \(eenduidig\) gevonden/
   );
 });
+
+// Descriptor-contract van de write-tool exact vastpinnen (zelfde reden als bij
+// de read-tool: een gewijzigde description verandert de tool-selectie en hoort
+// een test te breken — en gaat daarna door de eval-gate).
+test('descriptor-contract (write): statische vorm ligt exact vast', () => {
+  const w = HUISDIEREN_TOOLS.find((t) => t.name === 'huisdieren_logboek_toevoegen');
+  assert.deepEqual(shape(w), {
+      "name": "huisdieren_logboek_toevoegen",
+      "moduleKey": "huisdieren",
+      "kind": "write",
+      "risk": "write",
+      "destructive": false,
+      "idempotent": false,
+      "statusLabel": "Logboek-regel klaarzetten…",
+      "description": "Roep dit aan wanneer de gebruiker iets over een huisdier wil vastleggen: een gewicht (\"Nala weegt 12,5 kilo\") of een notitie (\"dierenarts zei dat alles goed is\"). Geef het gewicht in GRAMMEN. De gebruiker beslist op de bevestigingskaart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "De logboek-regels (meestal één, maximaal 5).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pet_name": {
+                  "type": "string",
+                  "description": "De naam van het dier, zoals het in de app heet"
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Optionele notitie"
+                },
+                "weight_grams": {
+                  "type": "integer",
+                  "description": "Optioneel gewicht in grammen (bv. 12500 voor 12,5 kg)"
+                }
+              },
+              "required": [
+                "pet_name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    });
+});
