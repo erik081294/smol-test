@@ -106,15 +106,22 @@ export function splitSuggestions(toolCalls = []) {
 
 /**
  * Filter de tool-registry op wat deze beurt mee mag: alleen tools van modules die
- * in het huishouden aan staan, en write-tools alleen als de beurt dat toestaat
- * (fase 3). Minder tools = minder tokens én geen acties op uitgezette modules.
+ * in het huishouden aan staan, write-tools alleen als de beurt dat toestaat (fase 3),
+ * én — als er een capability-poort meegegeven is — alleen tools die de gebruiker
+ * volgens zijn AI-capabilities mag laten uitvoeren (B4; lib/aiCapabilities.js levert
+ * de predicate). Minder tools = minder tokens, geen acties op uitgezette modules, en
+ * geen tool die de gebruiker toch niet mag gebruiken. `canUse` default = alles mag,
+ * zodat bestaande aanroepers (zonder capability-laag) onveranderd blijven werken.
  * @param {Array<{name:string, moduleKey:string, kind:string}>} tools
  * @param {string[]} [enabledModuleKeys]
- * @param {{includeWrite?: boolean}} [opts]
+ * @param {{includeWrite?: boolean, canUse?: (tool: {kind:string}) => boolean}} [opts]
  */
 export function filterTools(tools, enabledModuleKeys = [], opts = {}) {
   const enabled = new Set(enabledModuleKeys);
-  return tools.filter((t) => enabled.has(t.moduleKey) && (opts.includeWrite === true || t.kind === 'read'));
+  const canUse = typeof opts.canUse === 'function' ? opts.canUse : () => true;
+  return tools.filter(
+    (t) => enabled.has(t.moduleKey) && (opts.includeWrite === true || t.kind === 'read') && canUse(t)
+  );
 }
 
 /**

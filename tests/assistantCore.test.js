@@ -63,6 +63,23 @@ test('filterTools: includeWrite laat write-tools toe; zonder modules niets; defa
   assert.deepEqual(filterTools(TOOLS), []);
 });
 
+test('filterTools: canUse-poort verbergt tools die de gebruiker niet mag (capability-laag B4)', () => {
+  // Gebruiker zonder schrijfrecht → alleen reads, óók met includeWrite:true.
+  const readsOnly = (t) => t.kind === 'read';
+  assert.deepEqual(
+    filterTools(TOOLS, ['taken'], { includeWrite: true, canUse: readsOnly }).map((t) => t.name),
+    ['get_open_tasks']
+  );
+  // canUse geldt bovenop de module-poort: een verboden read valt óók weg.
+  const notReads = (t) => t.kind !== 'read';
+  assert.deepEqual(filterTools(TOOLS, ['taken'], { canUse: notReads }), []);
+  // Geen canUse (of geen functie) = alles mag — backward-compat met bestaande aanroepers.
+  assert.deepEqual(
+    filterTools(TOOLS, ['taken'], { includeWrite: true }).map((t) => t.name),
+    ['get_open_tasks', 'create_task']
+  );
+});
+
 test('toChatTools: mapt naar OpenAI-vorm; zonder argument leeg', () => {
   const mapped = toChatTools([TOOLS[0]]);
   assert.deepEqual(mapped, [{

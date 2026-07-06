@@ -33,6 +33,9 @@ export const GROUPS = [
   { test: 'dbResult', srcs: ['lib/dbResult.js'], exclude: ['StringLiteral'] },
   { test: 'decisions', srcs: ['lib/decisions.js'] },
   { test: 'expenses', srcs: ['lib/expenses.js'] },
+  // Pure capability-policy van de assistent (fundament AI-actie-laag, B4): welke
+  // AI-acties een gebruiker mag laten uitvoeren op basis van de risk-tier + intrekkingen.
+  { test: 'aiCapabilities', srcs: ['lib/aiCapabilities.js'] },
   { test: 'fairness', srcs: ['lib/fairness.js'] },
   { test: 'favoriteGroceries', srcs: ['lib/favoriteGroceries.js'] },
   // Gedeelde formulier-validatie van de entity-editors (ARCH-1, docs/architectuur.md).
@@ -148,7 +151,9 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 //     module-gate; bewaakt een patroon, geen muteerbare lib-module.
 // assistantGolden: meta-test op de golden-set-DATA (tests/assistant-golden.json) —
 // bewaakt structuur/registry-sync; er is geen bronmodule om te muteren.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden'];
+// assistantCoverage: meta-test op de dekking/budget van de tool-registry (data-module
+//   ↔ manifest, herbezoek-drempel) — bewaakt een registry-eigenschap, geen lib-module.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden', 'assistantCoverage'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
