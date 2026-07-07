@@ -136,6 +136,9 @@ export const GROUPS = [
   { test: 'assistantActions', srcs: ['lib/assistantActions.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
   { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
+  // Edge-foutrapportage (INF-4): pure DSN-parse + store-event-vorm. De Deno-schil
+  // (_shared/sentry.ts, fail-silent fetch) valt buiten node/Stryker.
+  { test: 'sentryCore', srcs: ['supabase/functions/_shared/sentryCore.js'] },
   // Voertuig- + geld-laag (V3 "TCO") en huisdier/heatmap/contrast: pure logica met een
   // unit-test die tot dusver buiten de ratchet viel (audit-bevinding). Nu wél bewaakt —
   // begin bij de geld-modules (vehicleCosts berekent kosten/km; vehicleSharing verdeelt).

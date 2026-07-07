@@ -114,6 +114,7 @@
     "supabase/functions/_shared/tools/tijdlijn.js",
     "supabase/functions/_shared/tools/delen.js",
     "supabase/functions/_shared/tools/index.js",
+    "supabase/functions/_shared/sentryCore.js",
     "supabase/functions/assistant/actions.js",
     "supabase/functions/assistant/core.js",
     "supabase/functions/notify/core.js",
