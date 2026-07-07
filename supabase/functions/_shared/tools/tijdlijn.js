@@ -57,7 +57,7 @@ export function renderTimelineRecent(rows = [], names = {}, photos = []) {
     photos.some((ph) => ph?.post_id === p.id && typeof ph?.photo_path === 'string' && ph.photo_path.length > 0));
   if (photoIdx !== -1) {
     // De findIndex-treffer hierboven garandeert de find-hit (type-only cast).
-    const photo = /** @type {{photo_path: string}} */ (photos.find((ph) => ph.post_id === sorted[photoIdx].id && ph.photo_path));
+    const photo = /** @type {{photo_path: string}} */ (photos.find((ph) => ph?.post_id === sorted[photoIdx].id && ph?.photo_path));
     render.push(imageNode({ bucket: 'timeline', path: photo.photo_path, caption: items[photoIdx].text }));
   }
   return { data, render };

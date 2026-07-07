@@ -187,3 +187,19 @@ test('tijdlijn_recent: haalt de foto-rijen van de getoonde posts op (position op
   await tool.run(toolCtx({ timeline_posts: [] }, leeg));
   assert.equal(leeg.some((c) => c.table === 'timeline_photos'), false);
 });
+
+test('renderTimelineRecent: foto-keuze volgt de getoonde volgorde en verdraagt rommel-fotorijen', () => {
+  const rows = [
+    { id: 'a', body: 'Bovenste zonder foto', author_id: 'u1', pinned_at: null, created_at: '2026-07-05T10:00:00Z' },
+    { id: 'c', body: 'Ouder met foto', author_id: 'u1', pinned_at: null, created_at: '2026-07-01T10:00:00Z' },
+  ];
+  // Rommel in de fotorijen (null, zonder pad, leeg pad) mag nooit crashen én
+  // telt niet als foto — de bovenste post zónder echte foto wordt overgeslagen.
+  const photos = [null, { post_id: 'a' }, { post_id: 'a', photo_path: '' }, { post_id: 'c', photo_path: 'h1/c/1.jpg' }];
+  const { render } = renderTimelineRecent(rows, { u1: 'Erik' }, photos);
+  assert.equal(render[0].type, 'list');
+  assert.equal(render[0].title, 'Prikbord');
+  assert.equal(render[1].path, 'h1/c/1.jpg');
+  // Caption = exact de lijstregel: snippet — auteur, datum (mét komma-scheiding).
+  assert.equal(render[1].caption, 'Ouder met foto — Erik, wo 1 jul');
+});

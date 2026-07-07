@@ -224,3 +224,16 @@ test('kosten_maandoverzicht: één maand met uitgaven → géén trend-node (er 
   const { render } = await tool.run(toolCtx({ expenses }, []), {});
   assert.equal(render.some((n) => n.variant === 'line'), false);
 });
+
+test('monthlyTrendPoints: alle 12 maandnamen komen uit de juiste tabel (zelfde patroon als dayLabel)', () => {
+  const labels = monthlyTrendPoints([], trendMonths('2026-12', 12)).map((p) => p.label);
+  assert.deepEqual(labels, ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']);
+});
+
+test('trendMonths: maandgrenzen exact (01 en 12 zijn geldig) en de ankers van het formaat', () => {
+  assert.equal(trendMonths('2026-01')[5], '2026-01');    // precies op de ondergrens
+  assert.equal(trendMonths('2026-12')[5], '2026-12');    // precies op de bovengrens
+  assert.deepEqual(trendMonths('2026-00'), []);          // maand 0 bestaat niet
+  assert.deepEqual(trendMonths('x2026-07'), []);         // ^-anker: geen prefix-rommel
+  assert.deepEqual(trendMonths('2026-070'), []);         // $-anker: geen suffix-rommel
+});

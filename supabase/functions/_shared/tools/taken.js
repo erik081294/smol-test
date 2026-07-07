@@ -36,9 +36,9 @@ export function renderOpenTasks(rows = [], names = {}, doneThisWeek = null) {
     return { text: parts.join(' · ') };
   });
   const data = { count: rows.length, tasks: sorted.map((t) => ({ title: t.title, due_date: t.due_date ?? null, assignee: (t.assigned_to && names[t.assigned_to]) || null })) };
-  const render = items.length > 0
+  const render = /** @type {object[]} */ (items.length > 0
     ? [{ type: 'list', title: `Open taken (${items.length})`, items }]
-    : [{ type: 'card', title: 'Open taken', lines: ['Niets open — lekker bezig!'] }];
+    : [{ type: 'card', title: 'Open taken', lines: ['Niets open — lekker bezig!'] }]);
   if (Number.isInteger(doneThisWeek) && /** @type {number} */ (doneThisWeek) > 0) {
     render.push(progressNode({
       label: 'Deze week afgerond',
