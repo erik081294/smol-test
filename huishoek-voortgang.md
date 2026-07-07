@@ -1758,3 +1758,20 @@ streams vers herstart op de nieuwe basis: **AI-20** (sessie 1), **AI-11** (sessi
 **PLT-7-staart + INF-4** (sessie 4; scope gecorrigeerd: de app-kant van Sentry bestaat al —
 `lib/monitoring.js` — alleen de edge-kant is het echte gat; het plan-28-mini-plan was daar
 stale t.o.v. backlog §6).
+
+---
+
+**Drie streams gemerged + AI-16 ronde 3 (2026-07-07, vervolg).** Op de nieuwe main:
+**AI-20** (multi-turn golden-cases via de productie-`actionFollowUpMessage`, NL-toon-judge
+opt-in `--tone`, Maestro-flow 06 + testID's confirm/reject), **AI-11 spoor 1**
+(deterministische catalogus-matching; `lib/groceryCatalog.js` edge-safe → app↔edge-brug;
+descriptions byte-identiek), **PLT-7-staart + INF-4-edge** (store-"binnenkort"-staat +
+`STORE_LINKS`-config; `sentryCore.js`/`sentry.ts` fail-silent in de catch-paden van
+assistant/scan-receipt) en **AI-16 ronde 3** in main (image/progress/lijn-chart +
+producenten tijdlijn-foto/kosten-maandtrend/taken-weekvoortgang; de tijdlijn-test ving
+een echte null-crash in de foto-lookup). Suite **1369 pass / 0 fail**, typecheck, eslint
+0 errors, ratchet groen (kosten bewust herijkt 97,4% — 4 equivalente mutanten;
+sentryCore-entry 97,6%). **Edge:** `scan-receipt` **v9 LIVE** (byte-geverifieerd);
+de `assistant`-v19-deploy (22 bundel-bestanden, nu incl. groceryCatalog/productMatch/
+sentry) is de open vervolgstap — de bundel is te groot voor de MCP-inline-route in deze
+sessie; via de Supabase-CLI (`supabase functions deploy assistant`) of een verse sessie.
