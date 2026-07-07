@@ -138,9 +138,16 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
   golden-set (`tests/assistant-golden.json` via [`scripts/assistant-eval.mjs`](../scripts/assistant-eval.mjs))
   en mag er **geen regressie** zijn t.o.v. de baseline
   ([`assistant-eval-baseline.json`](../assistant-eval-baseline.json)). De geautomatiseerde
-  gate scoort **tool-selectie-F1, args-subset-match en no-tool-accuracy** (beurt 1). NL-toon
-  en groundedness zijn (nog) géén geautomatiseerde judge — die borg je via handmatige
-  trace-review (§7); een LLM-as-judge daarvoor is een openstaande verbetering.
+  gate scoort **tool-selectie-F1, args-subset-match en no-tool-accuracy** over de te scoren
+  beurt. Cases zijn single-turn (`question`) of **multi-turn** (`turns`, AI-20): eerdere
+  beurten als tekst; een confirm-vervolg-beurt wordt via de productie-bouwer
+  (`actionFollowUpMessage`) gegenereerd, nooit overgetypt. Samenstel-check zonder API:
+  `node scripts/assistant-eval.mjs --dry-run`.
+- **NL-toon** heeft een LLM-as-judge ([`scripts/assistant-judge.mjs`](../scripts/assistant-judge.mjs),
+  AI-20): NL-rubric + 3 few-shot-ankers → `toneScore` (0–100, gemiddeld). **Opt-in via
+  `--tone`** zolang er geen gekalibreerde toon-baseline in de baseline-file ligt (de eerste
+  live `--tone --update-baseline`-run legt die vast; daarna ratchet 'ie met dezelfde
+  2pp-tolerantie mee). Groundedness blijft handmatige trace-review (§7).
 - Elke productie-failure (uit trace-review, §7) wordt een nieuwe golden-case in de repo.
   De repo is de bron van waarheid; Orq is de runner.
 
@@ -170,8 +177,8 @@ consistente huisgenoot-stem en maken de UX onvoorspelbaar.
   server-gerenderde kaarten, niet in lopende tekst. Details bereiken gebruikers via
   `link`-nodes (deep-link naar het module-scherm). Alleen op expliciet verzoek
   ("geef me een uitgebreid overzicht") mag een lang antwoord. Dit is in de
-  systemprompt verankerd (BEKNOPT-blok); breedsprakigheid vang je nu via handmatige
-  trace-review (§6) — een geautomatiseerde NL-toon-judge is nog niet gebouwd.
+  systemprompt verankerd (BEKNOPT-blok); breedsprakigheid vang je via de handmatige
+  trace-review (§7) en — opt-in, AI-20 — de NL-toon-judge van de eval-gate (§6).
 - **Elke beurt eindigt met antwoordopties** (AskUserQuestion-patroon): het model sluit
   af met de pseudo-tool `suggest_replies` (2–4 opties, ≤6 woorden); de app toont ze als
   tikbare chips boven de invoer. De opties zijn een versnelling, nooit een beperking:
