@@ -149,3 +149,41 @@ test('proposePost: foutteksten liggen vast; precies 80 tekens knipt niet', () =>
   assert.equal(proposePost({ items: [{ body: exact }] }).items[0], exact);
   assert.equal(proposePost({ items: [{ body: 'x'.repeat(MAX_POST_LENGTH) }] }).ok, true);
 });
+
+// --- Prikbord-foto (AI-16 ronde 3): image-node bij de bovenste post mét foto.
+
+test('renderTimelineRecent: bovenste post mét foto krijgt een image-node (gepind wint van nieuwer)', () => {
+  const rows = [
+    { id: 'a', body: 'Nieuwste zonder foto', pinned_at: null, created_at: '2026-07-05T10:00:00Z' },
+    { id: 'b', body: 'Gepind met foto', pinned_at: '2026-07-01T10:00:00Z', created_at: '2026-06-01T10:00:00Z' },
+    { id: 'c', body: 'Ouder met foto', pinned_at: null, created_at: '2026-05-01T10:00:00Z' },
+  ];
+  const photos = [
+    { post_id: 'c', photo_path: 'h1/c/1.jpg', position: 0 },
+    { post_id: 'b', photo_path: 'h1/b/1.jpg', position: 0 },  // eerste foto (position) van de gepinde post
+    { post_id: 'b', photo_path: 'h1/b/2.jpg', position: 1 },
+  ];
+  const { render } = renderTimelineRecent(rows, { }, photos);
+  assert.equal(render.length, 2);
+  assert.equal(render[1].type, 'image');
+  assert.equal(render[1].bucket, 'timeline');
+  assert.equal(render[1].path, 'h1/b/1.jpg');                 // gepind staat bovenaan → zijn foto wint
+  assert.equal(render[1].caption.startsWith('Gepind met foto'), true);
+  assert.equal(typeof render[1].text, 'string');              // fallback voor oude clients
+  // Geen foto's (of default) → alleen de lijst, geen lege image-node.
+  assert.equal(renderTimelineRecent(rows, {}).render.length, 1);
+  assert.equal(renderTimelineRecent(rows, {}, [{ post_id: 'x', photo_path: '' }]).render.length, 1);
+});
+
+test('tijdlijn_recent: haalt de foto-rijen van de getoonde posts op (position oplopend)', async () => {
+  const calls = [];
+  await tool.run(toolCtx({ timeline_posts: [{ id: 'a', body: 'x', created_at: '2026-07-01' }], timeline_photos: [] }, calls));
+  const photoCall = calls.find((c) => c.table === 'timeline_photos');
+  assert.equal(photoCall.selected, 'post_id, photo_path, position');
+  assert.deepEqual(photoCall.filters, [['in', 'post_id', ['a']]]);
+  assert.deepEqual(photoCall.order, ['position', { ascending: true }]);
+  // Zonder posts géén foto-query (geen lege .in()-roundtrip).
+  const leeg = [];
+  await tool.run(toolCtx({ timeline_posts: [] }, leeg));
+  assert.equal(leeg.some((c) => c.table === 'timeline_photos'), false);
+});
