@@ -9,6 +9,8 @@ import {
   renderGroceryList,
   proposeAddGroceries,
   proposeCheckGroceries,
+  matchCatalogGrocery,
+  uncategorizedAfterExecute,
   MAX_PROPOSED_GROCERIES,
 } from '../supabase/functions/_shared/tools/boodschappen.js';
 import { toolCtx } from './fakeAssistantDb.js';
@@ -104,13 +106,64 @@ test('proposeAddGroceries: trimt naam/hoeveelheid, lege hoeveelheid → null, ui
   ] });
   assert.equal(out.ok, true);
   assert.equal(out.summary, '3 boodschappen op de lijst zetten');
-  assert.deepEqual(out.items, ['Melk (2 pakken)', 'Eieren', 'Kaas']);
+  // Gematchte items tonen de catalogus-koppeling (item-emoji vóór de schap-emoji:
+  // Eieren 🥚, niet zuivel-🥛); ongematcht (Kaas: substring ≠ prefix) blijft kaal.
+  assert.deepEqual(out.items, [
+    'Melk (2 pakken) 🥛 · Zuivel & eieren',
+    'Eieren 🥚 · Zuivel & eieren',
+    'Kaas',
+  ]);
   assert.deepEqual(out.args.items, [
     { name: 'Melk', quantity: '2 pakken' },
     { name: 'Eieren', quantity: null },
     { name: 'Kaas', quantity: null },
   ]);
   assert.equal(out.items.length, out.args.items.length);
+});
+
+// --- AI-11 spoor 1: deterministische catalogus-matching.
+
+test('matchCatalogGrocery: exact (case-/ruis-ongevoelig), uniek prefix; ambigu/substring/onzin → null', () => {
+  assert.equal(matchCatalogGrocery('melk').key, 'melk');
+  assert.equal(matchCatalogGrocery('MELK 1L').key, 'melk');    // normalize: case + eenheid-ruis
+  assert.equal(matchCatalogGrocery('hagel').key, 'hagelslag'); // uniek prefix
+  // Exact wint óók als de naam een ambigu prefix van andere items is
+  // ("kipfilet" is prefix van "kipfilet vleeswaren" — exact-tak, geen null).
+  assert.equal(matchCatalogGrocery('kipfilet').key, 'kipfilet');
+  assert.equal(matchCatalogGrocery('kip'), null);              // ambigu prefix (Kipfilet ×2)
+  assert.equal(matchCatalogGrocery('wafel'), null);            // substring van Stroopwafels ≠ prefix
+  assert.equal(matchCatalogGrocery('zeldzaamding'), null);     // geen treffer
+  assert.equal(matchCatalogGrocery('500 g'), null);            // normaliseert naar leeg
+  assert.equal(matchCatalogGrocery(), null);
+});
+
+test('proposeAddGroceries: de match verrijkt alleen de kaartregel, niet de args (edit-flow blijft {name, quantity})', () => {
+  const out = proposeAddGroceries({ items: [{ name: 'melk', quantity: '2 pakken' }, { name: 'Zeldzaamding' }] });
+  assert.deepEqual(out.items, ['melk (2 pakken) 🥛 · Zuivel & eieren', 'Zeldzaamding']);
+  assert.deepEqual(out.args.items, [
+    { name: 'melk', quantity: '2 pakken' },
+    { name: 'Zeldzaamding', quantity: null },
+  ]);
+});
+
+test('uncategorizedAfterExecute: alleen ongematchte items, getrimd + gededupliceerd; zonder args → leeg', () => {
+  const items = [
+    { name: ' Zeldzaamding ', productId: 'p1' },
+    { name: 'Melk', productId: 'p2' },      // gematcht → valt af
+    { name: 'zeldzaamding 2x' },            // zelfde genormaliseerde naam → valt af
+    { name: '500 g', productId: 'p3' },     // normaliseert leeg → valt af
+    { name: 42, productId: 'p4' },          // geen string → valt af
+    { name: 'Ander ding', productId: null },
+  ];
+  const matches = [null, { key: 'melk' }, null, null, null, null];
+  assert.deepEqual(uncategorizedAfterExecute(items, matches), [
+    { name: 'Zeldzaamding', productId: 'p1' },
+    { name: 'Ander ding', productId: null },
+  ]);
+  assert.deepEqual(uncategorizedAfterExecute(), []);
+  assert.deepEqual(uncategorizedAfterExecute([null]), []); // gaten in de lijst breken niets
+  // matches optioneel: zonder matches is alles kandidaat.
+  assert.deepEqual(uncategorizedAfterExecute([{ name: 'X' }]), [{ name: 'X', productId: null }]);
 });
 
 test('proposeAddGroceries: één item → summary met naam', () => {
@@ -130,25 +183,82 @@ test('proposeAddGroceries: leeg, te veel, naamloos of te lang → duidelijke fou
   assert.match(proposeAddGroceries({ items: [{ name: 'x'.repeat(81) }] }).error, /80/);
 });
 
-test('boodschappen_toevoegen.execute: insert met added_by + checked:false, ids terug voor undo', async () => {
+test('boodschappen_toevoegen.execute: find-or-create product + gekoppelde insert, alleen groceries in het undo-spoor', async () => {
   const calls = [];
   const out = await tool('boodschappen_toevoegen').execute(
-    toolCtx({}, calls),
+    toolCtx({ products: [] }, calls),
     { items: [{ name: 'Melk', quantity: '2 pakken' }, { name: 'Kaas', quantity: null }] }
   );
-  assert.equal(calls[0].table, 'groceries');
-  assert.deepEqual(calls[0].inserted[0], {
-    household_id: 'h1', added_by: 'u1', name: 'Melk', quantity: '2 pakken', checked: false,
-  });
+  // 1. Bestaande huishoud-producten ophalen (find-or-create, zoals ensureProduct)…
+  assert.equal(calls[0].table, 'products');
+  assert.equal(calls[0].selected, 'id, name, search');
+  assert.deepEqual(calls[0].filters, [['eq', 'household_id', 'h1']]);
+  // 2. …ontbrekende producten aanmaken: Melk mét catalogus-schap/eenheid, Kaas kaal.
+  assert.equal(calls[1].table, 'products');
+  assert.deepEqual(calls[1].inserted, [
+    { household_id: 'h1', created_by: 'u1', name: 'Melk', search: 'melk', category: 'zuivel', default_unit: 'pak' },
+    { household_id: 'h1', created_by: 'u1', name: 'Kaas', search: 'kaas' },
+  ]);
+  // 3. De lijstregels, gekoppeld aan de zojuist gemaakte producten.
+  assert.equal(calls[2].table, 'groceries');
+  assert.deepEqual(calls[2].inserted, [
+    { household_id: 'h1', added_by: 'u1', name: 'Melk', quantity: '2 pakken', checked: false, product_id: 'products-1' },
+    { household_id: 'h1', added_by: 'u1', name: 'Kaas', quantity: null, checked: false, product_id: 'products-2' },
+  ]);
   assert.equal(out.summary, '2 boodschappen op de lijst gezet.');
+  // Products blijven buiten het undo-spoor (parity met handmatig: het product blijft bestaan).
   assert.deepEqual(out.inserted, [{ table: 'groceries', id: 'groceries-1' }, { table: 'groceries', id: 'groceries-2' }]);
 });
 
-test('boodschappen_toevoegen.execute: één item → enkelvoud-summary; insert-fout gooit', async () => {
+test('boodschappen_toevoegen.execute: bestaand product (via search óf naam-terugval, eerste wint) → geen product-insert', async () => {
+  const calls = [];
+  await tool('boodschappen_toevoegen').execute(
+    toolCtx({ products: [
+      { id: 'p1', name: 'Melk halfvol', search: 'melk' }, // match op opgeslagen search, niet op naam
+      { id: 'pDup', name: 'Melk', search: 'melk' },       // tweede met dezelfde norm → eerste wint
+      { id: 'p2', name: 'Kaas!', search: null },          // zonder search → terugval normalize(naam)
+    ] }, calls),
+    { items: [{ name: 'Melk', quantity: null }, { name: 'kaas', quantity: null }] }
+  );
+  assert.equal(calls.length, 2); // select + groceries-insert, géén products-insert
+  assert.equal(calls[1].table, 'groceries');
+  assert.equal(calls[1].inserted[0].product_id, 'p1');
+  assert.equal(calls[1].inserted[1].product_id, 'p2');
+});
+
+test('boodschappen_toevoegen.execute: batch-dedupe op genormaliseerde naam; lege normalisatie → geen koppeling', async () => {
+  const calls = [];
+  await tool('boodschappen_toevoegen').execute(
+    toolCtx({ products: [] }, calls),
+    { items: [{ name: 'Melk', quantity: null }, { name: 'melk 1L', quantity: '2' }, { name: '500 g', quantity: null }] }
+  );
+  // "Melk" en "melk 1L" normaliseren gelijk → één product; "500 g" normaliseert leeg → geen product.
+  assert.deepEqual(calls[1].inserted.map((p) => p.search), ['melk']);
+  const rows = calls[2].inserted;
+  assert.equal(rows[0].product_id, 'products-1');
+  assert.equal(rows[1].product_id, 'products-1');
+  assert.equal('product_id' in rows[2], false);
+});
+
+test('boodschappen_toevoegen.execute: één item → enkelvoud-summary', async () => {
   const out = await tool('boodschappen_toevoegen').execute(toolCtx({}, []), { items: [{ name: 'Melk', quantity: null }] });
   assert.equal(out.summary, 'Op de boodschappenlijst gezet.');
+});
+
+test('boodschappen_toevoegen.execute: fouten gooien (products-select, products-insert én groceries-insert)', async () => {
   await assert.rejects(
+    () => tool('boodschappen_toevoegen').execute(toolCtx({}, [], { queryError: { message: 'boem' } }), { items: [{ name: 'Melk', quantity: null }] }),
+    /boem/
+  );
+  await assert.rejects( // products-insert faalt (product bestond nog niet)
     () => tool('boodschappen_toevoegen').execute(toolCtx({}, [], { insertError: {} }), { items: [{ name: 'Melk', quantity: null }] }),
+    /query mislukt/
+  );
+  await assert.rejects( // groceries-insert faalt (product bestond al, dus geen products-insert ervoor)
+    () => tool('boodschappen_toevoegen').execute(
+      toolCtx({ products: [{ id: 'p1', name: 'Melk', search: 'melk' }] }, [], { insertError: {} }),
+      { items: [{ name: 'Melk', quantity: null }] }
+    ),
     /query mislukt/
   );
 });

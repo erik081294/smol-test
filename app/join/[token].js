@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useHousehold } from '../../lib/household';
@@ -9,6 +9,7 @@ import { Button, Card } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type, space, radius } from '../../lib/theme';
 import { normalizeToken } from '../../lib/invites';
+import { STORE_LINKS } from '../../lib/constants';
 import { t } from '../../lib/i18n';
 
 // --- Presentatie-bouwstenen (module-niveau: niet opnieuw aangemaakt per render) -------
@@ -127,8 +128,6 @@ export default function JoinInvite() {
   );
   const goApp = useCallback(() => router.replace('/(tabs)/vandaag'), [router]);
   const dismiss = useCallback(() => { clearPendingInvite(); router.replace('/'); }, [clearPendingInvite, router]);
-  const showDownloadSoon = useCallback(
-    () => dialog.alert({ title: t('join.download.title'), body: t('join.download.soon') }), [dialog]);
 
   // --- States ----------------------------------------------------------------
   if (loading) {
@@ -153,14 +152,28 @@ export default function JoinInvite() {
             {t('join.accepted.body', { household })}
           </Text>
 
-          {/* Download-prompt — placeholders; echte store-links bestaan nog niet. */}
+          {/* Download-verwijzing (PLT-7-staart): er zijn nog geen store-listings.
+              Zolang STORE_LINKS (lib/constants.js) leeg is tonen we een rustige,
+              niet-tikbare "binnenkort"-caption — geen dode links of badges die
+              nergens heengaan. Zodra de echte URL's daar zijn ingevuld (Erik-actie)
+              verschijnen de tikbare store-badges hier vanzelf. */}
           <View style={{ marginTop: space.xl, padding: space.lg, backgroundColor: colors.ocherSoft, borderRadius: radius.md }}>
             <Text style={[type.title, { marginBottom: space.xs }]}>{t('join.download.title')}</Text>
-            <Text style={[type.caption, { color: colors.inkSoft, marginBottom: space.md }]}>{t('join.download.body')}</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <StoreBadge label={t('join.download.ios')} onPress={showDownloadSoon} />
-              <StoreBadge label={t('join.download.android')} onPress={showDownloadSoon} />
-            </View>
+            <Text style={[type.caption, { color: colors.inkSoft }]}>{t('join.download.body')}</Text>
+            {STORE_LINKS.ios || STORE_LINKS.android ? (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: space.md }}>
+                {STORE_LINKS.ios ? (
+                  <StoreBadge label={t('join.download.ios')} onPress={() => Linking.openURL(STORE_LINKS.ios)} />
+                ) : null}
+                {STORE_LINKS.android ? (
+                  <StoreBadge label={t('join.download.android')} onPress={() => Linking.openURL(STORE_LINKS.android)} />
+                ) : null}
+              </View>
+            ) : (
+              <Text style={[type.caption, { color: colors.inkFaint, marginTop: space.md }]}>
+                {t('join.download.soon')}
+              </Text>
+            )}
           </View>
 
           <Button title={t('join.continue')} onPress={goApp} style={{ marginTop: space.lg }} />

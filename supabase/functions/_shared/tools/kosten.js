@@ -69,6 +69,51 @@ export function renderExpensesSummary(rows = [], monthLabel = '') {
   return { data, render };
 }
 
+// NL-maandafkortingen voor de trend-labels (spiegel van de dayLabel-stijl).
+const MONTH_LABELS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+
+/**
+ * De n maanden t/m `month` als "YYYY-MM"-lijst (oudste eerst) — puur string/
+ * getal-rekenen, geen Date (tz-vast). Ongeldige maand → [].
+ * @param {string} [month] "YYYY-MM"
+ * @param {number} [n]
+ * @returns {string[]}
+ */
+export function trendMonths(month = '', n = 6) {
+  const parsed = /^(\d{4})-(\d{2})$/.exec(month ?? '');
+  if (!parsed) return [];
+  let y = Number(parsed[1]);
+  let m = Number(parsed[2]);
+  if (m < 1 || m > 12) return [];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.unshift(`${y}-${String(m).padStart(2, '0')}`);
+    m -= 1;
+    if (m === 0) { m = 12; y -= 1; }
+  }
+  return out;
+}
+
+/**
+ * Uitgaven-rijen → maandtotalen voor de lijn-grafiek (AI-16 ronde 3): één punt
+ * per maand uit `months` (label = NL-maandafkorting, waarde in CENTEN). Lege
+ * maanden blijven 0 — een maand zonder uitgaven is informatie; rijen buiten
+ * het venster (of rommel) tellen niet mee.
+ * @param {Array<{amount_cents?:number|null, spent_on?:string|null}>} [rows]
+ * @param {string[]} [months] "YYYY-MM"-lijst uit trendMonths
+ * @returns {Array<{label:string, value:number}>}
+ */
+export function monthlyTrendPoints(rows = [], months = []) {
+  const totals = new Map(months.map((m) => [m, 0]));
+  for (const row of rows) {
+    if (typeof row?.spent_on !== 'string') continue;
+    const key = row.spent_on.slice(0, 7);
+    if (!totals.has(key)) continue;
+    totals.set(key, /** @type {number} */ (totals.get(key)) + (row.amount_cents ?? 0));
+  }
+  return months.map((m) => ({ label: MONTH_LABELS[Number(m.slice(5, 7)) - 1], value: /** @type {number} */ (totals.get(m)) }));
+}
+
 // Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
 // regel per actieve module in de systemprompt-snapshot (progressive disclosure:
 // brief altijd, tool-descriptions als detail, tool-output als derde laag).
@@ -103,7 +148,25 @@ export const KOSTEN_TOOLS = [
           .lt('spent_on', nextMonth(month))
           .limit(500)
       );
-      return renderExpensesSummary(rows, month);
+      const out = renderExpensesSummary(rows, month);
+      // AI-16 ronde 3: maandtrend als lijn-grafiek — aparte lichte query zodat
+      // de maand-samenvatting (en dus de `data` naar het model) byte-identiek
+      // blijft. Pas tonen bij ≥2 maanden mét uitgaven (anders is er geen trend).
+      const months = trendMonths(month);
+      const trendRows = throwOnError(
+        await ctx.db
+          .from('expenses')
+          .select('amount_cents, spent_on')
+          .eq('household_id', ctx.householdId)
+          .gte('spent_on', `${months[0]}-01`)
+          .lt('spent_on', nextMonth(month))
+          .limit(2000)
+      );
+      const points = monthlyTrendPoints(trendRows, months);
+      if (points.filter((p) => p.value > 0).length >= 2) {
+        out.render.push(chartNode({ title: 'Trend per maand', unit: 'euro', variant: 'line', points }));
+      }
+      return out;
     },
   },
 ];

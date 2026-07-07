@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS, EXPENSE_CATEGORIES, TAG_COLORS } from '../lib/constants.js';
+import { CATEGORIES, VISIBILITY_VALUES, RECUR_VALUES, ROLE, MEAL_TYPES, PANTRY_LOCATIONS, EXPENSE_CATEGORIES, TAG_COLORS, STORE_LINKS } from '../lib/constants.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(resolve(here, '../supabase/migrations/0001_init.sql'), 'utf8');
@@ -60,4 +60,15 @@ test('TAG_COLORS: vaste set distinct geldige hex-kleuren', () => {
   assert.equal(TAG_COLORS.length, 7);
   assert.equal(new Set(TAG_COLORS).size, TAG_COLORS.length); // allemaal uniek
   for (const c of TAG_COLORS) assert.match(c, /^#[0-9A-Fa-f]{6}$/); // #RRGGBB
+});
+
+// STORE_LINKS (PLT-7): de download-links op het join-succes-scherm. Pin de vorm:
+// beide platform-sleutels bestaan, en een waarde is óf null (nog geen store-listing →
+// het scherm toont de niet-tikbare "binnenkort"-caption) óf een https-URL (→ tikbare
+// badge). Het scherm leunt op precies dit onderscheid.
+test('STORE_LINKS: ios/android aanwezig, waarde null of https-URL', () => {
+  assert.deepEqual(Object.keys(STORE_LINKS).sort(), ['android', 'ios']);
+  for (const [platform, url] of Object.entries(STORE_LINKS)) {
+    assert.ok(url === null || /^https:\/\//.test(url), `${platform}: null of https-URL, kreeg ${url}`);
+  }
 });

@@ -7,17 +7,21 @@
 // imports horen niet in de edge-bundel); de sortering hieronder spiegelt orderTimeline.
 
 import { dayLabel, throwOnError } from './helpers.js';
+import { imageNode } from './render.js';
 
 const MAX_BODY_SNIPPET = 120;
 
 /**
  * Recente prikbord-posts → data + lijst. Gepinde berichten eerst (nieuwst gepind
  * bovenaan), daarna de nieuwste posts — spiegel van lib/timeline.js orderTimeline.
- * Auteur via memberNames; body wordt op één regel geknipt.
+ * Auteur via memberNames; body wordt op één regel geknipt. Met `photos` erbij
+ * (AI-16 ronde 3) krijgt de bóvenste post mét foto zijn foto als image-node —
+ * het pad komt uit de RLS-gefilterde query, de client signt zelf (storage-RLS).
  * @param {Array<{id:string, body?:string|null, author_id?:string|null, pinned_at?:string|null, created_at?:string|null}>} [rows]
  * @param {Record<string,string>} [names] profiel-id → weergavenaam
+ * @param {Array<{post_id?:string|null, photo_path?:string|null}>} [photos] op position gesorteerd
  */
-export function renderTimelineRecent(rows = [], names = {}) {
+export function renderTimelineRecent(rows = [], names = {}, photos = []) {
   const sorted = [...rows].sort((a, b) => {
     const ap = a?.pinned_at ?? '';
     const bp = b?.pinned_at ?? '';
@@ -46,7 +50,17 @@ export function renderTimelineRecent(rows = [], names = {}) {
     const text = e.snippet || '(foto)';
     return { text: meta ? `${text} — ${meta}` : text, emoji: e.pinned ? '📌' : null };
   });
-  return { data, render: [{ type: 'list', title: 'Prikbord', items }] };
+  const render = /** @type {object[]} */ ([{ type: 'list', title: 'Prikbord', items }]);
+  // De bovenste post mét foto (in de getoonde volgorde) krijgt zijn eerste
+  // foto erbij; de caption is dezelfde regel als in de lijst.
+  const photoIdx = sorted.findIndex((p) =>
+    photos.some((ph) => ph?.post_id === p.id && typeof ph?.photo_path === 'string' && ph.photo_path.length > 0));
+  if (photoIdx !== -1) {
+    // De findIndex-treffer hierboven garandeert de find-hit (type-only cast).
+    const photo = /** @type {{photo_path: string}} */ (photos.find((ph) => ph?.post_id === sorted[photoIdx].id && ph?.photo_path));
+    render.push(imageNode({ bucket: 'timeline', path: photo.photo_path, caption: items[photoIdx].text }));
+  }
+  return { data, render };
 }
 
 export const MAX_POST_LENGTH = 2000;
@@ -94,7 +108,18 @@ export const TIJDLIJN_TOOLS = [
           .order('created_at', { ascending: false })
           .limit(15)
       );
-      return renderTimelineRecent(rows, ctx.memberNames ?? {});
+      // Foto's van deze posts (AI-16 ronde 3) — RLS erft de post-zichtbaarheid;
+      // position oplopend zodat "eerste foto van de post" deterministisch is.
+      const photos = rows.length > 0
+        ? throwOnError(
+            await ctx.db.from('timeline_photos')
+              .select('post_id, photo_path, position')
+              .in('post_id', rows.map((r) => r.id))
+              .order('position', { ascending: true })
+              .limit(30)
+          )
+        : [];
+      return renderTimelineRecent(rows, ctx.memberNames ?? {}, photos);
     },
   },
   {

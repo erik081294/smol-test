@@ -2,7 +2,7 @@
 // top-3-sortering en de maandgrens-compositie van de query.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KOSTEN_TOOLS, KOSTEN_BRIEF, KOSTEN_MANIFEST, renderExpensesSummary, weeklyExpensePoints } from '../supabase/functions/_shared/tools/kosten.js';
+import { KOSTEN_TOOLS, KOSTEN_BRIEF, KOSTEN_MANIFEST, renderExpensesSummary, weeklyExpensePoints, trendMonths, monthlyTrendPoints } from '../supabase/functions/_shared/tools/kosten.js';
 import { toolCtx } from './fakeAssistantDb.js';
 
 const tool = KOSTEN_TOOLS.find((t) => t.name === 'kosten_maandoverzicht');
@@ -163,4 +163,77 @@ test('kosten_maandoverzicht: geldige month-arg wordt wél gebruikt', async () =>
     ['gte', 'spent_on', '2026-03-01'],
     ['lt', 'spent_on', '2026-04-01'],
   ]);
+});
+
+// --- Maandtrend (AI-16 ronde 3): pure maand-lijst + -totalen en de lijn-node.
+
+test('trendMonths: 6 maanden t/m de maand, oudste eerst, over de jaargrens heen', () => {
+  assert.deepEqual(trendMonths('2026-07'), ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07']);
+  assert.deepEqual(trendMonths('2026-02'), ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']);
+  assert.deepEqual(trendMonths('2026-07', 2), ['2026-06', '2026-07']);
+  assert.deepEqual(trendMonths('juli'), []);
+  assert.deepEqual(trendMonths('2026-13'), []);
+  assert.deepEqual(trendMonths(), []);
+});
+
+test('monthlyTrendPoints: som per maand (NL-label), buiten het venster telt niet, lege maand blijft 0', () => {
+  const months = trendMonths('2026-07', 3);           // mei, jun, jul
+  const points = monthlyTrendPoints([
+    { amount_cents: 100, spent_on: '2026-05-10' },
+    { amount_cents: 250, spent_on: '2026-05-20' },
+    { amount_cents: 999, spent_on: '2026-07-01' },
+    { amount_cents: 555, spent_on: '2026-04-30' },    // vóór het venster → weg
+    { spent_on: '2026-07-02' },                        // ontbrekend bedrag telt als 0
+    { amount_cents: 100 },                             // geen datum → weg
+    null,                                              // rommel-rij → geen crash
+  ], months);
+  assert.deepEqual(points, [
+    { label: 'mei', value: 350 },
+    { label: 'jun', value: 0 },
+    { label: 'jul', value: 999 },
+  ]);
+  assert.deepEqual(monthlyTrendPoints(), []);
+});
+
+test('kosten_maandoverzicht: aparte trend-query (6 maanden) + lijn-node bij ≥2 maanden met uitgaven', async () => {
+  const calls = [];
+  const expenses = [
+    { description: 'Juni', amount_cents: 500, spent_on: '2026-06-10' },
+    { description: 'Juli', amount_cents: 800, spent_on: '2026-07-02' },
+  ];
+  const { render } = await tool.run(toolCtx({ expenses }, calls), {});
+  const queries = calls.filter((c) => c.table === 'expenses');
+  assert.equal(queries.length, 2);
+  assert.equal(queries[1].selected, 'amount_cents, spent_on');
+  assert.deepEqual(queries[1].filters, [
+    ['eq', 'household_id', 'h1'],
+    ['gte', 'spent_on', '2026-02-01'],
+    ['lt', 'spent_on', '2026-08-01'],
+  ]);
+  const trend = render[render.length - 1];
+  assert.equal(trend.type, 'chart');
+  assert.equal(trend.variant, 'line');
+  assert.equal(trend.title, 'Trend per maand');
+  assert.equal(trend.unit, 'euro');
+  assert.deepEqual(trend.points.map((p) => p.label), ['feb', 'mrt', 'apr', 'mei', 'jun', 'jul']);
+  assert.deepEqual(trend.points.slice(4), [{ label: 'jun', value: 500 }, { label: 'jul', value: 800 }]);
+});
+
+test('kosten_maandoverzicht: één maand met uitgaven → géén trend-node (er is geen trend)', async () => {
+  const expenses = [{ description: 'Juli', amount_cents: 800, spent_on: '2026-07-02' }];
+  const { render } = await tool.run(toolCtx({ expenses }, []), {});
+  assert.equal(render.some((n) => n.variant === 'line'), false);
+});
+
+test('monthlyTrendPoints: alle 12 maandnamen komen uit de juiste tabel (zelfde patroon als dayLabel)', () => {
+  const labels = monthlyTrendPoints([], trendMonths('2026-12', 12)).map((p) => p.label);
+  assert.deepEqual(labels, ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']);
+});
+
+test('trendMonths: maandgrenzen exact (01 en 12 zijn geldig) en de ankers van het formaat', () => {
+  assert.equal(trendMonths('2026-01')[5], '2026-01');    // precies op de ondergrens
+  assert.equal(trendMonths('2026-12')[5], '2026-12');    // precies op de bovengrens
+  assert.deepEqual(trendMonths('2026-00'), []);          // maand 0 bestaat niet
+  assert.deepEqual(trendMonths('x2026-07'), []);         // ^-anker: geen prefix-rommel
+  assert.deepEqual(trendMonths('2026-070'), []);         // $-anker: geen suffix-rommel
 });

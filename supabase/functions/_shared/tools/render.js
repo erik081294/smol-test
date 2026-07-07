@@ -20,17 +20,51 @@ import { fmtEuro } from './helpers.js';
 const fmtChartValue = (value, unit) => (unit === 'euro' ? fmtEuro(value) : String(value));
 
 /**
- * Staafgrafiek-node (één serie). `unit: 'euro'` ⇒ waarden in CENTEN.
- * @param {{ title?: string|null, unit?: 'euro'|null, points: Array<{label:string, value:number}> }} opts
+ * Grafiek-node (één serie). `unit: 'euro'` ⇒ waarden in CENTEN.
+ * `variant: 'line'` ⇒ lijn-variant voor trends (AI-16 ronde 3); default staaf.
+ * @param {{ title?: string|null, unit?: 'euro'|null, variant?: 'line'|null, points: Array<{label:string, value:number}> }} opts
  */
-export function chartNode({ title = null, unit = null, points }) {
+export function chartNode({ title = null, unit = null, variant = null, points }) {
   const body = points.map((p) => `${p.label}: ${fmtChartValue(p.value, unit)}`).join(' · ');
   return {
     type: 'chart',
     ...(title ? { title } : {}),
     ...(unit ? { unit } : {}),
+    ...(variant === 'line' ? { variant: 'line' } : {}),
     points,
     text: title ? `${title}: ${body}` : body,
+  };
+}
+
+/**
+ * Foto-node (AI-16 ronde 3): een kaal opslagpad uit een eigen private bucket —
+ * nooit een URL. De client signt het pad zelf (storage-RLS scopet op het
+ * household-segment), de poortwachter whitelist de bucket. De fallback voor
+ * oude clients is de caption (of "(foto)").
+ * @param {{ bucket: string, path: string, caption?: string|null }} opts
+ */
+export function imageNode({ bucket, path, caption = null }) {
+  return {
+    type: 'image',
+    bucket,
+    path,
+    ...(caption ? { caption } : {}),
+    text: caption ?? '(foto)',
+  };
+}
+
+/**
+ * Voortgangs-node (AI-16 ronde 3): label + teller/noemer ("5 van 12").
+ * De noemer hoort > 0 te zijn — de poortwachter dropt 'm anders.
+ * @param {{ label: string, value: number, max: number }} opts
+ */
+export function progressNode({ label, value, max }) {
+  return {
+    type: 'progress',
+    label,
+    value,
+    max,
+    text: `${label}: ${value} van ${max}`,
   };
 }
 

@@ -257,3 +257,44 @@ test('taken_toevoegen.execute: één taak → enkelvoud-summary; insert-fout goo
     /rls/
   );
 });
+
+// --- Weekvoortgang (AI-16 ronde 3): progress-node + de afgerond-deze-week-query.
+
+test('renderOpenTasks: progress-node bij ≥1 afgeronde taak; data blijft byte-identiek', () => {
+  const rows = [{ title: 'Stofzuigen' }, { title: 'Afwas' }];
+  const met = renderOpenTasks(rows, {}, 3);
+  assert.deepEqual(met.data, renderOpenTasks(rows, {}).data);
+  const node = met.render[met.render.length - 1];
+  assert.deepEqual(node, {
+    type: 'progress', label: 'Deze week afgerond', value: 3, max: 5,
+    text: 'Deze week afgerond: 3 van 5',
+  });
+  // Alles af → balk vol (max = alleen de afgeronde), naast de "niets open"-kaart.
+  const leeg = renderOpenTasks([], {}, 2);
+  assert.deepEqual(leeg.render.map((n) => n.type), ['card', 'progress']);
+  assert.equal(leeg.render[1].max, 2);
+});
+
+test('renderOpenTasks: geen progress-node bij 0/ontbrekend/niet-integer (een lege balk is geen informatie)', () => {
+  const rows = [{ title: 'Stofzuigen' }];
+  assert.deepEqual(renderOpenTasks(rows, {}, 0).render.map((n) => n.type), ['list']);
+  assert.deepEqual(renderOpenTasks(rows, {}, null).render.map((n) => n.type), ['list']);
+  assert.deepEqual(renderOpenTasks(rows, {}).render.map((n) => n.type), ['list']);
+  assert.deepEqual(renderOpenTasks(rows, {}, 2.5).render.map((n) => n.type), ['list']);
+});
+
+test('taken_open: telt afgerond-sinds-maandag in dezelfde scope (only_mine telt alleen eigen werk)', async () => {
+  const calls = [];
+  await TAKEN_TOOLS.find((t) => t.name === 'taken_open').run(toolCtx({ tasks: [] }, calls), {});
+  // ctx.today = 2026-07-04 (za) → maandag = 2026-06-29.
+  const done = calls.filter((c) => c.table === 'tasks')[1];
+  assert.equal(done.selected, 'id');
+  assert.deepEqual(done.filters, [
+    ['eq', 'household_id', 'h1'],
+    ['not', 'completed_at', 'is', null],
+    ['gte', 'completed_at', '2026-06-29T00:00:00Z'],
+  ]);
+  const mine = [];
+  await TAKEN_TOOLS.find((t) => t.name === 'taken_open').run(toolCtx({ tasks: [] }, mine), { only_mine: true });
+  assert.deepEqual(mine.filter((c) => c.table === 'tasks')[1].filters.at(-1), ['eq', 'assigned_to', 'u1']);
+});

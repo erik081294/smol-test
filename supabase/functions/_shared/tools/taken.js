@@ -10,14 +10,20 @@
 //    `execute(ctx, args)` en de annotaties `destructive`/`idempotent` (MCP-vocabulaire);
 //  - render is server-side en deterministisch; het model krijgt alleen `data`.
 
-import { dayLabel, isIsoDate, resolveMemberId, throwOnError } from './helpers.js';
+import { dayLabel, isIsoDate, resolveMemberId, throwOnError, weekStart } from './helpers.js';
+import { progressNode } from './render.js';
 
 /**
  * Open taken → data + kaart. Sorteert op due_date (zonder datum achteraan).
+ * Met `doneThisWeek` erbij (AI-16 ronde 3) toont een voortgangs-node hoeveel
+ * er deze week al afgerond is t.o.v. wat er nu nog open staat — pas bij ≥1
+ * afgeronde taak (een lege balk is geen informatie). De `data` naar het model
+ * blijft byte-identiek.
  * @param {Array<{title:string, due_date?:string|null, assigned_to?:string|null}>} [rows]
  * @param {Record<string,string>} [names] profiel-id → weergavenaam
+ * @param {number|null} [doneThisWeek] aantal deze week afgeronde taken
  */
-export function renderOpenTasks(rows = [], names = {}) {
+export function renderOpenTasks(rows = [], names = {}, doneThisWeek = null) {
   const sorted = [...rows].sort((a, b) => {
     if (!a.due_date && !b.due_date) return 0;
     if (!a.due_date) return 1;
@@ -30,9 +36,16 @@ export function renderOpenTasks(rows = [], names = {}) {
     return { text: parts.join(' · ') };
   });
   const data = { count: rows.length, tasks: sorted.map((t) => ({ title: t.title, due_date: t.due_date ?? null, assignee: (t.assigned_to && names[t.assigned_to]) || null })) };
-  const render = items.length > 0
+  const render = /** @type {object[]} */ (items.length > 0
     ? [{ type: 'list', title: `Open taken (${items.length})`, items }]
-    : [{ type: 'card', title: 'Open taken', lines: ['Niets open — lekker bezig!'] }];
+    : [{ type: 'card', title: 'Open taken', lines: ['Niets open — lekker bezig!'] }]);
+  if (Number.isInteger(doneThisWeek) && /** @type {number} */ (doneThisWeek) > 0) {
+    render.push(progressNode({
+      label: 'Deze week afgerond',
+      value: /** @type {number} */ (doneThisWeek),
+      max: /** @type {number} */ (doneThisWeek) + rows.length,
+    }));
+  }
   return { data, render };
 }
 
@@ -98,7 +111,21 @@ export const TAKEN_TOOLS = [
         .is('completed_at', null);
       if (args.only_mine === true) q = q.eq('assigned_to', ctx.userId);
       const rows = throwOnError(await q.order('due_date', { ascending: true, nullsFirst: false }).limit(50));
-      return renderOpenTasks(rows, ctx.memberNames ?? {});
+      // AI-16 ronde 3: hoeveel is er deze week al afgerond? Zelfde scope als
+      // de open-query (only_mine telt dan ook alleen de eigen afrondingen).
+      const monday = weekStart(ctx.today);
+      let doneThisWeek = null;
+      if (monday) {
+        let dq = ctx.db
+          .from('tasks')
+          .select('id')
+          .eq('household_id', ctx.householdId)
+          .not('completed_at', 'is', null)
+          .gte('completed_at', `${monday}T00:00:00Z`);
+        if (args.only_mine === true) dq = dq.eq('assigned_to', ctx.userId);
+        doneThisWeek = throwOnError(await dq.limit(200)).length;
+      }
+      return renderOpenTasks(rows, ctx.memberNames ?? {}, doneThisWeek);
     },
   },
   {
