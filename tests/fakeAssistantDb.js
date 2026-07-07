@@ -25,11 +25,13 @@ export function fakeDb(rowsByTable, calls, opts = {}) {
         }
         return api;
       },
-      insert(rows) { rec.inserted = rows; return api; },
+      insert(rows) { rec.inserted = Array.isArray(rows) ? rows : [rows]; return api; },
       update(patch) { rec.updated = patch; return api; },
       eq(col, val) { rec.filters.push(['eq', col, val]); return api; },
       in(col, vals) { rec.filters.push(['in', col, vals]); return api; },
       is(col, val) { rec.filters.push(['is', col, val]); return api; },
+      not(col, op, val) { rec.filters.push(['not', col, op, val]); return api; },
+      gt(col, val) { rec.filters.push(['gt', col, val]); return api; },
       gte(col, val) { rec.filters.push(['gte', col, val]); return api; },
       lt(col, val) { rec.filters.push(['lt', col, val]); return api; },
       order(col, o) { rec.order = [col, o]; return api; },

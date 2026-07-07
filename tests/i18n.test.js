@@ -66,6 +66,9 @@ test('authErrorMessage vertaalt bekende Supabase-authfouten naar NL', () => {
   );
   assert.equal(authErrorMessage('Password should be at least 6 characters'), t('auth.err.weakPassword'));
   assert.equal(authErrorMessage('Network request failed'), t('auth.err.network'));
+  // OTP-login (PLT-8): verkeerde/verlopen inlogcode → nette NL-melding.
+  assert.equal(authErrorMessage('Token has expired or is invalid'), t('auth.err.otpInvalid'));
+  assert.equal(authErrorMessage({ message: 'Signups not allowed for otp' }), t('auth.err.otpInvalid'));
 });
 
 test('authErrorMessage valt terug: leeg → generiek, onbekend → ruwe tekst', () => {

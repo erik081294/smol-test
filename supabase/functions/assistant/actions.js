@@ -142,7 +142,11 @@ export function selectItems(args, selected) {
 // result.inserted (data-corruptie, oude versie) wordt geweigerd.
 // NB: recipe_ingredients staat er bewust NIET in — die verdwijnen bij het
 // verwijderen van hun recept mee via on delete cascade (migratie 0016).
-export const UNDO_TABLE_WHITELIST = ['tasks', 'groceries', 'meal_plan_entries', 'recipes'];
+export const UNDO_TABLE_WHITELIST = [
+  'tasks', 'groceries', 'meal_plan_entries', 'recipes',
+  // AI-19 fase B: de additieve writes van de vijf nieuwe packs.
+  'plants', 'pet_log', 'vehicle_log', 'timeline_posts', 'reservations',
+];
 
 /**
  * Groepeer result.inserted per tabel voor de undo-verwijdering; valideert elke

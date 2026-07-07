@@ -16,13 +16,10 @@ import { MANIFESTS, ASSISTANT_TOOLS } from '../supabase/functions/_shared/tools/
 // mét reden; fase 2 dicht deze via de tool-factory + logica-brug. Zolang een module
 // hier staat kan hij niet stil buiten de assistent vallen — en zodra hij een manifest
 // krijgt, faalt de stale-check hieronder tot de rij hier weg is.
-const NO_ASSISTANT = {
-  planten: 'fase 2 — nog geen tool-pack (plantCare-logica bestaat al)',
-  huisdieren: 'fase 2 — nog geen tool-pack (petCare-logica bestaat al)',
-  voertuigen: 'fase 2 — nog geen tool-pack (vehicleCare/-Costs-logica bestaat al)',
-  tijdlijn: 'fase 2 — nog geen tool-pack',
-  delen: 'fase 2 — nog geen tool-pack (reservations/vehicleSharing-logica bestaat al)',
-};
+// AI-19 fase A (plan 27, 2026-07-06): alle data-modules hebben nu een tool-pack.
+// De lijst is leeg maar blijft bestaan als contract: een toekomstige module die
+// bewust géén assistent-toegang krijgt, hoort hier mét reden.
+const NO_ASSISTANT = {};
 
 test('dekking: elke data-module heeft een manifest of staat expliciet op NO_ASSISTANT', () => {
   const withManifest = new Set(MANIFESTS.map((m) => m.moduleKey));

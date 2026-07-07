@@ -43,6 +43,7 @@ import {
   statusLabelMap,
   sseLine,
   openProposalsNote,
+  actionFollowUpMessage,
 } from './core.js';
 // @ts-ignore — zie boven.
 import { ASSISTANT_TOOLS, MODULE_BRIEFS } from '../_shared/tools/index.js';
@@ -151,6 +152,9 @@ Deno.serve(async (req: Request) => {
     enabledModuleKeys?: string[];
     memberNames?: Record<string, string>;
     today?: string;
+    // Client-tijdzone (minuten oost van UTC, bv. 120 voor NL-zomertijd): nodig om
+    // reserverings-tijden als échte UTC-instants op te slaan en lokaal te tonen.
+    tzOffsetMinutes?: number;
     stream?: boolean;
     // Scherm-context (AI-10): moduleKey van het scherm waar de assistent is
     // geopend — een aanwijzing voor het model, nooit een beperking.
@@ -159,6 +163,10 @@ Deno.serve(async (req: Request) => {
     // is geen chatbeurt en kost geen LLM-call. decision 'edit' (AI-10) draagt
     // de door de GEBRUIKER bewerkte args (gaat door dezelfde propose-validatie).
     action?: { id?: string; decision?: string; selected?: number[]; args?: object; memberNames?: Record<string, string> };
+    // Vervolgbeurt na een geslaagde confirm (AI-18, "bevestigen is een beurt"):
+    // de client stuurt alleen de bevestigde action-ids; de beurt-tekst wordt
+    // hier deterministisch uit de OPGESLAGEN rijen gebouwd (nooit client-tekst).
+    followUp?: { actionIds?: string[] };
   };
   try {
     body = await req.json();
@@ -298,8 +306,30 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // --- Chatbeurt: vanaf hier is message verplicht.
-  const { householdId, message } = body;
+  // --- Chatbeurt: vanaf hier is een beurt-tekst verplicht — óf het bericht van
+  // de gebruiker, óf de server-gebouwde vervolg-nota na een confirm (AI-18).
+  const { householdId } = body;
+  let message = typeof body.message === 'string' ? body.message : '';
+  let turnKind: string | null = null;
+  if (body.followUp) {
+    // "Bevestigen is een beurt": alleen ids reizen mee; de tekst komt uit de
+    // opgeslagen action-rijen (RLS creator-privé — je kunt alleen opvolgen wat
+    // je zelf ziet) en alleen daadwerkelijk uitgevoerde (done) rijen tellen.
+    const ids = Array.isArray(body.followUp.actionIds)
+      ? body.followUp.actionIds.filter((id) => typeof id === 'string' && UUID_RE.test(id)).slice(0, 5)
+      : [];
+    const followConvId = typeof body.conversationId === 'string' && UUID_RE.test(body.conversationId) ? body.conversationId : null;
+    if (ids.length === 0 || !followConvId) return json({ error: 'Ongeldige vervolg-aanvraag.' }, 400);
+    const { data: followRows } = await db
+      .from('assistant_messages')
+      .select('id, content')
+      .in('id', ids)
+      .eq('role', 'action')
+      .eq('conversation_id', followConvId);
+    message = actionFollowUpMessage(followRows ?? []);
+    if (!message) return json({ error: 'Niets om op te volgen.' }, 409);
+    turnKind = 'action_follow_up';
+  }
   if (!householdId || typeof message !== 'string' || message.trim().length === 0) {
     return json({ error: 'householdId en message zijn verplicht' }, 400);
   }
@@ -345,7 +375,10 @@ Deno.serve(async (req: Request) => {
   const derivedKeys = await loadEnabledModuleKeys(db, householdId, userId);
   const enabledKeys = derivedKeys ?? (Array.isArray(body.enabledModuleKeys) ? body.enabledModuleKeys : []);
   const granted = await loadGrantedCapabilities(db, householdId, userId);
-  const ctx = { db, householdId, userId, today, memberNames };
+  const tzOffsetMinutes = Number.isInteger(body.tzOffsetMinutes) && Math.abs(body.tzOffsetMinutes as number) <= 840
+    ? (body.tzOffsetMinutes as number)
+    : 0;
+  const ctx = { db, householdId, userId, today, memberNames, tzOffsetMinutes };
 
   // Write-tools doen mee (AI-8): de loop voert ze nooit uit — de interceptie
   // hieronder maakt er een bevestigingsvoorstel van (HITL). De capability-poort
@@ -398,7 +431,10 @@ Deno.serve(async (req: Request) => {
     household_id: householdId,
     created_by: userId,
     role: 'user',
-    content: { v: 1, text: message },
+    // `kind: 'action_follow_up'` markeert de synthetische vervolg-nota (AI-18):
+    // de client verbergt die rij als bubble; voor de LLM-history telt hij wél
+    // gewoon mee (historyFromRows) zodat latere beurten de context houden.
+    content: { v: 1, text: message, ...(turnKind ? { kind: turnKind } : {}) },
   });
 
   // Snapshot ná de history-load (AI-10): briefs van de actieve modules, het
@@ -539,7 +575,7 @@ Deno.serve(async (req: Request) => {
           // tool bouwt puur een voorstel (propose), dat als role='action'-rij
           // wordt opgeslagen; de gebruiker beslist op de bevestigingskaart en
           // pas dán draait tool.execute — met de hier opgeslagen args.
-          const proposal = tool.propose(call.args, { today, memberNames });
+          const proposal = tool.propose(call.args, { today, memberNames, tzOffsetMinutes });
           if (!proposal.ok) {
             result = { error: proposal.error };
           } else {

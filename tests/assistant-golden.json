@@ -498,6 +498,226 @@
           }
         ]
       }
+    },
+    {
+      "id": "pla-01",
+      "question": "Welke planten hebben binnenkort water nodig?",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pla-02",
+      "question": "Hoe staat het met onze planten?",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-01",
+      "question": "Hoe oud zijn onze huisdieren ook alweer?",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-02",
+      "question": "Staat er nog dierverzorging open?",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-01",
+      "question": "Wanneer moet de auto weer naar de APK?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-02",
+      "question": "Wat kost onze auto eigenlijk per maand aan vaste lasten?",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_overzicht"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-01",
+      "question": "Wat staat er op het prikbord?",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_recent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-02",
+      "question": "Hebben de anderen nog iets gedeeld de laatste dagen?",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_recent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-01",
+      "question": "Is de deelauto zaterdag vrij?",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveringen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-02",
+      "question": "Wie heeft de aanhanger gereserveerd deze week?",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveringen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pla-03",
+      "question": "We hebben een nieuwe monstera voor in de woonkamer, zet 'm in de app",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_toevoegen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pla-04",
+      "question": "Voeg een ficus toe die om de week water moet",
+      "expect": {
+        "tools": [
+          {
+            "name": "planten_toevoegen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-03",
+      "question": "Nala weegt nu 12,5 kilo, leg dat even vast",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_logboek_toevoegen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hui-04",
+      "question": "Zet in het logboek van Rex dat de dierenarts alles goed vond",
+      "expect": {
+        "tools": [
+          {
+            "name": "huisdieren_logboek_toevoegen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-03",
+      "question": "De Volvo heeft vandaag nieuwe banden gekregen op 123456 km",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_onderhoud_loggen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vtg-04",
+      "question": "Log even dat de auto een grote beurt heeft gehad",
+      "expect": {
+        "tools": [
+          {
+            "name": "voertuigen_onderhoud_loggen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-03",
+      "question": "Zet op het prikbord dat de cv-monteur dinsdag tussen 9 en 12 komt",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_plaatsen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tml-04",
+      "question": "Laat de anderen even weten dat oma zondag komt eten",
+      "expect": {
+        "tools": [
+          {
+            "name": "tijdlijn_plaatsen"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-03",
+      "question": "Reserveer de deelauto voor zaterdag van 14 tot 16 uur",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveren"
+          }
+        ]
+      }
+    },
+    {
+      "id": "del-04",
+      "question": "Ik wil de aanhanger morgenochtend van 10 tot 11 gebruiken",
+      "expect": {
+        "tools": [
+          {
+            "name": "delen_reserveren"
+          }
+        ]
+      }
     }
   ]
 }

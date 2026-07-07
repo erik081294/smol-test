@@ -63,6 +63,9 @@ export const GROUPS = [
   // Pure lijst-kern onder de optimistische mutaties van useCollection (patch/remove/
   // removeMany; review 2026-07-02). De hook zelf blijft React-schil (niet gemuteerd).
   { test: 'optimisticList', srcs: ['lib/optimisticList.js'] },
+  // Wachtwoordloze e-mail-OTP-login (PLT-8): code-validatie, resend-afkoeltijd en
+  // de naam-check na de eerste login. De welcome-/naam-schermen zijn dunne schil.
+  { test: 'otp', srcs: ['lib/otp.js'] },
   { test: 'pantry', srcs: ['lib/pantry.js'] },
   { test: 'pendingDeletes', srcs: ['lib/pendingDeletes.js'] },
   { test: 'plantCare', srcs: ['lib/plantCare.js'] },
@@ -75,7 +78,12 @@ export const GROUPS = [
   { test: 'recurringExpense', srcs: ['lib/recurringExpense.js'] },
   { test: 'reservations', srcs: ['lib/reservations.js'] },
   { test: 'rotation', srcs: ['lib/rotation.js'] },
+  // Globaal zoeken (PLT-3): rangschikken van RPC-hits + kind→route/module-mapping.
+  { test: 'searchRank', srcs: ['lib/searchRank.js'] },
   { test: 'timeline', srcs: ['lib/timeline.js'] },
+  // Pure filterkern van de tijdlijn (TML-6, plan 19): DEFAULT-ON + twee lagen
+  // (huishouden wint). De hook (useTimelineFilters) blijft React-schil.
+  { test: 'timelineFilter', srcs: ['lib/timelineFilter.js'] },
   { test: 'visibility', srcs: ['lib/visibility.js'] },
   // offCategoryMap.js is een token-regeltabel (data); StringLiteral-mutaties op die
   // tokens zijn ruis — de test dekt de match-LOGICA + representatieve mappings, niet
@@ -98,6 +106,9 @@ export const GROUPS = [
   { test: 'widgets', srcs: ['lib/widgets/colorSchemes.js'], exclude: ['StringLiteral'] },
   // Assistent (AI-1, plan 23): catalog-poortwachter, agent-loop-kern en tool-registry.
   { test: 'assistantUi', srcs: ['lib/assistantUi.js'] },
+  // Pure interactie-logica van de gen-UI-componenten (AI-16, plan 26): grafiek-
+  // layout/as-schaal en de porties-herrekening van de recept-kaart.
+  { test: 'assistantGenUi', srcs: ['lib/assistantGenUi.js'] },
   // SSE-client-laag + markdown-subset van de assistent (AI-5, plan 24 ronde D).
   { test: 'assistantStream', srcs: ['lib/assistantStream.js'] },
   { test: 'markdownLite', srcs: ['lib/markdownLite.js'] },
@@ -107,11 +118,20 @@ export const GROUPS = [
   // Assistent-tool-packs (skill-file per module, guidelines §1) + HITL-lagen (AI-8):
   // per pack een eigen test zodat de ratchet gericht per module draait.
   { test: 'assistantToolPacks', srcs: ['supabase/functions/_shared/tools/index.js', 'supabase/functions/_shared/tools/helpers.js'] },
+  // Gedeeld gen-UI-vocabulaire (AI-16 ronde 2): node-constructors + fallback-
+  // generatie; het roundtrip-contract met de poortwachter zit in dezelfde test.
+  { test: 'assistantRender', srcs: ['supabase/functions/_shared/tools/render.js'] },
   { test: 'assistantToolsTaken', srcs: ['supabase/functions/_shared/tools/taken.js'] },
   { test: 'assistantToolsBoodschappen', srcs: ['supabase/functions/_shared/tools/boodschappen.js'] },
   { test: 'assistantToolsKosten', srcs: ['supabase/functions/_shared/tools/kosten.js'] },
   { test: 'assistantToolsVoorraad', srcs: ['supabase/functions/_shared/tools/voorraad.js'] },
   { test: 'assistantToolsMaaltijden', srcs: ['supabase/functions/_shared/tools/maaltijden.js'] },
+  // AI-19 fase A (plan 27): de vijf voorheen lege modules.
+  { test: 'assistantToolsPlanten', srcs: ['supabase/functions/_shared/tools/planten.js'] },
+  { test: 'assistantToolsHuisdieren', srcs: ['supabase/functions/_shared/tools/huisdieren.js'] },
+  { test: 'assistantToolsVoertuigen', srcs: ['supabase/functions/_shared/tools/voertuigen.js'] },
+  { test: 'assistantToolsTijdlijn', srcs: ['supabase/functions/_shared/tools/tijdlijn.js'] },
+  { test: 'assistantToolsDelen', srcs: ['supabase/functions/_shared/tools/delen.js'] },
   { test: 'assistantHitl', srcs: ['supabase/functions/assistant/actions.js'] },
   { test: 'assistantActions', srcs: ['lib/assistantActions.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
