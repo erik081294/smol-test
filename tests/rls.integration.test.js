@@ -868,6 +868,123 @@ test('RLS: emoji-reactie — lid reageert/toggelt, buitenstaander buitenspel, au
   assert.ok(bobSecretIns, 'lid mag niet reageren op een post die het niet mag zien');
 });
 
+// --- Tekstreacties / comments (0075) — kind-tabel erft de post-zichtbaarheid ---
+test('RLS 0075: comment volgt de post-zichtbaarheid; auteur niet te vervalsen; delete alleen eigen; geen lek op onzichtbare post', opts, async () => {
+  const alice = await makeUser('alice_cmt');
+  const bob = await makeUser('bob_cmt');     // huisgenoot
+  const eve = await makeUser('eve_cmt');      // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Commenthuis');
+  await addMember(alice, bob, hh.id);
+
+  const { data: post, error: pErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Zeg er wat van', visibility: 'household' })
+    .select().single();
+  assert.ok(!pErr, `post: ${pErr?.message}`);
+
+  // Lid plaatst een comment op een zichtbare post → mag; de huisgenoot ziet 'm.
+  const { data: cmt, error: cErr } = await bob.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: post.id, author_id: bob.id, body: 'Leuk!' })
+    .select().single();
+  assert.ok(!cErr, `lid plaatst comment: ${cErr?.message}`);
+  const aliceSees = await alice.client.from('timeline_comments').select('id, body').eq('post_id', post.id);
+  assert.equal(aliceSees.data?.length, 1, 'huisgenoot ziet de comment (erft post-zichtbaarheid)');
+  assert.equal(aliceSees.data?.[0].body, 'Leuk!');
+
+  // Buitenstaander: ziet niets en mag zelf niets plaatsen (geen lid).
+  const eveSees = await eve.client.from('timeline_comments').select('id').eq('post_id', post.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de comment NIET');
+  const { error: eveInsErr } = await eve.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: post.id, author_id: eve.id, body: 'Hoi' });
+  assert.ok(eveInsErr, 'buitenstaander mag geen comment plaatsen (geen lid)');
+
+  // Auteur niet te vervalsen (author_id = auth.uid()); lege body faalt op de CHECK.
+  const { error: forgeErr } = await bob.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: post.id, author_id: alice.id, body: 'Namens Alice' });
+  assert.ok(forgeErr, 'een lid mag geen comment op naam van een ander plaatsen');
+  const { error: emptyErr } = await bob.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: post.id, author_id: bob.id, body: '' });
+  assert.ok(emptyErr, 'een lege body moet op de lengte-CHECK worden geweigerd');
+
+  // Delete alleen eigen: Alice kan Bobs comment niet verwijderen (using filtert de rij weg).
+  const aliceDel = await alice.client.from('timeline_comments').delete().eq('id', cmt.id).select();
+  assert.equal(aliceDel.data?.length ?? 0, 0, 'een ander mag jouw comment niet verwijderen');
+  const stillThere = await alice.client.from('timeline_comments').select('id').eq('id', cmt.id);
+  assert.equal(stillThere.data?.length, 1, 'de comment staat er nog');
+  const { error: ownDelErr } = await bob.client.from('timeline_comments').delete().eq('id', cmt.id);
+  assert.ok(!ownDelErr, `eigen comment verwijderen: ${ownDelErr?.message}`);
+  const gone = await alice.client.from('timeline_comments').select('id').eq('id', cmt.id);
+  assert.equal(gone.data?.length ?? 0, 0, 'de eigen comment is weg');
+
+  // Lekpreventie: op een custom post die Bob niet mag zien, ziet Bob geen comments
+  // en kan hij er ook geen plaatsen (can_view op de parent, zoals 0067).
+  const { data: secret, error: sErr } = await alice.client.from('timeline_posts')
+    .insert({ household_id: hh.id, author_id: alice.id, body: 'Alleen ik', visibility: 'custom', share_with: [alice.id] })
+    .select().single();
+  assert.ok(!sErr, `custom post: ${sErr?.message}`);
+  const { error: selfCmtErr } = await alice.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: secret.id, author_id: alice.id, body: 'Notitie aan mezelf' });
+  assert.ok(!selfCmtErr, `auteur reageert op eigen custom post: ${selfCmtErr?.message}`);
+  const bobSecret = await bob.client.from('timeline_comments').select('id').eq('post_id', secret.id);
+  assert.equal(bobSecret.data?.length ?? 0, 0, 'lid ziet comments op een onzichtbare post NIET (can_view-lekpreventie)');
+  const { error: bobSecretIns } = await bob.client.from('timeline_comments')
+    .insert({ household_id: hh.id, post_id: secret.id, author_id: bob.id, body: 'Mag niet' });
+  assert.ok(bobSecretIns, 'lid mag niet reageren op een post die het niet mag zien');
+});
+
+// --- Tijdlijn-filter-prefs (0076) — twee lagen, RLS exact als 0004 -------------
+test('RLS 0076: huishouden-prefs leesbaar voor leden maar owner-only schrijfbaar; user-prefs alleen eigen rijen', opts, async () => {
+  const alice = await makeUser('alice_tlp');   // owner
+  const bob = await makeUser('bob_tlp');       // lid
+  const eve = await makeUser('eve_tlp');        // buitenstaander
+
+  const hh = await makeHousehold(alice, 'Filterhuis');
+  await addMember(alice, bob, hh.id);
+
+  // Owner zet de basis: kosten-events van de tijdlijn af.
+  const { error: ownErr } = await alice.client.from('household_timeline_prefs')
+    .insert({ household_id: hh.id, axis: 'module', value: 'kosten', enabled: false });
+  assert.ok(!ownErr, `owner zet huishouden-pref: ${ownErr?.message}`);
+
+  // Elk lid leest de basis (om te weten wat er überhaupt kan); buitenstaander niets.
+  const bobSees = await bob.client.from('household_timeline_prefs').select('axis, value, enabled').eq('household_id', hh.id);
+  assert.equal(bobSees.data?.length, 1, 'lid leest de huishouden-prefs');
+  assert.equal(bobSees.data?.[0].enabled, false);
+  const eveSees = await eve.client.from('household_timeline_prefs').select('value').eq('household_id', hh.id);
+  assert.equal(eveSees.data?.length ?? 0, 0, 'buitenstaander ziet de huishouden-prefs NIET');
+
+  // Maar schrijven op huishouden-niveau is owner-only: insert geweigerd, update filtert weg.
+  const { error: bobInsErr } = await bob.client.from('household_timeline_prefs')
+    .insert({ household_id: hh.id, axis: 'module', value: 'taken', enabled: false });
+  assert.ok(bobInsErr, 'een gewoon lid mag geen huishouden-pref zetten');
+  const bobUpd = await bob.client.from('household_timeline_prefs')
+    .update({ enabled: true }).eq('household_id', hh.id).eq('axis', 'module').eq('value', 'kosten').select();
+  assert.equal(bobUpd.data?.length ?? 0, 0, 'een gewoon lid mag een huishouden-pref niet terugzetten');
+
+  // User-prefs: alleen je eigen rijen. Bob verfijnt voor zichzelf …
+  const { error: bobPrefErr } = await bob.client.from('user_timeline_prefs')
+    .insert({ household_id: hh.id, profile_id: bob.id, axis: 'event_type', value: 'grocery_added', enabled: false });
+  assert.ok(!bobPrefErr, `lid zet eigen user-pref: ${bobPrefErr?.message}`);
+
+  // … maar kan niet voor een ander schrijven, en zelfs de owner ziet Bobs rijen niet.
+  const { error: bobForAliceErr } = await bob.client.from('user_timeline_prefs')
+    .insert({ household_id: hh.id, profile_id: alice.id, axis: 'module', value: 'taken', enabled: false });
+  assert.ok(bobForAliceErr, 'een lid mag geen user-pref voor een ander zetten');
+  const aliceSeesBobs = await alice.client.from('user_timeline_prefs')
+    .select('value').eq('household_id', hh.id).eq('profile_id', bob.id);
+  assert.equal(aliceSeesBobs.data?.length ?? 0, 0, 'user-prefs zijn alleen voor de eigenaar zichtbaar (ook niet voor de owner)');
+
+  // Buitenstaander: geen lid → ook geen eigen rijen in dit huishouden.
+  const { error: evePrefErr } = await eve.client.from('user_timeline_prefs')
+    .insert({ household_id: hh.id, profile_id: eve.id, axis: 'module', value: 'kosten', enabled: false });
+  assert.ok(evePrefErr, 'een niet-lid mag geen user-prefs in dit huishouden zetten');
+
+  // De axis-CHECK weert onbekende assen (typo-vangnet).
+  const { error: axisErr } = await alice.client.from('household_timeline_prefs')
+    .insert({ household_id: hh.id, axis: 'kleur', value: 'groen', enabled: false });
+  assert.ok(axisErr, 'een onbekende as moet op de CHECK worden geweigerd');
+});
+
 // --- Uitnodigingen (0053) — de toetredingsroute zelf moet waterdicht zijn -----
 test('RLS: alleen de owner maakt invites; token is single-use, buitenstaander buitenspel', opts, async () => {
   const alice = await makeUser('alice_inv');   // owner

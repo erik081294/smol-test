@@ -142,21 +142,36 @@ test('descriptor-contract: statische vorm van de vier tools ligt exact vast', ()
   });
 });
 
-test('renderWeekMenu: diner blijft onbenoemd, andere momenten wél; titel-fallbacks recept → "Maaltijd"', () => {
+test('renderWeekMenu: schedule met álle vensterdagen, today-markering, diner onbenoemd, titel-fallbacks', () => {
   const rows = [
     { plan_date: '2026-07-06', meal_type: 'diner', title: 'Lasagne', servings: 4 },
     { plan_date: '2026-07-07', meal_type: 'lunch', title: null, recipes: { title: 'Soep' }, servings: null },
     { plan_date: '2026-07-08', meal_type: null, title: null, recipes: null },
   ];
-  const { data, render } = renderWeekMenu(rows, 7);
-  assert.equal(render[0].type, 'list');
-  assert.equal(render[0].title, 'Weekmenu (komende 7 dagen)');
-  assert.deepEqual(render[0].items, [
-    { text: 'ma 6 jul — Lasagne (4p)' },
-    { text: 'di 7 jul · lunch — Soep' },
-    { text: 'wo 8 jul — Maaltijd' },
+  const { data, render } = renderWeekMenu(rows, 4, '2026-07-06');
+  assert.equal(render[0].type, 'schedule');
+  assert.equal(render[0].title, 'Weekmenu (komende 4 dagen)');
+  // Vier vensterdagen — óók de lege 9 jul (een gat in het menu is informatie).
+  assert.deepEqual(render[0].days, [
+    { label: 'ma 6 jul', today: true, entries: [{ text: 'Lasagne (4p)' }] },
+    { label: 'di 7 jul', today: false, entries: [{ text: 'Soep · lunch' }] },
+    { label: 'wo 8 jul', today: false, entries: [{ text: 'Maaltijd' }] },
+    { label: 'do 9 jul', today: false, entries: [] },
   ]);
+  // Tekst-fallback voor oude clients: leesbare regel per maaltijd.
+  assert.equal(render[0].text, 'ma 6 jul — Lasagne (4p)\ndi 7 jul — Soep · lunch\nwo 8 jul — Maaltijd');
+  // De data naar het model is byte-identiek aan vóór AI-16.
   assert.deepEqual(data.entries[1], { date: '2026-07-07', meal_type: 'lunch', title: 'Soep', servings: null });
+});
+
+test('renderWeekMenu: zonder geldige startdatum alleen de dagen mét entries (pure fallback)', () => {
+  const rows = [
+    { plan_date: '2026-07-06', meal_type: 'diner', title: 'Lasagne', servings: null },
+    { plan_date: '2026-07-08', meal_type: 'diner', title: 'Wraps', servings: null },
+  ];
+  const { render } = renderWeekMenu(rows, 7);
+  assert.deepEqual(render[0].days.map((d) => d.label), ['ma 6 jul', 'wo 8 jul']);
+  assert.deepEqual(render[0].days.map((d) => d.today), [false, false]);
 });
 
 test('renderWeekMenu: leeg/default → uitnodigende kaart', () => {
@@ -328,7 +343,13 @@ test('renderRecipe: ingrediëntregels met/zonder hoeveelheid, servings-fallback,
   assert.equal(out.type, 'recipe');
   assert.equal(out.title, 'Pasta pesto');
   assert.equal(out.servings, 4);
-  assert.deepEqual(out.ingredients, [{ text: 'Penne · 400 gram' }, { text: 'Basilicum' }, { text: 'Zout' }]);
+  // Mét hoeveelheid reizen de gestructureerde velden mee (AI-16: die voeden de
+  // porties-stepper op de client); zonder hoeveelheid blijft het een tekstregel.
+  assert.deepEqual(out.ingredients, [
+    { text: 'Penne · 400 gram', name: 'Penne', quantity: 400, unit: 'gram' },
+    { text: 'Basilicum' },
+    { text: 'Zout' },
+  ]);
   assert.deepEqual(out.steps, ['Kook', 'Meng']);
 });
 
@@ -348,9 +369,25 @@ test('renderRecipeMatches: filtert case-insensitief op titel, top 3, data draagt
   ];
   const out = renderRecipeMatches(rows, 'PESTO');
   assert.deepEqual(out.data, { count: 2, matches: [{ id: 'r1', title: 'Pasta Pesto', servings: 4 }, { id: 'r3', title: 'Pesto-toast', servings: 2 }] });
-  assert.equal(out.render.length, 2);
+  // ≥2 treffers → recept-kaarten + de beslis-kaart (AI-16): een tik stuurt de
+  // keuze als gewone gebruikersbeurt terug het gesprek in.
+  assert.equal(out.render.length, 3);
   assert.equal(out.render[0].type, 'recipe');
-  assert.deepEqual(out.render[0].ingredients, [{ text: 'Penne · 400 gram' }]);
+  assert.deepEqual(out.render[0].ingredients, [{ text: 'Penne · 400 gram', name: 'Penne', quantity: 400, unit: 'gram' }]);
+  assert.deepEqual(out.render[2], {
+    type: 'choice',
+    prompt: 'Welk recept bedoel je?',
+    options: [
+      { label: 'Pasta Pesto', description: 'voor 4 personen', reply: 'Gebruik het recept "Pasta Pesto"' },
+      { label: 'Pesto-toast', description: 'voor 2 personen', reply: 'Gebruik het recept "Pesto-toast"' },
+    ],
+    text: 'Welk recept bedoel je? Pasta Pesto / Pesto-toast',
+  });
+});
+
+test('renderRecipeMatches: één treffer → géén beslis-kaart (niets te kiezen)', () => {
+  const out = renderRecipeMatches([{ id: 'r1', title: 'Lasagne', servings: 6 }], 'lasagne');
+  assert.deepEqual(out.render.map((n) => n.type), ['recipe']);
 });
 
 test('renderRecipeMatches: geen query → nieuwste paar; geen treffer → geruststellende kaart', () => {
@@ -367,7 +404,8 @@ test('renderRecipeMatches: kapt af op de top 3, maar telt álle treffers in data
   const out = renderRecipeMatches(rows, 'soep');
   assert.equal(out.data.count, 5);           // alle treffers geteld
   assert.equal(out.data.matches.length, 3);  // maar hooguit 3 kaarten/ids terug
-  assert.equal(out.render.length, 3);
+  assert.deepEqual(out.render.map((n) => n.type), ['recipe', 'recipe', 'recipe', 'choice']);
+  assert.equal(out.render[3].options.length, 3);
 });
 
 test('maaltijden_recept_zoeken: juiste tabel/kolommen + JS-filter op titel', async () => {

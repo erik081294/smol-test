@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
 import { appRoute } from '../lib/appRoute';
+import { needsDisplayName } from '../lib/otp';
 import { SplashWait } from '../lib/ui';
 import { ToastProvider } from '../lib/toast';
 import { DialogProvider } from '../lib/dialog';
@@ -42,6 +43,13 @@ function Gate({ themeMode }) {
   // Eén bron van waarheid voor de gate-beslissing (puur, unit-getest in household.js).
   const route = appRoute({ authLoading, session, hhLoading, hasFetched, households });
 
+  // PLT-8: een account dat via de e-mail-inlogcode is ontstaan heeft nog geen
+  // weergavenaam (user_metadata.display_name ontbreekt; wachtwoord-signups zetten
+  // 'm altijd al). Die vragen we éérst op /naam, vóór onboarding/app. In de
+  // effect-deps zodat de redirect ook loopt zodra updateUser de metadata zet
+  // (USER_UPDATED verandert `session` maar niet `route`).
+  const needsName = needsDisplayName(session?.user);
+
   useEffect(() => {
     if (route === 'loading') return;
     const group = segments[0];
@@ -54,6 +62,12 @@ function Gate({ themeMode }) {
     // sessie. Die maakt `session` truthy → zonder deze uitzondering zou de Gate de
     // gebruiker meteen de app in kaatsen vóór hij een nieuw wachtwoord kan zetten.
     if (group === 'herstel') return;
+
+    // Eerste OTP-login zonder naam → eerst het naam-scherm (zie hierboven).
+    if (needsName) {
+      if (group !== 'naam') router.replace('/naam');
+      return;
+    }
 
     if (route === 'auth') {
       if (group !== '(auth)') router.replace('/(auth)/welcome');
@@ -68,10 +82,11 @@ function Gate({ themeMode }) {
     // maken of toe te treden (FND-5). Zou de gate 'onboarding' hier wegkaatsen, dan is dat scherm
     // onbereikbaar voor bestaande leden (de "Nieuw of aansluiten"-knop deed dan niets). Onboarding
     // navigeert zélf de app in na een succesvolle create — óók voor het eerste huishouden.
-    if (group === '(auth)' || group === undefined) {
+    // 'naam' telt hier ook: is de naam (net) gezet, dan moet dat scherm door naar de app.
+    if (group === '(auth)' || group === 'naam' || group === undefined) {
       router.replace('/(tabs)/vandaag');
     }
-  }, [route, segments]);
+  }, [route, needsName, segments]);
 
   // Toon het wachtscherm zolang auth/huishoudens nog laden. Pas hierna beslist de
   // redirect-useEffect, zodat een nog-niet-geladen lege lijst nooit het onboarding-
@@ -87,6 +102,7 @@ function Gate({ themeMode }) {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="herstel" />
+        <Stack.Screen name="naam" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="join" />
         <Stack.Screen name="(tabs)" />
@@ -104,6 +120,7 @@ function Gate({ themeMode }) {
         <Stack.Screen name="kosten-inzichten" options={{ presentation: 'modal' }} />
         <Stack.Screen name="resource" options={{ presentation: 'modal' }} />
         <Stack.Screen name="tijdlijn" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="zoeken" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );

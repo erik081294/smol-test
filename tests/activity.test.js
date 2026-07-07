@@ -25,7 +25,8 @@ test('formatActivity: taakvoltooiing → NL-regel + icoon + tijd', () => {
     { id: 'c1', type: 'task_completed', at: ago(5 * MIN), actorName: 'Tim', taskTitle: 'Stofzuigen' },
     NOW,
   );
-  assert.deepEqual(item, { id: 'c1', at: ago(5 * MIN), when: '5 min geleden', icon: 'check', text: "Tim vinkte 'Stofzuigen' af" });
+  // `type` reist mee naar de feed (de tijdlijn-filter beslist erop, TML-6).
+  assert.deepEqual(item, { id: 'c1', type: 'task_completed', at: ago(5 * MIN), when: '5 min geleden', icon: 'check', text: "Tim vinkte 'Stofzuigen' af" });
 });
 
 test('formatActivity: zonder actor → "Iemand"; zonder titel → null', () => {
@@ -46,6 +47,8 @@ test('buildFeed: filtert ongeldige events en sorteert nieuwste eerst', () => {
   ], NOW);
   assert.deepEqual(feed.map((f) => f.id), ['b', 'a']);
   assert.equal(feed.length, 2);
+  // Elk feed-item draagt zijn event-type (waar de tijdlijn-filter op beslist).
+  assert.deepEqual(feed.map((f) => f.type), ['task_completed', 'task_completed']);
 });
 
 test('buildFeed: vouwt opeenvolgende identieke acties samen met teller', () => {
@@ -136,7 +139,7 @@ test('buildFeed: opeenvolgende identieke boodschappen vouwen samen met teller', 
 test('formatActivity: plant/huisdier/voertuig "toegevoegd" → juiste regel + icoon', () => {
   assert.deepEqual(
     { ...formatActivity({ id: 'pl1', type: 'plant_added', at: ago(MIN), actorName: 'Ann', subject: 'Monstera' }, NOW) },
-    { id: 'pl1', at: ago(MIN), when: '1 min geleden', icon: 'plants', text: "Ann voegde plant 'Monstera' toe" },
+    { id: 'pl1', type: 'plant_added', at: ago(MIN), when: '1 min geleden', icon: 'plants', text: "Ann voegde plant 'Monstera' toe" },
   );
   assert.equal(formatActivity({ id: 'pe1', type: 'pet_added', at: ago(MIN), actorName: 'Tim', subject: 'Rex' }, NOW).text, "Tim voegde huisdier 'Rex' toe");
   assert.equal(formatActivity({ id: 'v1', type: 'vehicle_added', at: ago(MIN), actorName: 'Tim', subject: 'Clio' }, NOW).icon, 'voertuig');

@@ -6,8 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CATALOG_TYPES, ACTION_UI_STATES, normalizeNode, normalizeTree, treeToText, pendingActionIds } from '../lib/assistantUi.js';
 
-test('CATALOG_TYPES blijft de afgesproken vaste set (plan 23, +recipe AI-12)', () => {
-  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link', 'recipe']);
+test('CATALOG_TYPES blijft de afgesproken vaste set (plan 23, +recipe AI-12, +chart/schedule/choice AI-16)', () => {
+  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link', 'recipe', 'chart', 'schedule', 'choice']);
 });
 
 test('normalizeNode: text vereist niet-lege tekst', () => {
@@ -109,9 +109,11 @@ test('normalizeNode: link alleen naar interne routes (moet met "/" beginnen)', (
 });
 
 test('normalizeNode: onbekend type degradeert naar tekst (text vóór title), anders null', () => {
-  assert.deepEqual(normalizeNode({ type: 'chart', text: 'grafiek-tekst', title: 't' }), { type: 'text', text: 'grafiek-tekst' });
-  assert.deepEqual(normalizeNode({ type: 'chart', title: 'alleen titel' }), { type: 'text', text: 'alleen titel' });
-  assert.equal(normalizeNode({ type: 'chart', data: [1, 2] }), null);
+  // 'gauge' bestaat (nog) niet — precies de oude-client-route waarop nieuwe
+  // server-nodes met een text-fallback leesbaar blijven (plan 26).
+  assert.deepEqual(normalizeNode({ type: 'gauge', text: 'meter-tekst', title: 't' }), { type: 'text', text: 'meter-tekst' });
+  assert.deepEqual(normalizeNode({ type: 'gauge', title: 'alleen titel' }), { type: 'text', text: 'alleen titel' });
+  assert.equal(normalizeNode({ type: 'gauge', data: [1, 2] }), null);
 });
 
 test('normalizeTree: zonder argument → lege array (default-param)', () => {
@@ -182,6 +184,143 @@ test('normalizeNode: recipe met ongeldige servings → null; zonder titel én in
 test('treeToText: recipe geeft titel + ingrediënten (a11y/preview)', () => {
   const [node] = normalizeTree([{ type: 'recipe', title: 'Pesto', ingredients: [{ text: 'Penne' }, { text: 'Pesto' }] }]);
   assert.equal(treeToText([node]), 'Pesto: Penne, Pesto');
+});
+
+// --- Interactieve gen-UI (AI-16, plan 26): chart, schedule, choice + de
+// --- gestructureerde recept-ingrediënten voor de porties-stepper.
+
+test('normalizeNode: chart vereist geldige punten; kapotte punten vervallen; cap op 12', () => {
+  const node = normalizeNode({
+    type: 'chart', title: 'Uitgaven per week', unit: 'euro', text: 'fallback voor oude clients',
+    points: [
+      { label: '1–7', value: 12300 },
+      { label: '8–14', value: 0 },          // nul mag (lege week is informatie)
+      { label: '', value: 5 },              // leeg label → weg
+      { label: 'x', value: -3 },            // negatief → weg
+      { label: 'y', value: Number.NaN },    // NaN → weg
+      { label: 'w', value: '5' },           // string-waarde (type-strikt) → weg
+      { label: 'z' },                       // geen value → weg
+      null,                                 // rommel-punt → weg, geen crash
+    ],
+  });
+  assert.deepEqual(node, {
+    type: 'chart', title: 'Uitgaven per week', unit: 'euro',
+    points: [{ label: '1–7', value: 12300 }, { label: '8–14', value: 0 }],
+  });
+  // Zonder één geldig punt is er niets te tekenen.
+  assert.equal(normalizeNode({ type: 'chart', points: [] }), null);
+  assert.equal(normalizeNode({ type: 'chart', points: 'rommel' }), null);
+  // Cap: precies MAX_CHART_POINTS staven blijven over.
+  const many = normalizeNode({ type: 'chart', points: Array.from({ length: 20 }, (_, i) => ({ label: `p${i}`, value: i + 1 })) });
+  assert.equal(many.points.length, 12);
+});
+
+test('normalizeNode: chart-unit is alleen "euro" of null (geen verzonnen eenheden)', () => {
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], unit: 'euro' }).unit, 'euro');
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], unit: 'dollar' }).unit, null);
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }] }).unit, null);
+});
+
+test('normalizeNode: schedule houdt lege dagen (gaten zijn informatie); navigatie via link-nodes', () => {
+  const node = normalizeNode({
+    type: 'schedule', title: 'Weekmenu', text: 'fallback',
+    days: [
+      { label: 'ma 6 jul', today: true, entries: [{ text: 'Lasagne', emoji: '🍝' }, { text: '' }, null] },
+      { label: 'di 7 jul', entries: [] },
+      { label: '', entries: [{ text: 'weg' }] },   // zonder daglabel → weg
+      { label: 'wo 8 jul' },                        // zonder entries-array → lege dag
+      null,                                         // rommel-dag → weg, geen crash
+    ],
+  });
+  assert.deepEqual(node, {
+    type: 'schedule', title: 'Weekmenu',
+    days: [
+      { label: 'ma 6 jul', today: true, entries: [{ text: 'Lasagne', emoji: '🍝' }] },
+      { label: 'di 7 jul', today: false, entries: [] },
+      { label: 'wo 8 jul', today: false, entries: [] },
+    ],
+  });
+  assert.equal(normalizeNode({ type: 'schedule', days: [] }), null);
+  // Cap: nooit meer dan MAX_SCHEDULE_DAYS rijen.
+  const many = normalizeNode({ type: 'schedule', days: Array.from({ length: 20 }, (_, i) => ({ label: `dag ${i}` })) });
+  assert.equal(many.days.length, 14);
+});
+
+test('normalizeNode: choice vereist prompt én minstens één optie met label+reply; cap op 6', () => {
+  const node = normalizeNode({
+    type: 'choice', prompt: 'Welke bedoel je?', text: 'fallback',
+    options: [
+      { label: 'Lasagne', description: '4 porties', reply: 'Gebruik het recept "Lasagne"' },
+      { label: 'Zonder reply' },
+      { label: '', reply: 'x' },
+      null,                                        // rommel-optie → weg, geen crash
+      { label: 'Pasta pesto', reply: 'Gebruik het recept "Pasta pesto"' },
+    ],
+  });
+  assert.deepEqual(node, {
+    type: 'choice', prompt: 'Welke bedoel je?',
+    options: [
+      { label: 'Lasagne', description: '4 porties', reply: 'Gebruik het recept "Lasagne"' },
+      { label: 'Pasta pesto', description: null, reply: 'Gebruik het recept "Pasta pesto"' },
+    ],
+  });
+  assert.equal(normalizeNode({ type: 'choice', options: [{ label: 'x', reply: 'y' }] }), null); // geen prompt
+  assert.equal(normalizeNode({ type: 'choice', prompt: 'p', options: [] }), null);
+  const many = normalizeNode({ type: 'choice', prompt: 'p', options: Array.from({ length: 9 }, (_, i) => ({ label: `o${i}`, reply: `r${i}` })) });
+  assert.equal(many.options.length, 6);
+});
+
+test('normalizeNode: recipe houdt gestructureerde ingrediëntvelden alleen compleet (naam+hoeveelheid)', () => {
+  const node = normalizeNode({
+    type: 'recipe', title: 'Pesto', servings: 4,
+    ingredients: [
+      { text: 'Penne · 400 gram', name: 'Penne', quantity: 400, unit: 'gram' },
+      { text: 'Ei · 2', name: 'Ei', quantity: 2 },                  // zonder eenheid → unit null
+      { text: 'Zout naar smaak', name: 'Zout' },                    // geen quantity → alleen tekst
+      { text: 'Basilicum · 1 bos', quantity: 1, unit: 'bos' },      // geen naam → alleen tekst
+      { text: 'Olie · x', name: 'Olie', quantity: Number.NaN },     // kapotte quantity → alleen tekst
+      { text: 'Kaas · veel', name: 'Kaas', quantity: '400' },       // string-quantity (type-strikt) → alleen tekst
+      { text: 'Room · ∞', name: 'Room', quantity: Infinity },       // oneindig → alleen tekst
+      { text: 'Peper · 0', name: 'Peper', quantity: 0 },            // 0 is geen hoeveelheid → alleen tekst
+      null,                                                          // rommel-rij → weg, geen crash
+    ],
+  });
+  assert.deepEqual(node.ingredients, [
+    { text: 'Penne · 400 gram', name: 'Penne', quantity: 400, unit: 'gram' },
+    { text: 'Ei · 2', name: 'Ei', quantity: 2, unit: null },
+    { text: 'Zout naar smaak' },
+    { text: 'Basilicum · 1 bos' },
+    { text: 'Olie · x' },
+    { text: 'Kaas · veel' },
+    { text: 'Room · ∞' },
+    { text: 'Peper · 0' },
+  ]);
+});
+
+test('treeToText: chart/schedule/choice blijven leesbaar (a11y/tabelvorm)', () => {
+  const nodes = normalizeTree([
+    { type: 'chart', title: 'Uitgaven', points: [{ label: 'wk1', value: 100 }, { label: 'wk2', value: 250 }] },
+    { type: 'schedule', title: 'Weekmenu', days: [
+      { label: 'ma', entries: [{ text: 'Lasagne' }] },
+      { label: 'di', entries: [] },
+    ] },
+    { type: 'choice', prompt: 'Welke?', options: [{ label: 'A', reply: 'a' }, { label: 'B', reply: 'b' }] },
+  ]);
+  assert.equal(
+    treeToText(nodes),
+    'Uitgaven: wk1 100, wk2 250\nWeekmenu — ma: Lasagne; di: —\nWelke? A / B'
+  );
+});
+
+test('treeToText: chart/schedule zonder titel laten het scheidingsteken weg', () => {
+  assert.equal(
+    treeToText(normalizeTree([{ type: 'chart', points: [{ label: 'wk1', value: 100 }] }])),
+    'wk1 100'
+  );
+  assert.equal(
+    treeToText(normalizeTree([{ type: 'schedule', days: [{ label: 'ma', entries: [{ text: 'Soep' }] }] }])),
+    'ma: Soep'
+  );
 });
 
 test('pendingActionIds: alleen openstaande confirm_action-nodes, ≥2 stuurt de bundel-knop', () => {

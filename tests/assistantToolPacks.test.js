@@ -6,7 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ASSISTANT_TOOLS, MODULE_BRIEFS, MANIFESTS, aggregateToolPacks, aggregateBriefs } from '../supabase/functions/_shared/tools/index.js';
-import { fmtEuro, nextMonth, addDays, isIsoDate, dayLabel, resolveMemberId } from '../supabase/functions/_shared/tools/helpers.js';
+import { fmtEuro, nextMonth, addDays, isIsoDate, dayLabel, resolveMemberId, isHhmm, toUtcIso, localHhmm, localDate,
+} from '../supabase/functions/_shared/tools/helpers.js';
 import { MODULES } from '../lib/modules.js';
 
 const MODULE_KEYS = new Set(MODULES.map((m) => m.key));
@@ -30,13 +31,23 @@ test('registry: de verwachte toolset, gesorteerd op naam (cache-hygiëne)', () =
     'boodschappen_afvinken',
     'boodschappen_lijst',
     'boodschappen_toevoegen',
+    'delen_reserveren',
+    'delen_reserveringen',
+    'huisdieren_logboek_toevoegen',
+    'huisdieren_overzicht',
     'kosten_maandoverzicht',
     'maaltijden_plannen',
     'maaltijden_recept_opslaan',
     'maaltijden_recept_zoeken',
     'maaltijden_weekmenu',
+    'planten_overzicht',
+    'planten_toevoegen',
     'taken_open',
     'taken_toevoegen',
+    'tijdlijn_plaatsen',
+    'tijdlijn_recent',
+    'voertuigen_onderhoud_loggen',
+    'voertuigen_overzicht',
     'voorraad_bijna_op',
   ]);
 });
@@ -113,10 +124,16 @@ test('contract: propose houdt items en args.items 1-op-1 uitgelijnd (selectie-in
     boodschappen_toevoegen: { items: [{ name: 'Melk' }, { name: 'Kaas', quantity: '2' }] },
     maaltijden_plannen: { items: [{ date: '2026-07-10', title: 'X' }, { date: '2026-07-11', title: 'Y' }] },
     maaltijden_recept_opslaan: { items: [{ title: 'Pesto', ingredients: [{ name: 'Basilicum' }] }, { title: 'Soep', ingredients: [{ name: 'Ui' }] }] },
+    // AI-19 fase B.
+    planten_toevoegen: { items: [{ name: 'Monstera' }, { name: 'Ficus', water_days: 7 }] },
+    huisdieren_logboek_toevoegen: { items: [{ pet_name: 'Nala', weight_grams: 12500 }, { pet_name: 'Rex', note: 'alles goed' }] },
+    voertuigen_onderhoud_loggen: { items: [{ vehicle_name: 'Volvo', title: 'Grote beurt' }, { vehicle_name: 'Bakfiets', title: 'Ketting', performed_on: '2026-07-01' }] },
+    tijdlijn_plaatsen: { items: [{ body: 'De cv-monteur komt dinsdag' }] },
+    delen_reserveren: { items: [{ resource_name: 'Deelauto', date: '2026-07-11', from: '14:00', to: '16:00' }, { resource_name: 'Aanhanger', date: '2026-07-12', from: '10:00', to: '11:00' }] },
   };
   for (const t of ASSISTANT_TOOLS.filter((t) => t.kind === 'write')) {
     assert.ok(samples[t.name], `${t.name}: voeg een propose-sample toe aan deze contract-test`);
-    const out = t.propose(samples[t.name], { memberNames: {} });
+    const out = t.propose(samples[t.name], { memberNames: {}, today: '2026-07-06', tzOffsetMinutes: 120 });
     assert.equal(out.ok, true, `${t.name}: sample hoort geldig te zijn`);
     assert.equal(out.items.length, out.args.items.length, `${t.name}: items/args-uitlijning`);
     assert.ok(typeof out.summary === 'string' && out.summary.length > 0, `${t.name}: summary`);
@@ -238,4 +255,48 @@ test('resolveMemberId: hele naam case-insensitief; dubbelzinnig of onbekend → 
   assert.equal(resolveMemberId(undefined, names), null);
   assert.equal(resolveMemberId('erik'), null);                // default memberNames = {}
   assert.equal(resolveMemberId('erik', { u1: 'Erik', u2: 'erik' }), null); // dubbelzinnig
+});
+
+// --- Tijd-helpers (AI-19 fase B): lokale tijden ↔ UTC-instants via de client-offset.
+
+test('isHhmm: 24-uurs grenzen exact', () => {
+  assert.equal(isHhmm('00:00'), true);
+  assert.equal(isHhmm('23:59'), true);
+  assert.equal(isHhmm('24:00'), false);
+  assert.equal(isHhmm('9:00'), false);      // altijd twee cijfers
+  assert.equal(isHhmm('12:60'), false);
+  assert.equal(isHhmm(''), false);
+  assert.equal(isHhmm(), false);
+  assert.equal(isHhmm('x14:00'), false);   // ^-anker
+  assert.equal(isHhmm('14:00x'), false);   // $-anker
+});
+
+test('toUtcIso: NL-zomertijd (+120) schuift terug naar UTC; over de dagrens heen; rommel → null', () => {
+  assert.equal(toUtcIso('2026-07-11', '14:00', 120), '2026-07-11T12:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '01:00', 120), '2026-07-10T23:00:00.000Z');  // dagrens
+  assert.equal(toUtcIso('2026-07-11', '14:00', 0), '2026-07-11T14:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '14:00', 9999), '2026-07-11T14:00:00.000Z'); // kapotte offset → 0
+  assert.equal(toUtcIso('2026-02-31', '14:00', 120), null);                        // geen echte datum
+  assert.equal(toUtcIso('2026-07-11', '25:00', 120), null);
+  // Precies op de offset-grens (±14 uur bestaat echt: Kiribati).
+  assert.equal(toUtcIso('2026-07-11', '14:00', 840), '2026-07-11T00:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '14:00', -840), '2026-07-12T04:00:00.000Z');
+  assert.equal(toUtcIso('2026-07-11', '14:00', 841), '2026-07-11T14:00:00.000Z'); // net erover → 0
+});
+
+test('localHhmm/localDate: round-trip met toUtcIso; onleesbaar → lege string', () => {
+  const iso = toUtcIso('2026-07-11', '14:00', 120);
+  assert.equal(localHhmm(iso, 120), '14:00');
+  assert.equal(localDate(iso, 120), '2026-07-11');
+  assert.equal(localHhmm(iso, 0), '12:00');           // zelfde instant, andere bril
+  const nacht = toUtcIso('2026-07-11', '01:00', 120); // UTC valt op 10 juli…
+  assert.equal(localDate(nacht, 120), '2026-07-11');  // …maar lokaal blijft het de 11e
+  assert.equal(localHhmm('rommel', 120), '');
+  assert.equal(localDate(null, 120), '');
+  // Kapotte of niet-gehele offsets vallen ook hier terug op 0 (UTC-bril).
+  assert.equal(localHhmm(iso, 9999), '12:00');
+  assert.equal(localHhmm(iso, 1.5), '12:00');
+  assert.equal(localDate(nacht, 9999), '2026-07-10');
+  assert.equal(localHhmm(iso, 840), '02:00');   // precies op de grens telt mee
+  assert.equal(localDate(iso, -840), '2026-07-10');
 });

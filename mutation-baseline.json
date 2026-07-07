@@ -2,9 +2,9 @@
   "generatedAt": "2026-07-06T00:00:00.000Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 6977,
-    "total": 8185,
-    "score": 85.2
+    "killed": 8746,
+    "total": 10275,
+    "score": 85.1
   },
   "files": {
     "lib/activity.js": {
@@ -208,9 +208,9 @@
       "score": 92.3
     },
     "lib/timeline.js": {
-      "killed": 105,
-      "total": 112,
-      "score": 93.8
+      "killed": 139,
+      "total": 146,
+      "score": 95.2
     },
     "lib/visibility.js": {
       "killed": 60,
@@ -333,14 +333,19 @@
       "score": 45.9
     },
     "lib/assistantUi.js": {
-      "killed": 217,
-      "total": 232,
-      "score": 93.5
+      "killed": 341,
+      "total": 361,
+      "score": 94.5
+    },
+    "lib/assistantGenUi.js": {
+      "killed": 116,
+      "total": 118,
+      "score": 98.3
     },
     "supabase/functions/assistant/core.js": {
-      "killed": 437,
-      "total": 497,
-      "score": 87.9
+      "killed": 483,
+      "total": 553,
+      "score": 87.3
     },
     "lib/assistantStream.js": {
       "killed": 88,
@@ -358,9 +363,9 @@
       "score": 100
     },
     "supabase/functions/_shared/tools/helpers.js": {
-      "killed": 89,
-      "total": 90,
-      "score": 98.9
+      "killed": 145,
+      "total": 149,
+      "score": 97.3
     },
     "supabase/functions/_shared/tools/index.js": {
       "killed": 13,
@@ -378,9 +383,14 @@
       "score": 88.3
     },
     "supabase/functions/_shared/tools/kosten.js": {
-      "killed": 69,
-      "total": 72,
-      "score": 95.8
+      "killed": 139,
+      "total": 141,
+      "score": 98.6
+    },
+    "supabase/functions/_shared/tools/render.js": {
+      "killed": 35,
+      "total": 35,
+      "score": 100
     },
     "supabase/functions/_shared/tools/voorraad.js": {
       "killed": 65,
@@ -388,9 +398,34 @@
       "score": 94.2
     },
     "supabase/functions/_shared/tools/maaltijden.js": {
-      "killed": 477,
-      "total": 568,
-      "score": 84
+      "killed": 508,
+      "total": 599,
+      "score": 84.8
+    },
+    "supabase/functions/_shared/tools/planten.js": {
+      "killed": 185,
+      "total": 231,
+      "score": 80.1
+    },
+    "supabase/functions/_shared/tools/huisdieren.js": {
+      "killed": 256,
+      "total": 323,
+      "score": 79.3
+    },
+    "supabase/functions/_shared/tools/voertuigen.js": {
+      "killed": 257,
+      "total": 333,
+      "score": 77.2
+    },
+    "supabase/functions/_shared/tools/tijdlijn.js": {
+      "killed": 169,
+      "total": 205,
+      "score": 82.4
+    },
+    "supabase/functions/_shared/tools/delen.js": {
+      "killed": 214,
+      "total": 281,
+      "score": 76.2
     },
     "supabase/functions/assistant/actions.js": {
       "killed": 187,
@@ -406,6 +441,21 @@
       "killed": 34,
       "total": 37,
       "score": 91.9
+    },
+    "lib/searchRank.js": {
+      "killed": 75,
+      "total": 81,
+      "score": 92.6
+    },
+    "lib/otp.js": {
+      "killed": 41,
+      "total": 41,
+      "score": 100
+    },
+    "lib/timelineFilter.js": {
+      "killed": 60,
+      "total": 64,
+      "score": 93.8
     }
   }
 }

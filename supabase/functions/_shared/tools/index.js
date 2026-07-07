@@ -16,6 +16,11 @@ import { BOODSCHAPPEN_MANIFEST } from './boodschappen.js';
 import { KOSTEN_MANIFEST } from './kosten.js';
 import { VOORRAAD_MANIFEST } from './voorraad.js';
 import { MAALTIJDEN_MANIFEST } from './maaltijden.js';
+import { PLANTEN_MANIFEST } from './planten.js';
+import { HUISDIEREN_MANIFEST } from './huisdieren.js';
+import { VOERTUIGEN_MANIFEST } from './voertuigen.js';
+import { TIJDLIJN_MANIFEST } from './tijdlijn.js';
+import { DELEN_MANIFEST } from './delen.js';
 
 // De enige registratie-plek: één manifest per module. Alles hieronder is afgeleid
 // (tools, briefs, later editable-fields/coverage) — een nieuwe module = hier één
@@ -26,6 +31,13 @@ export const MANIFESTS = [
   KOSTEN_MANIFEST,
   VOORRAAD_MANIFEST,
   MAALTIJDEN_MANIFEST,
+  // AI-19 fase A (plan 27): de vijf voorheen lege modules — read-tools eerst,
+  // de HITL-writes volgen in fase B.
+  PLANTEN_MANIFEST,
+  HUISDIEREN_MANIFEST,
+  VOERTUIGEN_MANIFEST,
+  TIJDLIJN_MANIFEST,
+  DELEN_MANIFEST,
 ];
 
 /**

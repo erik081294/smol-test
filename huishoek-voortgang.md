@@ -1653,3 +1653,84 @@ scaffold** (géén auto-CRUD-per-tabel — dat blaast het ~12-tool-budget op en 
   nieuwe tool) en het dichten van de 5 lege modules (planten/huisdieren/voertuigen/tijdlijn/delen). **Rest:**
   edge-deploy (bundel-brug bevestigen) + device-smoke van de beheer-UI + eval-gate draaien (geen regressie
   verwacht — tool-facing surface onveranderd).
+
+---
+
+**AI-16 ronde 1 — interactieve gen-UI: chart, schedule, choice + porties-stepper (2026-07-06).**
+De gen-UI wordt een volwaardige UI-laag ([plan 26](docs/plans/26-gen-ui-componenten.md); AI-16-rij §6):
+
+- **+3 node-types (§9-max):** **`chart`** — één-serie staafgrafiek (dataviz-methode: één hue,
+  nice-as, recessief grid, tik-inspectie; relief verplicht in donker thema → waarde-labels +
+  a11y-label per staaf + `treeToText` als tabelvorm), gevoed door `kosten_maandoverzicht`
+  (pure [`weeklyExpensePoints`](supabase/functions/_shared/tools/kosten.js), uitgaven per week).
+  **`schedule`** — het weekmenu als rooster met álle vensterdagen (lege dagen zichtbaar als gat,
+  `today` server-side uit `ctx.today`). **`choice`** — AskUserQuestion-beslis-kaart bij ≥2
+  recept-treffers: tik stuurt de reply als gewone gebruikersbeurt (geen args/tools vanaf een
+  kaart — HITL blijft de enige schrijfroute).
+- **Verrijkte `recipe`:** ingrediënten dragen gestructureerd `name/quantity/unit` naast `text`;
+  de kaart krijgt een porties-`Stepper` met **live herrekening** — puur en client-lokaal in het
+  nieuwe [`lib/assistantGenUi.js`](lib/assistantGenUi.js) (`niceMax`/`chartLayout`/
+  `formatChartValue`/`formatQuantity`/`scaleIngredients`).
+- **AI-7-beslissing:** het A2UI-wire-protocol bleek voor deze interactie niet nodig (blijft
+  `Later`); de platte tree is de compat-vorm, live updates zijn client-lokale pure functies.
+- **Veiligheids-invariants intact:** render server-side deterministisch; poortwachter valideert
+  streng (caps 12 punten/6 opties/14 dagen, type-strikt via `Number.isFinite`); élke nieuwe
+  server-node draagt een `text`-fallback voor oudere clients. Tool-descriptions/prompt/`data`
+  **byte-identiek** → geen eval-gate nodig.
+- **DoD:** suite **1204 pass / 0 fail**; typecheck + `eslint .` schoon; mutatie-ratchet groen
+  mét gestegen scores (assistantUi 93,5→**94,5** · kosten 95,8→**98,6** · nieuw assistantGenUi
+  **98,3**; baseline bijgewerkt, totaal 85,2→85,8%). Guidelines §9 uitgebreid met de
+  interactieregels. **Rest:** edge-deploy (samen met de nog open AI-17-deploy — productie draait
+  v16), device-verificatie op de moto (chart-tik, rooster, choice→reply, stepper, beide thema's).
+
+---
+
+**AI-18 — gen-UI-vocabulaire + HITL-vervolgbeurt (2026-07-06, ronde 2 van plan 26).**
+Antwoord op twee Erik-vragen: "hoe modulair is dit echt?" en "reageert de AI na mijn akkoord?".
+
+- **Compositie i.p.v. opnieuw beginnen:** [`_shared/tools/render.js`](supabase/functions/_shared/tools/render.js)
+  — `chartNode`/`scheduleNode`/`choiceNode` mét automatische text-fallback; kosten- en
+  maaltijden-pack componeren er nu uit. De **roundtrip-contracttest**
+  ([`tests/assistantRender.test.js`](tests/assistantRender.test.js)) bewaakt dat elke
+  constructor-output ongeschonden door de client-poortwachter komt — een pack kan geen node
+  meer bouwen die client-side stilletjes sneuvelt. Guidelines §9: nieuw component per module
+  = paar regels compositie; de client-kant blijft generiek dicht.
+- **Bevestigen is een beurt (guidelines §10-4):** na een geslaagde confirm — bij "Akkoord
+  met alles" één beurt voor de hele bundel — stuurt de client automatisch een vervolg-beurt
+  met alléén de action-ids. De server bouwt de beurt-tekst deterministisch uit de opgeslagen
+  done-rijen (pure `actionFollowUpMessage`, whitespace-gesanitized; nooit client-tekst).
+  De AI bevestigt kort en stelt de logische vervolgstap voor; een vervolg-áctie is altijd
+  wéér een HITL-voorstel. Synthetische beurt: geen chat-bubble (`kind:'action_follow_up'`,
+  verborgen bij herladen), wél LLM-history; stil bij fouten; valt onder de rate-limit.
+- **DoD:** suite **1214 pass / 0 fail**; typecheck + lint schoon; ratchet groen — render.js
+  **100%**, core 87,3% (nieuwe helper + tests), baseline bijgewerkt (totaal 85,8%).
+  **Rest:** edge-deploy (v16 → nieuw, samen met AI-17-deploy), device-verificatie
+  (confirm→reactie, bundel→één beurt), golden-cases voor de vervolg-beurt via trace-review.
+
+---
+
+**Edge-deploy v18 (2026-07-06, via MCP).** De `assistant`-function draait nu op v18 met de
+volledige AI-16/AI-18-laag (schedule/chart/choice-render, render.js-vocabulaire, de
+followUp-route). Bevinding vooraf: **v17 (08:32 UTC) droeg de AI-17-brug al** — de backlog-
+claim "productie draait v16" was verouderd; de app↔edge-bundel-brug (lib/modules.js +
+lib/aiCapabilities.js in de edge-bundel) was daarmee al live bewezen. Deploy-verificatie:
+alle 13 bundelbestanden byte-vergeleken met HEAD (identiek op de afsluitende newline na),
+status ACTIVE, logs schoon. **Rest:** device-smoke op de moto (app-kant vereist de nieuwe
+client uit deze branch).
+
+---
+
+**Parallelle golf-uitvoering plan 27 (2026-07-06, drie worktree-streams + main).**
+Vier workstreams tegelijk gebouwd en samengevoegd (alles groen: suite 1294 pass / 0 fail,
+typecheck, lint, ratchet):
+
+- **AI-19 fase A (main):** de assistent dekt nu álle 10 datamodules — 5 nieuwe read-tool-packs
+  (planten/huisdieren/voertuigen/tijdlijn/delen) op de bestaande pure logica, bewust
+  zelfstandig (geen date-fns/extensieloze imports in de edge-bundel). Toolset 11→16,
+  `NO_ASSISTANT` leeg, 10 golden-cases erbij (55 totaal). **Rest:** edge-deploy (bundelt
+  straks mee met fase B) + eval-gate-run (ORQ-key).
+- **TML-4 + TML-6 (stream):** comments + filters, migraties **0075/0076 LIVE** (advisor schoon).
+- **PLT-3 (stream):** globaal zoeken, migratie **0077 LIVE**; `searchRank` 92,6%.
+- **PLT-8 (stream):** OTP-code-login (lib/otp.js 100%); **Erik-actie:** dashboard-config.
+
+Migratienummers verschoven t.o.v. plan 27 (PLT-3 nam 0077; AI-9 → eerstvolgend vrij).

@@ -1,7 +1,7 @@
 // Units voor de pure kern van de tijdlijn / prikbord (TML-1). Zie lib/timeline.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { orderTimeline, summarizePost, isPostValid, aggregateReactions, eventReactionTarget } from '../lib/timeline.js';
+import { orderTimeline, summarizePost, isPostValid, aggregateReactions, eventReactionTarget, orderComments, commentCountLabel } from '../lib/timeline.js';
 
 const ids = (list) => list.map((p) => p.id);
 
@@ -189,4 +189,68 @@ test('aggregateReactions: lege/ontbrekende invoer → lege lijst (default-param)
 
 test('eventReactionTarget: koppelt bron-tabel en id tot een stabiel doel-id', () => {
   assert.equal(eventReactionTarget('task_completions', 'abc-123'), 'task_completions:abc-123');
+});
+
+// ── orderComments + commentCountLabel (TML-4) ──────────────────────────────
+
+test('orderComments: oudste eerst — assert de héle lijst, ook met omgekeerde invoer', () => {
+  // Ids bewust TEGEN de datum-volgorde in ('z' is de oudste): zo kan de datum-
+  // vergelijking niet stiekem door de id-tie-break worden vervangen.
+  const rows = [
+    { id: 'y', created_at: '2026-07-02T10:00:00Z' },
+    { id: 'x', created_at: '2026-07-03T10:00:00Z' },
+    { id: 'z', created_at: '2026-07-01T10:00:00Z' },
+  ];
+  const expected = ['z', 'y', 'x'];
+  assert.deepEqual(orderComments(rows).map((r) => r.id), expected);
+  assert.deepEqual(orderComments([...rows].reverse()).map((r) => r.id), expected);
+});
+
+test('orderComments: ontbrekende of ongeldige created_at zakt naar onder (niet naar boven)', () => {
+  const rows = [
+    { id: 'leeg' },
+    { id: 'kapot', created_at: 'niet-een-datum' },
+    { id: 'echt', created_at: '2026-07-01T10:00:00Z' },
+  ];
+  // De echte comment eerst; de datum-lozen erachter (onderling op id-tie-break).
+  assert.deepEqual(orderComments(rows).map((r) => r.id), ['echt', 'kapot', 'leeg']);
+});
+
+test('orderComments: exact gelijke tijd → stabiele id-tie-break, ongeacht invoervolgorde', () => {
+  const a = { id: 'a', created_at: '2026-07-01T10:00:00Z' };
+  const b = { id: 'b', created_at: '2026-07-01T10:00:00Z' };
+  assert.deepEqual(orderComments([b, a]).map((r) => r.id), ['a', 'b']);
+  assert.deepEqual(orderComments([a, b]).map((r) => r.id), ['a', 'b']);
+});
+
+test('orderComments: muteert de invoer niet, is null-veilig en werkt zonder argument', () => {
+  const rows = [
+    { id: 'b', created_at: '2026-07-02T10:00:00Z' },
+    { id: 'a', created_at: '2026-07-01T10:00:00Z' },
+  ];
+  const snapshot = rows.map((r) => r.id);
+  orderComments(rows);
+  assert.deepEqual(rows.map((r) => r.id), snapshot, 'invoer ongewijzigd');
+  assert.deepEqual(orderComments(), []);                       // default-param: leeg → leeg
+  // Null-elementen crashen niet en zakken onder — in béíde posities (de sort-
+  // vergelijker moet null als a én als b aankunnen), en zelfs dubbel-null.
+  const out = orderComments([null, { id: 'echt', created_at: '2026-07-01T10:00:00Z' }]);
+  assert.equal(out[0]?.id, 'echt');
+  assert.equal(out[1], null);
+  const out2 = orderComments([{ id: 'echt', created_at: '2026-07-01T10:00:00Z' }, null]);
+  assert.equal(out2[0]?.id, 'echt');
+  assert.equal(out2[1], null);
+  assert.deepEqual(orderComments([null, null]), [null, null]);
+});
+
+test('commentCountLabel: 0/1/meer + de grens 1→2 en ongeldige invoer', () => {
+  assert.equal(commentCountLabel(0), 'Nog geen reacties');
+  assert.equal(commentCountLabel(1), '1 reactie');             // enkelvoud, precies op de grens
+  assert.equal(commentCountLabel(2), '2 reacties');            // meervoud direct boven de grens
+  assert.equal(commentCountLabel(12), '12 reacties');
+  assert.equal(commentCountLabel(), 'Nog geen reacties');      // default-param / ontbrekend
+  assert.equal(commentCountLabel(-3), 'Nog geen reacties');    // negatief telt als nul
+  assert.equal(commentCountLabel(NaN), 'Nog geen reacties');
+  assert.equal(commentCountLabel(Infinity), 'Nog geen reacties'); // niet-eindig → nul
+  assert.equal(commentCountLabel('7'), 'Nog geen reacties');   // geen number → nul
 });

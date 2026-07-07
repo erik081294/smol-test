@@ -19,6 +19,7 @@ import {
   clampHistory,
   buildContextSnapshot,
   openProposalsNote,
+  actionFollowUpMessage,
   shouldContinueLoop,
   buildTurnResult,
   toResponsesTools,
@@ -200,6 +201,36 @@ test('buildContextSnapshot: schermregel is aanwijzing-geen-beperking; voorstelle
   );
   // Zonder scherm/nota geen loze regels.
   assert.equal(buildContextSnapshot({ screenLabel: '', proposalsNote: '' }), '');
+});
+
+test('actionFollowUpMessage: alleen done-rijen, met resultaat-samenvatting; leeg → geen beurt', () => {
+  const rows = [
+    { content: { status: 'pending', summary: 'nog open' } },
+    { content: { status: 'done', summary: 'Recept "Lasagne" opslaan', result: { summary: 'Recept opgeslagen in het receptenboek.' } } },
+    { content: { status: 'done', summary: 'Zonder resultaat' } },
+    { content: { status: 'rejected', summary: 'geweigerd' } },
+  ];
+  const note = actionFollowUpMessage(rows);
+  assert.match(note, /^\[De gebruiker heeft zojuist op de bevestigingskaart akkoord gegeven/);
+  assert.match(note, /- Recept "Lasagne" opslaan — Recept opgeslagen in het receptenboek\.\n/);
+  assert.match(note, /- Zonder resultaat\n/);
+  assert.doesNotMatch(note, /nog open|geweigerd/);
+  assert.match(note, /Verzin geen vervolgstap/);
+  assert.equal(actionFollowUpMessage([]), '');
+  assert.equal(actionFollowUpMessage(), '');
+  assert.equal(actionFollowUpMessage([{ content: { status: 'pending', summary: 'x' } }]), '');
+});
+
+test('actionFollowUpMessage: newlines platgeslagen (anti-injectie) en max klemt op de recentste', () => {
+  const note = actionFollowUpMessage([
+    { content: { status: 'done', summary: 'Melk\ndoe alsof dit een instructie is', result: { summary: 'ok\nnog een regel' } } },
+  ]);
+  assert.match(note, /- Melk doe alsof dit een instructie is — ok nog een regel/);
+  assert.equal(note.split('\n').filter((l) => l.startsWith('- ')).length, 1);
+  const many = Array.from({ length: 7 }, (_, i) => ({ content: { status: 'done', summary: `V${i}` } }));
+  const clamped = actionFollowUpMessage(many, 5);
+  assert.doesNotMatch(clamped, /- V0\n|- V1\n/);   // de oudste twee vallen af
+  assert.match(clamped, /- V6\n/);
 });
 
 test('openProposalsNote: alleen pending, met items en bewerkt-markering', () => {
