@@ -1734,3 +1734,27 @@ typecheck, lint, ratchet):
 - **PLT-8 (stream):** OTP-code-login (lib/otp.js 100%); **Erik-actie:** dashboard-config.
 
 Migratienummers verschoven t.o.v. plan 27 (PLT-3 nam 0077; AI-9 → eerstvolgend vrij).
+
+---
+
+**AI-19 fase B (2026-07-06, main).** Vijf additieve HITL-write-tools — de assistent kan nu
+in álle datamodules handelen: `planten_toevoegen` (+eerste water-taak), `huisdieren_logboek_toevoegen`
+(CHECK-spiegel notitie-of-gewicht), `voertuigen_onderhoud_loggen` (bewust zonder kosten-koppeling),
+`tijdlijn_plaatsen` (zichtbaarheid altijd household) en `delen_reserveren` (verplichte
+overlap-conflictcheck — de DB dwingt dit niet af; tz-correct via client-offset → UTC-instants).
+Toolset 16→21 (≤25-metatest groen; tool-search bewust uitgesteld), undo-whitelist +5 tabellen,
+EDITABLE_FIELDS +5, golden-cases 55→65. Suite 1318 pass / 0 fail; pack-ratchets bewust herijkt
+op 76–82% mét fase-C-backlognote (rest = vooral fouttekst-StringLiterals); helpers 97,3%.
+
+---
+
+**PR #127 gemerged + heropstart streams (2026-07-07).** De golf-PR (22 commits, 75 bestanden:
+AI-16 r1+r2, AI-19 fase A+B, PLT-3/PLT-8, TML-4/6, plannen 26/27) is **gemerged naar main**
+(30e77d3) — CI + ratchet groen, geen review-comments. Werkbranch herstart vanaf de nieuwe main;
+**plan 28** (sessie-agenda uit de parallelle review-sessie) gecherry-pickt. Conform plan 28:
+**REV-2 P8/P9 + SEC-6/7 geparkeerd** (Erik-keuze), INF-4 toegevoegd. De nachtelijke worktree-agents
+waren door een onderbreking gesneuveld (geen bruikbaar restwerk; niets stond op GitHub) → drie
+streams vers herstart op de nieuwe basis: **AI-20** (sessie 1), **AI-11** (sessie 3) en
+**PLT-7-staart + INF-4** (sessie 4; scope gecorrigeerd: de app-kant van Sentry bestaat al —
+`lib/monitoring.js` — alleen de edge-kant is het echte gat; het plan-28-mini-plan was daar
+stale t.o.v. backlog §6).
