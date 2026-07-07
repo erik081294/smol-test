@@ -383,9 +383,9 @@
       "score": 88.3
     },
     "supabase/functions/_shared/tools/kosten.js": {
-      "killed": 139,
-      "total": 141,
-      "score": 98.6
+      "killed": 228,
+      "total": 234,
+      "score": 97.4
     },
     "supabase/functions/_shared/tools/render.js": {
       "killed": 35,

@@ -109,9 +109,9 @@ export function monthlyTrendPoints(rows = [], months = []) {
     if (typeof row?.spent_on !== 'string') continue;
     const key = row.spent_on.slice(0, 7);
     if (!totals.has(key)) continue;
-    totals.set(key, totals.get(key) + (row.amount_cents ?? 0));
+    totals.set(key, /** @type {number} */ (totals.get(key)) + (row.amount_cents ?? 0));
   }
-  return months.map((m) => ({ label: MONTH_LABELS[Number(m.slice(5, 7)) - 1], value: totals.get(m) }));
+  return months.map((m) => ({ label: MONTH_LABELS[Number(m.slice(5, 7)) - 1], value: /** @type {number} */ (totals.get(m)) }));
 }
 
 // Module-brief (AI-10, guidelines §1): de goedkope altijd-in-context-laag — één
