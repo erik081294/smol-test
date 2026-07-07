@@ -456,6 +456,11 @@
       "killed": 60,
       "total": 64,
       "score": 93.8
+    },
+    "supabase/functions/_shared/sentryCore.js": {
+      "killed": 41,
+      "total": 42,
+      "score": 97.6
     }
   }
 }
