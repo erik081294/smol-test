@@ -173,7 +173,10 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 // bewaakt structuur/registry-sync; er is geen bronmodule om te muteren.
 // assistantCoverage: meta-test op de dekking/budget van de tool-registry (data-module
 //   ↔ manifest, herbezoek-drempel) — bewaakt een registry-eigenschap, geen lib-module.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden', 'assistantCoverage'];
+// assistantJudge: meta-test op de eval-tooling zelf (scripts/assistant-judge.mjs,
+//   rubric/score-parse van de NL-toon-judge, AI-20) — net als codeEquivalence een
+//   scripts/-helper, geen lib-module om te muteren.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden', 'assistantCoverage', 'assistantJudge'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
