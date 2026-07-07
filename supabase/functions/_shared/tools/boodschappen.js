@@ -2,8 +2,16 @@
 // Tool-pack van de Boodschappen-module (assistent-skill-file, guidelines §1).
 // Lezen (boodschappen_lijst) en voorstellen (boodschappen_toevoegen — HITL:
 // bevestiging in de app vóór er iets op de lijst komt). Contract: zie taken.js.
+// AI-11 spoor 1: toevoegen matcht deterministisch tegen de gebundelde catalogus
+// (lib/groceryCatalog.js) en koppelt aan een huishoud-product — zelfde verrijking
+// als handmatig toevoegen, geen losse dubbele regels.
 
 import { throwOnError } from './helpers.js';
+// App↔edge-brug (patroon lib/modules.js in assistant/index.ts): de gebundelde
+// catalogus is puur en edge-safe, dus de assistent matcht tegen exact dezelfde
+// bron als het handmatige toevoegen in de app — niet tegen een tweede lijst.
+import { itemByName, searchCatalog, categoryMeta } from '../../../../lib/groceryCatalog.js';
+import { normalize } from '../../../../lib/productMatch.js';
 
 /**
  * Boodschappenlijst (onafgevinkt) → data + kaart.
@@ -19,6 +27,56 @@ export function renderGroceryList(rows = []) {
 }
 
 export const MAX_PROPOSED_GROCERIES = 20;
+
+/**
+ * Deterministische catalogus-match voor een vrije boodschap-naam (AI-11 spoor 1):
+ * exact op genormaliseerde naam (case-/ruis-ongevoelig via dezelfde `normalize`
+ * als de app), anders een uniek prefix ("hagel" → Hagelslag). Een ambigu prefix
+ * ("kip" → Kipfilet én Kipfilet (vleeswaren)) of geen treffer → null; het item
+ * blijft dan ongematcht (kandidaat voor async categorisering, spoor 2).
+ * @param {string} [name]
+ * @returns {{key:string, name:string, category:string, unit:string, emoji?:string}|null}
+ */
+export function matchCatalogGrocery(name) {
+  const exact = itemByName(name);
+  if (exact) return exact;
+  const q = normalize(name);
+  // Equivalente mutant: zonder deze kortsluiting matcht '' alsnog niets
+  // (alle 190+ items zijn dan "prefix-treffer" → ambigu → null), alleen trager.
+  // Stryker disable next-line all
+  if (!q) return null;
+  // searchCatalog rangschikt prefix-treffers voorop maar geeft óók
+  // midden-in-de-naam-treffers terug ("kaas" → Jonge kaas); alleen een écht
+  // prefix telt hier, en alleen als het ondubbelzinnig is.
+  const prefix = searchCatalog(q).filter((it) => normalize(it.name).startsWith(q));
+  return prefix.length === 1 ? prefix[0] : null;
+}
+
+/**
+ * SEAM voor AI-11 spoor 2 (async categoriseren): welke net toegevoegde items
+ * hebben géén catalogus-match en moeten later alsnog een schap krijgen?
+ * `items` en `matches` lopen 1-op-1 (matches[i] = matchCatalogGrocery van
+ * items[i], null = geen match); dedupliceert op genormaliseerde naam.
+ * TODO(AI-11 spoor 2, huishoek-backlog.md §6): hier de async categorisering
+ * aanhaken — een goedkoop model kiest een schap uit de catalog_categories-
+ * taxonomie voor deze werklijst. Bewust nog géén model-call gebouwd: dat vergt
+ * Orq-config + eval-gate (docs/assistent-architectuur.md).
+ * @param {Array<{name?:string, productId?:string|null}>} [items]
+ * @param {Array<object|null>} [matches]
+ * @returns {Array<{name:string, productId:string|null}>}
+ */
+export function uncategorizedAfterExecute(items = [], matches = []) {
+  const out = [];
+  const seen = new Set();
+  items.forEach((it, i) => {
+    const name = typeof it?.name === 'string' ? it.name.trim() : '';
+    const key = normalize(name);
+    if (!key || matches[i] || seen.has(key)) return;
+    seen.add(key);
+    out.push({ name, productId: it.productId ?? null });
+  });
+  return out;
+}
 
 /**
  * Puur voorstel-bouwwerk van boodschappen_toevoegen. `items` (weergaveteksten)
@@ -38,7 +96,18 @@ export function proposeAddGroceries(args = {}) {
     if (name.length > 80) return { ok: false, error: 'Een boodschap mag maximaal 80 tekens zijn.' };
     const quantity = typeof it?.quantity === 'string' && it.quantity.trim().length > 0 ? it.quantity.trim() : null;
     norm.push({ name, quantity });
-    items.push(quantity ? `${name} (${quantity})` : name);
+    // Catalogus-match op de kaartregel (AI-11): de gebruiker ziet dát er
+    // gekoppeld wordt — "Melk (2 pakken) 🥛 · Zuivel & eieren". De match zelf
+    // reist niet mee in args: execute her-matcht deterministisch (zo blijft de
+    // edit-flow op {name, quantity} werken en valt er niets te vervalsen).
+    const base = quantity ? `${name} (${quantity})` : name;
+    const match = matchCatalogGrocery(name);
+    if (match) {
+      const cat = categoryMeta(match.category);
+      items.push(`${base} ${match.emoji ?? cat.emoji} · ${cat.label}`);
+    } else {
+      items.push(base);
+    }
   }
   const summary = norm.length === 1
     ? `"${norm[0].name}" op de boodschappenlijst zetten`
@@ -133,14 +202,60 @@ export const BOODSCHAPPEN_TOOLS = [
     },
     propose: proposeAddGroceries,
     async execute(ctx, args) {
-      const rows = args.items.map((it) => ({
-        household_id: ctx.householdId,
-        added_by: ctx.userId,
-        name: it.name,
-        quantity: it.quantity,
-        checked: false,
-      }));
+      // Verrijking (AI-11 spoor 1): koppel elk item — net als handmatig toevoegen
+      // (useProducts.ensureProduct) — via find-or-create op de genormaliseerde
+      // naam aan een huishoud-product, met schap/default-eenheid uit de
+      // catalogus-match. Zo krijgt een assistent-boodschap dezelfde schap-
+      // indeling/emoji én voedt hij de times_added-recency ("Eerder gekozen"),
+      // i.p.v. een losse dubbele regel naast de catalogus achter te laten.
+      const existing = throwOnError(
+        await ctx.db.from('products').select('id, name, search')
+          .eq('household_id', ctx.householdId).limit(1000)
+      );
+      const productByNorm = new Map();
+      for (const p of existing) {
+        // Zelfde terugval als ensureProduct: een rij zonder `search` matcht op naam.
+        const key = p.search || normalize(p.name);
+        if (key && !productByNorm.has(key)) productByNorm.set(key, p.id);
+      }
+      const toCreate = [];
+      for (const it of args.items) {
+        const key = normalize(it.name);
+        if (!key || productByNorm.has(key) || toCreate.some((p) => p.search === key)) continue;
+        // Gematcht → schap + default-eenheid (zelfde velden als de handmatige
+        // catalogus-tik); ongematcht → kaal product (categorie null → 'overig').
+        const match = matchCatalogGrocery(it.name);
+        toCreate.push({
+          household_id: ctx.householdId,
+          created_by: ctx.userId,
+          name: it.name,
+          search: key,
+          ...(match?.category ? { category: match.category } : {}),
+          ...(match?.unit ? { default_unit: match.unit } : {}),
+        });
+      }
+      if (toCreate.length > 0) {
+        // insert(...).select geeft de rijen in insert-volgorde terug → 1-op-1 met toCreate.
+        const created = throwOnError(await ctx.db.from('products').insert(toCreate).select('id'));
+        toCreate.forEach((p, i) => { if (created[i]?.id) productByNorm.set(p.search, created[i].id); });
+      }
+      // TODO(AI-11 spoor 2, huishoek-backlog.md §6): items zónder catalogus-match
+      // hier async laten categoriseren — uncategorizedAfterExecute levert de werklijst.
+      const rows = args.items.map((it) => {
+        const productId = productByNorm.get(normalize(it.name)) ?? null;
+        return {
+          household_id: ctx.householdId,
+          added_by: ctx.userId,
+          name: it.name,
+          quantity: it.quantity,
+          checked: false,
+          ...(productId ? { product_id: productId } : {}),
+        };
+      });
       const inserted = throwOnError(await ctx.db.from('groceries').insert(rows).select('id'));
+      // Alleen de lijstregels in het undo-spoor: net als bij handmatig toevoegen
+      // blijft het huishoud-product bestaan als de regel weer verdwijnt (en
+      // 'products' staat bewust niet in de UNDO_TABLE_WHITELIST).
       return {
         summary: inserted.length === 1 ? 'Op de boodschappenlijst gezet.' : `${inserted.length} boodschappen op de lijst gezet.`,
         inserted: inserted.map((r) => ({ table: 'groceries', id: r.id })),

@@ -7,7 +7,7 @@
 // die op de client stilletjes sneuvelt of velden verliest.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chartNode, scheduleNode, choiceNode } from '../supabase/functions/_shared/tools/render.js';
+import { chartNode, scheduleNode, choiceNode, imageNode, progressNode } from '../supabase/functions/_shared/tools/render.js';
 import { normalizeNode } from '../lib/assistantUi.js';
 
 test('chartNode: vorm + euro-fallback (centen → komma-notatie, ·-gescheiden)', () => {
@@ -61,7 +61,42 @@ test('roundtrip: chartNode passeert de poortwachter met alle punten intact', () 
     type: 'chart',
     title: 'Per week',
     unit: 'euro',
+    variant: 'bar',
     points: [{ label: '1–7', value: 12500 }, { label: '8–14', value: 0 }],
+  });
+});
+
+test('roundtrip: chartNode lijn-variant houdt zijn variant (r3); onzin-variant reist niet mee', () => {
+  const line = chartNode({ title: 'Trend', unit: 'euro', variant: 'line', points: [{ label: 'jun', value: 100 }, { label: 'jul', value: 200 }] });
+  assert.equal(normalizeNode(line).variant, 'line');
+  assert.equal(line.text, 'Trend: jun: € 1,00 · jul: € 2,00'); // fallback blijft de tabelvorm
+  // De constructor laat een niet-bestaande variant weg → poortwachter default 'bar'.
+  const raar = chartNode({ variant: 'pie', points: [{ label: 'a', value: 1 }] });
+  assert.equal('variant' in raar, false);
+  assert.equal(normalizeNode(raar).variant, 'bar');
+});
+
+test('imageNode: vorm + caption-fallback ("(foto)" zonder caption)', () => {
+  assert.deepEqual(imageNode({ bucket: 'timeline', path: 'h1/p1/f.jpg', caption: 'De nieuwe kast' }), {
+    type: 'image', bucket: 'timeline', path: 'h1/p1/f.jpg', caption: 'De nieuwe kast', text: 'De nieuwe kast',
+  });
+  const kaal = imageNode({ bucket: 'pets', path: 'h1/d1/f.jpg' });
+  assert.equal('caption' in kaal, false);
+  assert.equal(kaal.text, '(foto)');
+});
+
+test('progressNode: vorm + teller-fallback', () => {
+  assert.deepEqual(progressNode({ label: 'Deze week afgerond', value: 5, max: 12 }), {
+    type: 'progress', label: 'Deze week afgerond', value: 5, max: 12, text: 'Deze week afgerond: 5 van 12',
+  });
+});
+
+test('roundtrip: imageNode en progressNode passeren de poortwachter verliesvrij', () => {
+  assert.deepEqual(normalizeNode(imageNode({ bucket: 'timeline', path: 'h1/p1/f.jpg', caption: 'Kast' })), {
+    type: 'image', bucket: 'timeline', path: 'h1/p1/f.jpg', caption: 'Kast',
+  });
+  assert.deepEqual(normalizeNode(progressNode({ label: 'Deze week afgerond', value: 5, max: 12 })), {
+    type: 'progress', label: 'Deze week afgerond', value: 5, max: 12,
   });
 });
 
@@ -100,8 +135,11 @@ test('roundtrip: op een OUDE client (zonder deze types) degradeert elke construc
   // Dat contract borgen we hier per constructor: text is aanwezig én niet leeg.
   for (const node of [
     chartNode({ title: 'T', unit: 'euro', points: [{ label: 'a', value: 1 }] }),
+    chartNode({ title: 'T', variant: 'line', points: [{ label: 'a', value: 1 }] }),
     scheduleNode({ title: 'T', days: [{ label: 'ma', entries: [{ text: 'x' }] }] }),
     choiceNode({ prompt: 'P?', options: [{ label: 'A', reply: 'a' }] }),
+    imageNode({ bucket: 'timeline', path: 'h1/f.jpg' }),
+    progressNode({ label: 'L', value: 1, max: 2 }),
   ]) {
     assert.equal(typeof node.text, 'string');
     assert.ok(node.text.length > 0);

@@ -51,6 +51,19 @@ export function isIsoDate(s) {
 }
 
 /**
+ * De maandag van de week waarin `isoDate` valt (NL-week, AI-16 ronde 3:
+ * voedt de "deze week afgerond"-voortgang). Puur en tz-vast; ongeldige
+ * invoer → null (de aanroeper laat de voortgang dan weg).
+ * @param {string} isoDate
+ * @returns {string|null}
+ */
+export function weekStart(isoDate) {
+  if (!isIsoDate(isoDate)) return null;
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  return addDays(isoDate, -((d.getUTCDay() + 6) % 7));
+}
+
+/**
  * "2026-07-10" → "vr 10 jul" — compact NL-datumlabel voor lijsten/kaarten.
  * Puur en tz-vast (UTC); ongeldige invoer → de invoer zelf (nooit crashen op data).
  * @param {string} isoDate

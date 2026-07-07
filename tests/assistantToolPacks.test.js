@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ASSISTANT_TOOLS, MODULE_BRIEFS, MANIFESTS, aggregateToolPacks, aggregateBriefs } from '../supabase/functions/_shared/tools/index.js';
 import { fmtEuro, nextMonth, addDays, isIsoDate, dayLabel, resolveMemberId, isHhmm, toUtcIso, localHhmm, localDate,
+  weekStart,
 } from '../supabase/functions/_shared/tools/helpers.js';
 import { MODULES } from '../lib/modules.js';
 
@@ -282,6 +283,18 @@ test('toUtcIso: NL-zomertijd (+120) schuift terug naar UTC; over de dagrens heen
   assert.equal(toUtcIso('2026-07-11', '14:00', 840), '2026-07-11T00:00:00.000Z');
   assert.equal(toUtcIso('2026-07-11', '14:00', -840), '2026-07-12T04:00:00.000Z');
   assert.equal(toUtcIso('2026-07-11', '14:00', 841), '2026-07-11T14:00:00.000Z'); // net erover → 0
+});
+
+test('weekStart: maandag van de week — elke weekdag-tak, maandag blijft zichzelf', () => {
+  assert.equal(weekStart('2026-06-29'), '2026-06-29');   // maandag → zelfde dag (offset 0)
+  assert.equal(weekStart('2026-07-01'), '2026-06-29');   // woensdag → -2
+  assert.equal(weekStart('2026-07-04'), '2026-06-29');   // zaterdag → -5
+  assert.equal(weekStart('2026-07-05'), '2026-06-29');   // zondag (dow 0) → -6, niet +1
+  assert.equal(weekStart('2026-07-06'), '2026-07-06');   // de maandag erna
+  assert.equal(weekStart('2026-01-01'), '2025-12-29');   // over de jaargrens
+  assert.equal(weekStart('rommel'), null);
+  assert.equal(weekStart('2026-02-31'), null);           // geen echte kalenderdag
+  assert.equal(weekStart(), null);
 });
 
 test('localHhmm/localDate: round-trip met toUtcIso; onleesbaar → lege string', () => {

@@ -35,6 +35,8 @@ componenten in [`../lib/ui.js`](../lib/ui.js) en de tabs in
 | `t-fab-task` / `t-fab-expense` / `t-fab-vehicle` | "toevoegen"-FAB per module |
 | `t-field-title` / `t-field-amount` / `t-field-description` | editor-velden |
 | `t-grocery-add` | het boodschap-invoerveld |
+| `t-assistant-input` / `t-assistant-send` / `t-assistant-stop` | assistent-composer ([`../lib/AssistantChat.js`](../lib/AssistantChat.js)) |
+| `t-assistant-confirm` / `t-assistant-reject` | Doen/Niet doen op de HITL-bevestigingskaart ([`../lib/AssistantMessageView.js`](../lib/AssistantMessageView.js)) |
 | `t-error-boundary` | de error-boundary-fallback (voor `assertNotVisible`) |
 
 `assertVisible` op zichtbare **inhoud** (bv. "E2E rooktest taak") blijft op tekst — dat is
@@ -55,8 +57,11 @@ razendsnel en zonder door "Meer" te tikken. Zie [`../docs/rooktest.md`](../docs/
 - `05-editor-guard.yaml` — het formulier-fundament (ARCH-5): leeg opslaan → inline fout; iets invullen →
   sluiten vraagt om bevestiging (de **discard-guard**, nieuw); "Blijven" behoudt de invoer, "Sluiten zonder
   opslaan" gooit weg → geen rij aangemaakt (self-cleanend). Verifieert het nieuwe full-mode-gedrag.
+- `06-assistent.yaml` — assistent-schrijfpad (AI-20): schrijf-verzoek → HITL-bevestigingskaart →
+  "Doen" → vervolg-beurt (AI-18). Enige flow met een échte LLM-beurt → ruime timeouts.
+  **Nog niet op toestel geverifieerd** (vergt device + ingelogd huishouden + edge/Orq live) — open stap.
 
-Alle vijf op toestel geverifieerd (moto g72, groen via `npm run rooktest`). De `E2E…`-rijen
+Flows 01–05 op toestel geverifieerd (moto g72, groen via `npm run rooktest`). De `E2E…`-rijen
 die ze aanmaken worden door de runner op DB-niveau opgeruimd (`scripts/rooktest-cleanup.mjs`) — geen
 UI-delete in de flows, want de app verwijdert undo-toast-gestuurd (timer) en dat vuurt na een
 editor-`router.back()` niet betrouwbaar af.

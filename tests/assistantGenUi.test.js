@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  niceMax, chartLayout, formatChartValue, formatQuantity,
+  niceMax, chartLayout, lineLayout, formatChartValue, formatQuantity, progressFraction,
   MIN_SERVINGS, MAX_SERVINGS, clampServings, scaleIngredients,
 } from '../lib/assistantGenUi.js';
 
@@ -138,4 +138,47 @@ test('scaleIngredients: incomplete of kapotte regels blijven exact ongemoeid (ze
     input[0], input[1], input[2], input[3], null,
     { text: 'Ei · 4', name: 'Ei', quantity: 4 },
   ]);
+});
+
+// --- Ronde 3 (plan 28 sessie 6): lijn-layout + voortgangsfractie. -----------
+
+test('lineLayout: dots op kolom-midden, y vanaf de top, zelfde nice-as als de staaf', () => {
+  const layout = lineLayout([{ label: 'jun', value: 0 }, { label: 'jul', value: 100 }], 200, 100);
+  assert.deepEqual(layout.dots, [
+    { label: 'jun', value: 0, x: 50, y: 100 },     // 0 → onderaan het plot-vlak
+    { label: 'jul', value: 100, x: 150, y: 0 },    // nice-max (100) → bovenaan
+  ]);
+  assert.deepEqual(layout.ticks, [50, 100]);
+  assert.equal(layout.max, 100);
+});
+
+test('lineLayout: segment ligt met zijn midden tussen de dots (rotated-View-wiskunde)', () => {
+  // Horizontaal segment (gelijke waarden): lengte = dot-afstand, hoek 0.
+  const vlak = lineLayout([{ label: 'a', value: 50 }, { label: 'b', value: 50 }], 100, 100);
+  assert.deepEqual(vlak.segments, [{ left: 25, top: 0, length: 50, angle: 0 }]);
+  // Diagonaal omhoog: lengte = hypot(dx, dy), hoek = atan2(dy, dx) (negatief = omhoog).
+  const diag = lineLayout([{ label: 'a', value: 0 }, { label: 'b', value: 100 }], 200, 100);
+  const l = Math.hypot(100, 100);
+  assert.deepEqual(diag.segments, [{ left: 100 - l / 2, top: 50, length: l, angle: Math.atan2(-100, 100) }]);
+  // Eén punt → geen segmenten, wel een dot.
+  assert.equal(lineLayout([{ label: 'a', value: 1 }], 100, 100).segments.length, 0);
+});
+
+test('lineLayout: onbruikbare maat of lege punten → null (renderer tekent dan niets)', () => {
+  assert.equal(lineLayout([], 100, 100), null);
+  assert.equal(lineLayout([{ label: 'a', value: 1 }], 0, 100), null);
+  assert.equal(lineLayout([{ label: 'a', value: 1 }], 100, 0), null);
+  assert.equal(lineLayout([{ label: 'a', value: 1 }], Number.NaN, 100), null);
+  assert.equal(lineLayout('rommel', 100, 100), null);
+});
+
+test('progressFraction: fractie geklemd op [0, 1]; rommel of noemer ≤ 0 → 0', () => {
+  assert.equal(progressFraction(5, 12), 5 / 12);
+  assert.equal(progressFraction(12, 12), 1);      // precies vol (grenswaarde)
+  assert.equal(progressFraction(15, 12), 1);      // overschot klemt
+  assert.equal(progressFraction(0, 12), 0);
+  assert.equal(progressFraction(-3, 12), 0);
+  assert.equal(progressFraction(1, 0), 0);
+  assert.equal(progressFraction(Number.NaN, 12), 0);
+  assert.equal(progressFraction(1, Infinity), 0); // niet-eindige noemer → 0
 });

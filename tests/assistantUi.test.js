@@ -6,8 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CATALOG_TYPES, ACTION_UI_STATES, normalizeNode, normalizeTree, treeToText, pendingActionIds } from '../lib/assistantUi.js';
 
-test('CATALOG_TYPES blijft de afgesproken vaste set (plan 23, +recipe AI-12, +chart/schedule/choice AI-16)', () => {
-  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link', 'recipe', 'chart', 'schedule', 'choice']);
+test('CATALOG_TYPES blijft de afgesproken vaste set (plan 23, +recipe AI-12, +chart/schedule/choice AI-16 r1, +image/progress r3)', () => {
+  assert.deepEqual(CATALOG_TYPES, ['text', 'card', 'list', 'keyvalue', 'confirm_action', 'link', 'recipe', 'chart', 'schedule', 'choice', 'image', 'progress']);
 });
 
 test('normalizeNode: text vereist niet-lege tekst', () => {
@@ -204,7 +204,7 @@ test('normalizeNode: chart vereist geldige punten; kapotte punten vervallen; cap
     ],
   });
   assert.deepEqual(node, {
-    type: 'chart', title: 'Uitgaven per week', unit: 'euro',
+    type: 'chart', title: 'Uitgaven per week', unit: 'euro', variant: 'bar',
     points: [{ label: '1–7', value: 12300 }, { label: '8–14', value: 0 }],
   });
   // Zonder één geldig punt is er niets te tekenen.
@@ -219,6 +219,42 @@ test('normalizeNode: chart-unit is alleen "euro" of null (geen verzonnen eenhede
   assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], unit: 'euro' }).unit, 'euro');
   assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], unit: 'dollar' }).unit, null);
   assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }] }).unit, null);
+});
+
+test('normalizeNode: chart-variant is alleen "line" of "bar" (default bar, geen verzonnen varianten)', () => {
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], variant: 'line' }).variant, 'line');
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }], variant: 'pie' }).variant, 'bar');
+  assert.equal(normalizeNode({ type: 'chart', points: [{ label: 'a', value: 1 }] }).variant, 'bar');
+});
+
+test('normalizeNode: image alleen uit eigen gewhiteliste buckets, kaal relatief pad', () => {
+  assert.deepEqual(
+    normalizeNode({ type: 'image', bucket: 'timeline', path: ' h1/p1/foto.jpg ', caption: 'De nieuwe kast' }),
+    { type: 'image', bucket: 'timeline', path: 'h1/p1/foto.jpg', caption: 'De nieuwe kast' }
+  );
+  assert.equal(normalizeNode({ type: 'image', bucket: 'timeline', path: 'h1/f.jpg' }).caption, null);
+  // Whitelist: onbekende bucket → drop (nooit een vreemde bron de renderer in).
+  assert.equal(normalizeNode({ type: 'image', bucket: 'avatars', path: 'h1/f.jpg' }), null);
+  assert.equal(normalizeNode({ type: 'image', path: 'h1/f.jpg' }), null);
+  // Padregels: absoluut, traversal of URL → drop.
+  assert.equal(normalizeNode({ type: 'image', bucket: 'pets', path: '/h1/f.jpg' }), null);
+  assert.equal(normalizeNode({ type: 'image', bucket: 'pets', path: 'h1/../h2/f.jpg' }), null);
+  assert.equal(normalizeNode({ type: 'image', bucket: 'pets', path: 'https://evil.example/f.jpg' }), null);
+  assert.equal(normalizeNode({ type: 'image', bucket: 'pets', path: '' }), null);
+});
+
+test('normalizeNode: progress vereist label en noemer > 0; waarde klemt op [0, max]', () => {
+  assert.deepEqual(
+    normalizeNode({ type: 'progress', label: 'Deze week afgerond', value: 5, max: 12, text: 'fallback' }),
+    { type: 'progress', label: 'Deze week afgerond', value: 5, max: 12 }
+  );
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: 15, max: 12 }).value, 12); // klem
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: 0, max: 12 }).value, 0);   // 0 mag
+  assert.equal(normalizeNode({ type: 'progress', label: '', value: 1, max: 2 }), null);
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: -1, max: 2 }), null);
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: 1, max: 0 }), null);
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: '1', max: 2 }), null);      // type-strikt
+  assert.equal(normalizeNode({ type: 'progress', label: 'x', value: 1 }), null);
 });
 
 test('normalizeNode: schedule houdt lege dagen (gaten zijn informatie); navigatie via link-nodes', () => {
@@ -310,6 +346,15 @@ test('treeToText: chart/schedule/choice blijven leesbaar (a11y/tabelvorm)', () =
     treeToText(nodes),
     'Uitgaven: wk1 100, wk2 250\nWeekmenu — ma: Lasagne; di: —\nWelke? A / B'
   );
+});
+
+test('treeToText: image en progress blijven leesbaar (caption/teller — a11y en oude previews)', () => {
+  const nodes = normalizeTree([
+    { type: 'image', bucket: 'timeline', path: 'h1/p1/f.jpg', caption: 'De nieuwe kast — Erik, ma 6 jul' },
+    { type: 'image', bucket: 'pets', path: 'h1/d1/f.jpg' },
+    { type: 'progress', label: 'Deze week afgerond', value: 5, max: 12 },
+  ]);
+  assert.equal(treeToText(nodes), 'De nieuwe kast — Erik, ma 6 jul\n(foto)\nDeze week afgerond: 5 van 12');
 });
 
 test('treeToText: chart/schedule zonder titel laten het scheidingsteken weg', () => {

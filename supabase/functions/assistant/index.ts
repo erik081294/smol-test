@@ -69,6 +69,9 @@ import {
 } from './actions.js';
 // @ts-ignore — Deno-runtime-import.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+// Edge-foutrapportage (INF-4): fail-silent, no-op zonder de secret SENTRY_DSN —
+// verandert de bestaande foutafhandeling/responses niet.
+import { reportEdgeError } from '../_shared/sentry.ts';
 
 const ORQ_CHAT_URL = 'https://api.orq.ai/v2/proxy/chat/completions';
 const ORQ_RESPONSES_URL = 'https://api.orq.ai/v3/router/responses';
@@ -301,6 +304,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, status: 'done', summary: result.summary, undoable: (result.inserted ?? []).length > 0 });
     } catch (e) {
       console.error('[assistant] voorstel uitvoeren faalde', String(e));
+      await reportEdgeError('assistant', 'voorstel uitvoeren faalde', e, { stage: 'action-confirm' });
       await finish('failed', {}, 'executing');
       return json({ error: 'Dat lukte even niet — het voorstel is niet uitgevoerd.' }, 500);
     }
@@ -358,6 +362,7 @@ Deno.serve(async (req: Request) => {
     }
   } catch (e) {
     console.error('[assistant] rate-limit-check faalde (fail-closed)', String(e));
+    await reportEdgeError('assistant', 'rate-limit-check faalde (fail-closed)', e, { stage: 'rate-limit' });
     return json({ error: 'De assistent is tijdelijk niet beschikbaar.' }, 503);
   }
 
@@ -508,11 +513,13 @@ Deno.serve(async (req: Request) => {
       });
     } catch (e) {
       console.error('[assistant] Orq onbereikbaar', String(e));
+      await reportEdgeError('assistant', 'Orq onbereikbaar', e, { stage: 'orq' });
       throw new TurnError('Kon de assistent-service niet bereiken.', 502);
     }
     if (!orqRes.ok) {
       const detail = await orqRes.text().catch(() => '');
       console.error('[assistant] Orq-fout', orqRes.status, detail.slice(0, 500));
+      await reportEdgeError('assistant', 'Orq-fout', null, { stage: 'orq', status: String(orqRes.status) });
       throw new TurnError('Dat lukte even niet — probeer het nog eens.', 502);
     }
     if (!streamUpstream) return await orqRes.json().catch(() => null);
@@ -664,7 +671,12 @@ Deno.serve(async (req: Request) => {
           emit({ type: 'done' });
         } catch (e) {
           const msg = e instanceof TurnError ? e.message : 'Dat lukte even niet — probeer het nog eens.';
-          if (!(e instanceof TurnError)) console.error('[assistant] beurt faalde', String(e));
+          // TurnError is al bij de bron gemeld (Orq-catch hierboven); alleen het
+          // onverwachte pad hoeft naar Sentry.
+          if (!(e instanceof TurnError)) {
+            console.error('[assistant] beurt faalde', String(e));
+            await reportEdgeError('assistant', 'beurt faalde (stream)', e, { stage: 'turn' });
+          }
           emit({ type: 'error', message: msg });
         } finally {
           try { controller.close(); } catch { /* al gesloten */ }
@@ -681,8 +693,10 @@ Deno.serve(async (req: Request) => {
     const turn = await runTurn(null);
     return json({ conversationId, ...turn });
   } catch (e) {
+    // TurnError is al bij de bron gemeld (Orq-catch); alleen het onverwachte pad.
     if (e instanceof TurnError) return json({ error: e.message }, e.status);
     console.error('[assistant] beurt faalde', String(e));
+    await reportEdgeError('assistant', 'beurt faalde', e, { stage: 'turn' });
     return json({ error: 'Dat lukte even niet — probeer het nog eens.' }, 500);
   }
 });

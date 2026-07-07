@@ -1734,3 +1734,44 @@ typecheck, lint, ratchet):
 - **PLT-8 (stream):** OTP-code-login (lib/otp.js 100%); **Erik-actie:** dashboard-config.
 
 Migratienummers verschoven t.o.v. plan 27 (PLT-3 nam 0077; AI-9 → eerstvolgend vrij).
+
+---
+
+**AI-19 fase B (2026-07-06, main).** Vijf additieve HITL-write-tools — de assistent kan nu
+in álle datamodules handelen: `planten_toevoegen` (+eerste water-taak), `huisdieren_logboek_toevoegen`
+(CHECK-spiegel notitie-of-gewicht), `voertuigen_onderhoud_loggen` (bewust zonder kosten-koppeling),
+`tijdlijn_plaatsen` (zichtbaarheid altijd household) en `delen_reserveren` (verplichte
+overlap-conflictcheck — de DB dwingt dit niet af; tz-correct via client-offset → UTC-instants).
+Toolset 16→21 (≤25-metatest groen; tool-search bewust uitgesteld), undo-whitelist +5 tabellen,
+EDITABLE_FIELDS +5, golden-cases 55→65. Suite 1318 pass / 0 fail; pack-ratchets bewust herijkt
+op 76–82% mét fase-C-backlognote (rest = vooral fouttekst-StringLiterals); helpers 97,3%.
+
+---
+
+**PR #127 gemerged + heropstart streams (2026-07-07).** De golf-PR (22 commits, 75 bestanden:
+AI-16 r1+r2, AI-19 fase A+B, PLT-3/PLT-8, TML-4/6, plannen 26/27) is **gemerged naar main**
+(30e77d3) — CI + ratchet groen, geen review-comments. Werkbranch herstart vanaf de nieuwe main;
+**plan 28** (sessie-agenda uit de parallelle review-sessie) gecherry-pickt. Conform plan 28:
+**REV-2 P8/P9 + SEC-6/7 geparkeerd** (Erik-keuze), INF-4 toegevoegd. De nachtelijke worktree-agents
+waren door een onderbreking gesneuveld (geen bruikbaar restwerk; niets stond op GitHub) → drie
+streams vers herstart op de nieuwe basis: **AI-20** (sessie 1), **AI-11** (sessie 3) en
+**PLT-7-staart + INF-4** (sessie 4; scope gecorrigeerd: de app-kant van Sentry bestaat al —
+`lib/monitoring.js` — alleen de edge-kant is het echte gat; het plan-28-mini-plan was daar
+stale t.o.v. backlog §6).
+
+---
+
+**Drie streams gemerged + AI-16 ronde 3 (2026-07-07, vervolg).** Op de nieuwe main:
+**AI-20** (multi-turn golden-cases via de productie-`actionFollowUpMessage`, NL-toon-judge
+opt-in `--tone`, Maestro-flow 06 + testID's confirm/reject), **AI-11 spoor 1**
+(deterministische catalogus-matching; `lib/groceryCatalog.js` edge-safe → app↔edge-brug;
+descriptions byte-identiek), **PLT-7-staart + INF-4-edge** (store-"binnenkort"-staat +
+`STORE_LINKS`-config; `sentryCore.js`/`sentry.ts` fail-silent in de catch-paden van
+assistant/scan-receipt) en **AI-16 ronde 3** in main (image/progress/lijn-chart +
+producenten tijdlijn-foto/kosten-maandtrend/taken-weekvoortgang; de tijdlijn-test ving
+een echte null-crash in de foto-lookup). Suite **1369 pass / 0 fail**, typecheck, eslint
+0 errors, ratchet groen (kosten bewust herijkt 97,4% — 4 equivalente mutanten;
+sentryCore-entry 97,6%). **Edge:** `scan-receipt` **v9 LIVE** (byte-geverifieerd);
+de `assistant`-v19-deploy (22 bundel-bestanden, nu incl. groceryCatalog/productMatch/
+sentry) is de open vervolgstap — de bundel is te groot voor de MCP-inline-route in deze
+sessie; via de Supabase-CLI (`supabase functions deploy assistant`) of een verse sessie.

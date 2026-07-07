@@ -1,0 +1,49 @@
+# Kritieke flow 6 (AI-20): assistent schrijf-verzoek → bevestigingskaart → Doen →
+# vervolg-beurt (AI-18, "bevestigen is een beurt"). Start op de tabbalk (ingelogd
+# test-huishouden). Zie .maestro/README.md.
+#
+# Dit is de enige flow met een échte LLM-beurt in de lus: de wachttijden zijn dus
+# ruim (edge-call + model). Selectors op id (t-assistant-* uit lib/AssistantChat.js
+# en lib/AssistantMessageView.js).
+#
+# Self-cleanend: de itemnaam draagt de E2E-prefix; de runner ruimt `E2E%`-rijen in
+# `groceries` op DB-niveau op (scripts/rooktest-cleanup.mjs — groceries zit in de
+# targets-lijst). De prompt spelt de naam expliciet zodat het model 'm letterlijk
+# (mét hoofdletter-prefix, de cleanup-LIKE is hoofdlettergevoelig) overneemt.
+appId: app.huishoek
+---
+# Géén launchApp (opent de dev-client-launcher); de runner cold-laadt de app.
+# Assistent is een niet-primaire module (geen eigen tab-knop) → via "Meer".
+- tapOn:
+    id: "t-tab-meer"
+- tapOn: "Assistent"
+- tapOn:
+    id: "t-assistant-input"
+- inputText: "Zet E2E-testmelk op de boodschappenlijst (precies die naam)."
+- tapOn:
+    id: "t-assistant-send"
+# LLM-beurt: wacht ruim op de bevestigingskaart (HITL-voorstel, boodschappen_toevoegen).
+- extendedWaitUntil:
+    visible:
+      id: "t-assistant-confirm"           # "Doen" op de bevestigingskaart
+    timeout: 60000
+- tapOn:
+    id: "t-assistant-confirm"
+# Na een geslaagd akkoord start direct de vervolg-beurt (AI-18): de stop-knop
+# vervangt de verzendknop zolang de beurt streamt. Dat 'ie verschijnt bewijst
+# dat de execute slaagde én de opvolging afgetrapt is.
+- extendedWaitUntil:
+    visible:
+      id: "t-assistant-stop"
+    timeout: 20000
+# De kaart kantelt intussen naar de afgehandelde staat ("✓ Gedaan.").
+- extendedWaitUntil:
+    visible: '.*Gedaan\..*'
+    timeout: 20000
+# Vervolg-beurt afgerond: de stop-knop maakt weer plaats (nieuwe assistent-tekst staat er).
+- extendedWaitUntil:
+    notVisible:
+      id: "t-assistant-stop"
+    timeout: 90000
+- assertNotVisible:
+    id: "t-error-boundary"

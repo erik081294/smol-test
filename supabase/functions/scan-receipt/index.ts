@@ -24,6 +24,9 @@
 
 // @ts-ignore — Deno laadt het .js-buurbestand; types niet nodig in deze schil.
 import { extractText, parseModelJson, normalize, effectiveMime, isAllowedMime } from './core.js';
+// Edge-foutrapportage (INF-4): fail-silent, no-op zonder de secret SENTRY_DSN —
+// verandert de bestaande foutafhandeling/responses niet.
+import { reportEdgeError } from '../_shared/sentry.ts';
 
 const ORQ_INVOKE_URL = 'https://api.orq.ai/v2/deployments/invoke';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // ~8MB base64-payload; grotere foto's weigeren
@@ -118,6 +121,7 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     console.error('[scan-receipt] rate-limit-check faalde (fail-closed)', String(e));
+    await reportEdgeError('scan-receipt', 'rate-limit-check faalde (fail-closed)', e, { stage: 'rate-limit' });
     return json({ error: 'Bonscan is tijdelijk niet beschikbaar.' }, 503);
   }
 
@@ -150,12 +154,14 @@ Deno.serve(async (req) => {
   } catch (e) {
     // Log de details server-side; geef de client geen interne foutstring (infra-fingerprint).
     console.error('[scan-receipt] Orq onbereikbaar', String(e));
+    await reportEdgeError('scan-receipt', 'Orq onbereikbaar', e, { stage: 'orq' });
     return json({ error: 'Kon de bonscan-service niet bereiken' }, 502);
   }
 
   if (!orqRes.ok) {
     const detail = await orqRes.text().catch(() => '');
     console.error('[scan-receipt] Orq-fout', orqRes.status, detail.slice(0, 500));
+    await reportEdgeError('scan-receipt', 'Orq-fout', null, { stage: 'orq', status: String(orqRes.status) });
     return json({ error: 'De bonscan mislukte', status: orqRes.status }, 502);
   }
 
@@ -163,6 +169,7 @@ Deno.serve(async (req) => {
   const text = extractText(data);
   if (!text) {
     console.error('[scan-receipt] Geen tekst in Orq-antwoord', JSON.stringify(data)?.slice(0, 500));
+    await reportEdgeError('scan-receipt', 'geen tekst in Orq-antwoord', null, { stage: 'parse' });
     return json({ error: 'Kon de bon niet uitlezen' }, 502);
   }
 
@@ -171,6 +178,7 @@ Deno.serve(async (req) => {
     parsed = parseModelJson(text);
   } catch {
     console.error('[scan-receipt] JSON-parse mislukt', text.slice(0, 500));
+    await reportEdgeError('scan-receipt', 'JSON-parse van modelantwoord mislukt', null, { stage: 'parse' });
     return json({ error: 'De bon kon niet als gegevens worden gelezen — probeer een scherpere foto of voer handmatig in.' }, 422);
   }
 

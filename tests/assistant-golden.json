@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "comment": "Golden-set voor de assistent-eval-gate (AI-3, plan 24 ronde B; guidelines §6). Elke case: vraag → verwachte tool-keuze op de EERSTE beurt. expect.tools = [] betekent: er hoort GÉÉN tool te vuren (de irrelevance-bucket). args = verwachte argument-subset (alleen de velden die er echt toe doen). Nieuwe productie-failure uit de trace-review? Voeg 'm hier toe. Draaien: node scripts/assistant-eval.mjs",
+  "comment": "Golden-set voor de assistent-eval-gate (AI-3, plan 24 ronde B; guidelines §6; multi-turn in AI-20). Elke case: vraag → verwachte tool-keuze op de TE SCOREN beurt. expect.tools = [] betekent: er hoort GÉÉN tool te vuren (de irrelevance-bucket). args = verwachte argument-subset (alleen de velden die er echt toe doen). Multi-turn: i.p.v. question een turns-array ({role:'user'|'assistant', content} — alleen tekst-beurten); de laatste entry is de te scoren user-beurt. Een user-turn mag i.p.v. content een follow_up_rows-array dragen (opgeslagen action-rijen): de runner genereert de tekst dan via actionFollowUpMessage uit assistant/core.js — exact de synthetische vervolg-nota die de server na een bevestigde actie bouwt (nooit drift van productie). Nieuwe productie-failure uit de trace-review? Voeg 'm hier toe. Draaien: node scripts/assistant-eval.mjs (samenstel-check zonder API: --dry-run)",
   "cases": [
     {
       "id": "tak-01",
@@ -718,6 +718,118 @@
           }
         ]
       }
+    },
+    {
+      "id": "mt-conf-01",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Zet melk op de boodschappenlijst."
+        },
+        {
+          "role": "assistant",
+          "content": "Staat voor je klaar — bevestig hieronder."
+        },
+        {
+          "role": "user",
+          "follow_up_rows": [
+            {
+              "content": {
+                "status": "done",
+                "summary": "\"melk\" op de boodschappenlijst zetten",
+                "result": {
+                  "summary": "Op de boodschappenlijst gezet."
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "tools": []
+      },
+      "note": "vervolg-beurt na een confirm (AI-18): de synthetische server-nota (actionFollowUpMessage) → kort bevestigen, GEEN nieuwe tool-call — de actie is al uitgevoerd"
+    },
+    {
+      "id": "mt-conf-02",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Maak een taak aan: zaterdag stofzuigen."
+        },
+        {
+          "role": "assistant",
+          "content": "Staat voor je klaar — bevestig hieronder."
+        },
+        {
+          "role": "user",
+          "follow_up_rows": [
+            {
+              "content": {
+                "status": "done",
+                "summary": "Taak \"stofzuigen\" toevoegen",
+                "result": {
+                  "summary": "Taak toegevoegd."
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "tools": []
+      },
+      "note": "vervolg-beurt na een bevestigde taak: bevestigen in één zin, niet de taak nógmaals voorstellen (taken_toevoegen zou een dubbele rij opleveren)"
+    },
+    {
+      "id": "mt-choice-01",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Ik wil vrijdag lasagne koken, met recept erbij."
+        },
+        {
+          "role": "assistant",
+          "content": "Ik vond twee recepten in jullie receptenboek: \"Lasagne bolognese\" (4 porties) en \"Lasagne met spinazie\" (2 porties). Welke wil je gebruiken?"
+        },
+        {
+          "role": "user",
+          "content": "Gebruik het recept \"Lasagne bolognese\""
+        }
+      ],
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_plannen"
+          }
+        ]
+      },
+      "note": "choice-reply-opvolging (AI-16/AI-20): het zoeken is al gebeurd (history), de keuze-beurt hoort dóór te pakken naar inplannen — niet opnieuw maaltijden_recept_zoeken"
+    },
+    {
+      "id": "mt-choice-02",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Wat zal ik zondag koken? Iets met pompoen."
+        },
+        {
+          "role": "assistant",
+          "content": "In jullie receptenboek staan \"Pompoensoep met gember\" en \"Pompoenrisotto\". Zal ik er één voor zondag inplannen?"
+        },
+        {
+          "role": "user",
+          "content": "Gebruik het recept \"Pompoensoep met gember\""
+        }
+      ],
+      "expect": {
+        "tools": [
+          {
+            "name": "maaltijden_plannen"
+          }
+        ]
+      },
+      "note": "choice-reply-opvolging, tweede variant: gevonden recept gekozen → maaltijden_plannen (met het gevonden recept), geen nieuwe zoekronde"
     }
   ]
 }

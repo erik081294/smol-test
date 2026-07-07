@@ -136,6 +136,9 @@ export const GROUPS = [
   { test: 'assistantActions', srcs: ['lib/assistantActions.js'] },
   { test: 'notify', srcs: ['supabase/functions/notify/core.js'] },
   { test: 'scanReceipt', srcs: ['supabase/functions/scan-receipt/core.js'] },
+  // Edge-foutrapportage (INF-4): pure DSN-parse + store-event-vorm. De Deno-schil
+  // (_shared/sentry.ts, fail-silent fetch) valt buiten node/Stryker.
+  { test: 'sentryCore', srcs: ['supabase/functions/_shared/sentryCore.js'] },
   // Voertuig- + geld-laag (V3 "TCO") en huisdier/heatmap/contrast: pure logica met een
   // unit-test die tot dusver buiten de ratchet viel (audit-bevinding). Nu wél bewaakt —
   // begin bij de geld-modules (vehicleCosts berekent kosten/km; vehicleSharing verdeelt).
@@ -173,7 +176,10 @@ export const MUTATED_SOURCES = [...new Set(GROUPS.flatMap((g) => g.srcs))];
 // bewaakt structuur/registry-sync; er is geen bronmodule om te muteren.
 // assistantCoverage: meta-test op de dekking/budget van de tool-registry (data-module
 //   ↔ manifest, herbezoek-drempel) — bewaakt een registry-eigenschap, geen lib-module.
-export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden', 'assistantCoverage'];
+// assistantJudge: meta-test op de eval-tooling zelf (scripts/assistant-judge.mjs,
+//   rubric/score-parse van de NL-toon-judge, AI-20) — net als codeEquivalence een
+//   scripts/-helper, geen lib-module om te muteren.
+export const UNMUTATED_TESTS = ['perfAggregates', 'rls.integration', 'groupsCoverage', 'typecheckCoverage', 'codeEquivalence', 'moduleGating', 'assistantGolden', 'assistantCoverage', 'assistantJudge'];
 
 // Selecteer groepen op een substring-filter (naam of bron). Lege filter = alles.
 export function selectGroups(filter) {
