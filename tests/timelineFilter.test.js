@@ -53,6 +53,31 @@ test('visibleOnTimeline: een bericht (geen eventType) valt niet onder de event_t
   assert.equal(visibleOnTimeline(post, { userDisabled: { module: ['tijdlijn'] } }), false);
 });
 
+// ── member-as (TML-7) ────────────────────────────────────────────────────────
+
+test('visibleOnTimeline: member-as verbergt items van een uitgezet lid (post én event)', () => {
+  const post = { member: 'u1' };                                             // bericht: alleen auteur
+  const event = { module: 'taken', eventType: 'task_completed', member: 'u1' };
+  const cfg = { userDisabled: { member: ['u1'] } };
+  assert.equal(visibleOnTimeline(post, cfg), false);
+  assert.equal(visibleOnTimeline(event, cfg), false);
+  // Grens: een ánder lid in de lijst raakt dit item niet.
+  assert.equal(visibleOnTimeline({ member: 'u2' }, cfg), true);
+});
+
+test('visibleOnTimeline: member-as — huishouden-uitzetting wint (lid kan niet terugzetten)', () => {
+  assert.equal(
+    visibleOnTimeline({ member: 'u1' }, { householdDisabled: { member: ['u1'] }, userDisabled: {} }),
+    false,
+  );
+});
+
+test('visibleOnTimeline: item zonder member (bv. actor onbekend/null) valt niet onder de member-as', () => {
+  const cfg = { householdDisabled: { member: ['u1'] } };
+  assert.equal(visibleOnTimeline({ module: 'taken', eventType: 'task_completed' }, cfg), true);
+  assert.equal(visibleOnTimeline({ module: 'taken', eventType: 'task_completed', member: null }, cfg), true);
+});
+
 test('visibleOnTimeline: null-paden — leeg item of kapotte lijsten → default-on', () => {
   assert.equal(visibleOnTimeline(), true);                      // geen item
   assert.equal(visibleOnTimeline(null), true);                  // expliciet null

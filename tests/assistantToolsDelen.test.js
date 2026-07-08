@@ -184,6 +184,148 @@ test('descriptor-contract (write): statische vorm ligt exact vast', () => {
     });
 });
 
+// ── Ratchet-verdieping (AI-19 fase C): de randen die de mutatietest aanwees. ──
+
+test('renderUpcomingReservations: kapotte rijen vallen weg, onbekende resource → "Gedeeld", titel ligt vast', () => {
+  const { data, render } = renderUpcomingReservations(
+    [
+      null,                                                                                       // hele rij null → geen crash
+      { resource_id: 'r1', starts_at: '2026-07-06T09:00:00+00:00', ends_at: null },               // ends_at kapot → weg
+      { resource_id: 'bestaat-niet', starts_at: '2026-07-06T10:00:00+00:00', ends_at: '2026-07-06T11:00:00+00:00' },
+    ],
+    { r1: 'Deelauto' }, {}, '2026-07-06'
+  );
+  assert.equal(data.count, 1);
+  assert.equal(render[0].type, 'schedule');
+  assert.equal(render[0].title, 'Reserveringen');
+  assert.deepEqual(render[0].days[0].entries.map((e) => e.text), ['Gedeeld 10:00–11:00']);
+});
+
+test('renderUpcomingReservations: dag-rijen gesorteerd, óók bij ongeordende invoer', () => {
+  const { render } = renderUpcomingReservations(
+    [
+      { resource_id: 'r1', starts_at: '2026-07-09T10:00:00+00:00', ends_at: '2026-07-09T11:00:00+00:00' },
+      { resource_id: 'r1', starts_at: '2026-07-07T10:00:00+00:00', ends_at: '2026-07-07T11:00:00+00:00' },
+    ],
+    { r1: 'Auto' }
+  );
+  assert.deepEqual(render[0].days.map((d) => d.label), ['di 7 jul', 'do 9 jul']);
+});
+
+test('delen_reserveringen: rendert echte data (namen + client-offset); query-kolommen liggen vast', async () => {
+  const calls = [];
+  const ctx = {
+    ...toolCtx({
+      shared_resources: [{ id: 'r1', name: 'Deelauto' }],
+      reservations: [{ resource_id: 'r1', profile_id: 'u2', starts_at: '2026-07-06T10:00:00+00:00', ends_at: '2026-07-06T12:00:00+00:00' }],
+    }, calls),
+    tzOffsetMinutes: 120,   // NL-zomertijd: 10:00 UTC → 12:00 lokaal
+  };
+  const { render } = await tool.run(ctx);
+  assert.deepEqual(render[0].days[0].entries.map((e) => e.text), ['Deelauto 12:00–14:00 (Sam)']);
+  assert.equal(calls.find((c) => c.table === 'shared_resources').selected, 'id, name');
+  assert.equal(calls.find((c) => c.table === 'reservations').selected, 'resource_id, profile_id, starts_at, ends_at, note');
+});
+
+test('proposeReserve: exacte fouttekst per validatiepad (en ok blijft false)', () => {
+  assert.deepEqual(proposeReserve(), { ok: false, error: 'Geen reservering om te plaatsen.' });
+  const veel = Array.from({ length: 4 }, () => ({ resource_name: 'A', date: '2026-07-11', from: '10:00', to: '11:00' }));
+  assert.equal(proposeReserve({ items: veel }, {}).error, 'Maximaal 3 reserveringen per voorstel.');
+  assert.deepEqual(
+    proposeReserve({ items: [null] }, {}),
+    { ok: false, error: 'Zeg erbij wát je wilt reserveren (bv. de deelauto).' }
+  );
+  assert.equal(
+    proposeReserve({ items: [{ resource_name: 'A', date: 'morgen', from: '14:00', to: '16:00' }] }, {}).error,
+    'Ongeldige datum: morgen (gebruik YYYY-MM-DD).'
+  );
+  // Eén van beide tijden kapot volstaat (||, geen &&) — beide kanten.
+  assert.equal(
+    proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '25:00', to: '16:00' }] }, {}).error,
+    'Geef een begin- en eindtijd als HH:MM (bv. 14:00).'
+  );
+  assert.equal(
+    proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '14:00', to: '99:99' }] }, {}).error,
+    'Geef een begin- en eindtijd als HH:MM (bv. 14:00).'
+  );
+  // Grens: eind == begin is óók ongeldig (half-open interval).
+  assert.equal(
+    proposeReserve({ items: [{ resource_name: 'A', date: '2026-07-11', from: '14:00', to: '14:00' }] }, {}).error,
+    'De eindtijd moet ná de begintijd liggen.'
+  );
+});
+
+test('proposeReserve: notitie whitespace-only → null, lange notitie op 200 gekapt; enkelvouds-summary ligt vast', () => {
+  const base = { resource_name: 'Deelauto', date: '2026-07-11', from: '14:00', to: '16:00' };
+  assert.equal(proposeReserve({ items: [{ ...base, note: '   ' }] }, {}).args.items[0].note, null);
+  assert.equal(proposeReserve({ items: [{ ...base, note: 'x'.repeat(250) }] }, {}).args.items[0].note.length, 200);
+  assert.equal(proposeReserve({ items: [base] }, { tzOffsetMinutes: 120 }).summary, 'Deelauto reserveren (za 11 jul 14:00–16:00)');
+});
+
+test('delen_reserveren: naam-matching — onbekend/dubbelzinnig → vaste fout; trim/case/null-naam netjes', async () => {
+  const w = DELEN_TOOLS.find((t) => t.name === 'delen_reserveren');
+  const item = { resource_name: ' deelauto ', starts_at: '2026-07-11T12:00:00.000Z', ends_at: '2026-07-11T14:00:00.000Z', note: null };
+  await assert.rejects(
+    () => w.execute(toolCtx({ shared_resources: [{ id: 'r1', name: 'Aanhanger' }], reservations: [] }, []), { items: [{ ...item, resource_name: 'bakfiets' }] }),
+    /"bakfiets" is niet \(eenduidig\) gevonden/
+  );
+  // Twee resources met (op case na) dezelfde naam → dubbelzinnig, zelfde fout.
+  await assert.rejects(
+    () => w.execute(toolCtx({ shared_resources: [{ id: 'r1', name: 'Deelauto' }, { id: 'r2', name: 'deelauto' }], reservations: [] }, []), { items: [item] }),
+    /niet \(eenduidig\) gevonden/
+  );
+  // Trim + case-insensitief; een null-naam en een niet-matchende resource in de
+  // lijst bewijzen dat er écht (veilig) gefilterd wordt.
+  const calls = [];
+  const out = await w.execute(toolCtx({
+    shared_resources: [{ id: 'r0', name: null }, { id: 'rX', name: 'Aanhanger' }, { id: 'r1', name: ' Deelauto ' }],
+    reservations: [],
+  }, calls), { items: [item] });
+  assert.equal(out.summary, 'Gereserveerd.');
+  assert.equal(calls.find((c) => c.table === 'shared_resources').selected, 'id, name');
+  const ins = calls.find((c) => c.table === 'reservations' && c.inserted);
+  assert.equal(ins.inserted[0].resource_id, 'r1');
+  assert.equal(ins.selected, 'id');
+});
+
+test('delen_reserveren: conflictcheck — één overlappende volstaat (some) en de grens r.start == ons einde is vrij', async () => {
+  const w = DELEN_TOOLS.find((t) => t.name === 'delen_reserveren');
+  const item = { resource_name: 'Deelauto', starts_at: '2026-07-11T12:00:00.000Z', ends_at: '2026-07-11T14:00:00.000Z', note: null };
+  // Twee bestaande boekingen waarvan alléén de tweede overlapt → tóch conflict.
+  await assert.rejects(
+    () => w.execute(toolCtx({
+      shared_resources: [{ id: 'r1', name: 'Deelauto' }],
+      reservations: [
+        { id: 'a', starts_at: '2026-07-11T14:00:00.000Z', ends_at: '2026-07-11T15:00:00.000Z' },
+        { id: 'b', starts_at: '2026-07-11T13:00:00.000Z', ends_at: '2026-07-11T13:30:00.000Z' },
+      ],
+    }, []), { items: [item] }),
+    /al gereserveerd/
+  );
+  // Grens vooraan: bestaande boeking begint exact op ons einde → géén conflict.
+  const calls = [];
+  const out = await w.execute(toolCtx({
+    shared_resources: [{ id: 'r1', name: 'Deelauto' }],
+    reservations: [{ id: 'a', starts_at: '2026-07-11T14:00:00.000Z', ends_at: '2026-07-11T15:00:00.000Z' }],
+  }, calls), { items: [item] });
+  assert.equal(out.inserted.length, 1);
+  const cq = calls.find((c) => c.table === 'reservations' && !c.inserted);
+  assert.equal(cq.selected, 'id, starts_at, ends_at');
+  assert.deepEqual(cq.filters, [['eq', 'resource_id', 'r1'], ['gt', 'ends_at', item.starts_at]]);
+});
+
+test('delen_reserveren: twee items → twee inserts en meervouds-summary', async () => {
+  const w = DELEN_TOOLS.find((t) => t.name === 'delen_reserveren');
+  const out = await w.execute(toolCtx({ shared_resources: [{ id: 'r1', name: 'Deelauto' }], reservations: [] }, []), {
+    items: [
+      { resource_name: 'Deelauto', starts_at: '2026-07-11T08:00:00.000Z', ends_at: '2026-07-11T09:00:00.000Z', note: 'boodschappen' },
+      { resource_name: 'Deelauto', starts_at: '2026-07-12T08:00:00.000Z', ends_at: '2026-07-12T09:00:00.000Z', note: null },
+    ],
+  });
+  assert.equal(out.summary, '2 reserveringen geplaatst.');
+  assert.equal(out.inserted.length, 2);
+});
+
 test('proposeReserve: precies op de cap is oké; foutteksten en meervouds-summary liggen vast', () => {
   const res = (n) => Array.from({ length: n }, (_, i) => ({ resource_name: 'A', date: '2026-07-11', from: '10:00', to: '11:00' }));
   const ok = proposeReserve({ items: res(3) }, { tzOffsetMinutes: 0 });

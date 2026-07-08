@@ -203,3 +203,66 @@ test('renderTimelineRecent: foto-keuze volgt de getoonde volgorde en verdraagt r
   // Caption = exact de lijstregel: snippet — auteur, datum (mét komma-scheiding).
   assert.equal(render[1].caption, 'Ouder met foto — Erik, wo 1 jul');
 });
+
+// ── Ratchet-verdieping (AI-19 fase C): de randen die de mutatietest aanwees. ──
+
+test('renderTimelineRecent: tie-breaks — beide gepind (nieuwst gepind eerst), gelijke pinned_at → created_at beslist', () => {
+  const { data } = renderTimelineRecent([
+    { id: 'a', body: 'a', pinned_at: '2026-07-01T10:00:00Z', created_at: '2026-06-01T10:00:00Z' },
+    { id: 'b', body: 'b', pinned_at: '2026-07-02T10:00:00Z', created_at: '2026-05-01T10:00:00Z' },
+    { id: 'c', body: 'c', pinned_at: '2026-07-01T10:00:00Z', created_at: '2026-06-15T10:00:00Z' },
+  ]);
+  // b (nieuwst gepind) → dan a/c (zelfde pin-moment) op created_at nieuwste eerst.
+  assert.deepEqual(data.posts.map((p) => p.snippet), ['b', 'c', 'a']);
+});
+
+test('renderTimelineRecent: snippet-grens exact op 120; whitespace op één regel; kale post zonder meta', () => {
+  const precies = 'x'.repeat(120);
+  const over = 'y'.repeat(121);
+  const { data, render } = renderTimelineRecent([
+    { id: 'a', body: precies, created_at: '2026-07-06T10:00:00Z' },
+    { id: 'b', body: over, created_at: '2026-07-05T10:00:00Z' },
+    { id: 'c', body: '  regel\n\n twee  ', created_at: null },       // geen datum/auteur → geen meta-deel
+  ]);
+  assert.equal(data.posts[0].snippet, precies);                       // 120 knipt niet
+  assert.equal(data.posts[1].snippet, `${'y'.repeat(119)}…`);         // 121 → 119 + …
+  assert.equal(data.posts[2].snippet, 'regel twee');
+  assert.equal(data.posts[2].date, null);
+  assert.equal(render[0].items[2].text, 'regel twee');                // zonder meta géén " — "
+  assert.equal(render[0].items[2].emoji, null);                       // niet gepind → geen speld
+});
+
+test('proposePost: exacte fouttekst per pad; grens 2000/2001; kapot item', () => {
+  assert.deepEqual(proposePost(), { ok: false, error: 'Geen bericht om te plaatsen.' });
+  assert.equal(proposePost({ items: [{ body: 'a' }, { body: 'b' }] }).error, 'Eén prikbord-bericht per voorstel.');
+  assert.deepEqual(proposePost({ items: [null] }), { ok: false, error: 'Het bericht heeft tekst nodig.' });
+  assert.equal(proposePost({ items: [{ body: '   ' }] }).error, 'Het bericht heeft tekst nodig.');
+  assert.equal(proposePost({ items: [{ body: 'x'.repeat(2000) }] }).ok, true);
+  assert.equal(proposePost({ items: [{ body: 'x'.repeat(2001) }] }).error, 'Een bericht mag maximaal 2000 tekens zijn.');
+  // Preview-grens: 81 tekens → 79 + ellipsis.
+  assert.equal(proposePost({ items: [{ body: 'z'.repeat(81) }] }).items[0], `${'z'.repeat(79)}…`);
+});
+
+test('tijdlijn_recent/tijdlijn_plaatsen: query-/insert-vorm ligt exact vast', async () => {
+  const calls = [];
+  await tool.run(toolCtx({
+    timeline_posts: [{ id: 'p1', body: 'hoi', author_id: 'u1', pinned_at: null, created_at: '2026-07-06T10:00:00Z' }],
+    timeline_photos: [],
+  }, calls));
+  const pq = calls.find((c) => c.table === 'timeline_posts');
+  assert.equal(pq.selected, 'id, body, author_id, pinned_at, created_at');
+  assert.deepEqual(pq.filters, [['eq', 'household_id', 'h1']]);
+  assert.deepEqual(pq.order, ['created_at', { ascending: false }]);
+  const fq = calls.find((c) => c.table === 'timeline_photos');
+  assert.equal(fq.selected, 'post_id, photo_path, position');
+  assert.deepEqual(fq.filters, [['in', 'post_id', ['p1']]]);
+  assert.deepEqual(fq.order, ['position', { ascending: true }]);
+
+  const w = TIJDLIJN_TOOLS.find((t) => t.name === 'tijdlijn_plaatsen');
+  const calls2 = [];
+  const out = await w.execute(toolCtx({}, calls2), { items: [{ body: 'De cv-monteur komt dinsdag' }] });
+  const ins = calls2.find((c) => c.table === 'timeline_posts');
+  assert.deepEqual(ins.inserted, [{ household_id: 'h1', author_id: 'u1', body: 'De cv-monteur komt dinsdag' }]);
+  assert.equal(ins.selected, 'id');
+  assert.equal(out.summary, 'Op het prikbord gezet.');
+});

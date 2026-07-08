@@ -22,11 +22,17 @@ test('relativeTime: ongeldige input → lege string', () => {
 
 test('formatActivity: taakvoltooiing → NL-regel + icoon + tijd', () => {
   const item = formatActivity(
-    { id: 'c1', type: 'task_completed', at: ago(5 * MIN), actorName: 'Tim', taskTitle: 'Stofzuigen' },
+    { id: 'c1', type: 'task_completed', at: ago(5 * MIN), actorName: 'Tim', actorId: 'u-tim', taskTitle: 'Stofzuigen' },
     NOW,
   );
-  // `type` reist mee naar de feed (de tijdlijn-filter beslist erop, TML-6).
-  assert.deepEqual(item, { id: 'c1', type: 'task_completed', at: ago(5 * MIN), when: '5 min geleden', icon: 'check', text: "Tim vinkte 'Stofzuigen' af" });
+  // `type` en `actorId` reizen mee naar de feed: de tijdlijn-filter beslist op
+  // event-type/module (TML-6) en op lid/profiel-id (TML-7).
+  assert.deepEqual(item, { id: 'c1', type: 'task_completed', at: ago(5 * MIN), actorId: 'u-tim', when: '5 min geleden', icon: 'check', text: "Tim vinkte 'Stofzuigen' af" });
+});
+
+test('formatActivity: zonder actorId → null op het feed-item (member-as slaat het item dan over)', () => {
+  const item = formatActivity({ id: 'c9', type: 'task_completed', at: ago(MIN), actorName: 'Tim', taskTitle: 'Afwassen' }, NOW);
+  assert.equal(item.actorId, null);
 });
 
 test('formatActivity: zonder actor → "Iemand"; zonder titel → null', () => {
@@ -139,7 +145,7 @@ test('buildFeed: opeenvolgende identieke boodschappen vouwen samen met teller', 
 test('formatActivity: plant/huisdier/voertuig "toegevoegd" → juiste regel + icoon', () => {
   assert.deepEqual(
     { ...formatActivity({ id: 'pl1', type: 'plant_added', at: ago(MIN), actorName: 'Ann', subject: 'Monstera' }, NOW) },
-    { id: 'pl1', type: 'plant_added', at: ago(MIN), when: '1 min geleden', icon: 'plants', text: "Ann voegde plant 'Monstera' toe" },
+    { id: 'pl1', type: 'plant_added', at: ago(MIN), actorId: null, when: '1 min geleden', icon: 'plants', text: "Ann voegde plant 'Monstera' toe" },
   );
   assert.equal(formatActivity({ id: 'pe1', type: 'pet_added', at: ago(MIN), actorName: 'Tim', subject: 'Rex' }, NOW).text, "Tim voegde huisdier 'Rex' toe");
   assert.equal(formatActivity({ id: 'v1', type: 'vehicle_added', at: ago(MIN), actorName: 'Tim', subject: 'Clio' }, NOW).icon, 'voertuig');
@@ -171,4 +177,64 @@ test('formatActivity: count 1 levert geen teller en geen count-veld', () => {
   const item = formatActivity({ id: 'c1', type: 'task_completed', at: ago(MIN), actorName: 'Tim', taskTitle: 'Stofzuigen' }, NOW, 1);
   assert.equal(item.text, "Tim vinkte 'Stofzuigen' af");
   assert.equal('count' in item, false);
+});
+
+// ── Ratchet-verdieping (2026-07-08): de randen die de mutatietest aanwees. ──
+
+test('relativeTime: exacte drempels — 60 min wordt uur, 7 dagen wordt week', () => {
+  assert.equal(relativeTime(ago(60 * MIN), NOW), '1 uur geleden');
+  assert.equal(relativeTime(ago(59 * MIN), NOW), '59 min geleden');
+  assert.equal(relativeTime(ago(7 * DAG), NOW), '1 wk geleden');
+  assert.equal(relativeTime(ago(6 * DAG), NOW), '6 dagen geleden');
+});
+
+test('formatActivity: whitespace-only actor → "Iemand", whitespace-only subject → null (elke formatter)', () => {
+  const cases = [
+    ['task_completed', "Iemand vinkte 'X' af"],
+    ['expense_added', "Iemand voegde uitgave 'X' toe"],
+    ['grocery_added', "Iemand zette 'X' op de lijst"],
+    ['plant_added', "Iemand voegde plant 'X' toe"],
+  ];
+  for (const [type, verwacht] of cases) {
+    assert.equal(formatActivity({ id: 'w1', type, at: ago(MIN), actorName: '   ', subject: 'X' }, NOW).text, verwacht);
+    assert.equal(formatActivity({ id: 'w2', type, at: ago(MIN), actorName: 'Tim', subject: '   ' }, NOW), null);
+  }
+  // Iconen van de fabriek-formatters liggen vast.
+  assert.equal(formatActivity({ id: 'pe', type: 'pet_added', at: ago(MIN), subject: 'Rex' }, NOW).icon, 'pets');
+  assert.equal(formatActivity({ id: 'v', type: 'vehicle_added', at: ago(MIN), actorName: 'Tim', subject: 'Clio' }, NOW).text, "Tim voegde voertuig 'Clio' toe");
+});
+
+test('buildFeed: null-events crashen niet; formatter-null (leeg subject) verdwijnt uit de feed', () => {
+  const ok = buildFeed([null, { id: 'a', type: 'task_completed', at: ago(MIN), actorName: 'Tim', taskTitle: 'Echt' }], NOW);
+  assert.equal(ok.length, 1);
+  // Geldig type maar leeg subject: overleeft de type-filter, formatter geeft null → weggefilterd.
+  assert.deepEqual(buildFeed([{ id: 'b', type: 'task_completed', at: ago(MIN), actorName: 'Tim' }], NOW), []);
+});
+
+test('buildFeed: actor-loze events vouwen samen met lege-naam-events (zelfde groep), niet met een benoemde actor', () => {
+  const at = ago(5 * MIN);
+  // null-actor en ''-actor → zelfde groupKey → vouwen; 'Tim' begint een eigen groep.
+  const feed = buildFeed([
+    { id: 'c', type: 'grocery_added', at, subject: 'Melk' },
+    { id: 'b', type: 'grocery_added', at, actorName: '', subject: 'Melk' },
+    { id: 'a', type: 'grocery_added', at, actorName: 'Tim', subject: 'Melk' },
+  ], NOW);
+  assert.deepEqual(feed.map((f) => [f.text, f.count ?? 1]), [
+    ["Iemand zette 'Melk' 2× op de lijst", 2],
+    ["Tim zette 'Melk' op de lijst", 1],
+  ]);
+});
+
+test('buildFeed: tie-break op id bij exact gelijke tijd — volgorde is deterministisch (id aflopend)', () => {
+  const at = ago(10 * MIN);
+  const feed = buildFeed([
+    { id: 'a', type: 'task_completed', at, actorName: 'Tim', taskTitle: 'Alfa' },
+    { id: 'b', type: 'task_completed', at, actorName: 'Tim', taskTitle: 'Bravo' },
+    { id: 'c', type: 'task_completed', at, actorName: 'Tim', taskTitle: 'Charlie' },
+  ], NOW);
+  assert.deepEqual(feed.map((f) => f.text), [
+    "Tim vinkte 'Charlie' af",
+    "Tim vinkte 'Bravo' af",
+    "Tim vinkte 'Alfa' af",
+  ]);
 });

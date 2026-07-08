@@ -23,6 +23,7 @@ export function petAgeLabel(birthDate, today) {
   const [ty, tm] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
   let months = (ty - by) * 12 + (tm - bm);
   if (today.slice(8, 10) < birthDate.slice(8, 10)) months -= 1; // maandgrens nog niet bereikt
+  // Stryker disable next-line all -- defensief vangnet: `birthDate > today` hierboven vangt elke toekomst-datum al af, dus months kan hier niet meer negatief zijn (equivalente mutanten).
   if (months < 0) return null;
   if (months < 12) return `${months} mnd`;
   return `${Math.floor(months / 12)} jaar`;

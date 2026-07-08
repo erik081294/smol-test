@@ -6,18 +6,19 @@ import { useHousehold } from '../../lib/household';
 import { useTimelineFilters } from '../../lib/useTimelineFilters';
 import { TIMELINE_FILTER_MODULES, TIMELINE_EVENT_TYPES } from '../../lib/timelineFilter';
 import { getModule } from '../../lib/modules';
-import { ModalHeader, SectionHeader, ItemRow } from '../../lib/ui';
+import { ModalHeader, SectionHeader, ItemRow, Avatar } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, type, space } from '../../lib/theme';
 import { dialog } from '../../lib/dialog';
 import { t } from '../../lib/i18n';
 
-// Tijdlijn-filterinstellingen (TML-6): wat verschijnt er in de feed? Twee lagen,
+// Tijdlijn-filterinstellingen (TML-6/7): wat verschijnt er in de feed? Twee lagen,
 // zelfde patroon als de module-toggles in app/(tabs)/huishouden.js — "Voor mij"
 // (elk lid verfijnt voor zichzelf) en, voor de owner, "Voor het hele huishouden"
 // (de basis; een huishouden-uitzetting wint en is voor een lid niet terug te
 // zetten — de Switch staat dan uitgegrijsd, zoals bij modules).
-// Assen in deze stap: per module + per gebeurtenis-type (member/subgroep: TML-7/8).
+// Assen: per module + per gebeurtenis-type + per lid (waarde = profiel-id; raakt
+// berichten én systeem-events van dat lid). Subgroep-as: TML-8.
 
 // Icoon per event-type (dezelfde iconen als de feed-regels in lib/activity.js).
 const EVENT_ICON = {
@@ -32,10 +33,10 @@ const EVENT_ICON = {
 // Eén toggle-rij; op de "Voor mij"-laag is een huishouden-uitzetting leidend
 // (Switch uitgegrijsd + uitlegregel, zoals household.module.disabledByHousehold).
 // Top-level component (geen inline definitie in de render, react-hooks-regel).
-function FilterRow({ icon, label, locked, on, onChange }) {
+function FilterRow({ icon, label, leading, locked, on, onChange }) {
   return (
     <ItemRow
-      leading={<Icon name={icon} size={24} color={locked ? colors.inkFaint : colors.forest} />}
+      leading={leading ?? <Icon name={icon} size={24} color={locked ? colors.inkFaint : colors.forest} />}
       title={label}
       titleColor={locked ? colors.inkFaint : undefined}
       meta={locked ? <Text style={type.caption}>{t('household.module.disabledByHousehold')}</Text> : undefined}
@@ -49,7 +50,7 @@ function FilterRow({ icon, label, locked, on, onChange }) {
 
 export default function TijdlijnFilters() {
   const router = useRouter();
-  const { active } = useHousehold();
+  const { active, members } = useHousehold();
   const isOwner = active?.role === 'owner';
   const { householdDisabled, userDisabled, setHouseholdPref, setUserPref } = useTimelineFilters();
 
@@ -62,11 +63,11 @@ export default function TijdlijnFilters() {
   // De rijen van één laag: eerst de modules die de tijdlijn voeden, dan de
   // event-types. Gewone functie (geen inline component) — geeft direct JSX terug.
   const renderRows = (mine) => {
-    const row = (icon, label, axis, value) => {
+    const row = (icon, label, axis, value, leading) => {
       const locked = mine && hhOff(axis, value);
       const on = mine ? !locked && !meOff(axis, value) : !hhOff(axis, value);
       return (
-        <FilterRow key={`${axis}:${value}`} icon={icon} label={label} locked={locked} on={on}
+        <FilterRow key={`${axis}:${value}`} icon={icon} label={label} leading={leading} locked={locked} on={on}
           onChange={(v) => toggle(mine, axis, value, v)} />
       );
     };
@@ -81,6 +82,18 @@ export default function TijdlijnFilters() {
         {TIMELINE_EVENT_TYPES.map((type_) => (
           row(EVENT_ICON[type_] ?? 'pinboard', t(`timeline.filter.event.${type_}`), 'event_type', type_)
         ))}
+        {/* Per lid (TML-7): waarde = profiel-id (namen zijn niet uniek/stabiel);
+            verbergt berichten én systeem-events van dat lid. */}
+        {(members ?? []).length > 0 ? (
+          <>
+            <SectionHeader title={t('timeline.filters.members')} />
+            {members.map((m) => {
+              const name = m.display_name ?? 'Lid';
+              return row('pinboard', name, 'member', m.id,
+                <Avatar emoji={m.avatar_emoji} name={name} size={24} />);
+            })}
+          </>
+        ) : null}
       </>
     );
   };

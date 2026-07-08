@@ -81,6 +81,7 @@ export function proposeReserve(args = {}, env = {}) {
     }
     const startsAt = toUtcIso(/** @type {string} */ (it.date), /** @type {string} */ (it.from), off);
     const endsAt = toUtcIso(/** @type {string} */ (it.date), /** @type {string} */ (it.to), off);
+    // Stryker disable next-line all -- defensief: isIsoDate/isHhmm zijn hierboven al gevalideerd, dus toUtcIso kan hier niet op null uitkomen (equivalente mutanten).
     if (!startsAt || !endsAt) return { ok: false, error: 'De datum/tijd kon niet worden verwerkt.' };
     const note = typeof it?.note === 'string' && it.note.trim() ? it.note.trim().slice(0, 200) : null;
     norm.push({ resource_name: name, starts_at: startsAt, ends_at: endsAt, note });

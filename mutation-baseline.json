@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-07-06T00:00:00.000Z",
+  "generatedAt": "2026-07-08T08:40:53.261Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 8746,
-    "total": 10275,
-    "score": 85.1
+    "killed": 9339,
+    "total": 10641,
+    "score": 87.8
   },
   "files": {
     "lib/activity.js": {
-      "killed": 90,
-      "total": 104,
-      "score": 86.5
+      "killed": 183,
+      "total": 192,
+      "score": 95.3
     },
     "lib/agenda.js": {
       "killed": 184,
@@ -373,19 +373,19 @@
       "score": 100
     },
     "supabase/functions/_shared/tools/taken.js": {
-      "killed": 184,
-      "total": 209,
-      "score": 88
+      "killed": 211,
+      "total": 237,
+      "score": 89
     },
     "supabase/functions/_shared/tools/boodschappen.js": {
-      "killed": 233,
-      "total": 264,
-      "score": 88.3
+      "killed": 306,
+      "total": 341,
+      "score": 89.7
     },
     "supabase/functions/_shared/tools/kosten.js": {
-      "killed": 228,
+      "killed": 229,
       "total": 234,
-      "score": 97.4
+      "score": 97.9
     },
     "supabase/functions/_shared/tools/render.js": {
       "killed": 35,
@@ -393,39 +393,39 @@
       "score": 100
     },
     "supabase/functions/_shared/tools/voorraad.js": {
-      "killed": 65,
-      "total": 69,
-      "score": 94.2
+      "killed": 67,
+      "total": 71,
+      "score": 94.4
     },
     "supabase/functions/_shared/tools/maaltijden.js": {
-      "killed": 508,
+      "killed": 509,
       "total": 599,
-      "score": 84.8
+      "score": 85
     },
     "supabase/functions/_shared/tools/planten.js": {
-      "killed": 185,
+      "killed": 226,
       "total": 231,
-      "score": 80.1
+      "score": 97.8
     },
     "supabase/functions/_shared/tools/huisdieren.js": {
-      "killed": 256,
-      "total": 323,
-      "score": 79.3
+      "killed": 304,
+      "total": 319,
+      "score": 95.3
     },
     "supabase/functions/_shared/tools/voertuigen.js": {
-      "killed": 257,
+      "killed": 323,
       "total": 333,
-      "score": 77.2
+      "score": 97
     },
     "supabase/functions/_shared/tools/tijdlijn.js": {
-      "killed": 169,
-      "total": 205,
-      "score": 82.4
+      "killed": 233,
+      "total": 251,
+      "score": 92.8
     },
     "supabase/functions/_shared/tools/delen.js": {
-      "killed": 214,
-      "total": 281,
-      "score": 76.2
+      "killed": 259,
+      "total": 273,
+      "score": 94.9
     },
     "supabase/functions/assistant/actions.js": {
       "killed": 187,
@@ -453,9 +453,9 @@
       "score": 100
     },
     "lib/timelineFilter.js": {
-      "killed": 60,
-      "total": 64,
-      "score": 93.8
+      "killed": 62,
+      "total": 66,
+      "score": 93.9
     },
     "supabase/functions/_shared/sentryCore.js": {
       "killed": 41,

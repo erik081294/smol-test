@@ -177,3 +177,94 @@ test('proposeAddPetLog: precies op de cap is oké; foutteksten liggen vast', () 
   assert.equal(proposeAddPetLog({ items: [{ pet_name: 'Nala' }] }).error, 'Een logboek-regel heeft een notitie of een gewicht (in grammen) nodig.');
   assert.equal(proposeAddPetLog({ items: [{ note: 'los' }] }).error, 'Zeg erbij over wélk dier het gaat.');
 });
+
+// ── Ratchet-verdieping (AI-19 fase C): de randen die de mutatietest aanwees. ──
+
+test('petAgeLabel: strikt YYYY-MM-DD aan beide kanten — elke vorm-afwijking → null', () => {
+  for (const kapot of ['2026-7-6', 'x2026-07-06', '2026-07-061', '2026-ab-06', '26-07-06']) {
+    assert.equal(petAgeLabel(kapot, '2026-07-06'), null);
+    assert.equal(petAgeLabel('2025-01-01', kapot), null);
+  }
+  assert.equal(petAgeLabel('2025-08-06', '2026-07-06'), '11 mnd');   // 11 vs 12: net onder het jaar
+  assert.equal(petAgeLabel('2024-07-06', '2026-07-06'), '2 jaar');
+});
+
+test('renderPetsOverview: kapotte log-rijen tellen niet mee; enkelvoud "1 open taak"; lege soort → anders', () => {
+  const { data, render } = renderPetsOverview(
+    [
+      { id: 'd1', name: 'Nala', type: null, species_label: '   ', birth_date: null },   // whitespace-label + type null → anders
+    ],
+    [
+      null,                                                        // rij null → geen crash
+      { pet_id: 'd1', weight_grams: -5, created_at: '2026-07-01' }, // negatief telt niet
+      { pet_id: 'd1', weight_grams: 'zwaar' },                      // geen getal
+      { weight_grams: 9000 },                                       // zonder dier
+    ],
+    [null, { pet_id: 'd1' }],
+    ''
+  );
+  assert.deepEqual(data.pets, [{ name: 'Nala', type: 'anders', age: null, weight_grams: null, open_care_tasks: 1 }]);
+  assert.equal(render[0].title, 'Huisdieren (1)');
+  assert.deepEqual(render[0].items, [{ text: 'Nala — anders · 1 open taak', emoji: '🐾' }]);
+});
+
+test('huisdieren_overzicht: query-kolommen en sortering liggen vast', async () => {
+  const calls = [];
+  await tool.run(toolCtx({ pets: [], pet_log: [], tasks: [] }, calls));
+  const pq = calls.find((c) => c.table === 'pets');
+  assert.deepEqual(pq.filters, [['eq', 'household_id', 'h1']]);
+  assert.deepEqual(pq.order, ['name', undefined]);
+  const lq = calls.find((c) => c.table === 'pet_log');
+  assert.equal(lq.selected, 'pet_id, weight_grams, created_at');
+  assert.deepEqual(lq.order, ['created_at', { ascending: false }]);
+  assert.equal(calls.find((c) => c.table === 'tasks').selected, 'pet_id');
+});
+
+test('proposeAddPetLog: exacte fouttekst per pad; notitie-cap 500; gewicht-grenzen 200000/200001; niet-integer → null', () => {
+  assert.deepEqual(proposeAddPetLog(), { ok: false, error: 'Geen logboek-regel om toe te voegen.' });
+  const zes = Array.from({ length: 6 }, () => ({ pet_name: 'N', note: 'x' }));
+  assert.equal(proposeAddPetLog({ items: zes }).error, 'Maximaal 5 regels per voorstel.');
+  assert.deepEqual(proposeAddPetLog({ items: [null] }), { ok: false, error: 'Zeg erbij over wélk dier het gaat.' });
+  // Whitespace-notitie telt niet als notitie.
+  assert.equal(
+    proposeAddPetLog({ items: [{ pet_name: 'Nala', note: '   ' }] }).error,
+    'Een logboek-regel heeft een notitie of een gewicht (in grammen) nodig.'
+  );
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'N', note: 'x'.repeat(550) }] }).args.items[0].note.length, 500);
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'N', weight_grams: 200000 }] }).args.items[0].weight_grams, 200000);
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'N', weight_grams: 200001, note: 'x' }] }).args.items[0].weight_grams, null);
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'N', weight_grams: 12.5, note: 'x' }] }).args.items[0].weight_grams, null);
+  assert.equal(proposeAddPetLog({ items: [{ pet_name: 'N', weight_grams: 0, note: 'x' }] }).args.items[0].weight_grams, null);
+});
+
+test('proposeAddPetLog: regel-tekst met notitie én gewicht; whitespace-notitie getrimd; meervouds-summary', () => {
+  const out = proposeAddPetLog({ items: [{ pet_name: 'Nala', note: ' alles goed ', weight_grams: 12500 }] });
+  assert.deepEqual(out.items, ['Nala · 12,5 kg · alles goed']);
+  assert.deepEqual(out.args.items, [{ pet_name: 'Nala', note: 'alles goed', weight_grams: 12500 }]);
+  const twee = proposeAddPetLog({ items: [{ pet_name: 'Nala', note: 'a' }, { pet_name: 'Rex', note: 'b' }] });
+  assert.equal(twee.summary, '2 logboek-regels toevoegen');
+  assert.deepEqual(twee.items, ['Nala · a', 'Rex · b']);
+});
+
+test('huisdieren_logboek_toevoegen: dubbelzinnig/trim/null-naam; gewicht-only payload; summaries liggen vast', async () => {
+  const w = HUISDIEREN_TOOLS.find((t) => t.name === 'huisdieren_logboek_toevoegen');
+  const item = { pet_name: ' nala ', note: null, weight_grams: 12500 };
+  await assert.rejects(
+    () => w.execute(toolCtx({ pets: [{ id: 'd1', name: 'Nala' }, { id: 'd2', name: 'nala' }] }, []), { items: [item] }),
+    /"\s?nala\s?" is niet \(eenduidig\) gevonden bij de huisdieren\./
+  );
+  const calls = [];
+  const out = await w.execute(toolCtx({
+    pets: [{ id: 'd0', name: null }, { id: 'dX', name: 'Rex' }, { id: 'd1', name: ' Nala ' }],
+  }, calls), { items: [item] });
+  assert.equal(out.summary, 'In het logboek gezet.');
+  assert.equal(calls.find((c) => c.table === 'pets').selected, 'id, name');
+  const ins = calls.find((c) => c.table === 'pet_log' && c.inserted);
+  assert.deepEqual(ins.inserted[0], { pet_id: 'd1', created_by: 'u1', weight_grams: 12500 });   // note-key ontbreekt
+  assert.equal(ins.selected, 'id');
+  // Twee regels → meervoud.
+  const twee = await w.execute(toolCtx({ pets: [{ id: 'd1', name: 'Nala' }] }, []), {
+    items: [{ pet_name: 'Nala', note: 'a', weight_grams: null }, { pet_name: 'Nala', note: 'b', weight_grams: null }],
+  });
+  assert.equal(twee.summary, '2 logboek-regels toegevoegd.');
+});
