@@ -1775,3 +1775,36 @@ sentryCore-entry 97,6%). **Edge:** `scan-receipt` **v9 LIVE** (byte-geverifieerd
 de `assistant`-v19-deploy (22 bundel-bestanden, nu incl. groceryCatalog/productMatch/
 sentry) is de open vervolgstap — de bundel is te groot voor de MCP-inline-route in deze
 sessie; via de Supabase-CLI (`supabase functions deploy assistant`) of een verse sessie.
+
+---
+
+**Werkboek: de volledige open backlog uitgewerkt + drie nieuwe rijen + twee
+§6-correcties (2026-07-07).** Alles wat we willen bereiken — stabiliteit/launch, UX,
+features, AI — uitgewerkt tot ~35 zelfstandige klussen voor een developer zonder
+projectcontext → [plan 29](docs/plans/29-junior-uitwerking-backlog.md) (sporen S/U/F/A,
+elk met bestanden/stappenplan/acceptatie/valkuilen, geverifieerd tegen de code via drie
+parallelle verkenningen; plus onboarding, beslis-agenda D1–D13 en de
+eigenaar-actielijst). Nieuwe §6-rijen uit de doorlichting: **PLT-11** (in-app
+account-/dataverwijdering — store-eis, Data-1-FK-gat), **INF-14** (seed-script
+demo-huishouden — ontgrendelt de "device-gated op ontbrekende testdata"-klasse) en
+**INF-15** (Playwright-web-crash-sweep als spiegel van de Android-sweep). Twee stale
+§6-notities gecorrigeerd tegen de code: **INF-9** (de rate-limit is al fail-closed,
+`scan-receipt/index.ts:82-126` — stond nog als open L1-werk) en **BOO-9** (de
+bon-flow-scan is de OCR; `lookupBarcode` heeft géén aanroeper en `expo-camera` is geen
+dependency). Doc-only; status leeft in §6.
+
+---
+
+**AI-19 fase C + TML-7 gebouwd (2026-07-08, plan 29 A1/F2, branch `claude/werkboek-a1-tml7`).**
+Eerste uitvoering uit het werkboek. **A1:** de vijf tool-pack-ratchets van 76,2–82,4% naar
+**92,8–97,8%** (delen 94,9 · voertuigen 97,0 · huisdieren 95,3 · planten 97,8 · tijdlijn 92,8)
+met gerichte verdiepingstests op de survivor-clusters (validatie-fouttekst-paden, grenswaarden,
+sortering/tie-breaks, query-kolommen via de fake-db, insert-payloads); twee bewezen-onbereikbare
+defensieve takken Stryker-disabled mét motivatie; tool-descriptions byte-identiek (geen
+eval-gate-impact). En passant bleek de `lib/activity.js`-baseline verouderd (104 → 192 mutanten
+sinds TML-5): ook die van 86,5 → **95,3%** gedicht. **F2/TML-7:** tijdlijnfilter per lid —
+member-as in `visibleOnTimeline` (op profiel-id), `actorId` reist mee via `useActivity` →
+`formatActivity`, het filter raakt berichten én systeem-events, "Per lid"-sectie met avatars in
+het filterscherm (twee-lagen-gedrag, huishouden wint); geen migratie (0076-CHECK dekte `member`
+al). Suite 1430+ pass / 0 fail, typecheck + `eslint .` schoon, baselines herijkt tegen de finale
+code. Rest: device-verificatie TML-7 (→ §6 🔧).

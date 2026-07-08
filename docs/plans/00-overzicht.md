@@ -44,6 +44,7 @@ schrijven tests, hooks, schermen, RLS, edge cases en een file-checklist. De plan
 | 26 | [Interactieve gen-UI-componenten](./26-gen-ui-componenten.md) | AI-16 (+ AI-7-beslissing) | Assistent-UI (chart/schedule/choice + live herrekening) | Nee |
 | 27 | [Ontwikkelprogramma juli (review + golven)](./27-ontwikkelprogramma-juli.md) | AI-19/20, AI-9/11/16r3, PLT-3/7/8, DOC-1, TML-4/6, SEC/ARCH-staart | Programma-plan (gevalideerd, gefaseerd) | Ja (0075–0079, toewijzing in plan) |
 | 28 | [Werksessie-agenda juli](./28-werksessies-juli.md) | (sequencing van plan 27-scope + INF-4) | Sessie-agenda + Golf 0-checklist | Nee |
+| 29 | [Werkboek: alles uitgewerkt voor instap zonder context](./29-junior-uitwerking-backlog.md) | alle open ⏳/◐-items + §7-ideeën (sporen S/U/F/A) | Werkboek: ~35 klussen + beslis-agenda + eigenaar-acties | Deels (S1/S5/F1/F7/A6) |
 
 > **Build-historie staat hier niet.** Welke ronde wanneer is gebouwd/gemerged — de keuken-loop
 > (09/05/04), de no-device-ronde (10–13), het performance-pakket en de consolidatie van de drie
