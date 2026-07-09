@@ -1775,3 +1775,47 @@ sentryCore-entry 97,6%). **Edge:** `scan-receipt` **v9 LIVE** (byte-geverifieerd
 de `assistant`-v19-deploy (22 bundel-bestanden, nu incl. groceryCatalog/productMatch/
 sentry) is de open vervolgstap — de bundel is te groot voor de MCP-inline-route in deze
 sessie; via de Supabase-CLI (`supabase functions deploy assistant`) of een verse sessie.
+
+---
+
+**Design-systeem v2 doorgevoerd (2026-07-09).** Het nieuwe systeem uit
+`Huishoek new design system/` (design.md + een `.dc.html`-style-guide) is app-breed
+doorgevoerd in twee PR's. **Leidende keuze:** namen komen uit de code, waarden uit het
+nieuwe systeem — dus géén token-hernoemingen (`surface`→`card` e.d. zou 250+
+verwijzingen raken) en geen doc-vs-code-drift; `DESIGN.md` is op de échte tokennamen
+herschreven. Omdat er in heel `app/` maar 4 rauwe hex-waarden stonden, landde de hele
+reskin via `lib/palette.js` + `lib/theme.js`.
+
+**PR #133** — warmer zandwit/cream-kaarten/dieper oker, verzadigder `done`, radii
+8/12/16/24; **`forestSoft` gesplitst** (was een groene *inkt* voor de pressed-knop, wordt
+een zacht *oppervlak*; alle 15 verwijzingen naar het waarde-identieke `forestPressed` →
+nul visuele regressie). Merk-letters Bricolage + Hanken (UX-9), met alle 43 losse
+`fontWeight`-overrides omgezet naar `fontFamily`. **Module-tint** met `lib/modules.js`
+als canonieke bron (`colorToken`), gedeeld door widget-tegel en `ScreenHeader module=`;
+Koken→`maaltijden`, Was→`schoonmaak`, Agenda→`taken` (fantoom-key `"agenda"` weg),
+Klusjes blijft taak-categorie. `ProgressRing` vúlt nu i.p.v. te springen.
+
+**Drie a11y-afwijkingen van de style guide** (een web-mockup, nooit tegen de gate
+gehouden), elk gemeten: `inkFaint #8B948D` → 2,91:1 op de nieuwe bg (→ `#808A82`);
+`warning #E0A81E` → 1,83:1 op zijn eigen soft-vlak (status blijft gedempt); wit-op-oker
+2,65:1 en oker-als-statkleur 2,25:1 → glyph via `pickReadable()`, en `statOn()` valt terug
+op `ink` zodra een moduletint niet leest. `tests/contrast.test.js` bewaakt nu óók alle
+module-tinten (20/20, beide thema's).
+
+**Twee bugs die deze ronde blootlegde.** (1) *Vals-groene ratchet:*
+`mutation-check --since` vergelijkt **commits**, niet de working tree — lokaal met
+ongecommitte wijzigingen meldt 'ie "niets te controleren ✓" terwijl CI de daling wél
+vindt. `lib/modules.js` zakte 88,5%→82,1% doordat 20 nieuwe string-literals
+(`colorToken: 'modTaken'`) geen enkele test dooddt; gefixt met een test die de exacte
+mapping vastpint (91,6%). (2) **PR #134 — `wrangler pages deploy` slaat élke
+`node_modules`-map over.** Expo exporteert package-assets naar
+`dist/assets/node_modules/…`, dus geen enkele `.ttf` belandde op huishoek.app: web draaide
+stil door op het systeemfont (een ontbrekend asset geeft géén 404 maar de SPA-fallback,
+`200 text/html`). Native was niet geraakt. Opgelost door de 5 faces te vendoren in
+`assets/fonts/` (mét OFL) en de packages te verwijderen — dat halveerde meteen de
+font-payload: 25 ttf / 1,9 MB → 5 / 388 KB.
+
+Suite **1375 pass / 0 fail**, typecheck, eslint 0 errors, ratchet groen. **Web live** op
+huishoek.app (alle 5 fonts `200 font/ttf` geverifieerd). **Open:** device-rooktest
+(`type.body` 15→16 en `caption` 12→13 kunnen in krappe rijen afkappen; donkere HomeHero)
+en de illustratie-stage per module-tint → **UX-45**.
