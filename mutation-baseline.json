@@ -2,8 +2,8 @@
   "generatedAt": "2026-07-08T08:40:53.261Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 9339,
-    "total": 10641,
+    "killed": 9490,
+    "total": 10808,
     "score": 87.8
   },
   "files": {
@@ -118,9 +118,9 @@
       "score": 88.5
     },
     "lib/navMeta.js": {
-      "killed": 13,
-      "total": 20,
-      "score": 65
+      "killed": 16,
+      "total": 23,
+      "score": 69.6
     },
     "lib/notifications.js": {
       "killed": 154,
@@ -213,9 +213,9 @@
       "score": 95.2
     },
     "lib/visibility.js": {
-      "killed": 60,
-      "total": 67,
-      "score": 89.6
+      "killed": 95,
+      "total": 105,
+      "score": 90.5
     },
     "lib/offCategoryMap.js": {
       "killed": 53,
@@ -461,6 +461,16 @@
       "killed": 41,
       "total": 42,
       "score": 97.6
+    },
+    "lib/accountDeletion.js": {
+      "killed": 34,
+      "total": 36,
+      "score": 94.4
+    },
+    "lib/export.js": {
+      "killed": 79,
+      "total": 90,
+      "score": 87.8
     }
   }
 }

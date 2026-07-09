@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { View, Text, SectionList, ScrollView, TextInput, RefreshControl, Platform, Pressable, Keyboard, StyleSheet } from 'react-native';
+import { View, Text, SectionList, ScrollView, TextInput, RefreshControl, Platform, Pressable, Keyboard, StyleSheet, Share } from 'react-native';
 import { useDialog } from '../../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,6 +13,7 @@ import { groupGroceriesByCategory } from '../../lib/groceryList';
 import { normalize } from '../../lib/productMatch';
 import { parseQuantity, formatQuantity } from '../../lib/quantity';
 import { ProductImageView } from '../../lib/ProductImageView';
+import { groceriesAsText } from '../../lib/export';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Row, SwipeRow, Button, Stepper, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
 import { colors, radius, space, type, touchTarget } from '../../lib/theme';
@@ -230,7 +231,11 @@ export default function Boodschappen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
-        right={<ModuleHelpButton module="boodschappen" />} />
+        right={<ModuleHelpButton module="boodschappen"
+          actions={[{
+            label: t('export.groceries'), icon: 'share',
+            onPress: () => Share.share({ message: groceriesAsText(items, { title: t('export.groceries.title') }) }),
+          }]} />} />
 
       {/* Toevoegbalk — typen zoekt direct in de catalogus (dropdown hieronder). */}
       <View onLayout={(e) => setSearchTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}

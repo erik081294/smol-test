@@ -54,6 +54,23 @@ export default function Instellingen() {
           onPress={() => router.push('/beeldstijl')}
         />
 
+        <SectionHeader title={t('settings.danger')} />
+        <ItemRow
+          leading={
+            <View style={{
+              width: 40, height: 40, borderRadius: 20, backgroundColor: colors.dangerSoft,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon name="delete" size={22} color={colors.danger} />
+            </View>
+          }
+          title={t('settings.row.deleteAccount')}
+          titleColor={colors.danger}
+          meta={<Text style={type.caption}>{t('settings.row.deleteAccount.meta')}</Text>}
+          chevron
+          onPress={() => router.push('/account-verwijderen')}
+        />
+
         <SectionHeader title={t('settings.about')} />
         <Text style={[type.caption, { textAlign: 'center', marginTop: space.sm }]}>Huishoek · v1.0</Text>
       </ScrollView>

@@ -10,6 +10,12 @@ test('backLabelFor: detail-route → label van de herkomst-tab', () => {
   assert.equal(backLabelFor('kosten-inzichten'), 'Kosten');
   assert.equal(backLabelFor('resource'), 'Samen'); // module 'delen' heet 'Samen'
   assert.equal(backLabelFor('herinneringen'), 'Huishouden');
+  assert.equal(backLabelFor('beeldstijl'), 'Huishouden');
+  assert.equal(backLabelFor('account-verwijderen'), 'Huishouden'); // PLT-11: gevarenzone onder Instellingen/Huishouden
+});
+
+test('DETAIL_PARENT: account-verwijderen hangt onder huishouden', () => {
+  assert.equal(DETAIL_PARENT['account-verwijderen'], 'huishouden');
 });
 
 test('backLabelFor: onbekende route → null (val terug op de ✕)', () => {

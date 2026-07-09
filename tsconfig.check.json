@@ -28,6 +28,7 @@
     "strictNullChecks": true
   },
   "include": [
+    "lib/accountDeletion.js",
     "lib/activity.js",
     "lib/agenda.js",
     "lib/aiCapabilities.js",
@@ -47,6 +48,7 @@
     "lib/entityDiary.js",
     "lib/decisions.js",
     "lib/expenses.js",
+    "lib/export.js",
     "lib/fairness.js",
     "lib/favoriteGroceries.js",
     "lib/formValidation.js",

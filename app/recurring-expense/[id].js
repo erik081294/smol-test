@@ -131,7 +131,7 @@ export default function RecurringExpenseEditor() {
     <Editor
       title={isNew ? t('recurring.new') : t('recurring.edit')}
       onClose={() => router.back()} onConfirm={save} busy={busy}
-      confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
+      cancelLabel={t('common.cancelLong')}
     >
           <Field label={t('recurring.field.description')} value={description}
             onChangeText={(x) => { setDescription(x); clearErr('description'); }}

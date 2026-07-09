@@ -349,7 +349,14 @@ export default function PetScreen() {
             </Pressable>
           </Row>
           {petTasks.length === 0
-            ? <Text style={type.caption}>{t('pet.noTasks')}</Text>
+            ? (
+              // Lege-staat met handeling (PLA-10 D): tik opent de verzorging-sheet.
+              <Pressable onPress={openCareSheet} accessibilityRole="button" accessibilityLabel={t('pet.care.adjust')}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingVertical: space.sm })}>
+                <Text style={type.caption}>{t('pet.noTasks')}</Text>
+                <Text style={[type.caption, { color: colors.forest, marginTop: 2 }]}>{t('pet.care.adjust')}</Text>
+              </Pressable>
+            )
             : petTasks.map((task) => (
               <SwipeRow key={task.id}
                 left={{ icon: 'delete', label: t('common.delete'), color: colors.danger, onTrigger: () => removeTaskWithUndo(task) }}

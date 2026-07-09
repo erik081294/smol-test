@@ -17,7 +17,7 @@ import { colors, radius, type, space } from '../../lib/theme';
 import { recurrenceLabel } from '../../lib/recurrence';
 import { VISIBILITY, RECUR } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { visibilityPayload, visibilityRule } from '../../lib/visibility';
+import { visibilityPayload, visibilityRule, visibilityFromParams } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
 import { toggleValue } from '../../lib/listField';
@@ -48,7 +48,7 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 // leunt op hook-`dirty`, en de optionele velden gebruiken het gedeelde RevealLink.
 export default function TaskEditor() {
   const dialog = useDialog();
-  const { id, date, zone, plant } = useLocalSearchParams();
+  const { id, date, zone, plant, vis, sg, sw } = useLocalSearchParams();
   const isNew = id === 'new';
   const router = useRouter();
   const toast = useToast();
@@ -88,7 +88,9 @@ export default function TaskEditor() {
     recurEndMode: 'never', recurUntil: null, recurCount: 5, // herhaal-einde (UX, batch 2)
     rotation: [],                  // passthrough (UX-40)
     tagIds: [],                    // zelfgemaakte labels (UX-41)
-    visibility: VISIBILITY.HOUSEHOLD, shareSubgroupId: null, shareWith: [], // voor wie / wie ziet 'm
+    // Voor wie / wie ziet 'm. Vanuit een plant (PLA-10 B) erft de taak de
+    // plant-zichtbaarheid via de vis/sg/sw-params; anders de HOUSEHOLD-default.
+    ...(plant ? visibilityFromParams({ vis, sg, sw }) : { visibility: VISIBILITY.HOUSEHOLD, shareSubgroupId: null, shareWith: [] }),
   }, { serialize });
   const { values, setField, setValues, reset, dirty, errors, clearError: clearErr, busy, setBusy, validate, validateField } = form;
   const {

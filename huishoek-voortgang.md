@@ -1821,3 +1821,55 @@ ontwerpen vóór DOC-1/AI-9); **D12** gaf de REV-2-rest + SEC-6/7 weer vrij; **D
 laatste UX-42-vraag (drawer volstaat) → UX-42 ✅ → archief; verder B1–B3 (Bewaar / splitsen
 primair / "Reserveerbaar via Samen"), de plan-21-zorglijn (A zonder migratie → C → D, B erven)
 en TML-8 geparkeerd. FND-3 (kinderprofielen) bewust onbeslist gelaten.
+
+---
+
+**PLT-11 account-verwijdering gebouwd + migratie 0078 live (2026-07-09, plan 29 S1,
+branch `claude/plt11-accountverwijdering`).** Eerste van de drie "build 1/2/3"-klussen.
+FK-inventaris tegen de live DB: `profiles.id→auth.users` is CASCADE (dus profielrij gaat
+mee), 22 FK's naar `profiles` stonden op NO ACTION (Data-1-blokkade) en de 0070-rekey-guard
+blokkeerde bovendien het SET-NULL-cascade-pad. Migratie 0078 (via MCP, advisor schoon):
+(A) guard versoepeld — creator→NULL mag (anonimisering), waarde→andere waarde blijft dicht;
+(B) de 22 FK's → SET NULL, `timeline_reactions`→CASCADE; (C) DEFINER-RPC's `delete_account`
+(owner-blokkade + solo-huishoud-cascade + auth.users-delete) en `account_deletion_preview`.
+Pure `lib/accountDeletion.js` (`classifyHouseholds`/`canDeleteAccount`, mutatie 97,2%) voedt
+de impact-preview op het nieuwe `app/account-verwijderen.js` (getypte "VERWIJDER"-bevestiging),
+bereikbaar via een gevarenzone in Instellingen. **Live-RLS-geverifieerd** (4 scenario's groen,
+incl. de 0070-regressie): preview-tellingen, owner-blokkade P0001, anon-weigering en de
+anonimisering (lid weg → gedeelde taak blijft met created_by NULL, huisgenoot ziet 'm nog).
+Twee bewust geaccepteerde trade-offs in de migratie gedocumenteerd (paid_by-attributie,
+vrije-tekst-behoud). Suite 1418 pass, typecheck + `eslint .` (tracked) schoon. Rest:
+device-rooktest van de flow.
+
+---
+
+**Plan-29 besluiten doorgevoerd: UXR-11 B, PLA-10 zorg (B+D), PLT-4 export (2026-07-09,
+branch `claude/plt11-accountverwijdering`).** Tweede + derde van de "build 1/2/3"-opdracht,
+op één branch met PLT-11. **UXR-11 B1/B2/B3:** `common.save`→'Bewaar' + de 5 ModalHeader-
+overrides geschrapt (app-breed "Bewaar"), splitsen-knop op het bon-detail naar de primaire
+forest-variant, Samen-toggle → "Reserveerbaar via Samen". **PLA-10 zorg-lijn deel B+D:** een
+verzorgingstaak vanaf een plant erft nu de plant-zichtbaarheid (pure `visibilityToParams`/
+`visibilityFromParams` in `lib/visibility.js`, via query-params → taak-editor; ratchet 90,5%),
+en de lege-staat op plant + huisdier is een tik-CTA i.p.v. dood tekstje. Deel A (pauzeren-staat)
++ C (per-plant care-overzicht-parity) bewust device-gated gelaten (vragen UX-iteratie + een
+plantCare-template-laag). **PLT-4:** pure `lib/export.js` (`groceriesAsText` deelbare lijst +
+`balancesAsCsv` NL-Excel-CSV met escaping; ratchet 90,0%) via `Share.share` als gelabelde
+drawer-actie op Boodschappen resp. Kosten (UX-42-contract). DoD: suite 1431 pass / 0 fail,
+typecheck + `eslint .` (tracked) schoon, ratchet groen over alle 5 gewijzigde groepen
+(visibility 90,5 · export 90,0 · navMeta 65→69,6 · i18n 88,7 · accountDeletion 97,2).
+
+---
+
+**Web-deploy naar productie + ratchet-fix (2026-07-09).** CI-mutatie faalde op #132
+(`visibility` 88,6% vs baseline 90,5%): de baseline leunde op **timeout-kills** die op CI
+niet reproduceren (de bekende timeout-ruis uit CLAUDE.md). Gefixt door de 5 échte survivors
+in `visibilityToParams`/`visibilityFromParams` te doden met gerichte tests (survivors 12 → 6;
+de rest is pre-existing in `visibilityPayload`/`canView`) en de baselines op een **conservatieve
+CI-vloer** te zetten i.p.v. de piek (visibility 95/105, export 79/90, accountDeletion 34/36).
+CI #132 daarna groen (test + mutation). **Daarna huishoek.app bijgewerkt:** `expo export
+--platform web` uit een losse worktree (de hoofdcheckout stond op een andere branch) →
+`wrangler pages deploy --branch=main` → deployment `10b3b8dd` staat op **Production/main**
+(source `2997d45`); huishoek.app serveert de nieuwe bundel, `/`, `/welcome` en `/join/<token>`
+geven 200. **Let op:** productie loopt hiermee vóór op `main` tot #131 + #132 gemergd zijn.
+**Statuscorrectie:** de live iOS-AASA bevat al de echte Team ID (`J3DDDK3JB2.app.huishoek`) —
+de REV-2/plan-25-claim dat er nog een `REPLACE_`-placeholder live stond is stale en is gecorrigeerd.

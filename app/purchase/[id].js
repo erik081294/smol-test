@@ -212,7 +212,7 @@ export default function PurchaseEditor() {
           ))}
           {(existing.purchase_items ?? []).length > 0 ? (
             <View style={{ marginTop: space.xl, gap: space.sm }}>
-              <Button title={t('purchase.split')} icon="expenses" variant="accent"
+              <Button title={t('purchase.split')} icon="expenses" variant="primary"
                 onPress={() => {
                   const cents = existing.total_cents
                     ?? (existing.purchase_items ?? []).reduce((s, it) => s + (it.line_total_cents ?? 0), 0);

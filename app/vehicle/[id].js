@@ -249,7 +249,7 @@ export default function VehicleEditor() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ModalHeader title={isNew ? t('vehicle.new') : (existing?.name ?? t('vehicle.add'))}
-        onClose={requestClose} onConfirm={save} busy={busy} confirmLabel={t('common.save')} />
+        onClose={requestClose} onConfirm={save} busy={busy} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0, paddingBottom: space.xxl }}
         keyboardShouldPersistTaps="handled">
 
