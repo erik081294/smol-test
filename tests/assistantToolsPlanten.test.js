@@ -174,3 +174,93 @@ test('proposeAddPlants: precies op de cap is oké; foutteksten liggen vast', () 
   assert.equal(proposeAddPlants({ items: [] }).error, 'Geen plant om toe te voegen.');
   assert.equal(proposeAddPlants({ items: [{ name: 'A' }] }).summary, 'Plant "A" toevoegen');
 });
+
+// ── Ratchet-verdieping (AI-19 fase C): de randen die de mutatietest aanwees. ──
+
+test('renderPlantsOverview: kapotte taakrijen tellen niet mee; gelijke due_date → eerste wint; teksten liggen vast', () => {
+  const { data, render } = renderPlantsOverview(
+    [
+      { id: 'p1', name: 'Monstera', location: 'woonkamer' },
+      { id: 'p2', name: 'Ficus' },
+    ],
+    [
+      null,                                                            // rij null → geen crash
+      { title: 'Zwevend', due_date: '2026-07-10' },                    // geen plant_id → weg
+      { plant_id: 'p1', title: 42, due_date: '2026-07-10' },           // titel geen string → weg
+      { plant_id: 'p1', title: 'Voeding', due_date: '' },              // lege datum → weg
+      { plant_id: 'p1', title: 'Zonder datum' },                       // geen datum → weg
+      { plant_id: 'p1', title: 'Later', due_date: '2026-07-12' },
+      { plant_id: 'p1', title: 'Vroegst', due_date: '2026-07-10' },    // vroegste wint...
+      { plant_id: 'p1', title: 'Gelijk', due_date: '2026-07-10' },     // ...en bij gelijk blijft de eerdere staan
+    ]
+  );
+  assert.deepEqual(data.plants, [
+    { name: 'Monstera', location: 'woonkamer', next_care: { title: 'Vroegst', due_date: '2026-07-10' } },
+    { name: 'Ficus', location: null, next_care: null },
+  ]);
+  assert.equal(render[0].title, 'Planten (2)');
+  assert.deepEqual(render[0].items, [
+    { text: 'Monstera (woonkamer) — Vroegst vr 10 jul', emoji: '🪴' },
+    { text: 'Ficus', emoji: '🪴' },
+  ]);
+});
+
+test('planten_overzicht: query-kolommen en sortering liggen vast', async () => {
+  const calls = [];
+  await tool.run(toolCtx({ plants: [], tasks: [] }, calls));
+  const pq = calls.find((c) => c.table === 'plants');
+  assert.equal(pq.selected, 'id, name, location');
+  assert.deepEqual(pq.order, ['name', undefined]);
+  assert.equal(calls.find((c) => c.table === 'tasks').selected, 'plant_id, title, due_date');
+});
+
+test('proposeAddPlants: exacte fouttekst per pad; naam-grens 80/81; locatie-cap; water-tekst zonder ruis', () => {
+  assert.deepEqual(proposeAddPlants(), { ok: false, error: 'Geen plant om toe te voegen.' });
+  const zes = Array.from({ length: 6 }, () => ({ name: 'p' }));
+  assert.equal(proposeAddPlants({ items: zes }).error, 'Maximaal 5 planten per voorstel.');
+  assert.deepEqual(proposeAddPlants({ items: [null] }), { ok: false, error: 'Elke plant heeft een naam nodig.' });
+  assert.equal(proposeAddPlants({ items: [{ name: 'x'.repeat(81) }] }).error, 'Een plantnaam mag maximaal 80 tekens zijn.');
+  assert.equal(proposeAddPlants({ items: [{ name: 'x'.repeat(80) }] }).ok, true);   // precies op de grens mag
+  assert.equal(proposeAddPlants({ items: [{ name: 'A', location: '   ' }] }).args.items[0].location, null);
+  assert.equal(proposeAddPlants({ items: [{ name: 'A', location: 'x'.repeat(90) }] }).args.items[0].location.length, 80);
+  assert.equal(proposeAddPlants({ items: [{ name: 'A', water_days: 60 }] }).args.items[0].water_days, 60);
+  assert.equal(proposeAddPlants({ items: [{ name: 'A', water_days: 7.5 }] }).args.items[0].water_days, null);
+  // Zonder water_days géén "water elke null dgn"-ruis.
+  assert.deepEqual(proposeAddPlants({ items: [{ name: 'A', location: 'balkon' }] }).items, ['A · balkon']);
+});
+
+test('planten_toevoegen: zonder locatie/water_days een kale insert en géén taak; summary telt alleen planten', async () => {
+  const w = PLANTEN_TOOLS.find((t) => t.name === 'planten_toevoegen');
+  const calls = [];
+  const out = await w.execute(toolCtx({}, calls), { items: [{ name: 'Ficus', location: null, water_days: null }] });
+  const plantIns = calls.find((c) => c.table === 'plants');
+  assert.deepEqual(plantIns.inserted, [{ household_id: 'h1', created_by: 'u1', name: 'Ficus' }]);
+  assert.equal(plantIns.selected, 'id');
+  assert.equal(calls.find((c) => c.table === 'tasks'), undefined);   // geen water-interval → geen taak
+  assert.equal(out.summary, 'Plant toegevoegd.');
+  // Twee planten (één mét water-taak): summary telt alleen de planten, niet de taken.
+  const out2 = await w.execute(toolCtx({}, []), { items: [
+    { name: 'Monstera', location: null, water_days: 7 },
+    { name: 'Ficus', location: null, water_days: null },
+  ] });
+  assert.equal(out2.summary, '2 planten toegevoegd.');
+  assert.equal(out2.inserted.filter((r) => r.table === 'tasks').length, 1);
+});
+
+test('planten_toevoegen: de eerste water-taak draagt titel/categorie/recurrence exact', async () => {
+  const w = PLANTEN_TOOLS.find((t) => t.name === 'planten_toevoegen');
+  const calls = [];
+  await w.execute(toolCtx({}, calls), { items: [{ name: 'Monstera', location: null, water_days: 7 }] });
+  const taskIns = calls.find((c) => c.table === 'tasks');
+  assert.deepEqual(taskIns.inserted, [{
+    household_id: 'h1',
+    created_by: 'u1',
+    title: 'Monstera water geven',
+    category: 'plant',
+    plant_id: 'plants-1',
+    due_date: '2026-07-11',
+    recur_freq: 'daily',
+    recur_interval: 7,
+  }]);
+  assert.equal(taskIns.selected, 'id');
+});

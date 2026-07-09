@@ -111,15 +111,24 @@ export default function Tijdlijn() {
   const { reactionsFor } = useReactions();
   const { commentCountFor } = useComments();
   const { feed: activity } = useActivity();
-  // Tijdlijn-filter (TML-6): de twee prefs-lagen bepalen welke systeem-events de
-  // activiteit-laag toont — puur beslist door visibleOnTimeline (module + event-type).
+  // Tijdlijn-filter (TML-6/7): de twee prefs-lagen bepalen wat de tijdlijn toont —
+  // puur beslist door visibleOnTimeline (module + event-type + lid). De member-as
+  // (TML-7) werkt op profiel-id en raakt berichten én systeem-events.
   const { householdDisabled, userDisabled } = useTimelineFilters();
+  const filterConfig = useMemo(
+    () => ({ householdDisabled, userDisabled }),
+    [householdDisabled, userDisabled],
+  );
   const visibleActivity = useMemo(
     () => activity.filter((a) => visibleOnTimeline(
-      { module: moduleForEventType(a.type), eventType: a.type },
-      { householdDisabled, userDisabled },
+      { module: moduleForEventType(a.type), eventType: a.type, member: a.actorId },
+      filterConfig,
     )),
-    [activity, householdDisabled, userDisabled],
+    [activity, filterConfig],
+  );
+  const visiblePosts = useMemo(
+    () => posts.filter((p) => visibleOnTimeline({ member: p.author_id }, filterConfig)),
+    [posts, filterConfig],
   );
   const byId = useMemo(
     () => Object.fromEntries((members ?? []).map((m) => [m.id, m])),
@@ -155,7 +164,7 @@ export default function Tijdlijn() {
         </View>
       ) : null}
       <FlatList
-        data={posts}
+        data={visiblePosts}
         keyExtractor={(it) => it.id}
         contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.forest} />}
@@ -183,8 +192,9 @@ export default function Tijdlijn() {
         ) : null}
       />
       {/* Lege-staat dedupe (DESIGN.md principe 4): de Empty-CTA draagt de primaire
-          actie bij een leeg prikbord; de FAB komt pas terug zodra er berichten zijn. */}
-      {posts.length > 0 ? (
+          actie bij een leeg prikbord; de FAB komt pas terug zodra er berichten zijn
+          (zichtbáár zijn — bij een alles-wegfilterende member-as geldt de Empty-CTA). */}
+      {visiblePosts.length > 0 ? (
         <FAB label={t('timeline.fab')} accessibilityLabel={t('timeline.compose.title')} onPress={() => router.push('/tijdlijn/compose')} />
       ) : null}
     </SafeAreaView>

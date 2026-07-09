@@ -185,3 +185,141 @@ test('proposeLogMaintenance: precies op de cap is oké; foutteksten en meervouds
   assert.equal(proposeLogMaintenance({ items: [{ title: 'x' }] }, { today: '2026-07-06' }).error, 'Zeg erbij om wélk voertuig het gaat.');
   assert.equal(proposeLogMaintenance({ items: [{ vehicle_name: 'V' }] }, { today: '2026-07-06' }).error, 'Wat voor onderhoud was het? Geef een korte titel.');
 });
+
+// ── Ratchet-verdieping (AI-19 fase C): de randen die de mutatietest aanwees. ──
+
+test('renderVehiclesOverview: kapotte recurring-/log-rijen vallen weg; eerste geldige log wint', () => {
+  const { data } = renderVehiclesOverview(
+    [{ id: 'v1', name: 'Volvo' }],
+    [null, { amount_cents: 1000, recur_freq: 'monthly' }, { vehicle_id: 'v1', amount_cents: 1000, recur_freq: 'monthly' }],
+    [
+      null,                                                              // rij null → geen crash
+      { vehicle_id: 'v1', title: 42, performed_on: '2026-07-01' },       // titel geen string → weg
+      { vehicle_id: 'v1', title: 'Banden', performed_on: null },         // datum geen string → weg
+      { title: 'Zwevend', performed_on: '2026-07-01' },                  // geen voertuig → weg
+      { vehicle_id: 'v1', title: 'Grote beurt', performed_on: '2026-06-10' },   // eerste geldige → wint
+      { vehicle_id: 'v1', title: 'Kleine beurt', performed_on: '2026-05-01' },  // latere → genegeerd
+    ],
+  );
+  assert.equal(data.vehicles[0].fixed_monthly_cents, 1000);
+  assert.deepEqual(data.vehicles[0].last_maintenance, { title: 'Grote beurt', performed_on: '2026-06-10' });
+});
+
+test('renderVehiclesOverview: kaart-inhoud ligt vast (km-tekst, APK-grens inclusief, lasten, onderhoud)', () => {
+  const { render } = renderVehiclesOverview(
+    [{ id: 'v1', name: 'Volvo', license_plate: 'AB-12-CD', mileage: 12345, apk_expires_on: '2026-09-01' }],
+    [{ vehicle_id: 'v1', amount_cents: 5000, recur_freq: 'monthly' }],
+    [{ vehicle_id: 'v1', title: 'Grote beurt', performed_on: '2026-06-10' }],
+    '2026-09-01',   // APK exact óp de horizon → telt als binnenkort (<=, niet <)
+  );
+  assert.equal(render[0].type, 'keyvalue');
+  assert.deepEqual(render[0].pairs, [
+    { k: 'Kenteken', v: 'AB-12-CD' },
+    { k: 'Km-stand', v: '12345' },
+    { k: 'APK', v: 'di 1 sep — binnenkort!' },
+    { k: 'Vaste lasten', v: '€ 50,00/mnd' },
+    { k: 'Laatste onderhoud', v: 'Grote beurt (wo 10 jun)' },
+  ]);
+  // Zonder horizon (default '') is er nooit een attentie — ook niet met een APK-datum.
+  const zonder = renderVehiclesOverview([{ id: 'v1', name: 'Volvo', apk_expires_on: '2026-09-01' }]);
+  assert.equal(zonder.render[0].pairs.find((p) => p.k === 'APK').v, 'di 1 sep');
+});
+
+test('voertuigen_overzicht: query-kolommen en sortering liggen vast', async () => {
+  const calls = [];
+  await tool.run(toolCtx({ vehicles: [], recurring_expenses: [], vehicle_log: [] }, calls));
+  const vq = calls.find((c) => c.table === 'vehicles');
+  assert.equal(vq.selected, 'id, name, license_plate, mileage, apk_expires_on');
+  assert.deepEqual(vq.filters, [['eq', 'household_id', 'h1']]);
+  assert.deepEqual(vq.order, ['name', undefined]);
+  assert.equal(calls.find((c) => c.table === 'recurring_expenses').selected, 'vehicle_id, amount_cents, recur_freq, recur_interval');
+  const lq = calls.find((c) => c.table === 'vehicle_log');
+  assert.equal(lq.selected, 'vehicle_id, title, performed_on');
+  assert.deepEqual(lq.order, ['performed_on', { ascending: false }]);
+});
+
+test('proposeLogMaintenance: exacte fouttekst per validatiepad (en ok blijft false)', () => {
+  assert.deepEqual(proposeLogMaintenance(), { ok: false, error: 'Geen onderhoud om te loggen.' });
+  const veel = Array.from({ length: 6 }, () => ({ vehicle_name: 'V', title: 't' }));
+  assert.equal(proposeLogMaintenance({ items: veel }, {}).error, 'Maximaal 5 regels per voorstel.');
+  assert.deepEqual(
+    proposeLogMaintenance({ items: [null] }, { today: '2026-07-08' }),
+    { ok: false, error: 'Zeg erbij om wélk voertuig het gaat.' }
+  );
+  assert.deepEqual(
+    proposeLogMaintenance({ items: [{ vehicle_name: 'Volvo' }] }, { today: '2026-07-08' }),
+    { ok: false, error: 'Wat voor onderhoud was het? Geef een korte titel.' }
+  );
+  // Titel-grens: precies 120 mag, 121 niet.
+  assert.equal(proposeLogMaintenance({ items: [{ vehicle_name: 'V', title: 'x'.repeat(120) }] }, { today: '2026-07-08' }).ok, true);
+  assert.equal(
+    proposeLogMaintenance({ items: [{ vehicle_name: 'V', title: 'x'.repeat(121) }] }, { today: '2026-07-08' }).error,
+    'Een onderhouds-titel mag maximaal 120 tekens zijn.'
+  );
+  // Ongeldige datum zónder vandaag-fallback → de vaste datumfout.
+  assert.deepEqual(
+    proposeLogMaintenance({ items: [{ vehicle_name: 'V', title: 't' }] }, {}),
+    { ok: false, error: 'Ongeldige datum (gebruik YYYY-MM-DD).' }
+  );
+});
+
+test('proposeLogMaintenance: datum-vorm strikt YYYY-MM-DD — alles ernaast valt terug op vandaag', () => {
+  const today = '2026-07-08';
+  const met = (performed_on) =>
+    proposeLogMaintenance({ items: [{ vehicle_name: 'V', title: 't', performed_on }] }, { today }).args.items[0].performed_on;
+  assert.equal(met('2026-07-10'), '2026-07-10');       // geldig → blijft
+  for (const kapot of ['2026-07-101', 'x2026-07-10', '2026-07-1', '2026-7-10', '2-07-10', 'abcd-07-10', '2026-ab-10', '2026-07-ab']) {
+    assert.equal(met(kapot), today);
+  }
+});
+
+test('proposeLogMaintenance: trim op naam/titel, km-stand 0 telt mee, regel-tekst en enkelvouds-summary liggen vast', () => {
+  const out = proposeLogMaintenance(
+    { items: [{ vehicle_name: ' Volvo ', title: ' Nieuwe banden ', performed_on: '2026-07-10', mileage: 0 }] },
+    { today: '2026-07-08' }
+  );
+  assert.deepEqual(out.args.items, [{ vehicle_name: 'Volvo', title: 'Nieuwe banden', performed_on: '2026-07-10', mileage: 0 }]);
+  assert.deepEqual(out.items, ['Volvo · Nieuwe banden · vr 10 jul · 0 km']);
+  assert.equal(out.summary, 'Onderhoud "Nieuwe banden" loggen (Volvo)');
+  // Zonder km-stand géén "null km"-ruis in de regel.
+  const zonder = proposeLogMaintenance({ items: [{ vehicle_name: 'Volvo', title: 'Wasbeurt', performed_on: '2026-07-10' }] }, {});
+  assert.deepEqual(zonder.items, ['Volvo · Wasbeurt · vr 10 jul']);
+});
+
+test('voertuigen_onderhoud_loggen: naam-matching (onbekend/dubbelzinnig/trim/null-naam) en insert-payload', async () => {
+  const w = VOERTUIGEN_TOOLS.find((t) => t.name === 'voertuigen_onderhoud_loggen');
+  const item = { vehicle_name: ' volvo ', title: 'Nieuwe banden', performed_on: '2026-07-10', mileage: 12345 };
+  await assert.rejects(
+    () => w.execute(toolCtx({ vehicles: [{ id: 'v1', name: 'Fiets' }], vehicle_log: [] }, []), { items: [{ ...item, vehicle_name: 'bakfiets' }] }),
+    /"bakfiets" is niet \(eenduidig\) gevonden/
+  );
+  await assert.rejects(
+    () => w.execute(toolCtx({ vehicles: [{ id: 'v1', name: 'Volvo' }, { id: 'v2', name: 'volvo' }], vehicle_log: [] }, []), { items: [item] }),
+    /niet \(eenduidig\) gevonden/
+  );
+  const calls = [];
+  const out = await w.execute(toolCtx({
+    vehicles: [{ id: 'v0', name: null }, { id: 'vX', name: 'Fiets' }, { id: 'v1', name: ' Volvo ' }],
+    vehicle_log: [],
+  }, calls), { items: [item] });
+  assert.equal(out.summary, 'Onderhoud gelogd.');
+  assert.equal(calls.find((c) => c.table === 'vehicles').selected, 'id, name');
+  const ins = calls.find((c) => c.table === 'vehicle_log' && c.inserted);
+  assert.deepEqual(ins.inserted[0], { vehicle_id: 'v1', created_by: 'u1', title: 'Nieuwe banden', performed_on: '2026-07-10', mileage: 12345 });
+  assert.equal(ins.selected, 'id');
+});
+
+test('voertuigen_onderhoud_loggen: zonder km-stand geen mileage-kolom; twee items → meervouds-summary', async () => {
+  const w = VOERTUIGEN_TOOLS.find((t) => t.name === 'voertuigen_onderhoud_loggen');
+  const calls = [];
+  const out = await w.execute(toolCtx({ vehicles: [{ id: 'v1', name: 'Volvo' }], vehicle_log: [] }, calls), {
+    items: [
+      { vehicle_name: 'Volvo', title: 'Wasbeurt', performed_on: '2026-07-10', mileage: null },
+      { vehicle_name: 'Volvo', title: 'Olie', performed_on: '2026-07-11', mileage: null },
+    ],
+  });
+  assert.equal(out.summary, '2 onderhouds-regels gelogd.');
+  assert.equal(out.inserted.length, 2);
+  const ins = calls.find((c) => c.table === 'vehicle_log' && c.inserted);
+  assert.equal('mileage' in ins.inserted[0], false);
+});
