@@ -1808,3 +1808,16 @@ member-as in `visibleOnTimeline` (op profiel-id), `actorId` reist mee via `useAc
 het filterscherm (twee-lagen-gedrag, huishouden wint); geen migratie (0076-CHECK dekte `member`
 al). Suite 1430+ pass / 0 fail, typecheck + `eslint .` schoon, baselines herijkt tegen de finale
 code. Rest: device-verificatie TML-7 (→ §6 🔧).
+
+---
+
+**Besluitenronde plan 29 (2026-07-09).** De volledige beslis-agenda (D1–D12) in één sessie
+afgehandeld; uitkomsten vastgelegd in plan 29 §6 + de betrokken §6-rijen. Kern: **D7
+anonimiseren** bij accountverwijdering (SET NULL → "onbekend lid" — S1/PLT-11 ontgrendeld);
+**D5** leverde een nieuw feature-idee dat de BOO-14-opties vervangt → nieuwe rij **BOO-18**
+(boodschappen-modus: full-screen afvinkmodus + deelbare gast-URL op het invite-token-patroon);
+**D11** promoveerde **PLT-4** (export) uit §7; **D10** → nieuwe rij **AI-21** (tool-search
+ontwerpen vóór DOC-1/AI-9); **D12** gaf de REV-2-rest + SEC-6/7 weer vrij; **D4** sloot de
+laatste UX-42-vraag (drawer volstaat) → UX-42 ✅ → archief; verder B1–B3 (Bewaar / splitsen
+primair / "Reserveerbaar via Samen"), de plan-21-zorglijn (A zonder migratie → C → D, B erven)
+en TML-8 geparkeerd. FND-3 (kinderprofielen) bewust onbeslist gelaten.

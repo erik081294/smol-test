@@ -846,6 +846,22 @@ Vragen die klussen blokkeren of sturen — niet zelf beslissen, wel voorbereiden
 | D12 | S6 (push-poets) en REV-2-rest vrijgeven? | S6 | geparkeerd 2026-07-06 |
 | D13 | Bonnetjes-bron: alleen fotoscan of ook digitale bonnen (e-mail/AH)? (§5 backlog) | BOO-6/7-vervolg | digitaal is betrouwbaarder dan OCR |
 
+**Besluiten (besluitenronde 2026-07-09):**
+- **D1** "Bewaar" app-breed (5 overrides schrappen) · **D2** Splitsen primair (forest; "Naar
+  voorraad" soft) · **D3** Samen-toggle → "Reserveerbaar via Samen" · **D4** drawer volstaat
+  (UX-42 → ✅/archief).
+- **D5** verving de BOO-14-opties door een nieuw idee: **BOO-18 — boodschappen-modus**
+  (full-screen afvinkmodus in-app + deelbare gast-URL buiten het huishouden met
+  lijst-schrijfrechten maar zonder catalogus-schrijfrechten, incl. ben-je-al-lid-check;
+  leunt op het invite-token-patroon; security-review verplicht). U4 is daarmee vervallen.
+- **D6** aanbevolen zorg-lijn (pauzeren eerst zonder migratie, visibility erven,
+  care-overzicht, lege-staat-CTA's; volgorde A→C→D) · **D7** anonimiseren ("onbekend lid",
+  SET NULL) — **S1 is ontgrendeld** · **D8** kinderprofielen: nog niet beslissen ·
+  **D9** TML-8 geparkeerd (vorm bij bouwen: alleen verbergen).
+- **D10** tool-search vóórbereiden → nieuwe rij **AI-21** · **D11** PLT-4 gepromoveerd
+  (F9) + BOO-18 nieuw; WEN-1 blijft §7 · **D12** REV-2-rest + S6 **vrijgegeven** ·
+  **D13** (advies, geen formeel besluit): alleen fotoscan.
+
 ---
 
 ## 7. Eigenaar-acties (extern; geen dev-werk)
