@@ -1821,3 +1821,22 @@ ontwerpen vóór DOC-1/AI-9); **D12** gaf de REV-2-rest + SEC-6/7 weer vrij; **D
 laatste UX-42-vraag (drawer volstaat) → UX-42 ✅ → archief; verder B1–B3 (Bewaar / splitsen
 primair / "Reserveerbaar via Samen"), de plan-21-zorglijn (A zonder migratie → C → D, B erven)
 en TML-8 geparkeerd. FND-3 (kinderprofielen) bewust onbeslist gelaten.
+
+---
+
+**PLT-11 account-verwijdering gebouwd + migratie 0078 live (2026-07-09, plan 29 S1,
+branch `claude/plt11-accountverwijdering`).** Eerste van de drie "build 1/2/3"-klussen.
+FK-inventaris tegen de live DB: `profiles.id→auth.users` is CASCADE (dus profielrij gaat
+mee), 22 FK's naar `profiles` stonden op NO ACTION (Data-1-blokkade) en de 0070-rekey-guard
+blokkeerde bovendien het SET-NULL-cascade-pad. Migratie 0078 (via MCP, advisor schoon):
+(A) guard versoepeld — creator→NULL mag (anonimisering), waarde→andere waarde blijft dicht;
+(B) de 22 FK's → SET NULL, `timeline_reactions`→CASCADE; (C) DEFINER-RPC's `delete_account`
+(owner-blokkade + solo-huishoud-cascade + auth.users-delete) en `account_deletion_preview`.
+Pure `lib/accountDeletion.js` (`classifyHouseholds`/`canDeleteAccount`, mutatie 97,2%) voedt
+de impact-preview op het nieuwe `app/account-verwijderen.js` (getypte "VERWIJDER"-bevestiging),
+bereikbaar via een gevarenzone in Instellingen. **Live-RLS-geverifieerd** (4 scenario's groen,
+incl. de 0070-regressie): preview-tellingen, owner-blokkade P0001, anon-weigering en de
+anonimisering (lid weg → gedeelde taak blijft met created_by NULL, huisgenoot ziet 'm nog).
+Twee bewust geaccepteerde trade-offs in de migratie gedocumenteerd (paid_by-attributie,
+vrije-tekst-behoud). Suite 1418 pass, typecheck + `eslint .` (tracked) schoon. Rest:
+device-rooktest van de flow.

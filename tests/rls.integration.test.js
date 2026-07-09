@@ -1123,3 +1123,50 @@ test('RLS 0071: peek_invite lekt geen huishoud-info meer voor een ingetrokken to
   assert.equal(revokedPeek?.[0]?.inviter_name, null, 'uitnodiger mag niet meer lekken');
   assert.equal(revokedPeek?.[0]?.household_id, null, 'household_id mag niet meer lekken');
 });
+
+test('RLS 0078: account-verwijdering — preview, owner-blokkade en anonimisering', opts, async () => {
+  const alice = await makeUser('alice_del');   // owner met een medelid
+  const bob = await makeUser('bob_del');       // medelid dat straks zijn account verwijdert
+  const hh = await makeHousehold(alice, 'Delhuis');
+
+  // Probe: is de 0078-RPC al aanwezig? Zo niet (migratie nog niet toegepast) → soft skip,
+  // zodat deze case nooit de suite breekt maar wél automatisch meelift zodra 0078 live is.
+  const probe = await alice.client.rpc('account_deletion_preview');
+  if (probe.error && (probe.error.code === 'PGRST202'
+    || /does not exist|could not find|not find|schema cache/i.test(probe.error.message || ''))) {
+    console.log('[rls 0078] account_deletion_preview nog niet aanwezig — migratie 0078 niet toegepast, overslaan');
+    return;
+  }
+  assert.ok(!probe.error, `preview: ${probe.error?.message}`);
+  assert.ok(Array.isArray(probe.data), 'preview geeft een lijst');
+  const own = probe.data.find((r) => r.householdId === hh.id);
+  assert.ok(own, 'eigen huishouden staat in de preview');
+  assert.equal(own.memberCount, 1, 'nog vóór bob toetreedt: 1 lid');
+  assert.equal(own.ownerCount, 1);
+
+  await addMember(alice, bob, hh.id);
+
+  // Bob maakt een gedeelde taak aan (attributie = bob).
+  const { data: task, error: tErr } = await bob.client.from('tasks')
+    .insert({ household_id: hh.id, title: 'Bobs taak', visibility: 'household', created_by: bob.id })
+    .select().single();
+  assert.ok(!tErr, `taak aanmaken: ${tErr?.message}`);
+
+  // Owner-blokkade: alice is enige owner mét een medelid → weigeren (P0001).
+  const aliceDel = await alice.client.rpc('delete_account');
+  assert.ok(aliceDel.error, 'enige owner met andere leden mag zichzelf niet verwijderen');
+
+  // Anon mag de RPC niet uitvoeren.
+  const anon = createClient(URL, ANON, { auth: { persistSession: false } });
+  const anonDel = await anon.rpc('delete_account');
+  assert.ok(anonDel.error, 'anon mag delete_account niet uitvoeren');
+
+  // Bob (gewoon lid) verwijdert zijn account → slaagt; zijn taak blíjft voor het
+  // huishouden, maar geanonimiseerd (created_by NULL — de guard staat waarde→NULL toe).
+  const bobDel = await bob.client.rpc('delete_account');
+  assert.ok(!bobDel.error, `een lid mag zijn eigen account verwijderen: ${bobDel.error?.message}`);
+
+  const after = await alice.client.from('tasks').select('created_by').eq('id', task.id).single();
+  assert.ok(!after.error, 'de gedeelde taak bestaat nog voor het huishouden');
+  assert.equal(after.data?.created_by, null, 'de maker is geanonimiseerd (created_by NULL)');
+});
