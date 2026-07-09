@@ -1857,3 +1857,19 @@ plantCare-template-laag). **PLT-4:** pure `lib/export.js` (`groceriesAsText` dee
 drawer-actie op Boodschappen resp. Kosten (UX-42-contract). DoD: suite 1431 pass / 0 fail,
 typecheck + `eslint .` (tracked) schoon, ratchet groen over alle 5 gewijzigde groepen
 (visibility 90,5 · export 90,0 · navMeta 65→69,6 · i18n 88,7 · accountDeletion 97,2).
+
+---
+
+**Web-deploy naar productie + ratchet-fix (2026-07-09).** CI-mutatie faalde op #132
+(`visibility` 88,6% vs baseline 90,5%): de baseline leunde op **timeout-kills** die op CI
+niet reproduceren (de bekende timeout-ruis uit CLAUDE.md). Gefixt door de 5 échte survivors
+in `visibilityToParams`/`visibilityFromParams` te doden met gerichte tests (survivors 12 → 6;
+de rest is pre-existing in `visibilityPayload`/`canView`) en de baselines op een **conservatieve
+CI-vloer** te zetten i.p.v. de piek (visibility 95/105, export 79/90, accountDeletion 34/36).
+CI #132 daarna groen (test + mutation). **Daarna huishoek.app bijgewerkt:** `expo export
+--platform web` uit een losse worktree (de hoofdcheckout stond op een andere branch) →
+`wrangler pages deploy --branch=main` → deployment `10b3b8dd` staat op **Production/main**
+(source `2997d45`); huishoek.app serveert de nieuwe bundel, `/`, `/welcome` en `/join/<token>`
+geven 200. **Let op:** productie loopt hiermee vóór op `main` tot #131 + #132 gemergd zijn.
+**Statuscorrectie:** de live iOS-AASA bevat al de echte Team ID (`J3DDDK3JB2.app.huishoek`) —
+de REV-2/plan-25-claim dat er nog een `REPLACE_`-placeholder live stond is stale en is gecorrigeerd.

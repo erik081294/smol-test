@@ -32,7 +32,7 @@ Getoetst tegen de echte config/live-host, niet uit geheugen:
    het Engelse defaults → lokalisatie-/App-Review-frictie, geen crash. (Bevestigt INF-5 in de
    [app-review](../reviews/2026-07-02-app-review.md).)
 2. **Live universal links zijn dood.** `https://huishoek.app/.well-known/apple-app-site-association`
-   serveert live nog `REPLACE_APPLE_TEAM_ID.app.huishoek` — de placeholder-fix in `public/` (commit met
+   serveerde live nog `REPLACE_APPLE_TEAM_ID.app.huishoek` (**opgelost: sinds een latere web-deploy staat de echte Team ID live — geverifieerd 2026-07-09**) — de placeholder-fix in `public/` (commit met
    `J3DDDK3JB2`) is nog niet ge-deployed. (Zelfde restpunt als REV-2 §P8.)
 3. **"EAS cloud-simulator" is experimenteel.** Reguliere Expo-docs kennen alleen een *lokale* simulator
    (`ios: { simulator: true }`-build + `eas build:run`); de cloud/remote sim loopt via de experimentele
