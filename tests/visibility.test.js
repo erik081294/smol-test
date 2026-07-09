@@ -131,3 +131,27 @@ test('visibilityFromParams: inconsistente/kapotte invoer valt veilig terug op ho
 test('visibilityToParams: zonder argument → household-default', () => {
   assert.deepEqual(visibilityToParams(), { vis: 'household', sg: '', sw: '' });
 });
+
+test('visibilityToParams: sg wordt alléén gezet bij subgroup (niet bij household/custom mét een sg)', () => {
+  // Kill: `&&` → `||` en de altijd-waar-conditie in de sg-ternary.
+  assert.deepEqual(visibilityToParams({ visibility: 'household', shareSubgroupId: 'sg-1' }),
+    { vis: 'household', sg: '', sw: '' });
+  assert.deepEqual(visibilityToParams({ visibility: 'custom', shareSubgroupId: 'sg-1', shareWith: ['a'] }),
+    { vis: 'custom', sg: '', sw: 'a' });
+  // En subgroup zónder id levert géén sg op.
+  assert.deepEqual(visibilityToParams({ visibility: 'subgroup', shareSubgroupId: null }),
+    { vis: 'subgroup', sg: '', sw: '' });
+});
+
+test('visibilityToParams: custom zonder ledenlijst → lege sw (default-param én ?? []-tak)', () => {
+  assert.deepEqual(visibilityToParams({ visibility: 'custom' }), { vis: 'custom', sg: '', sw: '' });
+  // shareWith expliciet null raakt de `?? []`-tak (de default-param vangt alleen undefined).
+  assert.deepEqual(visibilityToParams({ visibility: 'custom', shareWith: null }), { vis: 'custom', sg: '', sw: '' });
+});
+
+test('visibilityFromParams: onbekende as negeert een meegegeven ledenlijst (custom-tak niet stiekem nemen)', () => {
+  assert.deepEqual(visibilityFromParams({ vis: 'onzin', sw: 'a,b' }),
+    { visibility: 'household', shareSubgroupId: null, shareWith: [] });
+  assert.deepEqual(visibilityFromParams({ vis: 'household', sw: 'a,b' }),
+    { visibility: 'household', shareSubgroupId: null, shareWith: [] });
+});

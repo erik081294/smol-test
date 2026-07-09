@@ -2,7 +2,7 @@
   "generatedAt": "2026-07-08T08:40:53.261Z",
   "tolerancePp": 1,
   "total": {
-    "killed": 9492,
+    "killed": 9490,
     "total": 10808,
     "score": 87.8
   },
@@ -463,14 +463,14 @@
       "score": 97.6
     },
     "lib/accountDeletion.js": {
-      "killed": 35,
+      "killed": 34,
       "total": 36,
-      "score": 97.2
+      "score": 94.4
     },
     "lib/export.js": {
-      "killed": 80,
+      "killed": 79,
       "total": 90,
-      "score": 88.9
+      "score": 87.8
     }
   }
 }
