@@ -18,7 +18,7 @@ import {
   BottomSheet, ModalHeader, AvatarSelect, Button, Row, ListSkeleton, Celebrate, SwipeRow, Banner, SheetScrollView,
 } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
-import { colors, categoryMeta, space, type, radius } from '../../lib/theme';
+import { colors, categoryMeta, space, type, radius, font } from '../../lib/theme';
 import { animateNextLayout, prefersReducedMotion } from '../../lib/motion';
 import { ChoreLibrarySheet } from '../../lib/ChoreLibrarySheet';
 import { choreToTask } from '../../lib/choreLibrary';
@@ -311,7 +311,7 @@ export default function Taken() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('tasks.title')} subtitle={t('tasks.subtitle')}
+      <ScreenHeader module="taken" title={t('tasks.title')} subtitle={t('tasks.subtitle')}
         right={
           <ModuleHelpButton
             module="taken"
@@ -361,7 +361,7 @@ export default function Taken() {
         {activeCount > 0 ? (
           <Pressable onPress={() => setFilters(EMPTY_FILTERS)} hitSlop={8} accessibilityRole="button"
             accessibilityLabel={t('tasks.filter.clear')}>
-            <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{t('tasks.filter.clear')}</Text>
+            <Text style={[type.caption, { color: colors.forest, fontFamily: font.semi }]}>{t('tasks.filter.clear')}</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -380,7 +380,7 @@ export default function Taken() {
             minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1.5,
             borderColor: colors.line, backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
           })}>
-          <Text style={[type.title, { fontWeight: '700' }]} numberOfLines={1}>{periodLabel}</Text>
+          <Text style={[type.title, { fontFamily: font.semi }]} numberOfLines={1}>{periodLabel}</Text>
           <Icon name="agenda" size={16} color={colors.forest} />
         </Pressable>
         <IconButton icon="forward" tint={colors.forest} accessibilityLabel={t('tasks.period.next')} onPress={() => slidePeriod(1)} />

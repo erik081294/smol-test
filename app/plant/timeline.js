@@ -35,7 +35,7 @@ function PlantTimelineCard({ entry, onPress }) {
     >
       <View style={{
         width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
-        backgroundColor: isNote ? colors.forestSoft : colors.surfaceAlt,
+        backgroundColor: isNote ? colors.forestPressed : colors.surfaceAlt,
         alignItems: 'center', justifyContent: 'center',
       }}>
         {isNote

@@ -7,7 +7,7 @@ import { useDialog } from '../lib/dialog';
 import { supabase } from '../lib/supabase';
 import { Button, Field } from '../lib/ui';
 import { Icon } from '../lib/icons';
-import { colors, type } from '../lib/theme';
+import { colors, type, font } from '../lib/theme';
 import { t, authErrorMessage } from '../lib/i18n';
 
 // Wachtwoord-herstel (UX-P5). Bereikt via de herstellink uit de reset-mail
@@ -64,7 +64,7 @@ export default function Herstel() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 28, justifyContent: 'center' }}>
           <View style={{ marginBottom: 28 }}>
             <Icon name="home" size={44} color={colors.ocher} weight="fill" />
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5, marginTop: 8 }}>
+            <Text style={{ fontSize: 28, fontFamily: font.display, color: '#fff', letterSpacing: -0.5, marginTop: 8 }}>
               {t('auth.recover.title')}
             </Text>
           </View>

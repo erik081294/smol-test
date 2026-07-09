@@ -34,7 +34,7 @@ export default function Voertuigen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('voertuigen.title')} subtitle={t('voertuigen.subtitle')}
+      <ScreenHeader module="voertuigen" title={t('voertuigen.title')} subtitle={t('voertuigen.subtitle')}
         right={<ModuleHelpButton module="voertuigen" />} />
 
       {/* Foutstaat (UX-23): een mislukte (her)laadbeurt toont een nette banner met

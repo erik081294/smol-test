@@ -201,7 +201,7 @@ export default function Keuken() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('keuken.title')} subtitle={t('keuken.subtitle')}
+      <ScreenHeader module="maaltijden" title={t('keuken.title')} subtitle={t('keuken.subtitle')}
         right={<ModuleHelpButton module="maaltijden" />} />
 
       <View style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>

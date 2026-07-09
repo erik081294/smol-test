@@ -7,7 +7,7 @@ import { useProducts } from '../../lib/useProducts';
 import { useProductPrices } from '../../lib/usePurchases';
 import { backLabelFor } from '../../lib/navMeta';
 import { ModalHeader, Row, SectionHeader, Empty, Sparkline } from '../../lib/ui';
-import { colors, type, space, radius } from '../../lib/theme';
+import { colors, type, space, radius, font } from '../../lib/theme';
 import { formatCents } from '../../lib/expenses';
 import { series, latestPerStore, stats, trendPct } from '../../lib/priceTrack';
 import { t, dateLocale } from '../../lib/i18n';
@@ -47,7 +47,7 @@ export default function ProductDetail() {
                 {trend != null ? (
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={type.caption}>{t('product.trend')}</Text>
-                    <Text style={[type.title, { color: trendColor, fontWeight: '800' }]}>
+                    <Text style={[type.title, { color: trendColor, fontFamily: font.semi }]}>
                       {trendArrow} {Math.abs(trend).toFixed(0)}%
                     </Text>
                   </View>

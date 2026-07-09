@@ -20,7 +20,7 @@ import { Field, Button, Checkbox, Stepper, ModalHeader, Row, Editor, BottomSheet
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
-import { colors, radius, type, space } from '../../lib/theme';
+import { colors, radius, type, space, font } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
@@ -462,10 +462,10 @@ export default function PetScreen() {
               paddingVertical: space.xs, paddingHorizontal: space.sm,
               borderRadius: radius.pill, borderWidth: 1.5,
               borderColor: active ? colors.forest : colors.line,
-              backgroundColor: active ? colors.forestSoft : colors.surface,
+              backgroundColor: active ? colors.forestPressed : colors.surface,
             }}>
             <Text style={{ fontSize: 18 }}>{pt.emoji}</Text>
-            <Text style={[type.body, active ? { color: colors.forest, fontWeight: '700' } : null]}>{pt.label}</Text>
+            <Text style={[type.body, active ? { color: colors.forest, fontFamily: font.semi } : null]}>{pt.label}</Text>
           </Pressable>
         );
       })}
@@ -582,7 +582,7 @@ function PetTimelineEntry({ entry, first, last, onPress }) {
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center',
           backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: space.sm }}>
           <View style={{ width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
-            backgroundColor: isPhoto ? colors.surfaceAlt : colors.forestSoft, alignItems: 'center', justifyContent: 'center' }}>
+            backgroundColor: isPhoto ? colors.surfaceAlt : colors.forestPressed, alignItems: 'center', justifyContent: 'center' }}>
             {isPhoto
               ? (url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} resizeMode="cover" /> : <Icon name="pets" size={20} color={colors.inkSoft} />)
               : <Icon name={isWeight ? 'weight' : 'note'} size={22} color={colors.forest} />}

@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { PixelRatio, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, space } from '../../lib/theme';
+import { colors, space, font } from '../../lib/theme';
 import { Icon } from '../../lib/icons';
 import { MODULES, MORE_TAB } from '../../lib/modules';
 import { useHousehold } from '../../lib/household';
@@ -22,7 +22,7 @@ function TabIcon({ icon, label, focused }) {
           extreem lang label wordt afgekapt i.p.v. verkleind — leesbaar > passend. */}
       <Text
         numberOfLines={1}
-        style={{ fontSize: 11, fontWeight: focused ? '700' : '500', color: tint }}
+        style={{ fontSize: 11, fontFamily: focused ? font.semi : font.medium, color: tint }}
       >
         {label}
       </Text>

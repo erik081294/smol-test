@@ -133,7 +133,7 @@ export default function Tijdlijn() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('timeline.title')} subtitle={t('timeline.subtitle')}
+      <ScreenHeader module="tijdlijn" title={t('timeline.title')} subtitle={t('timeline.subtitle')}
         right={
           <Row gap={space.xs}>
             {/* Filterinstellingen (TML-6): wat verschijnt er op de tijdlijn? */}

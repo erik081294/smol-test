@@ -7,7 +7,7 @@ import { pickImageAsset } from '../../lib/photoPicker';
 import { isPostValid } from '../../lib/timeline';
 import { Editor, Field, Button } from '../../lib/ui';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { colors, type, space, radius } from '../../lib/theme';
+import { colors, type, space, radius, font } from '../../lib/theme';
 import { dialog } from '../../lib/dialog';
 import { t } from '../../lib/i18n';
 
@@ -84,7 +84,7 @@ export default function Compose() {
                 hitSlop={8}
                 style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ color: colors.onDark, fontWeight: '700' }}>×</Text>
+                <Text style={{ color: colors.onDark, fontFamily: font.semi }}>×</Text>
               </Pressable>
             </View>
           ))}

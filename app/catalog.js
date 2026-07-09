@@ -16,7 +16,7 @@ import { ModalHeader, Empty, Chip, Stepper, SwipeRow } from '../lib/ui';
 import { Icon } from '../lib/icons';
 import { SearchField } from '../lib/SearchField';
 import { animateNextLayout } from '../lib/motion';
-import { colors, space, radius, type, screenPadding } from '../lib/theme';
+import { colors, space, radius, type, screenPadding, font } from '../lib/theme';
 import { t } from '../lib/i18n';
 
 const RECENT_KEY = '__recent__';
@@ -56,7 +56,7 @@ const CatalogRow = React.memo(function CatalogRow({ entry, count, onSetCount, on
         style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flex: 1 }}>
         <ProductImageView item={entry.image} imagePath={entry.photoPath} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={[type.body, onList ? { color: colors.forest, fontWeight: '700' } : null]} numberOfLines={1}>{entry.name}</Text>
+          <Text style={[type.body, onList ? { color: colors.forest, fontFamily: font.semi } : null]} numberOfLines={1}>{entry.name}</Text>
           {entry.unit ? <Text style={type.caption}>{entry.unit}</Text> : null}
         </View>
       </Pressable>
@@ -233,7 +233,7 @@ export default function Catalog() {
       })}>
       <Icon name="add" size={18} color={colors.forest} weight="bold" />
       <View style={{ flex: 1 }}>
-        <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+        <Text style={[type.body, { color: colors.forest, fontFamily: font.semi }]}>{t('catalog.add', { name: q })}</Text>
         <Text style={type.caption}>{t('catalog.custom.hint')}</Text>
       </View>
     </Pressable>

@@ -171,7 +171,7 @@ export default function Schoonmaak() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('cleaning.title')} subtitle={t('cleaning.subtitle')}
+      <ScreenHeader module="schoonmaak" title={t('cleaning.title')} subtitle={t('cleaning.subtitle')}
         right={<ModuleHelpButton module="schoonmaak" />} />
 
       <FlatList

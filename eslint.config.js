@@ -5,9 +5,13 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   {
     // Globale ignores (los object zónder andere keys, anders geldt het niet globaal):
-    // build-output, Deno-edge-functions (eigen runtime/URL-imports) en de Claude-
-    // skill-scripts (los tooling met eigen deps) horen niet bij de app-lint.
-    ignores: ["dist/*", "supabase/functions/**", ".claude/**", "reports/**", ".stryker-tmp/**"],
+    // build-output, Deno-edge-functions (eigen runtime/URL-imports), de Claude-
+    // skill-scripts (los tooling met eigen deps) en de meegeleverde runtime van de
+    // visuele style guide (vendored, geen app-code) horen niet bij de app-lint.
+    ignores: [
+      "dist/*", "supabase/functions/**", ".claude/**", "reports/**", ".stryker-tmp/**",
+      "Huishoek new design system/**",
+    ],
   },
   expoConfig,
   {
