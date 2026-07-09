@@ -31,6 +31,12 @@ Begin hier; ga niet op je geheugen af — de code beweegt sneller dan losse docs
   prompt-beheer via Orq-deployment, eval-gate, specialist-criteria) + runbook
   [`docs/orq-assistant.md`](docs/orq-assistant.md). Raak je assistent-tools, -prompt of
   -model aan? Lees die eerst.
+- **Vaste werkwijzes (Claude-skills):** [`.claude/skills/`](.claude/skills/) — de
+  uitvoerings-recepten mét valkuilen voor terugkerende taken: `pr-en-dod` (checks → push →
+  PR → merge), `device-testen` (rooktest/verificatie op het USB-toestel), `supabase-migraties`
+  (migratie/edge-function live zetten + RLS-verificatie), `svg-illustraties` (illustraties
+  tekenen/animeren). Ze laden automatisch op trefwoorden; begin zo'n taak niet zonder de
+  bijbehorende skill te volgen.
 
 Onderstaande **definition of done** borgt onze integratiesnelheid: testgaten horen dicht
 vóór de PR, niet pas bij de merge. (Deze sessie kostte een half uur omdat een PR pas bij
