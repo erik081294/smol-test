@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { View, Text, FlatList, ScrollView, Pressable, RefreshControl, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
@@ -8,6 +8,7 @@ import { useRecurringExpenses } from '../../lib/useRecurringExpenses';
 import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
+import { balancesAsCsv } from '../../lib/export';
 import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton, BottomSheet, SheetScrollView, Banner } from '../../lib/ui';
 import { colors, type, space } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
@@ -39,6 +40,12 @@ export default function Kosten() {
   );
   const payments = useMemo(() => settle(balances), [balances]);
 
+  // Saldo exporteren (PLT-4): het huidige saldo-overzicht als deelbare CSV.
+  const shareBalances = () => {
+    const rows = Object.entries(balances).map(([id, cents]) => ({ name: nameOf(id), cents }));
+    return Share.share({ title: t('export.balances.subject'), message: balancesAsCsv(rows) });
+  };
+
   const myBalance = balances[user?.id] ?? 0;
   const balanceText = myBalance > 0 ? t('expenses.balance.positive', { amount: formatCents(myBalance) })
     : myBalance < 0 ? t('expenses.balance.negative', { amount: formatCents(-myBalance) })
@@ -53,6 +60,7 @@ export default function Kosten() {
             actions={[
               { label: t('insights.title'), icon: 'insights', onPress: () => router.push('/kosten-inzichten') },
               { label: t('recurring.title'), icon: 'repeat', onPress: () => setRecurringOpen(true) },
+              { label: t('export.balances'), icon: 'share', onPress: shareBalances },
             ]}
           />
         } />

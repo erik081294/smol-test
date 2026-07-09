@@ -3,7 +3,7 @@
 // de JS-spiegeling die de UI gebruikt om netjes te valideren en lokaal te filteren.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visibilityPayload, validateVisibility, visibilityRule, canView } from '../lib/visibility.js';
+import { visibilityPayload, validateVisibility, visibilityRule, canView, visibilityToParams, visibilityFromParams } from '../lib/visibility.js';
 import { VISIBILITY } from '../lib/constants.js';
 
 // --- visibilityPayload ------------------------------------------------------
@@ -97,4 +97,37 @@ test('canView: custom alleen voor genoemde personen', () => {
 
 test('canView: ontbrekende visibility valt terug op household', () => {
   assert.equal(canView('you', { created_by: 'me' }, { householdMemberIds: HH }), true);
+});
+
+// ── zichtbaarheid via query-params (PLA-10 B): rondgang + defensieve terugval ──
+
+test('visibilityToParams/FromParams: household → household (leeg sg/sw), rondgang', () => {
+  const p = visibilityToParams({ visibility: 'household' });
+  assert.deepEqual(p, { vis: 'household', sg: '', sw: '' });
+  assert.deepEqual(visibilityFromParams(p), { visibility: 'household', shareSubgroupId: null, shareWith: [] });
+});
+
+test('visibilityToParams/FromParams: subgroup draagt alleen de subgroep-id; rondgang', () => {
+  const p = visibilityToParams({ visibility: 'subgroup', shareSubgroupId: 'sg-1', shareWith: ['x'] });
+  assert.deepEqual(p, { vis: 'subgroup', sg: 'sg-1', sw: '' });   // shareWith wordt genegeerd bij subgroup
+  assert.deepEqual(visibilityFromParams(p), { visibility: 'subgroup', shareSubgroupId: 'sg-1', shareWith: [] });
+});
+
+test('visibilityToParams/FromParams: custom draagt de ledenlijst; rondgang', () => {
+  const p = visibilityToParams({ visibility: 'custom', shareWith: ['a', 'b'] });
+  assert.deepEqual(p, { vis: 'custom', sg: '', sw: 'a,b' });
+  assert.deepEqual(visibilityFromParams(p), { visibility: 'custom', shareSubgroupId: null, shareWith: ['a', 'b'] });
+});
+
+test('visibilityFromParams: inconsistente/kapotte invoer valt veilig terug op household', () => {
+  const fb = { visibility: 'household', shareSubgroupId: null, shareWith: [] };
+  assert.deepEqual(visibilityFromParams({ vis: 'subgroup', sg: '' }), fb);       // subgroup zonder id
+  assert.deepEqual(visibilityFromParams({ vis: 'custom', sw: '' }), fb);          // custom zonder leden
+  assert.deepEqual(visibilityFromParams({ vis: 'custom' }), fb);                  // sw ontbreekt
+  assert.deepEqual(visibilityFromParams({ vis: 'onzin' }), fb);                   // onbekende as
+  assert.deepEqual(visibilityFromParams(), fb);                                    // geen argument
+});
+
+test('visibilityToParams: zonder argument → household-default', () => {
+  assert.deepEqual(visibilityToParams(), { vis: 'household', sg: '', sw: '' });
 });

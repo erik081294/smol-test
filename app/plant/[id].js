@@ -21,7 +21,7 @@ import { TaskRow } from '../../lib/TaskRow';
 import { colors, radius, type, space } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
-import { visibilityRule } from '../../lib/visibility';
+import { visibilityRule, visibilityToParams } from '../../lib/visibility';
 import { useEntityForm } from '../../lib/useEntityForm';
 import { requiredText, when, runRules, firstErrorField } from '../../lib/formValidation';
 import { toggleValue } from '../../lib/listField';
@@ -221,6 +221,20 @@ export default function PlantScreen() {
     const sp = species.find((s) => s.id === plant.species_id) ?? null;
     const card = careCard(sp, plant.location);
     const plantTasks = tasks.filter((pt) => pt.plant_id === plant.id);
+    // Verzorgingstaak toevoegen (PLA-10 B): de nieuwe taak érft de zichtbaarheid van
+    // de plant (een privé-plant → privé-taak) i.p.v. de HOUSEHOLD-default. We geven de
+    // opgeslagen plant-zichtbaarheid mee via query-params (visibilityToParams).
+    const addCareTask = () => router.push({
+      pathname: '/task/new',
+      params: {
+        plant: plant.id,
+        ...visibilityToParams({
+          visibility: plant.visibility,
+          shareSubgroupId: plant.share_subgroup_id,
+          shareWith: plant.share_with ?? [],
+        }),
+      },
+    });
     const toggle = (task) => (task.completed_at ? uncompleteTask(task.id) : completeTask(task));
     // Verwijderen met ongedaan-maken (zelfde patroon als de taak-/uitgave-editor):
     // de plant verdwijnt meteen uit de lijst, de echte delete volgt pas als de toast
@@ -293,7 +307,7 @@ export default function PlantScreen() {
               "Taak toevoegen"-knop maakt een eigen verzorgingstaak voor deze plant. */}
           <Row justify="space-between" align="center" style={{ marginTop: 20, marginBottom: 8 }}>
             <Text style={type.label}>{t('plant.careTasks')}</Text>
-            <Pressable onPress={() => router.push(`/task/new?plant=${plant.id}`)} hitSlop={8} accessibilityRole="button"
+            <Pressable onPress={addCareTask} hitSlop={8} accessibilityRole="button"
               accessibilityLabel={t('plant.careTask.add')}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.6 : 1 })}>
               <Icon name="add" size={16} color={colors.forest} />
@@ -301,7 +315,15 @@ export default function PlantScreen() {
             </Pressable>
           </Row>
           {plantTasks.length === 0
-            ? <Text style={[type.caption]}>{t('plant.noTasks')}</Text>
+            ? (
+              // Lege-staat met handeling (PLA-10 D): geen dood tekstje maar een tik
+              // die meteen de verzorgingstaak-flow opent.
+              <Pressable onPress={addCareTask} accessibilityRole="button" accessibilityLabel={t('plant.careTask.add')}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingVertical: space.sm })}>
+                <Text style={type.caption}>{t('plant.noTasks')}</Text>
+                <Text style={[type.caption, { color: colors.forest, marginTop: 2 }]}>{t('plant.careTask.add')}</Text>
+              </Pressable>
+            )
             : plantTasks.map((task) => <TaskRow key={task.id} task={task} members={members} onToggle={toggle}
                 onPress={() => router.push(`/task/${task.id}`)} />)}
 

@@ -80,6 +80,8 @@ export const GROUPS = [
   { test: 'rotation', srcs: ['lib/rotation.js'] },
   // Globaal zoeken (PLT-3): rangschikken van RPC-hits + kind→route/module-mapping.
   { test: 'searchRank', srcs: ['lib/searchRank.js'] },
+  // Pure export-/deel-formatters (PLT-4): boodschappenlijst als tekst, saldo als CSV.
+  { test: 'export', srcs: ['lib/export.js'] },
   // Pure beslislogica van account-verwijdering (PLT-11): drie emmers + prioriteit.
   { test: 'accountDeletion', srcs: ['lib/accountDeletion.js'] },
   { test: 'timeline', srcs: ['lib/timeline.js'] },

@@ -306,7 +306,7 @@ function SplitModal({ visible, onClose, resource, reservations, members }) {
   return (
     <BottomSheet visible={visible} onClose={onClose} avoidKeyboard>
       <ModalHeader title={t('share.splitCost')} onClose={onClose} onConfirm={save} busy={busy}
-        confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
+        cancelLabel={t('common.cancelLong')} />
       <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
         {reservers.length === 0 ? (
           <Banner tone="info">{t('share.split.noReservers')}</Banner>

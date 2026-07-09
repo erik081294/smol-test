@@ -304,7 +304,7 @@ function PantryEditor({ editor, onClose, onAdd, onUpdate, onDelete, suggestFor, 
   return (
     <BottomSheet visible={!!editor} onClose={onClose} avoidKeyboard>
       <ModalHeader title={isNew ? t('pantry.add') : name} onClose={onClose} onConfirm={save} busy={busy}
-        confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')} />
+        cancelLabel={t('common.cancelLong')} />
       <SheetScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0 }} keyboardShouldPersistTaps="handled">
         <Field label={t('pantry.field.name')} value={name} onChangeText={setName}
           placeholder={t('pantry.field.name.placeholder')} autoFocus={isNew} />

@@ -251,7 +251,7 @@ function RecipeEditor() {
     <Editor
       title={isNew ? t('recipe.new') : t('recipe.edit')}
       onClose={() => router.back()} onConfirm={save} busy={busy}
-      confirmLabel={t('common.save')} cancelLabel={t('common.cancelLong')}
+      cancelLabel={t('common.cancelLong')}
       dirty={fieldsDirty || (isNew && (!!photoAsset || draft.length > 0))}
     >
           {/* Omslagfoto (MLT-3) */}
