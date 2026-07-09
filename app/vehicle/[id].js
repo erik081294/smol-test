@@ -304,7 +304,7 @@ export default function VehicleEditor() {
                     flexDirection: 'row', alignItems: 'center', gap: space.sm,
                     padding: space.sm, borderRadius: radius.md,
                     borderWidth: 1, borderColor: on ? colors.forest : colors.line,
-                    backgroundColor: on ? colors.forestSoft : colors.surface,
+                    backgroundColor: on ? colors.forestPressed : colors.surface,
                   }}>
                     <Checkbox checked={on} onPress={() => toggleMaintenance(tpl.key)}
                       accessibilityLabel={tpl.title} />

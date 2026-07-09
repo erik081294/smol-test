@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contrastRatio, pickReadable, AA_TEXT, AA_LARGE } from '../lib/contrast.js';
 import { lightColors, darkColors } from '../lib/palette.js';
+import { MODULES } from '../lib/modules.js';
 
 // De categorie-accenten die als actieve-chip-vulling kunnen dienen (dynamische tint).
 const CATEGORY_TOKENS = [
@@ -98,6 +99,25 @@ for (const [theme, c] of [['licht', lightColors], ['donker', darkColors]]) {
 
   test(`contrast (${theme}): toast-tekst op toast-bg haalt AA-tekst`, () => {
     atLeast(c.toastText, c.toastBg, AA_TEXT, `${theme} toast`);
+  });
+
+  test(`contrast (${theme}): module-tinten — glyph op het sterke vlak ≥3:1, tekst op het soft-vlak AA`, () => {
+    // De module-tint (DESIGN.md "Module-kleuren") draagt twee rollen:
+    //   • sterk  → icoonvlak/checkbox-rand. De glyph erop kiest op runtime zijn
+    //     voorgrond (pickReadable, net als Chip); dat moet altijd ≥3:1 halen.
+    //   • soft   → kaart-/tegelvlak. Daarop staat gewone tekst in ink/inkSoft (AA).
+    // De sterke tint is nooit zélf de tekstkleur — oker haalt dat niet (zie
+    // lib/widgets/colorSchemes.js `statOn`, dat terugvalt op ink).
+    for (const m of MODULES) {
+      if (!m.colorToken) continue;
+      const strong = c[m.colorToken];
+      const soft = c[m.colorSoftToken];
+      assert.ok(strong && soft, `${theme} ${m.key}: tint-tokens ontbreken in het palet`);
+      const fg = pickReadable(strong, c.onAccent, c.onDark);
+      atLeast(fg, strong, AA_LARGE, `${theme} glyph op mod.${m.key} (${strong})`);
+      atLeast(c.ink, soft, AA_TEXT, `${theme} ink op mod.${m.key}Soft (${soft})`);
+      atLeast(c.inkSoft, soft, AA_TEXT, `${theme} inkSoft op mod.${m.key}Soft (${soft})`);
+    }
   });
 
   test(`contrast (${theme}): kenteken-plaatje (donkere tekst op ocher) haalt AA-tekst`, () => {

@@ -9,7 +9,7 @@ import { useHousehold } from '../../lib/household';
 import { useAuth } from '../../lib/auth';
 import { computeBalances, balancesFromTotals, settle, formatCents } from '../../lib/expenses';
 import { Empty, Card, Chip, FAB, ScreenHeader, ItemRow, ModuleHelpButton, ModalHeader, Button, ListSkeleton, BottomSheet, SheetScrollView, Banner } from '../../lib/ui';
-import { colors, type, space } from '../../lib/theme';
+import { colors, type, space, font } from '../../lib/theme';
 import { t, plural, dateLocale } from '../../lib/i18n';
 
 export default function Kosten() {
@@ -46,7 +46,7 @@ export default function Kosten() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('expenses.title')} subtitle={t('expenses.subtitle')}
+      <ScreenHeader module="kosten" title={t('expenses.title')} subtitle={t('expenses.subtitle')}
         right={
           <ModuleHelpButton
             module="kosten"
@@ -70,11 +70,11 @@ export default function Kosten() {
       {/* Saldo-balk */}
       <View style={{ paddingHorizontal: space.lg }}>
         <Card style={{ backgroundColor: colors.forest }}>
-          <Text style={{ color: colors.onDark, fontSize: 18, fontWeight: '700' }}>{balanceText}</Text>
+          <Text style={{ color: colors.onDark, fontSize: 18, fontFamily: font.semi }}>{balanceText}</Text>
           {payments.length > 0 && (
             <Pressable onPress={() => setShowSettle((s) => !s)} style={{ marginTop: space.sm }}
               accessibilityRole="button" hitSlop={8}>
-              <Text style={{ color: colors.ocher, fontWeight: '700' }}>
+              <Text style={{ color: colors.ocher, fontFamily: font.semi }}>
                 {showSettle ? t('expenses.settle.hide', { n: payments.length }) : t('expenses.settle.show', { n: payments.length })}
               </Text>
             </Pressable>

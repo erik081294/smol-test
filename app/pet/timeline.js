@@ -35,7 +35,7 @@ function PetTimelineCard({ entry, onPress }) {
     >
       <View style={{
         width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
-        backgroundColor: isPhoto ? colors.surfaceAlt : colors.forestSoft,
+        backgroundColor: isPhoto ? colors.surfaceAlt : colors.forestPressed,
         alignItems: 'center', justifyContent: 'center',
       }}>
         {isPhoto

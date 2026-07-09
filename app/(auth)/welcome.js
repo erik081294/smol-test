@@ -7,7 +7,7 @@ import { isConfigured } from '../../lib/supabase';
 import { useDialog } from '../../lib/dialog';
 import { Button, Field } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
-import { colors, type } from '../../lib/theme';
+import { colors, type, font } from '../../lib/theme';
 import { t, authErrorMessage } from '../../lib/i18n';
 import { normalizeOtpCode, isValidOtpCode, resendRemainingSeconds, canResend } from '../../lib/otp';
 
@@ -27,7 +27,7 @@ function FormLink({ label, onPress, disabled }) {
         opacity: pressed ? 0.6 : disabled ? 0.5 : 1,
       })}
     >
-      <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{label}</Text>
+      <Text style={[type.caption, { color: colors.forest, fontFamily: font.semi }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -189,7 +189,7 @@ export default function Welcome() {
           {/* Merk */}
           <View style={{ marginBottom: 36 }}>
             <Icon name="home" size={52} color={colors.ocher} weight="fill" />
-            <Text style={{ fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: -1, marginTop: 8 }}>
+            <Text style={{ fontSize: 38, fontFamily: font.display, color: '#fff', letterSpacing: -1, marginTop: 8 }}>
               Huishoek
             </Text>
             <Text style={{ fontSize: 17, color: colors.ocherSoft, marginTop: 6, lineHeight: 24 }}>
@@ -272,7 +272,7 @@ export default function Welcome() {
               hitSlop={8}
               style={({ pressed }) => ({ minHeight: 48, marginTop: 8, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
             >
-              <Text style={{ color: colors.onDark, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline', textAlign: 'center' }}>
+              <Text style={{ color: colors.onDark, fontSize: 15, fontFamily: font.semi, textDecorationLine: 'underline', textAlign: 'center' }}>
                 {label}
               </Text>
             </Pressable>

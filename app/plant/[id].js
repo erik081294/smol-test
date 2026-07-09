@@ -18,7 +18,7 @@ import { Field, Button, Chip, ModalHeader, Row, Editor, BottomSheet, SheetScroll
 import { PhotoDetailSheet } from '../../lib/PhotoDetailSheet';
 import { Icon } from '../../lib/icons';
 import { TaskRow } from '../../lib/TaskRow';
-import { colors, radius, type, space } from '../../lib/theme';
+import { colors, radius, type, space, font } from '../../lib/theme';
 import { VISIBILITY } from '../../lib/constants';
 import { VisibilityPicker } from '../../lib/VisibilityPicker';
 import { visibilityRule } from '../../lib/visibility';
@@ -271,7 +271,7 @@ export default function PlantScreen() {
               accessibilityLabel={t('plant.edit')}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: space.sm, opacity: pressed ? 0.6 : 1 })}>
               <Icon name="settings" size={15} color={colors.forest} />
-              <Text style={[type.caption, { color: colors.forest, fontWeight: '700' }]}>{t('plant.edit')}</Text>
+              <Text style={[type.caption, { color: colors.forest, fontFamily: font.semi }]}>{t('plant.edit')}</Text>
             </Pressable>
           </View>
 
@@ -617,7 +617,7 @@ function TimelineEntry({ photo, first, last, nameOf, onPress }) {
           borderWidth: 1, borderColor: colors.line, padding: space.sm,
         }}>
           <View style={{ width: 56, height: 56, borderRadius: radius.sm, overflow: 'hidden',
-            backgroundColor: isNote ? colors.forestSoft : colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            backgroundColor: isNote ? colors.forestPressed : colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
             {isNote
               ? <Icon name="note" size={22} color={colors.onDark} />
               : url ? <Image source={{ uri: url }} style={{ width: 56, height: 56 }} resizeMode="cover" />

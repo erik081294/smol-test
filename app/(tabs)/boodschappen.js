@@ -15,7 +15,7 @@ import { parseQuantity, formatQuantity } from '../../lib/quantity';
 import { ProductImageView } from '../../lib/ProductImageView';
 import { Empty, Checkbox, ScreenHeader, SectionHeader, ItemRow, IconButton, ModuleHelpButton, ListSkeleton, Row, SwipeRow, Button, Stepper, Banner } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
-import { colors, radius, space, type, touchTarget } from '../../lib/theme';
+import { colors, radius, space, type, touchTarget, font } from '../../lib/theme';
 import { animateNextLayout } from '../../lib/motion';
 import * as haptics from '../../lib/haptics';
 import { t } from '../../lib/i18n';
@@ -229,7 +229,7 @@ export default function Boodschappen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('groceries.title')} subtitle={t('groceries.subtitle')}
+      <ScreenHeader module="boodschappen" title={t('groceries.title')} subtitle={t('groceries.subtitle')}
         right={<ModuleHelpButton module="boodschappen" />} />
 
       {/* Toevoegbalk — typen zoekt direct in de catalogus (dropdown hieronder). */}
@@ -395,7 +395,7 @@ export default function Boodschappen() {
                     accessibilityLabel={t('catalog.add', { name: item.name })}
                     style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, opacity: pressed ? 0.6 : 1 })}>
                     <ProductImageView item={item} size={34} />
-                    <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontWeight: '700' } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[type.body, cnt >= 1 ? { color: colors.forest, fontFamily: font.semi } : null, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
                   </Pressable>
                   <Stepper compact value={cnt} min={0} max={99} onChange={(v) => setCatalogCount(item, v)}
                     accessibilityLabel={t('catalog.qty.for', { name: item.name })} />
@@ -406,7 +406,7 @@ export default function Boodschappen() {
               <Pressable onPress={addCustom} accessibilityRole="button" accessibilityLabel={t('catalog.add', { name: q })}
                 style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm, opacity: pressed ? 0.6 : 1 })}>
                 <Icon name="add" size={18} color={colors.forest} weight="bold" />
-                <Text style={[type.body, { color: colors.forest, fontWeight: '700' }]}>{t('catalog.add', { name: q })}</Text>
+                <Text style={[type.body, { color: colors.forest, fontFamily: font.semi }]}>{t('catalog.add', { name: q })}</Text>
               </Pressable>
             ) : null}
             <Pressable onPress={() => { const term = q; dismissSearch(); router.push(`/catalog?q=${encodeURIComponent(term)}`); }}

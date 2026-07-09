@@ -71,7 +71,7 @@ export default function Planten() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('plants.title')} subtitle={t('plants.subtitle')}
+      <ScreenHeader module="planten" title={t('plants.title')} subtitle={t('plants.subtitle')}
         right={
           <ModuleHelpButton
             module="planten"

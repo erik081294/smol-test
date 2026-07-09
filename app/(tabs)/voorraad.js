@@ -165,7 +165,7 @@ export default function Voorraad() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('pantry.title')} subtitle={t('pantry.subtitle')}
+      <ScreenHeader module="voorraad" title={t('pantry.title')} subtitle={t('pantry.subtitle')}
         right={<ModuleHelpButton module="voorraad" />} />
 
       <Row gap={space.sm} style={{ paddingHorizontal: space.lg, marginBottom: space.sm }}>

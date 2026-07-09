@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { useFonts } from 'expo-font';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { FONT_ASSETS } from '../lib/fonts';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { HouseholdProvider, useHousehold } from '../lib/household';
 import { appRoute } from '../lib/appRoute';
@@ -30,7 +32,7 @@ function NotificationsMount() {
   return null;
 }
 
-function Gate({ themeMode }) {
+function Gate({ themeMode, fontsReady }) {
   const { session, loading: authLoading } = useAuth();
   const { households, loading: hhLoading, hasFetched } = useHousehold();
   const segments = useSegments();
@@ -91,7 +93,9 @@ function Gate({ themeMode }) {
   // Toon het wachtscherm zolang auth/huishoudens nog laden. Pas hierna beslist de
   // redirect-useEffect, zodat een nog-niet-geladen lege lijst nooit het onboarding-
   // scherm laat flitsen (UX-8). Een merkvast scherm i.p.v. een kale spinner.
-  if (route === 'loading') {
+  // Ook zolang de merk-letters nog niet klaar zijn: zo ziet niemand een flits van
+  // systeemfont naar Bricolage/Hanken. Auth en fonts laden parallel.
+  if (route === 'loading' || !fontsReady) {
     return <SplashWait />;
   }
 
@@ -130,6 +134,10 @@ export default function RootLayout() {
   // Past het licht/donker-palet toe en geeft de effectieve modus terug; die voedt de
   // root-remount-key (in Gate) en de statusbalk-stijl.
   const themeMode = useTheme();
+  // De merk-letters (lib/fonts.js). Bij een laadfout gaan we tóch door: dan valt de
+  // app terug op het systeemfont i.p.v. eeuwig op de splash te blijven hangen.
+  const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
+  const fontsReady = fontsLoaded || !!fontError;
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -142,7 +150,7 @@ export default function RootLayout() {
                 {/* Assistent app-breed (AI-10): één gespreksstate voor tab én
                     overlay-sheet; de sheet rendert boven elk scherm. */}
                 <AssistantProvider>
-                  <Gate themeMode={themeMode} />
+                  <Gate themeMode={themeMode} fontsReady={fontsReady} />
                   <AssistantSheet />
                 </AssistantProvider>
               </DialogProvider>

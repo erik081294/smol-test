@@ -68,7 +68,7 @@ export default function Huisdieren() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <ScreenHeader title={t('pets.title')} subtitle={t('pets.subtitle')}
+      <ScreenHeader module="huisdieren" title={t('pets.title')} subtitle={t('pets.subtitle')}
         right={
           <ModuleHelpButton
             module="huisdieren"

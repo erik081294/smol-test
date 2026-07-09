@@ -7,7 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { useDialog } from '../../lib/dialog';
 import { Button, Card } from '../../lib/ui';
 import { Icon } from '../../lib/icons';
-import { colors, type, space, radius } from '../../lib/theme';
+import { colors, type, space, radius, font } from '../../lib/theme';
 import { normalizeToken } from '../../lib/invites';
 import { STORE_LINKS } from '../../lib/constants';
 import { t } from '../../lib/i18n';
@@ -39,10 +39,10 @@ function StoreBadge({ label, onPress }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button"
       style={({ pressed }) => ({
-        flex: 1, backgroundColor: pressed ? colors.forestSoft : colors.forest,
+        flex: 1, backgroundColor: pressed ? colors.forestPressed : colors.forest,
         borderRadius: radius.md, paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center',
       })}>
-      <Text style={{ color: colors.onDark, fontWeight: '700', fontSize: 13, textAlign: 'center' }}>{label}</Text>
+      <Text style={{ color: colors.onDark, fontFamily: font.semi, fontSize: 13, textAlign: 'center' }}>{label}</Text>
     </Pressable>
   );
 }

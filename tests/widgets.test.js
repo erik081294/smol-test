@@ -81,17 +81,43 @@ test('toggleWidgetDetails: schakelt om en raakt alleen de juiste widget', () => 
 });
 
 // --- kleurschema's ---
+// De module-tint komt uit lib/modules.js (tokennaam) + het meegegeven palet (hex),
+// zodat licht/donker vanzelf meekantelt. Eén klein nep-palet volstaat.
+const PAL = {
+  modKosten: '#2B7CB0', modKostenSoft: '#D6E7F2',
+  modBoodschappen: '#D98A29', modBoodschappenSoft: '#F6E6CB',
+  forest: '#0E3A2F', surface: '#FFF', line: '#EEE', inkSoft: '#555',
+  ink: '#1C2420', onAccent: '#2A1B08', onDark: '#FBF7EF',
+};
+
 test('widgetScheme: playful vs neutral verschillen; accent per module', () => {
-  const playful = widgetScheme('kosten', 'playful', {});
-  const neutral = widgetScheme('kosten', 'neutral', { surface: '#FFF', line: '#EEE', inkSoft: '#555' });
-  assert.equal(playful.accent, accentFor('kosten'));
-  assert.equal(playful.icon, accentFor('kosten'));
+  const playful = widgetScheme('kosten', 'playful', PAL);
+  const neutral = widgetScheme('kosten', 'neutral', PAL);
+  assert.equal(playful.accent, accentFor('kosten', PAL));
+  assert.equal(playful.icon, accentFor('kosten', PAL));
+  assert.equal(playful.bg, PAL.modKostenSoft); // playful gebruikt het échte soft-token
   assert.equal(neutral.bg, '#FFF');
   assert.notEqual(playful.bg, neutral.bg);
 });
 
-test('accentFor: onbekende module → default-accent', () => {
-  assert.equal(accentFor('bestaat-niet'), accentFor('taken') === '#2E6B4F' ? '#2E6B4F' : accentFor('bestaat-niet'));
+test('accentFor: tint uit de registry; onbekende module → forest, en zonder palet → default', () => {
+  assert.equal(accentFor('kosten', PAL), '#2B7CB0');
+  assert.equal(accentFor('bestaat-niet', PAL), PAL.forest); // geen tint → merkgroen
+  assert.equal(accentFor('bestaat-niet', {}), '#2E6B4F');   // leeg palet → default-accent
+});
+
+test('widgetScheme: glyph op het sterke vlak is altijd leesbaar (oker krijgt donkere voorgrond)', () => {
+  // Wit op oker zakt naar ~2.65:1 — pickReadable moet dan de donkere kant kiezen.
+  assert.equal(widgetScheme('boodschappen', 'playful', PAL).onAccent, PAL.onAccent);
+  // Op het diepe kosten-blauw wint juist het lichte cream-wit.
+  assert.equal(widgetScheme('kosten', 'playful', PAL).onAccent, PAL.onDark);
+});
+
+test('widgetScheme: stat valt terug op ink zodra de moduletint niet leest (3:1)', () => {
+  // Kosten-blauw haalt ≥3:1 op zijn soft-vlak → stat houdt de moduletint.
+  assert.equal(widgetScheme('kosten', 'playful', PAL).stat, PAL.modKosten);
+  // Oker op oker-soft haalt ~2.25:1 → stat wordt ink.
+  assert.equal(widgetScheme('boodschappen', 'playful', PAL).stat, PAL.ink);
 });
 
 // --- samenvattingen ---
