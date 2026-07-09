@@ -7,6 +7,7 @@ import {
   MODULES, DATA_MODULES, TOGGLEABLE_MODULES, getModule,
   effectiveModules, availableModules, isModuleEnabled, MODULE_GROUPS,
 } from '../lib/modules.js';
+import { lightColors, darkColors } from '../lib/palette.js';
 
 const KINDS = new Set(['overview', 'data', 'admin']);
 
@@ -164,4 +165,51 @@ test('availableModules: toont kern + wat het huishouden niet heeft uitgezet', ()
   assert.ok(!keys.includes('boodschappen'));
   assert.ok(keys.includes('taken'));
   assert.ok(keys.includes('vandaag'));
+});
+
+// --- module-tinten (DESIGN.md "Module-kleuren") ---
+// De tokennaam is een contract tussen deze registry en lib/palette.js: hij voedt
+// zowel de widget-tegel (widgetScheme) als de scherm-kop (ScreenHeader `module`).
+// Pin de exacte namen vast — een typefout hier maakt de tint stil onzichtbaar
+// (de lookup valt dan terug op forest) zonder dat er iets faalt.
+const MODULE_TINTS = {
+  taken: ['modTaken', 'modTakenSoft'],
+  boodschappen: ['modBoodschappen', 'modBoodschappenSoft'],
+  planten: ['modPlanten', 'modPlantenSoft'],
+  kosten: ['modKosten', 'modKostenSoft'],
+  maaltijden: ['modMaaltijden', 'modMaaltijdenSoft'],
+  schoonmaak: ['modSchoonmaak', 'modSchoonmaakSoft'],
+  voorraad: ['modVoorraad', 'modVoorraadSoft'],
+  tijdlijn: ['modTijdlijn', 'modTijdlijnSoft'],
+  huisdieren: ['modHuisdieren', 'modHuisdierenSoft'],
+  voertuigen: ['modVoertuigen', 'modVoertuigenSoft'],
+};
+
+test('module-tinten: exact deze modules dragen een tint, met exact deze tokennamen', () => {
+  for (const [key, [colorToken, colorSoftToken]] of Object.entries(MODULE_TINTS)) {
+    const m = getModule(key);
+    assert.ok(m, `module ${key} bestaat niet`);
+    assert.equal(m.colorToken, colorToken, `${key}.colorToken`);
+    assert.equal(m.colorSoftToken, colorSoftToken, `${key}.colorSoftToken`);
+  }
+  // Geen enkele ándere module draagt een tint (Agenda deelt die van Taken; Klusjes
+  // is een taak-categorie, geen module).
+  assert.deepEqual(
+    MODULES.filter((m) => m.colorToken).map((m) => m.key).sort(),
+    Object.keys(MODULE_TINTS).sort(),
+  );
+  // Een module zónder sterke tint heeft ook geen soft-tint.
+  for (const m of MODULES) {
+    if (!m.colorToken) assert.equal(m.colorSoftToken, undefined, `${m.key} heeft wél een soft-tint`);
+  }
+});
+
+test('module-tinten: elk token bestaat als hex in béide paletten', () => {
+  for (const m of MODULES) {
+    if (!m.colorToken) continue;
+    for (const [naam, pal] of [['licht', lightColors], ['donker', darkColors]]) {
+      assert.match(pal[m.colorToken] ?? '', /^#[0-9A-Fa-f]{6}$/, `${naam}: ${m.colorToken}`);
+      assert.match(pal[m.colorSoftToken] ?? '', /^#[0-9A-Fa-f]{6}$/, `${naam}: ${m.colorSoftToken}`);
+    }
+  }
 });
