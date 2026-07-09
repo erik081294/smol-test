@@ -1840,3 +1840,20 @@ anonimisering (lid weg → gedeelde taak blijft met created_by NULL, huisgenoot 
 Twee bewust geaccepteerde trade-offs in de migratie gedocumenteerd (paid_by-attributie,
 vrije-tekst-behoud). Suite 1418 pass, typecheck + `eslint .` (tracked) schoon. Rest:
 device-rooktest van de flow.
+
+---
+
+**Plan-29 besluiten doorgevoerd: UXR-11 B, PLA-10 zorg (B+D), PLT-4 export (2026-07-09,
+branch `claude/plt11-accountverwijdering`).** Tweede + derde van de "build 1/2/3"-opdracht,
+op één branch met PLT-11. **UXR-11 B1/B2/B3:** `common.save`→'Bewaar' + de 5 ModalHeader-
+overrides geschrapt (app-breed "Bewaar"), splitsen-knop op het bon-detail naar de primaire
+forest-variant, Samen-toggle → "Reserveerbaar via Samen". **PLA-10 zorg-lijn deel B+D:** een
+verzorgingstaak vanaf een plant erft nu de plant-zichtbaarheid (pure `visibilityToParams`/
+`visibilityFromParams` in `lib/visibility.js`, via query-params → taak-editor; ratchet 90,5%),
+en de lege-staat op plant + huisdier is een tik-CTA i.p.v. dood tekstje. Deel A (pauzeren-staat)
++ C (per-plant care-overzicht-parity) bewust device-gated gelaten (vragen UX-iteratie + een
+plantCare-template-laag). **PLT-4:** pure `lib/export.js` (`groceriesAsText` deelbare lijst +
+`balancesAsCsv` NL-Excel-CSV met escaping; ratchet 90,0%) via `Share.share` als gelabelde
+drawer-actie op Boodschappen resp. Kosten (UX-42-contract). DoD: suite 1431 pass / 0 fail,
+typecheck + `eslint .` (tracked) schoon, ratchet groen over alle 5 gewijzigde groepen
+(visibility 90,5 · export 90,0 · navMeta 65→69,6 · i18n 88,7 · accountDeletion 97,2).
